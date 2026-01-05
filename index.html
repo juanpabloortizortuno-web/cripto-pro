@@ -1,0 +1,255 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<title>CDC FUTURO CRIPTO | Oportunidades Reales</title>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+
+<style>
+body{
+  margin:0;
+  font-family:Arial,Helvetica,sans-serif;
+  background:#0b0b0b;
+  color:#f0b90b;
+}
+header{
+  background:#121212;
+  padding:12px;
+  border-bottom:2px solid #f0b90b;
+  text-align:center;
+}
+header h1{
+  margin:5px 0;
+  font-size:18px;
+}
+header .links a{
+  margin:0 8px;
+  color:#f0b90b;
+  font-weight:700;
+  text-decoration:none;
+}
+.container{
+  display:flex;
+  height:calc(100vh - 90px);
+}
+.sidebar{
+  width:100%;
+  max-width:420px;
+  overflow-y:auto;
+  border-right:2px solid #f0b90b;
+}
+.main{
+  flex:1;
+  display:flex;
+  flex-direction:column;
+  padding:10px;
+}
+#details{
+  background:#121212;
+  padding:15px;
+  border-radius:14px;
+  border:1px solid #f0b90b;
+  margin-bottom:10px;
+  max-height:250px;
+  overflow-y:auto;
+}
+input{
+  width:95%;
+  margin:10px;
+  padding:10px;
+  border-radius:10px;
+  border:none;
+}
+table{
+  width:100%;
+  border-collapse:collapse;
+}
+th,td{
+  padding:8px;
+  text-align:center;
+  font-size:14px;
+  border-bottom:1px solid #333;
+}
+th{
+  background:#f0b90b;
+  color:#000;
+}
+tr:hover{background:#1f1f1f;cursor:pointer}
+button{
+  width:100%;
+  padding:14px;
+  border:none;
+  border-radius:14px;
+  font-size:16px;
+  font-weight:700;
+  cursor:pointer;
+  margin-bottom:10px;
+}
+#start{
+  background:linear-gradient(135deg,#f0b90b,#ff9800);
+  color:#000;
+}
+.binance-buttons button{
+  width:48%;
+  margin:2px;
+  font-size:14px;
+}
+.max-title{
+  background:#f0b90b;
+  color:#000;
+  font-weight:700;
+}
+.min-title{
+  background:#3b0000;
+  color:#ffb3b3;
+  font-weight:700;
+}
+.red{color:#ff5252}
+.green{color:#4caf50}
+footer{
+  margin-top:10px;
+  text-align:center;
+  font-size:14px;
+}
+footer a{
+  color:#f0b90b;
+  font-weight:700;
+  text-decoration:none;
+}
+@media(max-width:768px){
+  .container{flex-direction:column;}
+  .sidebar{max-width:none;border-right:none;border-bottom:2px solid #f0b90b;}
+}
+</style>
+</head>
+
+<body>
+
+<header>
+  <h1>🚀 CDC FUTURO CRIPTO</h1>
+  <div class="links">
+    🎵 <a href="https://www.tiktok.com/@chicodelascomputadoras" target="_blank">Síguenos en TikTok</a> |
+    📲 <a href="https://wa.me/59177068807" target="_blank">Comprar Licencia por WhatsApp</a>
+  </div>
+</header>
+
+<div class="container">
+
+  <div class="sidebar">
+    <input id="search" placeholder="🔍 Buscar moneda (BTCUSDT)">
+    <table>
+      <thead>
+        <tr>
+          <th>Moneda</th>
+          <th>% Máx</th>
+          <th>% Mín</th>
+          <th>Acción</th>
+        </tr>
+      </thead>
+      <tbody id="coinTable"></tbody>
+    </table>
+  </div>
+
+  <div class="main">
+    <div id="details">
+      <em>Selecciona una moneda para ver detalles</em>
+    </div>
+    <button id="start">▶ INICIAR MONITOREO AUTOMÁTICO</button>
+
+    <footer>
+      🔐 Para licencias premium comunícate al  
+      <a href="https://wa.me/59177068807" target="_blank">WhatsApp +591 77068807</a>
+    </footer>
+  </div>
+
+</div>
+
+<script>
+const API="https://api.binance.com/api/v3/ticker/24hr";
+const coinTable=document.getElementById("coinTable");
+const details=document.getElementById("details");
+const search=document.getElementById("search");
+
+// Abrir Binance web o app separado
+function openBinanceWeb(symbol){
+  window.open(`https://www.binance.com/es/futures/${symbol}`,"_blank");
+}
+function openBinanceApp(symbol){
+  window.open(`https://app.binance.com/futures/${symbol}`,"_blank");
+}
+
+function showDetails(c){
+  details.innerHTML=`
+    <h3>📊 ${c.symbol}</h3>
+    <p><b>Precio:</b> ${c.price}</p>
+    <p><b>Mín 24h:</b> ${c.low}</p>
+    <p><b>Máx 24h:</b> ${c.high}</p>
+    <p>📈 % Máximo: <b>${c.pctMax.toFixed(2)}%</b></p>
+    <p>📉 % Mínimo: <b>${c.pctMin.toFixed(2)}%</b></p>
+    <div class="binance-buttons">
+      <button onclick="openBinanceWeb('${c.symbol}')">🌐 Binance Web</button>
+      <button onclick="openBinanceApp('${c.symbol}')">📱 Binance App</button>
+    </div>
+  `;
+}
+
+function renderCoin(c){
+  const tr=document.createElement("tr");
+  tr.innerHTML=`
+    <td>${c.symbol}</td>
+    <td class="${c.pctMax>70?'red':'green'}">${c.pctMax.toFixed(1)}%</td>
+    <td class="${c.pctMin>70?'red':'green'}">${c.pctMin.toFixed(1)}%</td>
+    <td>${c.pctMax>70?'⚠️ Máx':'🚀 Rebote'}</td>
+  `;
+  tr.onclick=()=>showDetails(c);
+  coinTable.appendChild(tr);
+}
+
+async function load(){
+  const r=await fetch(API);
+  const d=await r.json();
+
+  let coins=d.filter(c=>c.symbol.endsWith("USDT"))
+    .map(c=>{
+      const low=+c.lowPrice, high=+c.highPrice, price=+c.lastPrice;
+      return{
+        symbol:c.symbol,
+        price,
+        low,
+        high,
+        pctMax:((high-price)/(high-low))*100,
+        pctMin:((price-low)/(high-low))*100
+      };
+    });
+
+  const q=search.value.toUpperCase();
+  if(q) coins=coins.filter(c=>c.symbol.includes(q));
+
+  coinTable.innerHTML="";
+
+  const max=coins.filter(c=>c.pctMax>=70).sort((a,b)=>b.pctMax-a.pctMax);
+  const min=coins.filter(c=>c.pctMin>=70).sort((a,b)=>b.pctMin-a.pctMin);
+
+  if(max.length){
+    const tr=document.createElement("tr");
+    tr.innerHTML=`<td colspan="4" class="max-title">🔥 CERCA DEL MÁXIMO</td>`;
+    coinTable.appendChild(tr);
+    max.forEach(renderCoin);
+  }
+
+  if(min.length){
+    const tr=document.createElement("tr");
+    tr.innerHTML=`<td colspan="4" class="min-title">🔴 CERCA DEL MÍNIMO</td>`;
+    coinTable.appendChild(tr);
+    min.forEach(renderCoin);
+  }
+}
+
+document.getElementById("start").onclick=()=>{
+  load();
+  setInterval(load,60000);
+};
+</script>
+
+</body>
+</html>
