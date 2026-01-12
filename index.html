@@ -139,7 +139,6 @@ footer a{
 
 <div class="container">
 
-
   <!-- MENU IZQUIERDA -->
   <div class="sidebar">
     <input id="search" placeholder="🔍 Buscar (USDT)">
@@ -164,14 +163,12 @@ footer a{
       <em>Selecciona una moneda o token para ver detalles</em>
     </div>
 
-    <!-- Botón adaptativo Binance App / Web -->
-    <button id="btnOpenBinance" class="btn-binance-app">
-      📱 Abrir Binance
-    </button>
-
-    <p style="text-align:center;font-size:13px;color:var(--text-muted);margin-top:-4px;" id="mobileMessage">
-      *Si usas móvil, puedes abrir en la app si está instalada.
-    </p>
+    <!-- Botones Binance -->
+    <div id="binanceButtons" style="text-align:center;margin-top:12px;">
+      <button id="btnBinanceWeb" class="btn-binance-app">🌐 Abrir Binance Web</button>
+      <button id="btnBinanceIOS" class="btn-binance-app" style="background:#0A84FF;">🍏 Abrir Binance iOS</button>
+      <button id="btnBinanceAndroid" class="btn-binance-app" style="background:#3DDC84;">🤖 Abrir Binance Android</button>
+    </div>
 
     <input id="premiumCode" placeholder="🔐 Ingresa código PREMIUM">
     <button onclick="activatePremium();">Activar Licencia</button>
@@ -192,26 +189,11 @@ function isMobileDevice() {
   return /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
 }
 
-const openBtn = document.getElementById("btnOpenBinance");
-const mobileMsg = document.getElementById("mobileMessage");
+const openBtnWeb = document.getElementById("btnBinanceWeb");
+const openBtnIOS = document.getElementById("btnBinanceIOS");
+const openBtnAndroid = document.getElementById("btnBinanceAndroid");
 
-if(isMobileDevice()){
-  openBtn.innerText = "📱 Abrir en Binance App / Web";
-  mobileMsg.style.display = "block";
-} else {
-  openBtn.innerText = "🌐 Abrir en Binance Web";
-  mobileMsg.style.display = "none";
-}
-
-function openBinanceApp(symbol){
-  if(!symbol) return;
-  const url = `https://www.binance.com/es/futures/${symbol}?type=perpetual`;
-  window.open(url,"_blank");
-}
-
-openBtn.onclick = ()=>{
-  if(currentSymbol!="") openBinanceApp(currentSymbol);
-}
+let currentSymbol = "";
 
 // ================== Licencia y clics ==================
 
@@ -250,7 +232,6 @@ const API_24H       = "https://api.binance.com/api/v3/ticker/24hr";
 const FUNDING_API   = "https://fapi.binance.com/fapi/v1/premiumIndex";
 
 let futuresSymbols = new Set();
-let currentSymbol = "";
 
 async function loadFuturesList(){
   const r = await fetch(FUTURES_INFO);
@@ -268,6 +249,27 @@ async function getFunding(symbol){
   return (+j.lastFundingRate*100).toFixed(4);
 }
 
+// ================== Abrir Binance ==================
+
+function openBinanceWeb(symbol){
+  if(!symbol) return;
+  window.open(`https://www.binance.com/es/futures/${symbol}?type=perpetual`, "_blank");
+}
+function openBinanceIOS(symbol){
+  if(!symbol) return;
+  window.open(`https://apps.apple.com/app/id1436799971`, "_blank");
+}
+function openBinanceAndroid(symbol){
+  if(!symbol) return;
+  window.open(`https://play.google.com/store/apps/details?id=com.binance.dev`, "_blank");
+}
+
+openBtnWeb.onclick = ()=>openBinanceWeb(currentSymbol);
+openBtnIOS.onclick = ()=>openBinanceIOS(currentSymbol);
+openBtnAndroid.onclick = ()=>openBinanceAndroid(currentSymbol);
+
+// ================== Mostrar detalles ==================
+
 async function showFutureDetails(c){
   if(!canShowDetails()){ showBlockedMessage(); return; }
   clickCount++;
@@ -276,11 +278,15 @@ async function showFutureDetails(c){
   currentSymbol = c.symbol;
 
   const funding = await getFunding(c.symbol);
+
   document.getElementById("details").innerHTML = `
     <h3>${c.symbol}</h3>
-    <p>Precio: <span class="${c.distMax<20?'green':'red'}">${c.price}</span></p>
-    <p>Mín 24h: ${c.low} / Máx 24h: ${c.high}</p>
-    <p><b>Cercanía al Máx:</b> ${c.distMax.toFixed(2)}%</p>
+    <p>Precio Actual: <span class="green">${c.price}</span></p>
+    <p>Mínimo 24h: <span class="red">${c.low}</span></p>
+    <p>Máximo 24h: <span class="green">${c.high}</span></p>
+    <p><b>Distancia al Máx:</b> ${c.distMax.toFixed(2)}%</p>
+    <p><b>Distancia al Mín:</b> ${((c.price - c.low)/(c.high - c.low)*100).toFixed(2)}%</p>
+    <p><b>Cambio % 24h aprox:</b> ${((c.price - c.low)/c.low*100).toFixed(2)}%</p>
     <p><b>Funding Rate:</b> ${funding}%</p>
   `;
 }
@@ -317,6 +323,8 @@ function renderSpotRow(c){
   tr.onclick=()=>showSpotDetails(c);
   return tr;
 }
+
+// ================== Cargar datos ==================
 
 async function load(){
   await loadFuturesList();
