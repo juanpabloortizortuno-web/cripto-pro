@@ -5,12 +5,6 @@
 <title>CDC FUTURO CRIPTO | Dashboard PRO</title>
 <meta name="viewport" content="width=device-width, initial-scale=1">
 
-<link rel="manifest" href="manifest.json">
-<meta name="theme-color" content="#f0b90b">
-<meta name="apple-mobile-web-app-capable" content="yes">
-<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-<meta name="apple-mobile-web-app-title" content="Cripto PRO">
-
 <style>
 :root {
   --bg-main: #121212;
@@ -23,196 +17,109 @@
   --text-muted: #8a8e94;
 }
 
-body {
-  margin: 0;
-  font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+body{
+  margin:0;
+  font-family:Arial, sans-serif;
   background: var(--bg-main);
   color: var(--text-light);
-  overflow-x: hidden;
 }
-
-header {
+header{
   background: var(--bg-card);
-  padding: 12px;
-  border-bottom: 2px solid var(--accent-yellow);
-  display: flex;
-  justify-content: center;
-  align-items: center;
-  position: sticky;
-  top: 0;
-  z-index: 1000;
+  padding:12px;
+  border-bottom:2px solid var(--accent-yellow);
+  text-align:center;
 }
-
-header h1 {
-  margin: 0;
+header h1{
+  margin:0;
   color: var(--accent-yellow);
-  font-size: 20px;
+  font-size:22px;
 }
-
-.menu-btn {
-  position: absolute;
-  left: 12px;
-  background: var(--accent-yellow);
-  border: none;
-  border-radius: 6px;
-  width: 35px;
-  height: 35px;
-  font-size: 18px;
-  cursor: pointer;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  font-weight: bold;
-}
-
-#statusBar {
-  text-align: center;
-  padding: 8px;
-  background: #252531;
-  border-bottom: 2px solid var(--accent-blue);
-  font-weight: bold;
-  font-size: 14px;
-}
-
-.container {
-  display: flex;
-  height: calc(100vh - 110px);
-  position: relative;
-}
-
-/* SIDEBAR */
-.sidebar {
-  width: 350px;
+#statusBar{
+  text-align:center;
+  padding:10px;
   background: var(--bg-card);
-  border-right: 2px solid var(--accent-yellow);
-  display: flex;
-  flex-direction: column;
-  transition: transform 0.3s ease-in-out;
-  z-index: 900;
+  border-bottom:2px solid var(--accent-blue);
+  font-weight:bold;
 }
-
-.table-container {
-  overflow-y: auto;
-  flex: 1;
+.container{
+  display:flex;
+  height:calc(100vh - 120px);
 }
-
-/* MAIN CONTENT */
-.main {
-  flex: 1;
-  padding: 15px;
-  overflow-y: auto;
-  display: flex;
-  flex-direction: column;
+.sidebar{
+  width:100%;
+  max-width:380px;
+  background: var(--bg-card);
+  overflow-y:auto;
+  border-right:2px solid var(--accent-yellow);
+  padding-top:10px;
 }
-
-input {
-  width: calc(100% - 24px);
-  margin: 10px 12px;
-  padding: 10px;
-  border-radius: 8px;
-  border: none;
-  background: #2c2c3a;
-  color: var(--text-light);
+.main{
+  flex:1;
+  padding:12px;
+  overflow-y:auto;
 }
-
-table {
-  width: 100%;
-  border-collapse: collapse;
+input{
+  width:90%;
+  margin:10px;
+  padding:8px;
+  border-radius:8px;
+  border:none;
+  background:#2c2c3a;
+  color:var(--text-light);
 }
-
-th {
-  position: sticky;
-  top: 0;
+table{
+  width:100%;
+  border-collapse:collapse;
+}
+th,td{
+  padding:8px;
+  text-align:center;
+  border-bottom:1px solid #333;
+}
+th{
   background: var(--accent-yellow);
-  color: #000;
-  padding: 10px;
-  font-size: 13px;
-  z-index: 10;
+  color:#000;
 }
-
-td {
-  padding: 10px;
-  text-align: center;
-  border-bottom: 1px solid #333;
-  font-size: 14px;
+tr:hover{
+  background:#2c2c3a;
+  cursor:pointer;
 }
-
-tr:hover {
-  background: #2c2c3a;
-  cursor: pointer;
+button{
+  width:calc(100% - 24px);
+  margin:8px 12px;
+  padding:10px;
+  border:none;
+  border-radius:8px;
+  background: var(--accent-yellow);
+  font-size:15px;
+  font-weight:bold;
+  cursor:pointer;
+  color:#000;
 }
-
-/* BOTONES */
-.btn-action {
-  width: calc(100% - 24px);
-  margin: 8px 12px;
-  padding: 12px;
-  border: none;
-  border-radius: 8px;
-  font-weight: bold;
-  cursor: pointer;
-  font-size: 14px;
-  text-decoration: none;
-  display: block;
-  text-align: center;
-  box-sizing: border-box;
+button:hover{
+  filter:brightness(1.1);
 }
-
-.btn-binance-app {
+.btn-binance-app{
   background: var(--accent-blue);
-  color: #fff;
+  color:#fff;
 }
-
-.btn-premium {
-  background: var(--accent-yellow);
-  color: #000;
+footer{
+  text-align:center;
+  margin-top:12px;
+  font-size:14px;
 }
-
-#details {
-  background: #252531;
-  padding: 15px;
-  border-radius: 10px;
-  margin-bottom: 15px;
-  border-left: 4px solid var(--accent-yellow);
-  min-height: 80px;
+footer a{
+  color:var(--accent-yellow);
+  text-decoration:none;
+  font-weight:bold;
 }
-
-.section-title {
-  padding: 10px 12px;
-  font-size: 15px;
-  color: var(--accent-blue);
-  font-weight: bold;
-  background: #1a1a24;
-}
-
-footer {
-  text-align: center;
-  padding: 15px;
-  font-size: 13px;
-  margin-top: auto;
-}
-
-footer a { color: var(--accent-yellow); text-decoration: none; }
-
-.green { color: var(--accent-green); font-weight: bold; }
-.red { color: var(--accent-red); font-weight: bold; }
-
-/* RESPONSIVE */
-@media (max-width: 768px) {
-  .sidebar {
-    position: absolute;
-    left: 0;
-    top: 0;
-    height: 100%;
-    width: 85%;
-    box-shadow: 5px 0 15px rgba(0,0,0,0.5);
-  }
-  .sidebar.hidden {
-    transform: translateX(-100%);
-  }
-  .main {
-    width: 100%;
-  }
+.green{color:var(--accent-green);font-weight:bold;}
+.red{color:var(--accent-red);font-weight:bold;}
+.section-title{
+  padding:8px 12px;
+  font-size:16px;
+  color:var(--accent-blue);
+  font-weight:bold;
 }
 </style>
 </head>
@@ -220,233 +127,228 @@ footer a { color: var(--accent-yellow); text-decoration: none; }
 <body>
 
 <header>
-  <button class="menu-btn" id="menuToggle">⬅</button>
   <h1>🚀 CDC FUTURO CRIPTO</h1>
+  <p style="font-size:14px;color:var(--text-muted);margin-top:4px; text-align:center;">
+    <a href="https://www.tiktok.com/@chicodelascomputadoras" target="_blank" style="text-decoration:none; color:var(--accent-blue); font-weight:bold;">
+      Síguenos en TikTok: @chicodelascomputadoras
+    </a>
+  </p>
 </header>
 
-<div id="statusBar">Conectando con Binance...</div>
+<div id="statusBar"></div>
 
 <div class="container">
 
-  <div class="sidebar" id="sidebar">
-    <input id="search" placeholder="🔍 Buscar moneda (ej: BTC)">
-    
-    <div class="table-container">
-      <div class="section-title">📈 FUTURES DISPONIBLES</div>
-      <table>
-        <thead><tr><th>Moneda</th><th>% Máx</th><th>Señal</th></tr></thead>
-        <tbody id="futuresTable"></tbody>
-      </table>
 
-      <div class="section-title">✨ TOKENS SPOT</div>
-      <table>
-        <thead><tr><th>Token</th><th>Precio</th></tr></thead>
-        <tbody id="spotTable"></tbody>
-      </table>
-    </div>
-    
-    <div style="padding: 10px; text-align: center;">
-        <a href="https://www.tiktok.com/@chicodelascomputadoras" target="_blank" style="text-decoration:none; color:var(--text-muted); font-size:12px;">
-           TikTok: @chicodelascomputadoras
-        </a>
-    </div>
+  <!-- MENU IZQUIERDA -->
+  <div class="sidebar">
+    <input id="search" placeholder="🔍 Buscar (USDT)">
+
+    <div class="section-title">📈 FUTURES DISPONIBLES</div>
+    <table>
+      <thead><tr><th>Moneda</th><th>% Máx</th><th>Señal</th></tr></thead>
+      <tbody id="futuresTable"></tbody>
+    </table>
+
+    <div class="section-title">✨ TOKENS SPOT INTERESANTES</div>
+    <table>
+      <thead><tr><th>Token</th><th>Precio</th></tr></thead>
+      <tbody id="spotTable"></tbody>
+    </table>
   </div>
 
-  <div class="main" id="mainContent">
+  <!-- DETALLES A LA DERECHA -->
+  <div class="main">
 
     <div id="details">
-      <p style="text-align:center;"><em>Selecciona una moneda para ver el análisis</em></p>
+      <em>Selecciona una moneda o token para ver detalles</em>
     </div>
 
-    <a id="btnOpenBinance" class="btn-action btn-binance-app" href="javascript:void(0)">
-      🌐 Abrir en Binance
-    </a>
+    <!-- Botón adaptativo Binance App / Web -->
+    <button id="btnOpenBinance" class="btn-binance-app">
+      📱 Abrir Binance
+    </button>
 
-    <p style="text-align:center;font-size:12px;color:var(--text-muted);margin-top:5px;">
-      *Se intentará abrir la App directamente.
+    <p style="text-align:center;font-size:13px;color:var(--text-muted);margin-top:-4px;" id="mobileMessage">
+      *Si usas móvil, puedes abrir en la app si está instalada.
     </p>
 
-    <div style="margin-top: 20px; border-top: 1px solid #333; padding-top: 20px;">
-        <input id="premiumCode" placeholder="🔐 Ingresa código PREMIUM">
-        <button class="btn-action btn-premium" onclick="activatePremium();">Activar Licencia</button>
-    </div>
+    <input id="premiumCode" placeholder="🔐 Ingresa código PREMIUM">
+    <button onclick="activatePremium();">Activar Licencia</button>
 
     <footer>
-      ¿Sin licencia? <a href="https://wa.me/59177068807" target="_blank">📲 WhatsApp +591 77068807</a>
+      ¿Aún no tienes licencia?  
+      <a href="https://wa.me/59177068807" target="_blank">📲 WhatsApp +591 77068807</a>
     </footer>
 
   </div>
+
 </div>
 
 <script>
-// --- CONFIGURACIÓN ---
-const menuBtn = document.getElementById("menuToggle");
-const sidebar = document.getElementById("sidebar");
+// ================== Detectar dispositivo ==================
+
+function isMobileDevice() {
+  return /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
+}
+
 const openBtn = document.getElementById("btnOpenBinance");
-let currentSymbol = "";
+const mobileMsg = document.getElementById("mobileMessage");
+
+if(isMobileDevice()){
+  openBtn.innerText = "📱 Abrir en Binance App / Web";
+  mobileMsg.style.display = "block";
+} else {
+  openBtn.innerText = "🌐 Abrir en Binance Web";
+  mobileMsg.style.display = "none";
+}
+
+function openBinanceApp(symbol){
+  if(!symbol) return;
+  const url = `https://www.binance.com/es/futures/${symbol}?type=perpetual`;
+  window.open(url,"_blank");
+}
+
+openBtn.onclick = ()=>{
+  if(currentSymbol!="") openBinanceApp(currentSymbol);
+}
+
+// ================== Licencia y clics ==================
+
 let clickCount = parseInt(localStorage.getItem("clickCount")) || 0;
 
-// --- DETECTAR MÓVIL ---
-const isMobile = () => /Android|iPhone|iPad|iPod/i.test(navigator.userAgent);
-
-// --- TOGGLE SIDEBAR ---
-menuBtn.onclick = () => {
-  sidebar.classList.toggle("hidden");
-  menuBtn.innerText = sidebar.classList.contains("hidden") ? "➡" : "⬅";
-};
-
-// --- ACTUALIZAR ENLACE DE BINANCE ---
-function updateBinanceLink(symbol) {
-  if (!symbol) return;
-  const formattedSymbol = symbol.toUpperCase();
-  const appUrl = `binance://futures/${formattedSymbol}`;
-  const webUrl = `https://www.binance.com/es/futures/${formattedSymbol}`;
-
-  if (isMobile()) {
-    openBtn.href = appUrl;
-    // Si la app no abre en 1.5s, redirige a la web en la misma pestaña
-    openBtn.onclick = () => {
-      setTimeout(() => {
-        window.location.href = webUrl;
-      }, 1500);
-    };
-  } else {
-    openBtn.href = webUrl;
-    openBtn.target = "_blank";
-    openBtn.onclick = null;
-  }
+function saveClickCount(){ localStorage.setItem("clickCount", clickCount); }
+function hasPremium(){ return localStorage.getItem("premiumActive")==="1"; }
+function updateStatus(){
+  document.getElementById("statusBar").innerText = hasPremium()
+    ? "✅ Licencia Premium activa"
+    : `✳️ Clics en monedas: ${clickCount} / 10 (sin licencia)`;
 }
 
-// --- LÓGICA PREMIUM ---
-function hasPremium() { return localStorage.getItem("premiumActive") === "1"; }
+function canShowDetails(){ return hasPremium() || clickCount < 10; }
 
-function updateStatus() {
-  const status = document.getElementById("statusBar");
-  if (hasPremium()) {
-    status.innerText = "✅ LICENCIA PREMIUM ACTIVA";
-    status.style.color = "var(--accent-green)";
-  } else {
-    status.innerText = `✳️ Clics gratuitos: ${clickCount} / 10`;
-  }
-}
-
-function activatePremium() {
-  const code = document.getElementById("premiumCode").value.trim();
-  if (code.length >= 4) {
-    localStorage.setItem("premiumActive", "1");
-    alert("✔️ ¡Licencia activada con éxito!");
-    updateStatus();
-    location.reload();
-  } else {
-    alert("Código inválido");
-  }
-}
-
-// --- MOSTRAR DETALLES ---
-async function getFunding(symbol) {
-  try {
-    const r = await fetch(`https://fapi.binance.com/fapi/v1/premiumIndex?symbol=${symbol}`);
-    const j = await r.json();
-    return (parseFloat(j.lastFundingRate) * 100).toFixed(4);
-  } catch(e) { return "0.0000"; }
-}
-
-async function showDetails(c, isSpot = false) {
-  if (!hasPremium() && clickCount >= 10) {
-    document.getElementById("details").innerHTML = `<p class="red">⚠️ Límite gratuito alcanzado. Contacta a soporte para activar.</p>`;
-    return;
-  }
-  
-  if (!hasPremium()) {
-    clickCount++;
-    localStorage.setItem("clickCount", clickCount);
-    updateStatus();
-  }
-
-  currentSymbol = c.symbol;
-  updateBinanceLink(currentSymbol);
-  
-  const funding = isSpot ? "N/A" : await getFunding(c.symbol);
-
+function showBlockedMessage(){
   document.getElementById("details").innerHTML = `
-    <h2 style="margin:0; color:var(--accent-yellow);">${c.symbol}</h2>
-    <div style="display:grid; grid-template-columns: 1fr 1fr; gap:10px; margin-top:10px;">
-      <div><small>Precio:</small><br><strong>${c.price}</strong></div>
-      <div><small>Funding:</small><br><strong style="color:var(--accent-blue)">${funding}%</strong></div>
-      <div><small>Rango 24h:</small><br><span style="font-size:11px;">${c.low || '-'} / ${c.high || '-'}</span></div>
-      <div><small>Cercanía Máx:</small><br><strong class="${c.distMax < 20 ? 'green':'red'}">${c.distMax ? c.distMax.toFixed(2)+'%' : 'Spot'}</strong></div>
-    </div>
-  `;
-  
-  // En móviles cerramos el menú al elegir moneda para ver el detalle
-  if (window.innerWidth < 768) {
-    sidebar.classList.add("hidden");
-    menuBtn.innerText = "➡";
-  }
+    <p class="red" style="font-weight:bold;">
+      ⚠️ Has alcanzado el límite de 10 clics gratuitos.<br>
+      Activa la licencia para acceder a más detalles.
+    </p>`;
 }
 
-// --- CARGA DE DATOS DESDE BINANCE ---
-const FUTURES_INFO = "https://fapi.binance.com/fapi/v1/exchangeInfo";
-const API_24H = "https://api.binance.com/api/v3/ticker/24hr";
+function activatePremium(){
+  const code = document.getElementById("premiumCode").value.trim();
+  if(code.length<3){ alert("Ingresa un código válido."); return; }
+  localStorage.setItem("premiumActive","1");
+  alert("✔️ Licencia activada por 1 año!");
+  updateStatus();
+}
+
+// ================== Datos Binance ==================
+
+const FUTURES_INFO  = "https://fapi.binance.com/fapi/v1/exchangeInfo";
+const API_24H       = "https://api.binance.com/api/v3/ticker/24hr";
+const FUNDING_API   = "https://fapi.binance.com/fapi/v1/premiumIndex";
+
 let futuresSymbols = new Set();
+let currentSymbol = "";
 
-async function init() {
-  try {
-    const r = await fetch(FUTURES_INFO);
-    const j = await r.json();
-    j.symbols.forEach(s => {
-      if(s.quoteAsset === "USDT" && s.status === "TRADING") futuresSymbols.add(s.symbol);
-    });
-    loadData();
-    updateStatus();
-  } catch(e) { 
-    document.getElementById("statusBar").innerText = "❌ Error de conexión";
-  }
+async function loadFuturesList(){
+  const r = await fetch(FUTURES_INFO);
+  const j = await r.json();
+  j.symbols.forEach(s=>{
+    if(s.contractType==="PERPETUAL" && s.quoteAsset==="USDT" && s.status==="TRADING"){
+      futuresSymbols.add(s.symbol);
+    }
+  });
 }
 
-async function loadData() {
-  try {
-    const r = await fetch(API_24H);
-    const data = await r.json();
-    const q = document.getElementById("search").value.toUpperCase();
-
-    // FUTUROS
-    const fTable = document.getElementById("futuresTable");
-    fTable.innerHTML = "";
-    data.filter(c => futuresSymbols.has(c.symbol))
-      .map(c => {
-        const low = +c.lowPrice, high = +c.highPrice, price = +c.lastPrice;
-        let dist = ((price - low) / (high - low)) * 100;
-        return { symbol: c.symbol, price, low, high, distMax: dist };
-      })
-      .filter(c => c.price > 0 && (!q || c.symbol.includes(q)))
-      .sort((a,b) => b.distMax - a.distMax)
-      .forEach(c => {
-        const tr = document.createElement("tr");
-        const signal = c.distMax < 20 ? "🟢 LONG" : (c.distMax > 80 ? "🔴 SHORT" : "⏳ WAIT");
-        tr.innerHTML = `<td>${c.symbol}</td><td>${c.distMax.toFixed(1)}%</td><td class="${c.distMax<20?'green':'red'}">${signal}</td>`;
-        tr.onclick = () => showDetails(c);
-        fTable.appendChild(tr);
-      });
-
-    // SPOT
-    const sTable = document.getElementById("spotTable");
-    sTable.innerHTML = "";
-    data.filter(c => c.symbol.endsWith("USDT") && !futuresSymbols.has(c.symbol))
-      .filter(c => !q || c.symbol.includes(q))
-      .slice(0, 15)
-      .forEach(c => {
-        const tr = document.createElement("tr");
-        tr.innerHTML = `<td>${c.symbol}</td><td>${parseFloat(c.lastPrice).toFixed(4)}</td>`;
-        tr.onclick = () => showDetails({symbol: c.symbol, price: c.lastPrice}, true);
-        sTable.appendChild(tr);
-      });
-  } catch(e) { console.error("Error en update", e); }
+async function getFunding(symbol){
+  const r = await fetch(`${FUNDING_API}?symbol=${symbol}`);
+  const j = await r.json();
+  return (+j.lastFundingRate*100).toFixed(4);
 }
 
-document.getElementById("search").oninput = loadData;
-init();
-setInterval(loadData, 10000); // Actualiza cada 10 segundos
+async function showFutureDetails(c){
+  if(!canShowDetails()){ showBlockedMessage(); return; }
+  clickCount++;
+  saveClickCount();
+  updateStatus();
+  currentSymbol = c.symbol;
+
+  const funding = await getFunding(c.symbol);
+  document.getElementById("details").innerHTML = `
+    <h3>${c.symbol}</h3>
+    <p>Precio: <span class="${c.distMax<20?'green':'red'}">${c.price}</span></p>
+    <p>Mín 24h: ${c.low} / Máx 24h: ${c.high}</p>
+    <p><b>Cercanía al Máx:</b> ${c.distMax.toFixed(2)}%</p>
+    <p><b>Funding Rate:</b> ${funding}%</p>
+  `;
+}
+
+function renderFutureRow(c){
+  const tr=document.createElement("tr");
+  let signal="⏳";
+  if(c.distMax<20) signal="🟢 LONG (Comprar)";
+  else if(c.distMax>80) signal="🔴 SHORT (Vender)";
+  tr.innerHTML=`
+    <td>${c.symbol}</td>
+    <td>${c.distMax.toFixed(1)}%</td>
+    <td class="${c.distMax<20?'green':'red'}">${signal}</td>
+  `;
+  tr.onclick=()=>showFutureDetails(c);
+  return tr;
+}
+
+async function showSpotDetails(c){
+  if(!canShowDetails()){ showBlockedMessage(); return; }
+  clickCount++;
+  saveClickCount();
+  updateStatus();
+  currentSymbol = c.symbol;
+  document.getElementById("details").innerHTML = `
+    <h3>${c.symbol} (SPOT)</h3>
+    <p>Precio Spot: <span class="green">${c.price}</span></p>
+  `;
+}
+
+function renderSpotRow(c){
+  const tr=document.createElement("tr");
+  tr.innerHTML=`<td>${c.symbol}</td><td>${c.price}</td>`;
+  tr.onclick=()=>showSpotDetails(c);
+  return tr;
+}
+
+async function load(){
+  await loadFuturesList();
+  updateStatus();
+  const r=await fetch(API_24H);
+  const data=await r.json();
+  const q=document.getElementById("search").value.toUpperCase();
+
+  let futuresList=data.filter(c=>futuresSymbols.has(c.symbol))
+    .map(c=>{
+      const low=+c.lowPrice, high=+c.highPrice, price=+c.lastPrice;
+      return {symbol:c.symbol, price, low, high, distMax:((price-low)/(high-low))*100};
+    })
+    .filter(c=>c.price>=0.10 && c.price<=50);
+  if(q) futuresList=futuresList.filter(c=>c.symbol.includes(q));
+  futuresList.sort((a,b)=>b.distMax-a.distMax);
+
+  const ft=document.getElementById("futuresTable");
+  ft.innerHTML="";
+  futuresList.forEach(c=>ft.appendChild(renderFutureRow(c)));
+
+  let spotList=data.filter(c=>c.symbol.endsWith("USDT"))
+    .map(c=>({symbol:c.symbol, price:+c.lastPrice}))
+    .filter(c=>c.price>=0.10 && c.price<=50);
+  if(q) spotList=spotList.filter(c=>c.symbol.includes(q));
+  const st=document.getElementById("spotTable");
+  st.innerHTML="";
+  spotList.forEach(c=>st.appendChild(renderSpotRow(c)));
+}
+
+document.getElementById("search").oninput=load;
+load();
 </script>
 
 </body>
