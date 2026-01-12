@@ -26,7 +26,7 @@ body { margin: 0; font-family: 'Segoe UI', sans-serif; background: var(--bg-main
 }
 
 header { background: var(--bg-card); padding: 15px; border-bottom: 2px solid var(--accent-yellow); display: flex; justify-content: center; position: relative; }
-header h1 { margin: 0; color: var(--accent-yellow); font-size: 18px; text-transform: uppercase; letter-spacing: 1px; }
+header h1 { margin: 0; color: var(--accent-yellow); font-size: 18px; text-transform: uppercase; }
 
 .menu-btn { position: absolute; left: 12px; background: var(--accent-yellow); border: none; border-radius: 6px; width: 38px; height: 38px; font-size: 20px; cursor: pointer; font-weight: bold; }
 
@@ -35,7 +35,7 @@ header h1 { margin: 0; color: var(--accent-yellow); font-size: 18px; text-transf
 .container { display: flex; height: calc(100vh - 110px); position: relative; }
 
 /* SIDEBAR */
-.sidebar { width: 320px; background: var(--bg-card); border-right: 2px solid var(--accent-yellow); display: flex; flex-direction: column; transition: 0.3s; z-index: 900; }
+.sidebar { width: 310px; background: var(--bg-card); border-right: 2px solid var(--accent-yellow); display: flex; flex-direction: column; transition: 0.3s; z-index: 900; }
 .sidebar.hidden { transform: translateX(-100%); position: absolute; }
 .table-container { overflow-y: auto; flex: 1; }
 
@@ -48,22 +48,20 @@ table { width: 100%; border-collapse: collapse; }
 th { position: sticky; top: 0; background: var(--accent-yellow); color: #000; padding: 10px; font-size: 11px; }
 td { padding: 12px; text-align: center; border-bottom: 1px solid #333; font-size: 13px; }
 
-/* BOTONES CDC */
-.btn-action { width: 100%; padding: 16px; border-radius: 12px; border: none; font-weight: bold; cursor: pointer; font-size: 15px; text-decoration: none; display: block; text-align: center; margin-bottom: 10px; box-sizing: border-box; transition: 0.2s; }
-.btn-app { background: var(--accent-yellow); color: #000; box-shadow: 0 4px 15px rgba(252, 213, 53, 0.2); }
-.btn-app:active { transform: scale(0.98); }
+/* BOTONES MEJORADOS */
+.btn-action { width: 100%; padding: 18px; border-radius: 12px; border: none; font-weight: bold; cursor: pointer; font-size: 15px; text-decoration: none; display: block; text-align: center; margin-bottom: 12px; box-sizing: border-box; }
+.btn-app { background: var(--accent-yellow); color: #000; box-shadow: 0 4px 15px rgba(252, 213, 53, 0.3); }
 .btn-web { background: #2c2c3a; color: #fff; border: 1px solid #444; }
 .btn-whatsapp { background: #25D366; color: #fff; margin-top: 10px; }
 
-#details { background: #1a1a24; padding: 15px; border-radius: 12px; margin-bottom: 15px; border-left: 5px solid var(--accent-yellow); box-shadow: 0 4px 20px rgba(0,0,0,0.4); }
+#details { background: #1a1a24; padding: 15px; border-radius: 12px; margin-bottom: 15px; border-left: 5px solid var(--accent-yellow); }
 .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-top: 10px; }
 .item { background: #252531; padding: 10px; border-radius: 8px; text-align: center; }
-.item small { color: #888; display: block; font-size: 10px; margin-bottom: 4px; }
 
 .green { color: var(--accent-green); }
 .red { color: var(--accent-red); }
 
-@media (max-width: 768px) { .sidebar { position: absolute; left: 0; top: 0; height: 100%; width: 290px; } }
+@media (max-width: 768px) { .sidebar { position: absolute; left: 0; top: 0; height: 100%; width: 280px; } }
 </style>
 </head>
 
@@ -71,12 +69,12 @@ td { padding: 12px; text-align: center; border-bottom: 1px solid #333; font-size
 
 <div id="tiktokOverlay">
   <div style="font-size: 50px;">⚠️</div>
-  <h2 style="color:var(--accent-yellow)">BLOQUEO DE TIKTOK</h2>
-  <p>TikTok impide abrir la App de Binance.</p>
-  <div style="background:#222; padding:15px; border-radius:15px; border:1px solid var(--accent-yellow); margin:20px 0;">
+  <h2 style="color:var(--accent-yellow)">SALIR DE TIKTOK</h2>
+  <p>Para abrir la <b>App de Binance</b>:</p>
+  <div style="background:#222; padding:15px; border-radius:15px; border:1px solid var(--accent-yellow); margin:15px 0;">
     Toca los <b>(⋮)</b> y selecciona <br><b>"Abrir en el navegador"</b>.
   </div>
-  <button onclick="document.getElementById('tiktokOverlay').style.display='none'" style="background:var(--accent-blue); color:white; border:none; padding:12px 25px; border-radius:8px; font-weight:bold;">YA ESTOY EN CHROME / SAFARI</button>
+  <button onclick="document.getElementById('tiktokOverlay').style.display='none'" style="background:var(--accent-blue); color:white; border:none; padding:12px 25px; border-radius:8px;">CONTINUAR</button>
 </div>
 
 <header>
@@ -84,11 +82,11 @@ td { padding: 12px; text-align: center; border-bottom: 1px solid #333; font-size
   <h1>🚀 CDC FUTURO CRIPTO</h1>
 </header>
 
-<div id="statusBar">Cargando señales...</div>
+<div id="statusBar">Conectando...</div>
 
 <div class="container">
   <div class="sidebar" id="sidebar">
-    <input id="search" placeholder="🔍 Buscar (ej: BTC)">
+    <input id="search" placeholder="🔍 Buscar moneda...">
     <div class="table-container">
       <table>
         <thead><tr><th>MONEDA</th><th>% MÁX</th><th>SEÑAL</th></tr></thead>
@@ -99,20 +97,20 @@ td { padding: 12px; text-align: center; border-bottom: 1px solid #333; font-size
 
   <div class="main">
     <div id="details">
-      <p style="text-align:center; color:#888;">Selecciona una moneda para operar.</p>
+      <p style="text-align:center; color:#888;">Selecciona una moneda.</p>
     </div>
 
     <div id="actionButtons" style="display:none;">
-      <button onclick="openBinanceApp()" class="btn-action btn-app">⚡ ABRIR FUTUROS EN APP</button>
+      <button onclick="forceBinanceApp()" class="btn-action btn-app">⚡ ABRIR FUTUROS (APP)</button>
       <button onclick="openBinanceWeb()" class="btn-action btn-web">🌐 ANALIZAR EN WEB</button>
     </div>
 
     <div style="margin-top:auto; border-top:1px solid #333; padding-top:15px;">
       <input id="premiumCode" placeholder="Código Licencia PRO">
-      <button class="btn-action" style="background:var(--accent-blue); color:#fff;" onclick="activatePremium()">ACTIVAR LICENCIA PRO</button>
+      <button class="btn-action" style="background:var(--accent-blue); color:#fff;" onclick="activatePremium()">ACTIVAR PRO</button>
     </div>
 
-    <a href="https://api.whatsapp.com/send?phone=59177068807&text=Hola%20CDC!%20Quiero%20información%20de%20la%20Licencia%20PRO" class="btn-action btn-whatsapp" target="_blank">📲 ESCRIBENOS AL WHATSAPP</a>
+    <a href="https://api.whatsapp.com/send?phone=59177068807&text=Escribenos%20al%20WhatsApp%20vengo%20de%20TikTok%20quiero%20mi%20Licencia" class="btn-action btn-whatsapp" target="_blank">📲 ESCRIBENOS AL WHATSAPP</a>
   </div>
 </div>
 
@@ -120,9 +118,7 @@ td { padding: 12px; text-align: center; border-bottom: 1px solid #333; font-size
 let currentSymbol = "";
 let clickCount = parseInt(localStorage.getItem("clickCount")) || 0;
 
-// DETECCIÓN TIKTOK REAL
-const isTikTok = /TikTok/i.test(navigator.userAgent);
-if (isTikTok) {
+if (/TikTok/i.test(navigator.userAgent)) {
   document.getElementById("tiktokOverlay").style.display = "flex";
 }
 
@@ -132,18 +128,30 @@ document.getElementById("menuToggle").onclick = function() {
   this.innerText = sb.classList.contains("hidden") ? "➡" : "⬅";
 };
 
-// --- FUNCIÓN PARA ABRIR FUTUROS EN APP ---
-function openBinanceApp() {
+// --- FUNCIÓN MAESTRA DE APERTURA DE APP ---
+function forceBinanceApp() {
   if (!currentSymbol) return;
-  // Este es el Deep Link universal para la sección de FUTUROS
-  const deepLink = `binance://futures/${currentSymbol.toUpperCase()}`;
+  const symbol = currentSymbol.toUpperCase();
   
-  // Intentamos disparar el protocolo
-  window.location.href = deepLink;
+  // Lista de intentos (Protocolos conocidos de Binance)
+  const intents = [
+    `binance://futures/${symbol}`,
+    `bnc://app.binance.com/en/futures/${symbol}`,
+    `intent://futures/${symbol}#Intent;scheme=binance;package=com.binance.dev;end`
+  ];
 
-  // Si en 2 segundos no pasa nada (porque no tiene la app), abrimos la web
+  let success = false;
+  intents.forEach((url, index) => {
+    setTimeout(() => {
+      if(!success) {
+        window.location.href = url;
+      }
+    }, index * 200);
+  });
+
+  // Respaldo Web si nada funciona en 1.5s
   setTimeout(() => {
-    window.open(`https://www.binance.com/es/futures/${currentSymbol}`, "_blank");
+    window.open(`https://www.binance.com/es/futures/${symbol}`, "_blank");
   }, 1500);
 }
 
@@ -164,7 +172,7 @@ function updateStatus() {
 
 async function showDetails(c) {
   if (localStorage.getItem("premiumActive") !== "1" && clickCount >= 10) {
-    alert("Límite gratuito alcanzado. Contacta a soporte."); return;
+    alert("¡Adquiere tu licencia para continuar!"); return;
   }
   if (localStorage.getItem("premiumActive") !== "1") {
     clickCount++; localStorage.setItem("clickCount", clickCount); updateStatus();
@@ -174,15 +182,14 @@ async function showDetails(c) {
   document.getElementById("actionButtons").style.display = "block";
 
   document.getElementById("details").innerHTML = `
-    <h2 style="margin:0; color:var(--accent-yellow); font-size:24px;">${c.symbol}</h2>
+    <h2 style="margin:0; color:var(--accent-yellow); font-size:22px;">${c.symbol}</h2>
     <div class="grid">
       <div class="item"><small>PRECIO</small><b>$${parseFloat(c.price).toFixed(c.price < 1 ? 4 : 2)}</b></div>
       <div class="item"><small>VOLUMEN</small><b>$${(c.volume/1000000).toFixed(1)}M</b></div>
-      <div class="item"><small>UBICACIÓN</small><b class="${c.dist<20?'green':'red'}">${c.dist.toFixed(1)}%</b></div>
-      <div class="item"><small>SEÑAL</small><b class="${c.dist<20?'green':'red'}">${c.dist<20?'LONG 🟢':'SHORT 🔴'}</b></div>
+      <div class="item"><small>POSICIÓN</small><b class="${c.dist<20?'green':'red'}">${c.dist.toFixed(1)}%</b></div>
+      <div class="item"><small>SEÑAL</small><b class="${c.dist<20?'green':'red'}">${c.dist<20?'LONG':'SHORT'}</b></div>
     </div>
   `;
-  
   if(window.innerWidth < 768) {
     document.getElementById("sidebar").classList.add("hidden");
     document.getElementById("menuToggle").innerText = "➡";
@@ -222,7 +229,6 @@ async function load() {
 function activatePremium() {
   if(document.getElementById("premiumCode").value.trim().length > 3) {
     localStorage.setItem("premiumActive", "1");
-    alert("¡Felicidades! Licencia CDC PRO Activada.");
     location.reload();
   }
 }
