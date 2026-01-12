@@ -26,6 +26,7 @@ header {
   background: var(--bg-card); padding: 15px;
   border-bottom: 2px solid var(--accent-yellow);
   display: flex; justify-content: center; align-items: center;
+  position: relative;
 }
 
 header h1 { margin: 0; color: var(--accent-yellow); font-size: 18px; font-weight: bold; }
@@ -124,10 +125,10 @@ td { padding: 10px; text-align: center; border-bottom: 1px solid #333; font-size
       <p style="text-align:center;">Selecciona una moneda para analizar</p>
     </div>
 
-    <!-- Botones Binance Web / iOS / Android -->
-    <a id="linkBinanceWeb" class="btn-action btn-binance" style="display:none;" target="_blank">🌐 Abrir en Binance Web</a>
-    <a id="linkBinanceIOS" class="btn-action btn-binance" style="display:none;" target="_blank">📱 Abrir en Binance iOS</a>
-    <a id="linkBinanceAndroid" class="btn-action btn-binance" style="display:none;" target="_blank">🤖 Abrir en Binance Android</a>
+    <!-- Botones de Binance -->
+    <a id="linkBinanceWeb" class="btn-action btn-binance" target="_blank" style="display:none;">🌐 Abrir en Binance Web</a>
+    <a id="linkBinanceIOS" class="btn-action btn-binance" target="_blank" style="display:none;">📱 Abrir en Binance App (iOS)</a>
+    <a id="linkBinanceAndroid" class="btn-action btn-binance" target="_blank" style="display:none;">📱 Abrir en Binance App (Android)</a>
 
     <div style="margin-top:20px; border-top:1px solid #333; padding-top:20px;">
       <input id="premiumCode" placeholder="Ingresa tu código PRO">
@@ -178,30 +179,32 @@ async function showDetails(c) {
 
   currentSymbol = c.symbol;
 
-  // Mostrar enlaces según dispositivo
+  // Botones de Binance
   const btnWeb = document.getElementById("linkBinanceWeb");
   const btnIOS = document.getElementById("linkBinanceIOS");
   const btnAndroid = document.getElementById("linkBinanceAndroid");
 
   btnWeb.style.display = "block";
+  btnIOS.style.display = "block";
+  btnAndroid.style.display = "block";
+
+  // Enlace web normal
   btnWeb.href = `https://www.binance.com/es/futures/${c.symbol}?type=perpetual`;
 
-  btnIOS.style.display = "block";
-  btnIOS.href = `https://www.binance.com/m/en/futures/${c.symbol}?type=perpetual&device=ios`;
+  // Enlace tipo Square para abrir en la app automáticamente
+  const squareBase = "https://www.binance.com/es/square/post/16263307959081";
+  btnIOS.href = `${squareBase}?symbol=${c.symbol}`;
+  btnAndroid.href = `${squareBase}?symbol=${c.symbol}`;
 
-  btnAndroid.style.display = "block";
-  btnAndroid.href = `https://www.binance.com/m/en/futures/${c.symbol}?type=perpetual&device=android`;
-
-  // Mostrar detalles completos 24h
   document.getElementById("details").innerHTML = `
     <h2 style="margin:0; color:var(--accent-yellow);">${c.symbol}</h2>
     <div class="grid">
-      <div class="item"><small>PRECIO ACTUAL</small><br><b>$${c.price}</b></div>
+      <div class="item"><small>PRECIO</small><br><b>$${c.price}</b></div>
       <div class="item"><small>CAMBIO 24H</small><br><b class="${c.change>=0?'green':'red'}">${c.change}%</b></div>
       <div class="item"><small>VOLUMEN 24H</small><br><b>$${(c.volume/1000000).toFixed(2)}M</b></div>
-      <div class="item"><small>MÍNIMO 24H</small><br><b>$${c.low}</b></div>
-      <div class="item"><small>MÁXIMO 24H</small><br><b>$${c.high}</b></div>
-      <div class="item"><small>ESTADO</small><br><b class="${c.dist<20?'green':'red'}">${c.dist<20?'LONG':'SHORT'}</b></div>
+      <div class="item"><small>MÍN 24H</small><br><b>$${c.low}</b></div>
+      <div class="item"><small>MÁX 24H</small><br><b>$${c.high}</b></div>
+      <div class="item"><small>ESTADO</small><br><b class="${c.dist<20?'green':'red'}">${c.dist<20?'COMPRA':'VENTA'}</b></div>
     </div>
   `;
 
@@ -228,8 +231,9 @@ async function load() {
       .map(c => {
         const low = +c.lowPrice, high = +c.highPrice, price = +c.lastPrice;
         return { 
-          symbol: c.symbol, price, change: +c.priceChangePercent, 
-          volume: +c.quoteVolume, dist: ((price-low)/(high-low))*100, low, high
+          symbol: c.symbol, price, change: c.priceChangePercent, 
+          volume: +c.quoteVolume, dist: ((price-low)/(high-low))*100,
+          low, high
         };
       })
       .filter(c => c.price >= 0.08 && c.price <= 50 && (!q || c.symbol.includes(q)))
@@ -241,7 +245,7 @@ async function load() {
         table.appendChild(tr);
       });
     updateStatus();
-  } catch(e) { console.log("Error de conexión"); }
+  } catch(e) { console.log("Error de conexión", e); }
 }
 
 function activatePremium() {
