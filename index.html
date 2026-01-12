@@ -2,217 +2,264 @@
 <html lang="es">
 <head>
 <meta charset="UTF-8">
-<title>🚀 CDC FUTURO CRIPTO | PRO</title>
-<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+<title>CDC FUTURO CRIPTO | Dashboard PRO</title>
+<meta name="viewport" content="width=device-width, initial-scale=1">
 
 <style>
 :root {
-  --bg-main: #0c0c0f;
+  --bg-main: #121212;
   --bg-card: #1e1e28;
   --accent-yellow: #fcd535;
   --accent-blue: #0099ff;
   --accent-green: #4caf50;
   --accent-red: #ff5252;
   --text-light: #e0e0e0;
+  --text-muted: #8a8e94;
 }
 
-body { margin: 0; font-family: 'Segoe UI', sans-serif; background: var(--bg-main); color: var(--text-light); overflow: hidden; }
-
-/* CAPA TIKTOK */
-#tiktokOverlay {
-  display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%;
-  background: #000; z-index: 10000; color: white;
-  flex-direction: column; align-items: center; justify-content: center; text-align: center; padding: 25px;
+body {
+  margin: 0; font-family: 'Segoe UI', Tahoma, sans-serif;
+  background: var(--bg-main); color: var(--text-light);
+  overflow: hidden;
 }
 
-header { background: var(--bg-card); padding: 15px; border-bottom: 2px solid var(--accent-yellow); display: flex; justify-content: center; position: relative; }
-header h1 { margin: 0; color: var(--accent-yellow); font-size: 18px; text-transform: uppercase; }
+/* Encabezado */
+header {
+  background: var(--bg-card); padding: 15px;
+  border-bottom: 2px solid var(--accent-yellow);
+  display: flex; justify-content: center; align-items: center;
+  position: sticky; top: 0; z-index: 1000;
+}
 
-.menu-btn { position: absolute; left: 12px; background: var(--accent-yellow); border: none; border-radius: 6px; width: 38px; height: 38px; font-size: 20px; cursor: pointer; font-weight: bold; }
+header h1 { margin: 0; color: var(--accent-yellow); font-size: 20px; }
 
-#statusBar { text-align: center; padding: 8px; background: #1a1a24; border-bottom: 2px solid var(--accent-blue); font-size: 12px; font-weight: bold; }
+.menu-btn {
+  position: absolute; left: 12px;
+  background: var(--accent-yellow); border: none;
+  border-radius: 6px; width: 38px; height: 38px;
+  font-size: 20px; cursor: pointer; font-weight: bold;
+}
+
+#statusBar {
+  text-align: center; padding: 8px; background: #252531;
+  border-bottom: 2px solid var(--accent-blue);
+  font-weight: bold; font-size: 13px;
+}
 
 .container { display: flex; height: calc(100vh - 110px); position: relative; }
 
 /* SIDEBAR */
-.sidebar { width: 310px; background: var(--bg-card); border-right: 2px solid var(--accent-yellow); display: flex; flex-direction: column; transition: 0.3s; z-index: 900; }
+.sidebar {
+  width: 350px; background: var(--bg-card);
+  border-right: 2px solid var(--accent-yellow);
+  display: flex; flex-direction: column;
+  transition: transform 0.3s ease; z-index: 900;
+}
+
 .sidebar.hidden { transform: translateX(-100%); position: absolute; }
+
 .table-container { overflow-y: auto; flex: 1; }
 
-/* MAIN */
-.main { flex: 1; padding: 15px; overflow-y: auto; display: flex; flex-direction: column; }
+/* CONTENIDO PRINCIPAL */
+.main { flex: 1; padding: 20px; overflow-y: auto; display: flex; flex-direction: column; }
 
-input { width: calc(100% - 30px); margin: 10px 15px; padding: 12px; border-radius: 8px; border: none; background: #2c2c3a; color: white; font-size: 16px; outline: none; }
+input {
+  width: calc(100% - 30px); margin: 10px 15px;
+  padding: 12px; border-radius: 8px; border: none;
+  background: #2c2c3a; color: white; outline: none;
+}
 
 table { width: 100%; border-collapse: collapse; }
-th { position: sticky; top: 0; background: var(--accent-yellow); color: #000; padding: 10px; font-size: 11px; }
-td { padding: 12px; text-align: center; border-bottom: 1px solid #333; font-size: 13px; }
+th { position: sticky; top: 0; background: var(--accent-yellow); color: #000; padding: 12px; font-size: 13px; z-index: 10; }
+td { padding: 12px; text-align: center; border-bottom: 1px solid #333; font-size: 14px; }
+tr:hover { background: #2c2c3a; cursor: pointer; }
 
-/* BOTONES MEJORADOS */
-.btn-action { width: 100%; padding: 18px; border-radius: 12px; border: none; font-weight: bold; cursor: pointer; font-size: 15px; text-decoration: none; display: block; text-align: center; margin-bottom: 12px; box-sizing: border-box; }
-.btn-app { background: var(--accent-yellow); color: #000; box-shadow: 0 4px 15px rgba(252, 213, 53, 0.3); }
-.btn-web { background: #2c2c3a; color: #fff; border: 1px solid #444; }
-.btn-whatsapp { background: #25D366; color: #fff; margin-top: 10px; }
+/* DETALLES */
+#details {
+  background: #252531; padding: 20px; border-radius: 12px;
+  margin-bottom: 20px; border-left: 5px solid var(--accent-yellow);
+  box-shadow: 0 4px 15px rgba(0,0,0,0.3);
+}
 
-#details { background: #1a1a24; padding: 15px; border-radius: 12px; margin-bottom: 15px; border-left: 5px solid var(--accent-yellow); }
-.grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-top: 10px; }
-.item { background: #252531; padding: 10px; border-radius: 8px; text-align: center; }
+.detail-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 15px; margin-top: 15px; }
+.detail-item { background: #1a1a24; padding: 10px; border-radius: 8px; }
+.detail-item small { color: var(--text-muted); display: block; margin-bottom: 5px; }
 
-.green { color: var(--accent-green); }
-.red { color: var(--accent-red); }
+/* BOTONES */
+.btn-action {
+  width: 100%; padding: 15px; border-radius: 10px; border: none;
+  font-weight: bold; cursor: pointer; font-size: 16px;
+  text-decoration: none; display: block; text-align: center;
+  margin-bottom: 10px; transition: 0.3s;
+}
 
-@media (max-width: 768px) { .sidebar { position: absolute; left: 0; top: 0; height: 100%; width: 280px; } }
+.btn-binance { background: var(--accent-blue); color: #fff; }
+.btn-whatsapp { background: #25d366; color: #fff; }
+.btn-premium { background: var(--accent-yellow); color: #000; }
+
+.section-title { padding: 12px; font-size: 14px; color: var(--accent-blue); font-weight: bold; background: #1a1a24; }
+.green { color: var(--accent-green); font-weight: bold; }
+.red { color: var(--accent-red); font-weight: bold; }
+
+@media (max-width: 768px) {
+  .sidebar { position: absolute; left: 0; top: 0; height: 100%; width: 300px; }
+  .sidebar.hidden { transform: translateX(-100%); }
+}
 </style>
 </head>
 
 <body>
-
-<div id="tiktokOverlay">
-  <div style="font-size: 50px;">⚠️</div>
-  <h2 style="color:var(--accent-yellow)">SALIR DE TIKTOK</h2>
-  <p>Para abrir la <b>App de Binance</b>:</p>
-  <div style="background:#222; padding:15px; border-radius:15px; border:1px solid var(--accent-yellow); margin:15px 0;">
-    Toca los <b>(⋮)</b> y selecciona <br><b>"Abrir en el navegador"</b>.
-  </div>
-  <button onclick="document.getElementById('tiktokOverlay').style.display='none'" style="background:var(--accent-blue); color:white; border:none; padding:12px 25px; border-radius:8px;">CONTINUAR</button>
-</div>
 
 <header>
   <button class="menu-btn" id="menuToggle">⬅</button>
   <h1>🚀 CDC FUTURO CRIPTO</h1>
 </header>
 
-<div id="statusBar">Conectando...</div>
+<div id="statusBar">Conectando con Binance Pro...</div>
 
 <div class="container">
+
   <div class="sidebar" id="sidebar">
-    <input id="search" placeholder="🔍 Buscar moneda...">
+    <input id="search" placeholder="🔍 Buscar moneda (ej: BTC)">
     <div class="table-container">
+      <div class="section-title">📈 FUTUROS (0.08 - 50 USDT)</div>
       <table>
-        <thead><tr><th>MONEDA</th><th>% MÁX</th><th>SEÑAL</th></tr></thead>
+        <thead><tr><th>Moneda</th><th>% Máx</th><th>Señal</th></tr></thead>
         <tbody id="futuresTable"></tbody>
+      </table>
+
+      <div class="section-title">✨ TOP SPOT</div>
+      <table>
+        <thead><tr><th>Token</th><th>Precio</th></tr></thead>
+        <tbody id="spotTable"></tbody>
       </table>
     </div>
   </div>
 
-  <div class="main">
+  <div class="main" id="mainContent">
     <div id="details">
-      <p style="text-align:center; color:#888;">Selecciona una moneda.</p>
+      <p style="text-align:center;">Selecciona una moneda activa para ver detalles profundos.</p>
     </div>
 
-    <div id="actionButtons" style="display:none;">
-      <button onclick="forceBinanceApp()" class="btn-action btn-app">⚡ ABRIR FUTUROS (APP)</button>
-      <button onclick="openBinanceWeb()" class="btn-action btn-web">🌐 ANALIZAR EN WEB</button>
+    <a id="btnOpenBinance" class="btn-action btn-binance" style="display:none;">
+      ⚡ ANALIZAR EN APP BINANCE
+    </a>
+
+    <div style="margin-top: auto; border-top: 1px solid #333; padding-top: 20px;">
+      <input id="premiumCode" placeholder="🔑 Ingresa Código Licencia">
+      <button class="btn-action btn-premium" onclick="activatePremium()">ACTIVAR LICENCIA PRO</button>
     </div>
 
-    <div style="margin-top:auto; border-top:1px solid #333; padding-top:15px;">
-      <input id="premiumCode" placeholder="Código Licencia PRO">
-      <button class="btn-action" style="background:var(--accent-blue); color:#fff;" onclick="activatePremium()">ACTIVAR PRO</button>
-    </div>
+    <a href="https://wa.me/59177068807" class="btn-action btn-whatsapp" target="_blank">
+      📲 SOPORTE WHATSAPP
+    </a>
 
-    <a href="https://api.whatsapp.com/send?phone=59177068807&text=Escribenos%20al%20WhatsApp%20vengo%20de%20TikTok%20quiero%20mi%20Licencia" class="btn-action btn-whatsapp" target="_blank">📲 ESCRIBENOS AL WHATSAPP</a>
+    <footer style="text-align:center; font-size:12px; padding:10px;">
+        <a href="https://www.tiktok.com/@chicodelascomputadoras" target="_blank" style="color:var(--accent-blue); text-decoration:none; font-weight:bold;">
+           TikTok: @chicodelascomputadoras
+        </a>
+    </footer>
   </div>
+
 </div>
 
 <script>
+const menuBtn = document.getElementById("menuToggle");
+const sidebar = document.getElementById("sidebar");
+const openBtn = document.getElementById("btnOpenBinance");
 let currentSymbol = "";
 let clickCount = parseInt(localStorage.getItem("clickCount")) || 0;
 
-if (/TikTok/i.test(navigator.userAgent)) {
-  document.getElementById("tiktokOverlay").style.display = "flex";
-}
-
-document.getElementById("menuToggle").onclick = function() {
-  const sb = document.getElementById("sidebar");
-  sb.classList.toggle("hidden");
-  this.innerText = sb.classList.contains("hidden") ? "➡" : "⬅";
+// Menú retráctil
+menuBtn.onclick = () => {
+  sidebar.classList.toggle("hidden");
+  menuBtn.innerText = sidebar.classList.contains("hidden") ? "➡" : "⬅";
 };
 
-// --- FUNCIÓN MAESTRA DE APERTURA DE APP ---
-function forceBinanceApp() {
-  if (!currentSymbol) return;
-  const symbol = currentSymbol.toUpperCase();
-  
-  // Lista de intentos (Protocolos conocidos de Binance)
-  const intents = [
-    `binance://futures/${symbol}`,
-    `bnc://app.binance.com/en/futures/${symbol}`,
-    `intent://futures/${symbol}#Intent;scheme=binance;package=com.binance.dev;end`
-  ];
-
-  let success = false;
-  intents.forEach((url, index) => {
-    setTimeout(() => {
-      if(!success) {
-        window.location.href = url;
-      }
-    }, index * 200);
-  });
-
-  // Respaldo Web si nada funciona en 1.5s
-  setTimeout(() => {
-    window.open(`https://www.binance.com/es/futures/${symbol}`, "_blank");
-  }, 1500);
-}
-
-function openBinanceWeb() {
-  if (!currentSymbol) return;
-  window.open(`https://www.binance.com/es/futures/${currentSymbol}`, "_blank");
+// Lógica de apertura mejorada con Square para TikTok
+function openBinance(symbol) {
+  if (!symbol) return;
+  // Usamos el enlace de Square que confirmaste para forzar la App
+  const url = `https://www.binance.com/es/square/post/16263307959081?symbol=${symbol.toUpperCase()}`;
+  window.open(url, "_blank");
 }
 
 function updateStatus() {
+  const isPremium = localStorage.getItem("premiumActive") === "1";
   const bar = document.getElementById("statusBar");
-  if(localStorage.getItem("premiumActive") === "1") {
-    bar.innerText = "✅ LICENCIA PRO ACTIVA";
+  if(isPremium) {
+    bar.innerText = "✅ LICENCIA PREMIUM ACTIVA";
     bar.style.color = "var(--accent-green)";
   } else {
-    bar.innerText = `Clics: ${clickCount} / 10`;
+    bar.innerText = `✳️ Clics: ${clickCount} / 10`;
   }
 }
 
-async function showDetails(c) {
+// Obtener datos detallados
+async function showDetails(c, isSpot = false) {
   if (localStorage.getItem("premiumActive") !== "1" && clickCount >= 10) {
-    alert("¡Adquiere tu licencia para continuar!"); return;
+    document.getElementById("details").innerHTML = `<p class="red" style="text-align:center;">Límite alcanzado. Adquiere tu licencia en WhatsApp.</p>`;
+    return;
   }
+  
   if (localStorage.getItem("premiumActive") !== "1") {
     clickCount++; localStorage.setItem("clickCount", clickCount); updateStatus();
   }
 
   currentSymbol = c.symbol;
-  document.getElementById("actionButtons").style.display = "block";
+  openBtn.style.display = "block";
+  openBtn.onclick = () => openBinance(currentSymbol);
+
+  // Obtener Funding Rate en tiempo real
+  let funding = "N/A";
+  if(!isSpot) {
+    try {
+      const fr = await fetch(`https://fapi.binance.com/fapi/v1/premiumIndex?symbol=${c.symbol}`);
+      const fj = await r = await fr.json();
+      funding = (parseFloat(fj.lastFundingRate) * 100).toFixed(4) + "%";
+    } catch(e) { funding = "0.00%"; }
+  }
+
+  const volM = (parseFloat(c.volume) / 1000000).toFixed(2);
 
   document.getElementById("details").innerHTML = `
-    <h2 style="margin:0; color:var(--accent-yellow); font-size:22px;">${c.symbol}</h2>
-    <div class="grid">
-      <div class="item"><small>PRECIO</small><b>$${parseFloat(c.price).toFixed(c.price < 1 ? 4 : 2)}</b></div>
-      <div class="item"><small>VOLUMEN</small><b>$${(c.volume/1000000).toFixed(1)}M</b></div>
-      <div class="item"><small>POSICIÓN</small><b class="${c.dist<20?'green':'red'}">${c.dist.toFixed(1)}%</b></div>
-      <div class="item"><small>SEÑAL</small><b class="${c.dist<20?'green':'red'}">${c.dist<20?'LONG':'SHORT'}</b></div>
+    <h2 style="margin:0; color:var(--accent-yellow);">${c.symbol}</h2>
+    <div class="detail-grid">
+      <div class="detail-item"><small>PRECIO ACTUAL</small><b>$${c.price}</b></div>
+      <div class="detail-item"><small>CAMBIO 24H</small><b class="${c.change >= 0 ? 'green':'red'}">${c.change}%</b></div>
+      <div class="detail-item"><small>VOLUMEN</small><b>$${volM}M</b></div>
+      <div class="detail-item"><small>FUNDING</small><b class="blue">${funding}</b></div>
+      <div class="detail-item" style="grid-column: span 2;">
+        <small>CERCANÍA AL MÁXIMO (SEÑAL)</small>
+        <b class="${c.dist < 20 ? 'green':'red'}">${c.dist.toFixed(2)}% - ${c.dist < 20 ? '🟢 COMPRA (LONG)' : '🔴 VENTA (SHORT)'}</b>
+      </div>
     </div>
   `;
-  if(window.innerWidth < 768) {
-    document.getElementById("sidebar").classList.add("hidden");
-    document.getElementById("menuToggle").innerText = "➡";
-  }
+  if (window.innerWidth < 768) sidebar.classList.add("hidden");
 }
 
-async function load() {
+async function loadData() {
   try {
-    const rInfo = await fetch("https://fapi.binance.com/fapi/v1/exchangeInfo");
-    const dInfo = await rInfo.json();
-    const activeOnes = new Set(dInfo.symbols.filter(s => s.status === "TRADING").map(s => s.symbol));
+    // 1. Validar monedas activas en Futuros (Filtra WAVES y delisted)
+    const exInfo = await fetch("https://fapi.binance.com/fapi/v1/exchangeInfo");
+    const exJ = await exInfo.json();
+    const activeFutures = new Set(exJ.symbols.filter(s => s.status === "TRADING").map(s => s.symbol));
 
-    const r = await fetch("https://api.binance.com/api/v3/ticker/24hr");
-    const data = await r.json();
+    // 2. Obtener precios y estadísticas
+    const resp = await fetch("https://api.binance.com/api/v3/ticker/24hr");
+    const data = await resp.json();
     const q = document.getElementById("search").value.toUpperCase();
-    
-    const table = document.getElementById("futuresTable");
-    table.innerHTML = "";
 
-    data.filter(c => activeOnes.has(c.symbol))
+    // Filtro Futuros
+    const fTable = document.getElementById("futuresTable");
+    fTable.innerHTML = "";
+    data.filter(c => activeFutures.has(c.symbol))
       .map(c => {
         const low = +c.lowPrice, high = +c.highPrice, price = +c.lastPrice;
-        return { symbol: c.symbol, price, volume: c.quoteVolume, dist: ((price-low)/(high-low))*100 };
+        return { 
+          symbol: c.symbol, price, low, high, change: c.priceChangePercent, 
+          volume: c.quoteVolume, dist: ((price-low)/(high-low))*100 
+        };
       })
       .filter(c => c.price >= 0.08 && c.price <= 50 && (!q || c.symbol.includes(q)))
       .sort((a,b) => b.dist - a.dist)
@@ -220,23 +267,37 @@ async function load() {
         const tr = document.createElement("tr");
         tr.innerHTML = `<td><b>${c.symbol.replace("USDT","")}</b></td><td>${c.dist.toFixed(1)}%</td><td class="${c.dist<20?'green':'red'}">${c.dist<20?'LONG':'SHORT'}</td>`;
         tr.onclick = () => showDetails(c);
-        table.appendChild(tr);
+        fTable.appendChild(tr);
       });
+
+    // Filtro Spot
+    const sTable = document.getElementById("spotTable");
+    sTable.innerHTML = "";
+    data.filter(c => c.symbol.endsWith("USDT") && !activeFutures.has(c.symbol))
+      .filter(c => c.lastPrice >= 0.08 && c.lastPrice <= 50 && (!q || c.symbol.includes(q)))
+      .slice(0, 15)
+      .forEach(c => {
+        const tr = document.createElement("tr");
+        tr.innerHTML = `<td>${c.symbol}</td><td>$${parseFloat(c.lastPrice).toFixed(4)}</td>`;
+        tr.onclick = () => showDetails({symbol: c.symbol, price: c.lastPrice, change: c.priceChangePercent, volume: c.quoteVolume, dist: 0}, true);
+        sTable.appendChild(tr);
+      });
+
     updateStatus();
-  } catch(e) {}
+  } catch(e) { console.error("Error en API", e); }
 }
 
 function activatePremium() {
   if(document.getElementById("premiumCode").value.trim().length > 3) {
     localStorage.setItem("premiumActive", "1");
+    alert("¡Licencia PRO Activada!");
     location.reload();
   }
 }
 
-document.getElementById("search").oninput = load;
-load();
-setInterval(load, 25000);
+document.getElementById("search").oninput = loadData;
+loadData();
+setInterval(loadData, 30000);
 </script>
-
 </body>
 </html>
