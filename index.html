@@ -152,6 +152,10 @@ tr:hover {
   font-weight: bold;
   cursor: pointer;
   font-size: 14px;
+  text-decoration: none;
+  display: block;
+  text-align: center;
+  box-sizing: border-box;
 }
 
 .btn-binance-app {
@@ -170,6 +174,7 @@ tr:hover {
   border-radius: 10px;
   margin-bottom: 15px;
   border-left: 4px solid var(--accent-yellow);
+  min-height: 80px;
 }
 
 .section-title {
@@ -189,8 +194,8 @@ footer {
 
 footer a { color: var(--accent-yellow); text-decoration: none; }
 
-.green { color: var(--accent-green); }
-.red { color: var(--accent-red); }
+.green { color: var(--accent-green); font-weight: bold; }
+.red { color: var(--accent-red); font-weight: bold; }
 
 /* RESPONSIVE */
 @media (max-width: 768px) {
@@ -199,7 +204,7 @@ footer a { color: var(--accent-yellow); text-decoration: none; }
     left: 0;
     top: 0;
     height: 100%;
-    width: 280px;
+    width: 85%;
     box-shadow: 5px 0 15px rgba(0,0,0,0.5);
   }
   .sidebar.hidden {
@@ -219,7 +224,7 @@ footer a { color: var(--accent-yellow); text-decoration: none; }
   <h1>🚀 CDC FUTURO CRIPTO</h1>
 </header>
 
-<div id="statusBar">Cargando datos...</div>
+<div id="statusBar">Conectando con Binance...</div>
 
 <div class="container">
 
@@ -253,12 +258,12 @@ footer a { color: var(--accent-yellow); text-decoration: none; }
       <p style="text-align:center;"><em>Selecciona una moneda para ver el análisis</em></p>
     </div>
 
-    <button id="btnOpenBinance" class="btn-action btn-binance-app">
+    <a id="btnOpenBinance" class="btn-action btn-binance-app" href="javascript:void(0)">
       🌐 Abrir en Binance
-    </button>
+    </a>
 
-    <p style="text-align:center;font-size:12px;color:var(--text-muted);margin-top:-5px;">
-      *Se intentará abrir la App automáticamente.
+    <p style="text-align:center;font-size:12px;color:var(--text-muted);margin-top:5px;">
+      *Se intentará abrir la App directamente.
     </p>
 
     <div style="margin-top: 20px; border-top: 1px solid #333; padding-top: 20px;">
@@ -274,51 +279,47 @@ footer a { color: var(--accent-yellow); text-decoration: none; }
 </div>
 
 <script>
-// CONFIGURACIÓN Y ESTADO
+// --- CONFIGURACIÓN ---
 const menuBtn = document.getElementById("menuToggle");
 const sidebar = document.getElementById("sidebar");
 const openBtn = document.getElementById("btnOpenBinance");
 let currentSymbol = "";
 let clickCount = parseInt(localStorage.getItem("clickCount")) || 0;
 
-// TOGGLE SIDEBAR
+// --- DETECTAR MÓVIL ---
+const isMobile = () => /Android|iPhone|iPad|iPod/i.test(navigator.userAgent);
+
+// --- TOGGLE SIDEBAR ---
 menuBtn.onclick = () => {
   sidebar.classList.toggle("hidden");
   menuBtn.innerText = sidebar.classList.contains("hidden") ? "➡" : "⬅";
 };
 
-// DETECTAR MÓVIL
-const isMobile = () => /Android|iPhone|iPad|iPod/i.test(navigator.userAgent);
-
-// ABRIR BINANCE (OPTIMIZADO)
-function openBinanceApp(symbol) {
+// --- ACTUALIZAR ENLACE DE BINANCE ---
+function updateBinanceLink(symbol) {
   if (!symbol) return;
-  const cleanSymbol = symbol.replace("USDT", ""); // Algunos deep links prefieren el base asset
-  
-  // Intentamos abrir Futuros directamente
-  const appUrl = `binance://futures/${symbol.toUpperCase()}`;
-  const webUrl = `https://www.binance.com/es/futures/${symbol.toUpperCase()}`;
+  const formattedSymbol = symbol.toUpperCase();
+  const appUrl = `binance://futures/${formattedSymbol}`;
+  const webUrl = `https://www.binance.com/es/futures/${formattedSymbol}`;
 
   if (isMobile()) {
-    const start = Date.now();
-    window.location.href = appUrl;
-    
-    // Si en 1 segundo no cambió de app, abrir web
-    setTimeout(() => {
-      if (Date.now() - start < 1500) window.open(webUrl, "_blank");
-    }, 1000);
+    openBtn.href = appUrl;
+    // Si la app no abre en 1.5s, redirige a la web en la misma pestaña
+    openBtn.onclick = () => {
+      setTimeout(() => {
+        window.location.href = webUrl;
+      }, 1500);
+    };
   } else {
-    window.open(webUrl, "_blank");
+    openBtn.href = webUrl;
+    openBtn.target = "_blank";
+    openBtn.onclick = null;
   }
 }
 
-openBtn.onclick = () => {
-  if (currentSymbol) openBinanceApp(currentSymbol);
-  else alert("Selecciona una moneda primero");
-};
-
-// LÓGICA DE PREMIUM
+// --- LÓGICA PREMIUM ---
 function hasPremium() { return localStorage.getItem("premiumActive") === "1"; }
+
 function updateStatus() {
   const status = document.getElementById("statusBar");
   if (hasPremium()) {
@@ -331,7 +332,7 @@ function updateStatus() {
 
 function activatePremium() {
   const code = document.getElementById("premiumCode").value.trim();
-  if (code.length > 4) {
+  if (code.length >= 4) {
     localStorage.setItem("premiumActive", "1");
     alert("✔️ ¡Licencia activada con éxito!");
     updateStatus();
@@ -341,7 +342,7 @@ function activatePremium() {
   }
 }
 
-// CARGA DE DATOS (BINANCE API)
+// --- MOSTRAR DETALLES ---
 async function getFunding(symbol) {
   try {
     const r = await fetch(`https://fapi.binance.com/fapi/v1/premiumIndex?symbol=${symbol}`);
@@ -363,24 +364,28 @@ async function showDetails(c, isSpot = false) {
   }
 
   currentSymbol = c.symbol;
+  updateBinanceLink(currentSymbol);
+  
   const funding = isSpot ? "N/A" : await getFunding(c.symbol);
 
   document.getElementById("details").innerHTML = `
     <h2 style="margin:0; color:var(--accent-yellow);">${c.symbol}</h2>
     <div style="display:grid; grid-template-columns: 1fr 1fr; gap:10px; margin-top:10px;">
       <div><small>Precio:</small><br><strong>${c.price}</strong></div>
-      <div><small>Funding:</small><br><strong class="blue">${funding}%</strong></div>
+      <div><small>Funding:</small><br><strong style="color:var(--accent-blue)">${funding}%</strong></div>
       <div><small>Rango 24h:</small><br><span style="font-size:11px;">${c.low || '-'} / ${c.high || '-'}</span></div>
       <div><small>Cercanía Máx:</small><br><strong class="${c.distMax < 20 ? 'green':'red'}">${c.distMax ? c.distMax.toFixed(2)+'%' : 'Spot'}</strong></div>
     </div>
   `;
   
-  if (window.innerWidth < 768) sidebar.classList.add("hidden");
+  // En móviles cerramos el menú al elegir moneda para ver el detalle
+  if (window.innerWidth < 768) {
+    sidebar.classList.add("hidden");
+    menuBtn.innerText = "➡";
+  }
 }
 
-// ... Resto de funciones de carga de datos (loadFuturesList, load, etc) ...
-// (Mantenemos tu lógica de fetch que ya funcionaba bien)
-
+// --- CARGA DE DATOS DESDE BINANCE ---
 const FUTURES_INFO = "https://fapi.binance.com/fapi/v1/exchangeInfo";
 const API_24H = "https://api.binance.com/api/v3/ticker/24hr";
 let futuresSymbols = new Set();
@@ -390,54 +395,58 @@ async function init() {
     const r = await fetch(FUTURES_INFO);
     const j = await r.json();
     j.symbols.forEach(s => {
-      if(s.quoteAsset === "USDT") futuresSymbols.add(s.symbol);
+      if(s.quoteAsset === "USDT" && s.status === "TRADING") futuresSymbols.add(s.symbol);
     });
     loadData();
-  } catch(e) { console.error("Error inicializando", e); }
+    updateStatus();
+  } catch(e) { 
+    document.getElementById("statusBar").innerText = "❌ Error de conexión";
+  }
 }
 
 async function loadData() {
-  const r = await fetch(API_24H);
-  const data = await r.json();
-  const q = document.getElementById("search").value.toUpperCase();
+  try {
+    const r = await fetch(API_24H);
+    const data = await r.json();
+    const q = document.getElementById("search").value.toUpperCase();
 
-  // Filtrar Futuros
-  const fTable = document.getElementById("futuresTable");
-  fTable.innerHTML = "";
-  data.filter(c => futuresSymbols.has(c.symbol))
-    .map(c => {
-      const low = +c.lowPrice, high = +c.highPrice, price = +c.lastPrice;
-      return { symbol: c.symbol, price, low, high, distMax: ((price-low)/(high-low))*100 };
-    })
-    .filter(c => c.price >= 0.01 && (!q || c.symbol.includes(q)))
-    .sort((a,b) => b.distMax - a.distMax)
-    .forEach(c => {
-      const tr = document.createElement("tr");
-      const signal = c.distMax < 20 ? "🟢 LONG" : (c.distMax > 80 ? "🔴 SHORT" : "⏳ WAIT");
-      tr.innerHTML = `<td>${c.symbol}</td><td>${c.distMax.toFixed(1)}%</td><td class="${c.distMax<20?'green':'red'}">${signal}</td>`;
-      tr.onclick = () => showDetails(c);
-      fTable.appendChild(tr);
-    });
+    // FUTUROS
+    const fTable = document.getElementById("futuresTable");
+    fTable.innerHTML = "";
+    data.filter(c => futuresSymbols.has(c.symbol))
+      .map(c => {
+        const low = +c.lowPrice, high = +c.highPrice, price = +c.lastPrice;
+        let dist = ((price - low) / (high - low)) * 100;
+        return { symbol: c.symbol, price, low, high, distMax: dist };
+      })
+      .filter(c => c.price > 0 && (!q || c.symbol.includes(q)))
+      .sort((a,b) => b.distMax - a.distMax)
+      .forEach(c => {
+        const tr = document.createElement("tr");
+        const signal = c.distMax < 20 ? "🟢 LONG" : (c.distMax > 80 ? "🔴 SHORT" : "⏳ WAIT");
+        tr.innerHTML = `<td>${c.symbol}</td><td>${c.distMax.toFixed(1)}%</td><td class="${c.distMax<20?'green':'red'}">${signal}</td>`;
+        tr.onclick = () => showDetails(c);
+        fTable.appendChild(tr);
+      });
 
-  // Filtrar Spot
-  const sTable = document.getElementById("spotTable");
-  sTable.innerHTML = "";
-  data.filter(c => c.symbol.endsWith("USDT") && !futuresSymbols.has(c.symbol))
-    .filter(c => !q || c.symbol.includes(q))
-    .slice(0, 20)
-    .forEach(c => {
-      const tr = document.createElement("tr");
-      tr.innerHTML = `<td>${c.symbol}</td><td>${c.lastPrice}</td>`;
-      tr.onclick = () => showDetails({symbol: c.symbol, price: c.lastPrice}, true);
-      sTable.appendChild(tr);
-    });
-    
-  updateStatus();
+    // SPOT
+    const sTable = document.getElementById("spotTable");
+    sTable.innerHTML = "";
+    data.filter(c => c.symbol.endsWith("USDT") && !futuresSymbols.has(c.symbol))
+      .filter(c => !q || c.symbol.includes(q))
+      .slice(0, 15)
+      .forEach(c => {
+        const tr = document.createElement("tr");
+        tr.innerHTML = `<td>${c.symbol}</td><td>${parseFloat(c.lastPrice).toFixed(4)}</td>`;
+        tr.onclick = () => showDetails({symbol: c.symbol, price: c.lastPrice}, true);
+        sTable.appendChild(tr);
+      });
+  } catch(e) { console.error("Error en update", e); }
 }
 
 document.getElementById("search").oninput = loadData;
 init();
-setInterval(loadData, 30000); // Auto-update cada 30 seg
+setInterval(loadData, 10000); // Actualiza cada 10 segundos
 </script>
 
 </body>
