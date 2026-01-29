@@ -239,7 +239,6 @@ async function load() {
         const volume = +c.quoteVolume;
         const faltante100 = ((high - price)/high)*100;
 
-        // Señal de caídas grandes o EMA cruzando (simplificado)
         let signal = '';
         let signalColor = 'green';
         if(change <= -10 && (price-low)/low*100 <= 20) {
