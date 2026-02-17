@@ -7,7 +7,7 @@
   "background_color": "#0b0b0b",
   "theme_color": "#f0b90b",
   "scope": "./",
-  "orientation": "portrait",
+  "orientation": "portrait-primary",
   "categories": ["finance", "utilities"],
   "prefer_related_applications": false,
   "icons": [
@@ -22,6 +22,7 @@
       "type": "image/png"
     }
   ],
+  "related_applications": [],
   "apple-mobile-web-app-capable": "yes",
   "apple-mobile-web-app-status-bar-style": "black-translucent",
   "apple-mobile-web-app-title": "Cripto PRO"
