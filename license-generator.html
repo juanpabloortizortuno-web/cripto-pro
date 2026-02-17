@@ -1,3 +1,4 @@
+<<<<<<< HEAD
 <!DOCTYPE html>
 <html lang="es">
 <head>
@@ -130,3 +131,137 @@ updateLicenseList();
 
 </body>
 </html>
+=======
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<title>Generador de Licencias CDC PRO</title>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+
+<style>
+body {
+  font-family: Arial, sans-serif;
+  background: #121212;
+  color: #fcd535;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: flex-start;
+  min-height: 100vh;
+  padding: 20px;
+}
+
+h1 { margin-bottom: 20px; }
+
+.card {
+  background: #1e1e28;
+  padding: 20px;
+  border-radius: 12px;
+  width: 100%;
+  max-width: 400px;
+  box-shadow: 0 0 15px #000;
+  text-align: center;
+}
+
+input {
+  width: 80%;
+  padding: 10px;
+  margin: 10px 0;
+  border-radius: 6px;
+  border: none;
+  text-align: center;
+  font-size: 16px;
+}
+
+button {
+  padding: 12px 20px;
+  background: #fcd535;
+  color: black;
+  border: none;
+  border-radius: 6px;
+  font-weight: bold;
+  cursor: pointer;
+  margin-top: 10px;
+  font-size: 16px;
+}
+
+button:hover { background: #e6c200; }
+
+#generated {
+  margin-top: 15px;
+  font-size: 14px;
+  color: #00c3ff;
+  word-break: break-all;
+}
+
+#allLicenses {
+  margin-top: 15px;
+  font-size: 13px;
+  color: #f0f0f0;
+  max-height: 200px;
+  overflow-y: auto;
+  text-align: left;
+  padding: 10px;
+  background: #2c2f38;
+  border-radius: 6px;
+}
+</style>
+</head>
+<body>
+
+<h1>Generador de Licencias CDC PRO</h1>
+
+<div class="card">
+  <p>Genera licencias de 8 dígitos únicas.</p>
+  <button onclick="generateLicense()">Generar Licencia</button>
+  <div id="generated"></div>
+
+  <h3>Licencias guardadas:</h3>
+  <div id="allLicenses"></div>
+
+  <button onclick="clearLicenses()" style="background:#ff5252; color:white;">Limpiar todas las licencias</button>
+</div>
+
+<script>
+// Obtener licencias guardadas
+let VALID_LICENSES = JSON.parse(localStorage.getItem("validLicenses") || "[]");
+
+// Mostrar en pantalla
+function updateLicenseList() {
+  const list = document.getElementById("allLicenses");
+  if (VALID_LICENSES.length === 0) list.innerHTML = "No hay licencias generadas aún.";
+  else list.innerHTML = VALID_LICENSES.join("<br>");
+}
+
+// Generar licencia única de 8 dígitos
+function generateLicense() {
+  let code;
+  do {
+    code = Math.floor(10000000 + Math.random() * 90000000).toString();
+  } while (VALID_LICENSES.includes(code));
+
+  VALID_LICENSES.push(code);
+  localStorage.setItem("validLicenses", JSON.stringify(VALID_LICENSES));
+
+  document.getElementById("generated").innerText = "Licencia generada: " + code;
+  updateLicenseList();
+}
+
+// Limpiar todas las licencias
+function clearLicenses() {
+  if(confirm("¿Seguro que quieres borrar todas las licencias?")) {
+    VALID_LICENSES = [];
+    localStorage.setItem("validLicenses", JSON.stringify(VALID_LICENSES));
+    updateLicenseList();
+    document.getElementById("generated").innerText = "";
+  }
+}
+
+// Inicializar
+updateLicenseList();
+</script>
+
+</body>
+</html>
+>>>>>>> 24a54b6280920a3e7cbfdb9538bb54b5c94513de
