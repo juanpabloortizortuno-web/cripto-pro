@@ -99,9 +99,8 @@ td{padding:12px 8px;text-align:center;border-bottom:1px solid #333;font-size:13p
 
 <script>
 
-const sidebar = document.getElementById("sidebar");
-const statusBar = document.getElementById("statusBar");
-
+const sidebar=document.getElementById("sidebar");
+const statusBar=document.getElementById("statusBar");
 document.getElementById("menuToggle").onclick=()=>{sidebar.classList.toggle("hidden");};
 
 let clickCount=parseInt(localStorage.getItem("clickCount")||"0");
@@ -138,10 +137,17 @@ async function loadPRO(){
 
   try{
 
+    // FUTURES USDT-M PERPETUAL válidos
+    const futuresInfo=await fetch("https://fapi.binance.com/fapi/v1/exchangeInfo").then(r=>r.json());
+
+    const validFuturesUSDT=futuresInfo.symbols
+      .filter(s=>s.status==="TRADING" && s.contractType==="PERPETUAL" && s.quoteAsset==="USDT")
+      .map(s=>s.symbol);
+
     const allTickers=await fetch("https://api.binance.com/api/v3/ticker/24hr").then(r=>r.json());
 
     const filtered=allTickers
-      .filter(t=>t.symbol.endsWith("USDT")&&parseFloat(t.priceChangePercent)>8)
+      .filter(t=>validFuturesUSDT.includes(t.symbol) && parseFloat(t.priceChangePercent)>8)
       .sort((a,b)=>parseFloat(b.priceChangePercent)-parseFloat(a.priceChangePercent))
       .slice(0,15);
 
