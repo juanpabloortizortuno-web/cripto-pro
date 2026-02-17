@@ -61,12 +61,11 @@
       padding: 8px;
       background: #1f222a;
       font-size: 13px;
-      border-bottom: 1px solid #333;
     }
 
     .container {
       display: flex;
-      height: calc(100vh - 80px);
+      height: calc(100vh - 60px);
     }
 
     .sidebar {
@@ -180,6 +179,10 @@
       text-align: center;
     }
 
+    .tiktok-link:hover {
+      background: #e60044;
+    }
+
     .license-input {
       width: calc(100% - 24px);
       padding: 12px;
@@ -202,9 +205,9 @@
       cursor: pointer;
     }
 
-    .alert-high-change {
-      background-color: #ff5252; /* Rojo brillante para llamar la atención */
-      color: white;
+    .license-status {
+      text-align: center;
+      font-weight: bold;
     }
   </style>
 </head>
@@ -214,7 +217,7 @@
 <header>
   <button id="menuToggle">⬅</button>
   <h1>🚀 CDC FUTURO CRIPTO — PRO ELITE</h1>
-  <a class="tiktok-link" href="https://www.tiktok.com/@chicodelascomputadoras" target="_blank">TikTok</a>
+  <a class="tiktok-link" href="https://www.tiktok.com/@chicodelascomputadoras" target="_blank">Síguenos en TikTok</a>
 </header>
 
 <div id="statusBar">Inicializando mercado...</div>
@@ -224,31 +227,37 @@
     <input id="search" placeholder="🔍 Buscar moneda...">
     <table>
       <thead>
-        <tr><th>MONEDA</th><th>SUBIÓ 48H</th><th>LE FALTA</th></tr>
+        <tr>
+          <th>MONEDA</th>
+          <th>SUBIÓ 48H</th>
+          <th>LE FALTA</th>
+        </tr>
       </thead>
       <tbody id="tableBody"></tbody>
     </table>
   </div>
 
   <div class="main">
-    <div id="details" class="card">Selecciona una moneda.</div>
+    <div id="details" class="card">Selecciona una moneda para ver análisis completo.</div>
 
     <a id="linkBinanceWeb" class="btn-binance" target="_blank" style="display:none;">🌐 Abrir en Binance Web</a>
-    <a id="linkBinanceIOS" class="btn-binance" target="_blank" style="display:none;">📱 iOS</a>
-    <a id="linkBinanceAndroid" class="btn-binance" target="_blank" style="display:none;">📱 Android</a>
+    <a id="linkBinanceIOS" class="btn-binance" target="_blank" style="display:none;">📱 Abrir en Binance App (iOS)</a>
+    <a id="linkBinanceAndroid" class="btn-binance" target="_blank" style="display:none;">📱 Abrir en Binance App (Android)</a>
 
     <a href="https://wa.me/59177244375" target="_blank" class="whatsapp-btn">📲 CONTACTAR POR WHATSAPP</a>
 
     <div id="licenseArea" style="margin-top: 30px; border-top: 1px solid #444; padding-top: 20px;">
       <input id="premiumCode" placeholder="Pega tu código de licencia PRO aquí" class="license-input">
       <button class="license-btn" onclick="activatePremium()">ACTIVAR LICENCIA PERSONALIZADA</button>
-      <div id="licenseStatus" style="margin-top: 8px; text-align: center; font-weight: bold;"></div>
+      <div id="licenseStatus" class="license-status"></div>
     </div>
+
   </div>
+
 </div>
 
 <script>
-// =================== LÓGICA DE LICENCIA PRO ACTUALIZADA ===================
+// =================== SISTEMA DE LICENCIA ===================
 function getDeviceID() {
   let id = localStorage.getItem("deviceID");
   if (!id) {
@@ -263,7 +272,7 @@ function activatePremium() {
   const deviceID = getDeviceID();
 
   try {
-    const decoded = JSON.parse(atob(code));
+    const decoded = JSON.parse(atob(code)); // Suponiendo que el código esté en formato Base64
     const { n: nombre, t: fechaCreacion, d: diasDuracion } = decoded;
 
     const fechaExpiracion = fechaCreacion + (diasDuracion * 24 * 60 * 60 * 1000);
@@ -285,30 +294,11 @@ function activatePremium() {
     localStorage.setItem("userName", nombre);
     localStorage.setItem("expirationDate", fechaExpiracion);
 
-    showLicenseStatus(`¡Bienvenido ${nombre}! Activando... ✅`, "var(--accent-green)");
-    setTimeout(() => location.reload(), 1500);
+    showLicenseStatus(`¡Bienvenido ${nombre}! Activando... ✅`, "green");
+    setTimeout(() => location.reload(), 1500); // Recarga la página para activar el acceso PRO
   } catch (e) {
     showLicenseStatus("Código inválido o corrupto ❌", "red");
   }
-}
-
-function checkSubscription() {
-  if (localStorage.getItem("premiumActive") === "1") {
-    const exp = parseInt(localStorage.getItem("expirationDate"));
-    const nombre = localStorage.getItem("userName");
-
-    if (Date.now() > exp) {
-      localStorage.removeItem("premiumActive");
-      alert("Tu licencia ha expirado. Contacta al administrador.");
-      location.reload();
-    } else {
-      const dias = Math.ceil((exp - Date.now()) / (1000 * 60 * 60 * 24));
-      updateStatus(`🟢 PRO: ${nombre} | ⏳ Quedan ${dias} días`);
-      document.getElementById("licenseArea").style.display = "none"; // Ocultar input si ya es pro
-      return true;
-    }
-  }
-  return false;
 }
 
 function showLicenseStatus(msg, color) {
@@ -316,9 +306,9 @@ function showLicenseStatus(msg, color) {
   document.getElementById("licenseStatus").style.color = color;
 }
 
-// =================== MERCADO Y FUNCIONES ORIGINALES ===================
-let premiumActive = checkSubscription();
+// =================== MERCADO ===================
 let clickCount = parseInt(localStorage.getItem("clickCount") || "0");
+let premiumActive = localStorage.getItem("premiumActive") === "1";
 
 const sidebar = document.getElementById("sidebar");
 document.getElementById("menuToggle").onclick = () => {
@@ -331,130 +321,96 @@ function updateStatus(text) {
 }
 
 async function getAllUSDTSymbols() {
-  try {
-    const [spotInfo, futuresInfo] = await Promise.all([
-      fetch("https://api.binance.com/api/v3/exchangeInfo").then((r) => r.json()),
-      fetch("https://fapi.binance.com/fapi/v1/exchangeInfo").then((r) => r.json())
-    ]);
-    const spot = spotInfo.symbols.filter((s) => s.status === "TRADING" && s.quoteAsset === "USDT").map((s) => ({
-      symbol: s.symbol,
-      type: "spot"
-    }));
-    const futures = futuresInfo.symbols.filter((s) => s.status === "TRADING" && s.quoteAsset === "USDT").map((s) => ({
-      symbol: s.symbol,
-      type: "futures"
-    }));
-    return [...spot, ...futures];
-  } catch (e) {
-    return [];
-  }
+  const [spotInfo, futuresInfo] = await Promise.all([
+    fetch("https://api.binance.com/api/v3/exchangeInfo").then(r => r.json()),
+    fetch("https://fapi.binance.com/fapi/v1/exchangeInfo").then(r => r.json())
+  ]);
+  const spot = spotInfo.symbols.filter(s => s.status === "TRADING" && s.quoteAsset === "USDT").map(s => ({ symbol: s.symbol, type: "spot" }));
+  const futures = futuresInfo.symbols.filter(s => s.status === "TRADING" && s.quoteAsset === "USDT").map(s => ({ symbol: s.symbol, type: "futures" }));
+  return [...spot, ...futures];
 }
 
 async function calculate48h(symbol, type) {
   if (!premiumActive && clickCount >= 10) return null;
-  try {
-    const base = type === "futures" ? "https://fapi.binance.com/fapi/v1" : "https://api.binance.com/api/v3";
-    const [klines, ticker] = await Promise.all([
-      fetch(`${base}/klines?symbol=${symbol}&interval=1h&limit=48`).then((r) => r.json()),
-      fetch(`${base}/ticker/24hr?symbol=${symbol}`).then((r) => r.json())
-    ]);
-    if (!Array.isArray(klines) || klines.length < 48) return null;
-    const open48 = parseFloat(klines[0][1]);
-    const closeNow = parseFloat(klines[47][4]);
-    const change48 = ((closeNow - open48) / open48) * 100;
 
-    // Solo mostrar monedas con cambios de al menos 5% en 48 horas
-    if (change48 < 5) return null;
+  const base = type === "futures" ? "https://fapi.binance.com/fapi/v1" : "https://api.binance.com/api/v3";
+  const [klines, ticker] = await Promise.all([
+    fetch(`${base}/klines?symbol=${symbol}&interval=1h&limit=48`).then(r => r.json()),
+    fetch(`${base}/ticker/24hr?symbol=${symbol}`).then(r => r.json())
+  ]);
 
-    const change24 = parseFloat(ticker.priceChangePercent);
+  if (!Array.isArray(klines) || klines.length < 48) return null;
+  const open48 = parseFloat(klines[0][1]);
+  const closeNow = parseFloat(klines[47][4]);
+  const change48 = ((closeNow - open48) / open48) * 100;
+  if (change48 < 10) return null;
 
-    // Filtro de monedas que tienen al menos un 5% en 24 horas
-    if (change24 < 5) return null;
+  const high = parseFloat(ticker.highPrice);
+  const price = parseFloat(ticker.lastPrice);
+  const faltante = ((high - price) / high) * 100;
 
-    const high = parseFloat(ticker.highPrice);
-    const price = parseFloat(ticker.lastPrice);
-    const faltante = ((high - price) / high) * 100;
-
-    return {
-      symbol,
-      price,
-      change24,
-      change48,
-      high,
-      low: parseFloat(ticker.lowPrice),
-      volume: parseFloat(ticker.quoteVolume),
-      faltante,
-      type
-    };
-  } catch (e) {
-    return null;
-  }
+  return { symbol, price, change24: parseFloat(ticker.priceChangePercent), change48, high, low: parseFloat(ticker.lowPrice), volume: parseFloat(ticker.quoteVolume), faltante, type };
 }
 
 async function loadPRO() {
-  if (!premiumActive) {
-    updateStatus(`Versión Gratuita: (${clickCount}/10 clics usados)`);
-  }
-
+  updateStatus("Escaneando mercado...");
   const symbols = await getAllUSDTSymbols();
-  const promises = symbols.map((s) => calculate48h(s.symbol, s.type));
-  const results = (await Promise.all(promises)).filter((x) => x !== null).sort((a, b) => b.change48 - a.change48);
+  const promises = symbols.map(s => calculate48h(s.symbol, s.type));
+  const results = (await Promise.all(promises)).filter(x => x !== null).sort((a, b) => b.change48 - a.change48);
 
-  if (!premiumActive && clickCount >= 10) {
-    updateStatus("Límite alcanzado. Activa licencia PRO.");
-    document.getElementById("tableBody").innerHTML = "<tr><td colspan='3'>Licencia requerida 🔐</td></tr>";
+  if (!premiumActive) clickCount++;
+  localStorage.setItem("clickCount", clickCount);
+
+  if (!premiumActive && clickCount > 10) {
+    updateStatus("Has usado tus 10 oportunidades. Activa licencia PRO.");
+    document.getElementById("tableBody").innerHTML = "<tr><td colspan='3'>Licencia requerida</td></tr>";
     return;
   }
+
+  updateStatus(`Se encontraron ${results.length} monedas +10% en 48h (Clics usados: ${clickCount}/10)`);
 
   const tableBody = document.getElementById("tableBody");
   tableBody.innerHTML = "";
-  if (results.length === 0) {
-    tableBody.innerHTML = "<tr><td colspan='3'>Sin movimientos fuertes</td></tr>";
-    return;
-  }
 
-  results.forEach((c) => {
+  if (results.length === 0) { tableBody.innerHTML = "<tr><td colspan='3'>Sin oportunidades</td></tr>"; return; }
+
+  results.forEach(c => {
     const tr = document.createElement("tr");
-    const alertClass = c.change48 > 100 ? "alert-high-change" : "";
-    tr.innerHTML = `
-      <td><b>${c.symbol.replace("USDT", "")}</b></td>
-      <td class="green">${c.change48.toFixed(1)}%</td>
-      <td class="orange">${c.faltante.toFixed(1)}%</td>
-    `;
-
-    if (c.change48 > 100) {
-      tr.classList.add("alert-high-change"); // Clase para resaltar
-    }
-
-    tr.onclick = () => {
-      if (!premiumActive) {
-        clickCount++;
-        localStorage.setItem("clickCount", clickCount);
-      }
-      showDetails(c);
-    };
-
+    tr.innerHTML = `<td><b>${c.symbol.replace("USDT", "")}</b></td>
+                    <td class="green">${c.change48.toFixed(1)}%</td>
+                    <td class="orange">${c.faltante.toFixed(1)}%</td>`;
+    tr.onclick = () => showDetails(c);
     tableBody.appendChild(tr);
   });
 }
 
 function showDetails(c) {
+  if (!premiumActive && clickCount > 10) return;
+
   document.getElementById("details").innerHTML = `
     <h2 style="color:#fcd535">${c.symbol}</h2>
-    <p><b>Precio:</b> $${c.price}</p>
-    <p class="${c.change24 >= 0 ? 'green' : 'red'}"><b>24H:</b> ${c.change24.toFixed(2)}%</p>
-    <p class="green"><b>48H:</b> ${c.change48.toFixed(2)}%</p>
-    <hr style="border:0; border-top:1px solid #444">
-    <p class="orange">Faltante para Máx 24h: <b>${c.faltante.toFixed(1)}%</b></p>
-    <p>Volumen: ${(c.volume / 1000000).toFixed(2)}M USDT</p>
+    <p><b>Precio actual:</b> $${c.price}</p>
+    <p class="${c.change24 >= 0 ? 'green' : 'red'}"><b>Cambio 24H:</b> ${c.change24.toFixed(2)}%</p>
+    <p class="green"><b>Subida 48H:</b> ${c.change48.toFixed(2)}%</p>
+    <hr>
+    <p><b>Máx 24H:</b> $${c.high}</p>
+    <p><b>Mín 24H:</b> $${c.low}</p>
+    <p class="orange">⚠ Le falta <b>${c.faltante.toFixed(1)}%</b> para llegar al máximo 24H</p>
+    <p><b>Volumen:</b> ${(c.volume / 1000000).toFixed(2)}M USDT</p>
   `;
+
   document.getElementById("linkBinanceWeb").style.display = "block";
+  document.getElementById("linkBinanceIOS").style.display = "block";
+  document.getElementById("linkBinanceAndroid").style.display = "block";
+
   document.getElementById("linkBinanceWeb").href = `https://www.binance.com/es/futures/${c.symbol}?type=perpetual`;
-  // ... (otros links)
+  document.getElementById("linkBinanceIOS").href = `binance://futures/trade?symbol=${c.symbol}`;
+  document.getElementById("linkBinanceAndroid").href = `binance://futures/trade?symbol=${c.symbol}`;
 }
 
+document.getElementById("search").oninput = loadPRO;
 loadPRO();
-setInterval(loadPRO, 120000); // Actualiza cada 2 min
+setInterval(loadPRO, 90000);
 </script>
 
 </body>
