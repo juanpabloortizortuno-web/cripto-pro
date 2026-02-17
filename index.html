@@ -1,246 +1,178 @@
 <!DOCTYPE html>
 <html lang="es">
 <head>
-  <meta charset="UTF-8">
-  <title>🚀 CDC FUTURO CRIPTO | PRO ELITE</title>
-  <meta name="viewport" content="width=device-width, initial-scale=1">
-
-  <style>
-    :root {
-      --bg-main: #0f1115;
-      --bg-card: #1a1d24;
-      --accent-yellow: #fcd535;
-      --accent-green: #00c853;
-      --accent-red: #ff5252;
-      --accent-blue: #2196f3;
-      --text-light: #e0e0e0;
-    }
-
-    body { margin: 0; font-family: 'Segoe UI', sans-serif; background: var(--bg-main); color: var(--text-light); overflow-x: hidden; }
-    header { background: var(--bg-card); padding: 10px; display: flex; justify-content: space-between; align-items: center; border-bottom: 2px solid var(--accent-yellow); }
-    header h1 { margin: 0; font-size: 16px; color: var(--accent-yellow); }
-    header a { color: var(--accent-blue); text-decoration: none; font-size: 13px; font-weight: bold; }
-    #menuToggle { background: var(--accent-yellow); border: none; border-radius: 6px; width: 32px; height: 32px; font-size: 18px; cursor: pointer; }
-    #statusBar { text-align: center; padding: 8px; background: #1f222a; font-size: 13px; }
-
-    .container { display: flex; height: calc(100vh - 60px); }
-    .sidebar { width: 340px; background: var(--bg-card); overflow-y: auto; border-right: 2px solid var(--accent-yellow); transition: transform 0.3s ease; z-index: 900; }
-    .sidebar.hidden { transform: translateX(-100%); position: absolute; }
-    input { width: 90%; margin: 10px; padding: 10px; border-radius: 6px; border: none; background: #2c2f38; color: white; }
-    table { width: 100%; border-collapse: collapse; }
-    th { background: var(--accent-yellow); color: black; padding: 8px; font-size: 12px; position: sticky; top: 0; }
-    td { padding: 8px; text-align: center; border-bottom: 1px solid #333; font-size: 13px; }
-    tr:hover { background: #2a2e38; cursor: pointer; }
-
-    .main { flex: 1; padding: 20px; overflow-y: auto; }
-    .card { background: var(--bg-card); padding: 20px; border-radius: 12px; box-shadow: 0 0 20px rgba(0,0,0,0.4); }
-    .green { color: var(--accent-green); }
-    .red { color: var(--accent-red); }
-    .orange { color: orange; }
-
-    .whatsapp-btn { display: block; margin-top: 20px; padding: 15px; text-align: center; background: #25D366; color: white; font-weight: bold; border-radius: 8px; text-decoration: none; }
-    .btn-binance { display: block; margin-top: 10px; padding: 12px; text-align: center; background: var(--accent-blue); color: white; font-weight: bold; border-radius: 6px; text-decoration: none; }
-    .tiktok-link { display: inline-block; margin-top: 15px; padding: 10px 15px; background: #FF0050; color: white; border-radius: 6px; font-weight: bold; text-decoration: none; text-align: center; }
-    .tiktok-link:hover { background: #e60044; }
-
-    .license-input { width: calc(100% - 24px); padding: 12px; margin-top: 10px; border-radius: 6px; border: none; text-align: center; background: #2c2f38; color: white; }
-    .license-btn { padding: 12px; margin-top: 10px; width: 100%; background: var(--accent-yellow); border: none; border-radius: 6px; font-weight: bold; cursor: pointer; }
-    .license-status { text-align: center; font-weight: bold; }
-  </style>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>CDC FUTURO-PRO</title>
+<style>
+:root {
+  --bg-main: #0f1115;
+  --bg-card: #1a1d24;
+  --accent-yellow: #fcd535;
+  --accent-green: #00c853;
+  --accent-red: #ff5252;
+  --accent-blue: #2196f3;
+  --text-light: #e0e0e0;
+}
+body { margin:0; font-family:'Segoe UI',sans-serif; background:var(--bg-main); color:var(--text-light); overflow-x:hidden; }
+header { background:var(--bg-card); padding:10px 15px; border-bottom:2px solid var(--accent-yellow); display:flex; flex-direction:column; align-items:center; }
+.header-top { display:flex; width:100%; justify-content:space-between; align-items:center; }
+header h1 { margin:0; font-size:16px; color:var(--accent-yellow); text-align:center; line-height:1.1; font-weight:bold; }
+#menuToggle { background:var(--accent-yellow); border:none; border-radius:6px; width:35px; height:35px; font-size:18px; cursor:pointer; }
+.header-links { display:flex; gap:8px; width:100%; margin-top:10px; justify-content:center; }
+.btn-small { padding:5px 10px; border-radius:4px; font-weight:bold; text-decoration:none; font-size:11px; text-align:center; }
+#blockScreen { display:none; position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(15,17,21,0.98); z-index:9999; flex-direction:column; justify-content:center; align-items:center; text-align:center; padding:20px; }
+.container { display:flex; height:calc(100vh - 110px); position:relative; }
+.sidebar { width:300px; background:var(--bg-card); overflow-y:auto; border-right:2px solid var(--accent-yellow); transition: transform 0.3s ease; z-index:900; position:absolute; height:100%; left:0; }
+.sidebar.hidden { transform:translateX(-100%); }
+.main { flex:1; padding:15px; overflow-y:auto; width:100%; }
+#search { width:90%; margin:10px auto; display:block; padding:10px; border-radius:6px; border:none; background:#2c2f38; color:white; }
+table { width:100%; border-collapse:collapse; }
+th { background:var(--accent-yellow); color:black; padding:8px; font-size:11px; position:sticky; top:0; }
+td { padding:12px 8px; text-align:center; border-bottom:1px solid #333; font-size:13px; }
+.card { background:var(--bg-card); padding:20px; border-radius:12px; box-shadow:0 0 20px rgba(0,0,0,0.4); margin-bottom:10px; }
+.whatsapp-btn { display:block; margin-top:12px; padding:12px; text-align:center; background:#25D366; color:white; font-weight:bold; border-radius:6px; text-decoration:none; }
+.btn-binance { display:block; margin-top:8px; padding:10px; text-align:center; background:var(--accent-blue); color:white; font-weight:bold; border-radius:6px; text-decoration:none; font-size:12px; }
+#statusBar { text-align:center; padding:6px; background:#1f222a; font-size:12px; color:var(--accent-yellow); }
+.recommend { font-weight:bold; font-size:14px; margin-top:8px; }
+</style>
 </head>
-
 <body>
+
+<div id="blockScreen">
+  <h1 style="color:var(--accent-red)">SISTEMA BLOQUEADO ❌</h1>
+  <p>Has agotado tus 10 intentos gratuitos.</p>
+  <p>Para seguir usando <b>CDC FUTURO-PRO</b>, debes adquirir una licencia.</p>
+  <a href="https://wa.me/59177244375" class="whatsapp-btn" style="width:200px">ADQUIRIR LICENCIA PRO</a>
+  <div id="licenseAreaBlock" style="margin-top:20px;">
+    <input id="premiumCodeBlock" placeholder="Pega tu código aquí" style="padding:10px; border-radius:5px; border:none;">
+    <button onclick="activateFromBlock()" style="padding:10px; background:var(--accent-yellow); border:none; border-radius:5px; font-weight:bold;">ACTIVAR</button>
+  </div>
+</div>
+
 <header>
-  <button id="menuToggle">⬅</button>
-  <h1>🚀 CDC FUTURO CRIPTO — PRO ELITE</h1>
-  <div id="welcomeMessage" style="text-align: center; color: white; font-size: 14px;"></div>
-  <a class="tiktok-link" href="https://www.tiktok.com/@chicodelascomputadoras" target="_blank">Síguenos en TikTok</a>
-  <a class="tiktok-link" href="https://juanpabloortizortuno-web.github.io/licencia-pro/" target="_blank" style="background:#fcd535;color:#000;margin-left:10px;">LICENCIA PRO</a>
+  <div class="header-top">
+    <button id="menuToggle">☰</button>
+    <h1>CDC<br>FUTURO-PRO</h1>
+    <div style="width:35px;"></div>
+  </div>
+  <div class="header-links">
+    <a class="btn-small" href="https://www.tiktok.com/@chicodelascomputadoras" target="_blank" style="background:#FF0050; color:white;">TikTok</a>
+    <a class="btn-small" href="https://juanpabloortizortuno-web.github.io/licencia-pro/" target="_blank" style="background:#fcd535;color:#000;">LICENCIA PRO</a>
+  </div>
 </header>
 
-<div id="statusBar">Inicializando mercado...</div>
+<div id="statusBar">Inicializando...</div>
 
 <div class="container">
-  <div class="sidebar" id="sidebar">
+  <div class="sidebar hidden" id="sidebar">
     <input id="search" placeholder="🔍 Buscar moneda...">
     <table>
       <thead>
-        <tr>
-          <th>MONEDA</th>
-          <th>SUBIÓ 48H</th>
-          <th>VA POR</th>
-        </tr>
+        <tr><th>MONEDA</th><th>SUBIÓ 48H</th><th>VA POR</th></tr>
       </thead>
       <tbody id="tableBody"></tbody>
     </table>
   </div>
-
   <div class="main">
-    <div id="details" class="card">Selecciona una moneda para ver análisis completo.</div>
-
-    <a id="linkBinanceWeb" class="btn-binance" target="_blank" style="display:none;">🌐 Abrir en Binance Web</a>
-    <a id="linkBinanceIOS" class="btn-binance" target="_blank" style="display:none;">📱 Abrir en Binance App (iOS)</a>
-    <a id="linkBinanceAndroid" class="btn-binance" target="_blank" style="display:none;">📱 Abrir en Binance App (Android)</a>
-
-    <a href="https://wa.me/59177244375" target="_blank" class="whatsapp-btn">📲 CONTACTAR POR WHATSAPP</a>
-
-    <div id="licenseArea" style="margin-top: 30px; border-top: 1px solid #444; padding-top: 20px;">
-      <input id="premiumCode" placeholder="Pega tu código de licencia PRO aquí" class="license-input">
-      <button class="license-btn" onclick="activatePremium()">ACTIVAR LICENCIA PERSONALIZADA</button>
-      <div id="licenseStatus" class="license-status"></div>
+    <div id="details" class="card">Selecciona una moneda.</div>
+    <div id="binanceLinks">
+      <a id="linkBinanceWeb" class="btn-binance" target="_blank" style="display:none;">🌐 Binance Web</a>
+      <a id="linkBinanceIOS" class="btn-binance" target="_blank" style="display:none;">📱 App (iOS)</a>
+      <a id="linkBinanceAndroid" class="btn-binance" target="_blank" style="display:none;">📱 App (Android)</a>
     </div>
+    <a href="https://wa.me/59177244375" target="_blank" class="whatsapp-btn">📲 WHATSAPP SOPORTE</a>
   </div>
 </div>
 
 <script>
-function getDeviceID() {
-  let id = localStorage.getItem("deviceID");
-  if (!id) {
-    id = "DEV-" + Math.random().toString(36).substring(2,12).toUpperCase();
-    localStorage.setItem("deviceID", id);
-  }
-  return id;
+const sidebar = document.getElementById("sidebar");
+const statusBar = document.getElementById("statusBar");
+document.getElementById("menuToggle").onclick = () => { sidebar.classList.toggle("hidden"); };
+
+let clickCount = parseInt(localStorage.getItem("clickCount")||"0");
+let premiumActive = localStorage.getItem("premiumActive")==="1";
+
+function checkLimit() {
+  if(!premiumActive && clickCount>=10){ document.getElementById("blockScreen").style.display="flex"; return true; }
+  return false;
 }
-
-document.addEventListener("DOMContentLoaded", () => {
-  const premiumActive = localStorage.getItem("premiumActive")==="1";
-  const userName = localStorage.getItem("userName");
-  const expirationDate = parseInt(localStorage.getItem("expirationDate"));
-  if(premiumActive && userName && expirationDate){
-    const daysLeft = Math.max(0, Math.ceil((expirationDate - Date.now())/(1000*3600*24)));
-    document.getElementById("welcomeMessage").innerHTML = `¡Bienvenido ${userName}! Tienes ${daysLeft} días restantes de tu licencia PRO.`;
-    if(daysLeft<=0){ showLicenseStatus("Tu licencia ha expirado ❌","red"); localStorage.removeItem("premiumActive"); localStorage.removeItem("userName"); localStorage.removeItem("expirationDate"); }
-    document.getElementById("licenseArea").style.display="none";
-  }else{ document.getElementById("licenseArea").style.display="block"; }
-});
-
-function activatePremium(){
-  const code=document.getElementById("premiumCode").value.trim();
-  const deviceID=getDeviceID();
-  try{
-    const decoded=JSON.parse(atob(code));
-    const {n:nombre,t:fechaCreacion,d:diasDuracion}=decoded;
-    const fechaExpiracion=fechaCreacion+(diasDuracion*24*60*60*1000);
-    if(Date.now()>fechaExpiracion){ showLicenseStatus("Esta licencia ha expirado ❌","red"); return; }
-    let licenseUsedMap=JSON.parse(localStorage.getItem("licenseUsed")||"{}");
-    if(licenseUsedMap[code] && licenseUsedMap[code]!==deviceID){ showLicenseStatus("Licencia vinculada a otro equipo ❌","red"); return; }
-    licenseUsedMap[code]=deviceID;
-    localStorage.setItem("licenseUsed",JSON.stringify(licenseUsedMap));
-    localStorage.setItem("premiumActive","1");
-    localStorage.setItem("userName",nombre);
-    localStorage.setItem("expirationDate",fechaExpiracion);
-    document.getElementById("welcomeMessage").innerHTML=`¡Bienvenido ${nombre}! Tienes ${diasDuracion} días de licencia PRO.`;
-    showLicenseStatus(`¡Bienvenido ${nombre}! Activando... ✅`,"green");
-    setTimeout(()=>location.reload(),1500);
-  }catch(e){ showLicenseStatus("Código inválido o corrupto ❌","red"); }
-}
-
-function showLicenseStatus(msg,color){ const el=document.getElementById("licenseStatus"); el.innerText=msg; el.style.color=color; }
-
-// =================== MERCADO ===================
-let clickCount=parseInt(localStorage.getItem("clickCount")||"0");
-let premiumActive=localStorage.getItem("premiumActive")==="1";
-
-const sidebar=document.getElementById("sidebar");
-document.getElementById("menuToggle").onclick=()=>{ sidebar.classList.toggle("hidden"); document.getElementById("menuToggle").innerText=sidebar.classList.contains("hidden")?"➡":"⬅"; };
-
-function updateStatus(text){ document.getElementById("statusBar").innerText=text; }
 
 async function getAllUSDTSymbols(){
-  const [spotInfo,futuresInfo]=await Promise.all([
-    fetch("https://api.binance.com/api/v3/exchangeInfo").then(r=>r.json()),
-    fetch("https://fapi.binance.com/fapi/v1/exchangeInfo").then(r=>r.json())
-  ]);
-  const spot = spotInfo.symbols.filter(s=>s.status==="TRADING"&&s.quoteAsset==="USDT").map(s=>({symbol:s.symbol,type:"spot"}));
-  const futures = futuresInfo.symbols.filter(s=>s.status==="TRADING"&&s.quoteAsset==="USDT").map(s=>({symbol:s.symbol,type:"futures"}));
-  return [...spot,...futures];
+  try {
+    const [spot,futures]=await Promise.all([
+      fetch("https://api.binance.com/api/v3/exchangeInfo").then(r=>r.json()),
+      fetch("https://fapi.binance.com/fapi/v1/exchangeInfo").then(r=>r.json())
+    ]);
+    return [...spot.symbols.filter(s=>s.status==="TRADING"&&s.quoteAsset==="USDT").map(s=>({symbol:s.symbol,type:"spot"})),
+            ...futures.symbols.filter(s=>s.status==="TRADING"&&s.quoteAsset==="USDT").map(s=>({symbol:s.symbol,type:"futures"}))];
+  }catch(e){ return []; }
 }
 
 async function calculate48h(symbol,type){
-  if(!premiumActive && clickCount>=10) return null;
-  const base=type==="futures"?"https://fapi.binance.com/fapi/v1":"https://api.binance.com/api/v3";
+  const base = type==="futures"?"https://fapi.binance.com/fapi/v1":"https://api.binance.com/api/v3";
   try{
     const [klines,ticker]=await Promise.all([
-      fetch(`${base}/klines?symbol=${symbol}&interval=1h&limit=48`).then(r=>r.json()),
+      fetch(`${base}/klines?symbol=${symbol}&interval=1h&limit=50`).then(r=>r.json()),
       fetch(`${base}/ticker/24hr?symbol=${symbol}`).then(r=>r.json())
     ]);
-    if(!Array.isArray(klines)||klines.length<48) return null;
-    const open48=parseFloat(klines[0][1]);
-    const closeNow=parseFloat(klines[47][4]);
-    if(isNaN(open48)||isNaN(closeNow)) return null;
-    const change48=((closeNow-open48)/open48)*100;
+    const open48=parseFloat(klines[0][1]), closeNow=parseFloat(klines[47][4]);
+    const change48 = ((closeNow-open48)/open48)*100;
     if(change48<10) return null;
-
-    const high=parseFloat(ticker.highPrice);
-    const low=parseFloat(ticker.lowPrice);
-    const price=parseFloat(ticker.lastPrice);
-    const change24=parseFloat(ticker.priceChangePercent);
-    const volume=parseFloat(ticker.quoteVolume);
-    if([high,low,price,change24,volume].some(v=>isNaN(v))) return null;
-
-    const vaPor = ((price-low)/(high-low))*100;
-    return {symbol,price,change24,change48,high,low,volume,vaPor,type};
+    const closes = klines.map(k=>parseFloat(k[4]));
+    function EMA(prices,period){ const k=2/(period+1); let ema=prices[0]; for(let i=1;i<prices.length;i++) ema=prices[i]*k + ema*(1-k); return ema;}
+    const ema20 = EMA(closes.slice(-20),20), ema50=EMA(closes,50);
+    let rec="Esperar";
+    if(ema20>ema50 && closes[closes.length-1]>ema20) rec="Posible compra";
+    if(ema20<ema50 && closes[closes.length-1]<ema20) rec="Posible venta";
+    return {symbol,price:parseFloat(ticker.lastPrice),change24:parseFloat(ticker.priceChangePercent),change48,high:parseFloat(ticker.highPrice),low:parseFloat(ticker.lowPrice),volume:parseFloat(ticker.quoteVolume),vaPor:((ticker.lastPrice-ticker.lowPrice)/(ticker.highPrice-ticker.lowPrice))*100, ema20, ema50, rec, type};
   }catch(e){ return null; }
 }
 
 async function loadPRO(){
-  updateStatus("Escaneando mercado...");
-  const symbols=await getAllUSDTSymbols();
-  const promises=symbols.map(s=>calculate48h(s.symbol,s.type));
-  const results=(await Promise.all(promises)).filter(x=>x!==null).sort((a,b)=>b.change48-a.change48);
-
-  if(!premiumActive) clickCount++;
-  localStorage.setItem("clickCount",clickCount);
-
-  if(!premiumActive && clickCount>10){
-    updateStatus("Has usado tus 10 oportunidades. Activa licencia PRO.");
-    document.getElementById("tableBody").innerHTML="<tr><td colspan='3'>Licencia requerida</td></tr>";
-    return;
-  }
-
-  updateStatus(`Se encontraron ${results.length} monedas +10% en 48h (Clics usados: ${clickCount}/10)`);
-
-  const tableBody=document.getElementById("tableBody");
+  if(checkLimit()) return;
+  statusBar.innerText = "Escaneando... Intentos: "+clickCount+"/10";
+  const symbols = await getAllUSDTSymbols();
+  const results = (await Promise.all(symbols.map(s=>calculate48h(s.symbol,s.type)))).filter(x=>x!==null).sort((a,b)=>b.change48-a.change48);
+  const tableBody = document.getElementById("tableBody");
   tableBody.innerHTML="";
-  if(results.length===0){ tableBody.innerHTML="<tr><td colspan='3'>Sin oportunidades</td></tr>"; return; }
-
   results.forEach(c=>{
     const tr=document.createElement("tr");
     tr.innerHTML=`<td><b>${c.symbol.replace("USDT","")}</b></td>
-                    <td class="green">${c.change48.toFixed(1)}%</td>
-                    <td class="orange">Va por ${c.vaPor.toFixed(1)}% hacia su máximo de 24H</td>`;
-    tr.onclick=()=>showDetails(c);
+                  <td style="color:#00c853">${c.change48.toFixed(1)}%</td>
+                  <td style="color:orange">Va por ${c.vaPor.toFixed(1)}%</td>`;
+    tr.onclick=()=>{ if(checkLimit()) return; clickCount++; localStorage.setItem("clickCount",clickCount); showDetails(c); sidebar.classList.add("hidden"); };
     tableBody.appendChild(tr);
   });
 }
 
 function showDetails(c){
-  if(!premiumActive && clickCount>10) return;
   document.getElementById("details").innerHTML=`
     <h2 style="color:#fcd535">${c.symbol}</h2>
-    <p><b>Precio actual:</b> $${c.price}</p>
-    <p class="${c.change24>=0?'green':'red'}"><b>Cambio 24H:</b> ${c.change24.toFixed(2)}%</p>
-    <p class="green"><b>Subida 48H:</b> ${c.change48.toFixed(2)}%</p>
-    <hr>
-    <p><b>Máx 24H:</b> $${c.high}</p>
-    <p><b>Mín 24H:</b> $${c.low}</p>
-    <p class="orange">Va por ${c.vaPor.toFixed(1)}% hacia su máximo de 24H</p>
-    <p><b>Volumen:</b> ${(c.volume/1000000).toFixed(2)}M USDT</p>
-  `;
-
-  document.getElementById("linkBinanceWeb").style.display="block";
-  document.getElementById("linkBinanceIOS").style.display="block";
-  document.getElementById("linkBinanceAndroid").style.display="block";
-
-  document.getElementById("linkBinanceWeb").href=`https://www.binance.com/es/futures/${c.symbol}?type=perpetual`;
+    <p><b>Precio:</b> $${c.price}</p>
+    <p style="color:${c.change24>=0?'#00c853':'#ff5252'}"><b>24H:</b> ${c.change24.toFixed(2)}%</p>
+    <p style="color:#00c853"><b>Subida 48H:</b> ${c.change48.toFixed(2)}%</p>
+    <p style="color:orange">Va por ${c.vaPor.toFixed(1)}% hacia su máximo de 24H</p>
+    <p><b>EMA20:</b> ${c.ema20.toFixed(2)} | <b>EMA50:</b> ${c.ema50.toFixed(2)}</p>
+    <p class="recommend" style="color:${c.rec.includes('compra')?'#00c853':'#ff5252'}">${c.rec}</p>
+    <p style="font-size:12px; opacity:0.7">Volumen: ${(c.volume/1000000).toFixed(2)}M</p>`;
+  document.querySelectorAll(".btn-binance").forEach(b=>b.style.display="block");
+  document.getElementById("linkBinanceWeb").href=`https://www.binance.com/es/futures/${c.symbol}`;
   document.getElementById("linkBinanceIOS").href=`binance://futures/trade?symbol=${c.symbol}`;
   document.getElementById("linkBinanceAndroid").href=`binance://futures/trade?symbol=${c.symbol}`;
 }
 
-document.getElementById("search").oninput=loadPRO;
-loadPRO();
-setInterval(loadPRO,90000);
-</script>
+function activateFromBlock(){
+  const code=document.getElementById("premiumCodeBlock").value.trim();
+  try{ atob(code); localStorage.setItem("premiumActive","1"); location.reload(); }catch(e){ alert("Código inválido"); }
+}
 
+document.getElementById("search").oninput=(e)=>{
+  const val=e.target.value.toUpperCase();
+  document.querySelectorAll("#tableBody tr").forEach(tr=>tr.style.display=tr.innerText.includes(val)?"":"none");
+};
+
+checkLimit(); loadPRO(); setInterval(loadPRO,10000);
+</script>
 </body>
 </html>
