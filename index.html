@@ -65,7 +65,6 @@ td{padding:12px 8px;text-align:center;border-bottom:1px solid #333;font-size:13p
 <div id="statusBar">Inicializando...</div>
 
 <div class="container">
-
   <div class="sidebar hidden" id="sidebar">
     <input id="search" placeholder="🔍 Buscar moneda...">
     <table>
@@ -90,7 +89,6 @@ td{padding:12px 8px;text-align:center;border-bottom:1px solid #333;font-size:13p
     </div>
     <a href="https://wa.me/59177244375" target="_blank" class="whatsapp-btn">📲 WHATSAPP SOPORTE</a>
   </div>
-
 </div>
 
 <script>
@@ -147,33 +145,40 @@ async function loadPRO(){
     const tableBody=document.getElementById("tableBody");
     tableBody.innerHTML="";
 
-    for(const t of filtered){
-      const price=parseFloat(t.lastPrice);
-      const high=parseFloat(t.highPrice);
-      const low=parseFloat(t.lowPrice);
-      const faltante=((high-price)/(high-low))*100;
+    const klinesPromises = filtered.map(async t => {
+      try {
+        const price=parseFloat(t.lastPrice);
+        const high=parseFloat(t.highPrice);
+        const low=parseFloat(t.lowPrice);
+        const faltante=((high-price)/(high-low))*100;
 
-      // Klines 48H en Futures
-      const klines=await fetch(`https://fapi.binance.com/fapi/v1/klines?symbol=${t.symbol}&interval=1h&limit=48`).then(r=>r.json());
-      const open48=parseFloat(klines[0][1]);
-      const close48=parseFloat(klines[47][4]);
-      const change48=((close48-open48)/open48)*100;
+        const klines=await fetch(`https://fapi.binance.com/fapi/v1/klines?symbol=${t.symbol}&interval=1h&limit=48`).then(r=>r.json());
+        const open48=parseFloat(klines[0][1]);
+        const close48=parseFloat(klines[47][4]);
+        const change48=((close48-open48)/open48)*100;
 
-      const tr=document.createElement("tr");
-      tr.innerHTML=`
-        <td><b>${t.symbol.replace("USDT","")}</b></td>
-        <td style="color:#00c853">${parseFloat(t.priceChangePercent).toFixed(1)}%</td>
-        <td style="color:#ff9800">${change48.toFixed(1)}%</td>
-        <td style="color:${faltante<5?'#ff5252':'white'}">${faltante.toFixed(1)}%</td>
-      `;
-      tr.onclick=()=>{
-        if(checkLimit()) return;
-        if(!isLicenseActive()){clickCount++; localStorage.setItem("clickCount",clickCount);}
-        showDetails(t,change48,faltante);
-        sidebar.classList.add("hidden");
-      };
-      tableBody.appendChild(tr);
-    }
+        const tr=document.createElement("tr");
+        tr.innerHTML=`
+          <td><b>${t.symbol.replace("USDT","")}</b></td>
+          <td style="color:#00c853">${parseFloat(t.priceChangePercent).toFixed(1)}%</td>
+          <td style="color:#ff9800">${change48.toFixed(1)}%</td>
+          <td style="color:${faltante<5?'#ff5252':'white'}">${faltante.toFixed(1)}%</td>
+        `;
+        tr.onclick=()=>{
+          if(checkLimit()) return;
+          if(!isLicenseActive()){clickCount++; localStorage.setItem("clickCount",clickCount);}
+          showDetails(t,change48,faltante);
+          sidebar.classList.add("hidden");
+        };
+        tableBody.appendChild(tr);
+
+      } catch(e){
+        console.warn(`Error fetch klines ${t.symbol}`,e);
+      }
+    });
+
+    await Promise.allSettled(klinesPromises);
+
   }catch(e){
     statusBar.innerText="Error Binance ⚠️";
   }
@@ -226,7 +231,6 @@ document.getElementById("search").oninput=(e)=>{
 checkLimit();
 loadPRO();
 setInterval(loadPRO,60000);
-
 </script>
 </body>
 </html>
