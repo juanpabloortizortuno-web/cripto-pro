@@ -1,4 +1,3 @@
-<<<<<<< HEAD
 # 🚀 CDC FUTURO CRIPTO | PRO ELITE
 
 **Creador:** Juan Pablo Ortiz Ortuño  
@@ -125,5 +124,3 @@ Su objetivo es ayudar a los traders y entusiastas a identificar rápidamente **o
 ---
 
 ## 🗂️ Estructura del Repositorio
-
->>>>>>> 24a54b6280920a3e7cbfdb9538bb54b5c94513de
