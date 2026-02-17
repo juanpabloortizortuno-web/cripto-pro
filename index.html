@@ -2,71 +2,117 @@
 <html lang="es">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>CDC FUTURO-PRO SHORT</title>
+
 <style>
 :root {
   --bg-main:#0f1115;
   --bg-card:#1a1d24;
-  --accent-yellow:#fcd535;
-  --accent-green:#00c853;
-  --accent-red:#ff5252;
-  --accent-blue:#2196f3;
-  --text-light:#e0e0e0;
+  --yellow:#fcd535;
+  --green:#00c853;
+  --red:#ff5252;
+  --orange:#ff9800;
+  --text:#e0e0e0;
 }
-body{margin:0;font-family:'Segoe UI',sans-serif;background:var(--bg-main);color:var(--text-light);overflow-x:hidden;}
-header{background:var(--bg-card);padding:10px 15px;border-bottom:2px solid var(--accent-yellow);display:flex;flex-direction:column;align-items:center;}
-.header-top{display:flex;width:100%;justify-content:space-between;align-items:center;}
-header h1{margin:0;font-size:16px;color:var(--accent-yellow);text-align:center;font-weight:bold;}
-#menuToggle{background:var(--accent-yellow);border:none;border-radius:6px;width:35px;height:35px;font-size:18px;cursor:pointer;}
-.header-links{display:flex;gap:8px;width:100%;margin-top:10px;justify-content:center;}
-.btn-small{padding:5px 10px;border-radius:4px;font-weight:bold;text-decoration:none;font-size:11px;text-align:center;}
-#blockScreen{display:none;position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(15,17,21,0.98);z-index:9999;flex-direction:column;justify-content:center;align-items:center;text-align:center;padding:20px;}
-.container{display:flex;height:calc(100vh - 110px);position:relative;}
-.sidebar{width:300px;background:var(--bg-card);overflow-y:auto;border-right:2px solid var(--accent-yellow);transition:transform 0.3s ease;z-index:900;position:absolute;height:100%;left:0;}
-.sidebar.hidden{transform:translateX(-100%);}
-.main{flex:1;padding:15px;overflow-y:auto;width:100%;}
-#search{width:90%;margin:10px auto;display:block;padding:10px;border-radius:6px;border:none;background:#2c2f38;color:white;}
-table{width:100%;border-collapse:collapse;}
-th{background:var(--accent-yellow);color:black;padding:8px;font-size:11px;position:sticky;top:0;}
-td{padding:12px 8px;text-align:center;border-bottom:1px solid #333;font-size:13px;}
-.card{background:var(--bg-card);padding:20px;border-radius:12px;box-shadow:0 0 20px rgba(0,0,0,0.4);margin-bottom:10px;}
-.whatsapp-btn{display:block;margin-top:12px;padding:12px;text-align:center;background:#25D366;color:white;font-weight:bold;border-radius:6px;text-decoration:none;}
-.btn-binance{display:block;margin-top:8px;padding:10px;text-align:center;background:var(--accent-blue);color:white;font-weight:bold;border-radius:6px;text-decoration:none;font-size:12px;}
-#statusBar{text-align:center;padding:6px;background:#1f222a;font-size:12px;color:var(--accent-yellow);}
-.alert{font-weight:bold;font-size:16px;color:var(--accent-red);}
+
+body{
+  margin:0;
+  font-family:Segoe UI;
+  background:var(--bg-main);
+  color:var(--text);
+}
+
+header{
+  background:var(--bg-card);
+  padding:15px;
+  text-align:center;
+  border-bottom:2px solid var(--yellow);
+}
+
+h1{
+  margin:0;
+  font-size:18px;
+  color:var(--yellow);
+}
+
+#statusBar{
+  text-align:center;
+  padding:8px;
+  background:#1f222a;
+  font-size:12px;
+  color:var(--yellow);
+}
+
+.container{
+  display:flex;
+  height:calc(100vh - 100px);
+}
+
+.sidebar{
+  width:320px;
+  background:var(--bg-card);
+  overflow-y:auto;
+  border-right:2px solid var(--yellow);
+}
+
+table{
+  width:100%;
+  border-collapse:collapse;
+}
+
+th{
+  background:var(--yellow);
+  color:black;
+  font-size:11px;
+  padding:6px;
+}
+
+td{
+  padding:10px 6px;
+  font-size:12px;
+  text-align:center;
+  border-bottom:1px solid #333;
+}
+
+tr:hover{
+  background:#252933;
+  cursor:pointer;
+}
+
+.main{
+  flex:1;
+  padding:15px;
+  overflow-y:auto;
+}
+
+.card{
+  background:var(--bg-card);
+  padding:20px;
+  border-radius:12px;
+  box-shadow:0 0 15px rgba(0,0,0,0.4);
+}
+
+.alert{
+  font-size:18px;
+  font-weight:bold;
+  color:var(--red);
+}
+
 </style>
 </head>
+
 <body>
 
-<div id="blockScreen">
-  <h1 style="color:var(--accent-red)">SISTEMA BLOQUEADO ❌</h1>
-  <p>Has agotado tus 10 usos gratuitos.</p>
-  <p>Adquiere licencia PRO válida por 365 días.</p>
-  <a href="https://wa.me/59177244375" class="whatsapp-btn" style="width:200px">ADQUIRIR LICENCIA PRO</a>
-  <div style="margin-top:20px;">
-    <input id="premiumCodeBlock" placeholder="Pega tu código aquí" style="padding:10px;border-radius:5px;border:none;">
-    <button onclick="activateFromBlock()" style="padding:10px;background:var(--accent-yellow);border:none;border-radius:5px;font-weight:bold;">ACTIVAR</button>
-  </div>
-</div>
-
 <header>
-  <div class="header-top">
-    <button id="menuToggle">☰</button>
-    <h1>CDC<br>FUTURO-PRO SHORT</h1>
-    <div style="width:35px;"></div>
-  </div>
-  <div class="header-links">
-    <a class="btn-small" href="https://www.tiktok.com/@chicodelascomputadoras" target="_blank" style="background:#FF0050;color:white;">TikTok</a>
-    <a class="btn-small" href="https://juanpabloortizortuno-web.github.io/licencia-pro/" target="_blank" style="background:#fcd535;color:#000;">LICENCIA PRO</a>
-  </div>
+  <h1>CDC FUTURO-PRO 🔥 SHORT MODE</h1>
 </header>
 
-<div id="statusBar">Inicializando...</div>
+<div id="statusBar">Inicializando scanner...</div>
 
 <div class="container">
-  <div class="sidebar hidden" id="sidebar">
-    <input id="search" placeholder="🔍 Buscar moneda...">
+
+  <div class="sidebar">
     <table>
       <thead>
         <tr>
@@ -81,156 +127,121 @@ td{padding:12px 8px;text-align:center;border-bottom:1px solid #333;font-size:13p
   </div>
 
   <div class="main">
-    <div id="details" class="card">Selecciona una moneda.</div>
-    <div id="binanceLinks">
-      <a id="linkBinanceWeb" class="btn-binance" target="_blank" style="display:none;">🌐 Binance Web</a>
-      <a id="linkBinanceIOS" class="btn-binance" target="_blank" style="display:none;">📱 App (iOS)</a>
-      <a id="linkBinanceAndroid" class="btn-binance" target="_blank" style="display:none;">📱 App (Android)</a>
+    <div id="details" class="card">
+      Selecciona una moneda para ver detalles SHORT.
     </div>
-    <a href="https://wa.me/59177244375" target="_blank" class="whatsapp-btn">📲 WHATSAPP SOPORTE</a>
   </div>
+
 </div>
 
 <script>
-const sidebar=document.getElementById("sidebar");
-const statusBar=document.getElementById("statusBar");
-document.getElementById("menuToggle").onclick=()=>{sidebar.classList.toggle("hidden");};
 
-let clickCount=parseInt(localStorage.getItem("clickCount")||"0");
-let licenseExpiry=localStorage.getItem("licenseExpiry");
-
-function isLicenseActive(){
-  if(!licenseExpiry) return false;
-  if(Date.now()>parseInt(licenseExpiry)){
-    localStorage.removeItem("licenseExpiry");
-    return false;
-  }
-  return true;
-}
-
-function checkLimit(){
-  if(isLicenseActive()) return false;
-  if(clickCount>=10){
-    document.getElementById("blockScreen").style.display="flex";
-    return true;
-  }
-  return false;
-}
+const statusBar = document.getElementById("statusBar");
 
 async function loadPRO(){
-  if(checkLimit()) return;
 
-  if(isLicenseActive()){
-    const days=Math.floor((parseInt(licenseExpiry)-Date.now())/(1000*60*60*24));
-    statusBar.innerText="Licencia PRO activa | Días restantes: "+days;
-  }else{
-    statusBar.innerText="Modo gratuito | Usos: "+clickCount+"/10";
-  }
+  statusBar.innerText = "Escaneando mercado SHORT...";
 
   try{
-    // FUTURES USDT-M PERPETUAL válidos
-    const futuresInfo=await fetch("https://fapi.binance.com/fapi/v1/exchangeInfo").then(r=>r.json());
-    const validFuturesUSDT=futuresInfo.symbols
-      .filter(s=>s.status==="TRADING" && s.contractType==="PERPETUAL" && s.quoteAsset==="USDT")
-      .map(s=>s.symbol);
 
-    // Tickers FUTURES
-    const allTickers=await fetch("https://fapi.binance.com/fapi/v1/ticker/24hr").then(r=>r.json());
+    const allTickers = await fetch("https://api.binance.com/api/v3/ticker/24hr")
+      .then(r=>r.json());
 
-    const filtered=allTickers
-      .filter(t=>validFuturesUSDT.includes(t.symbol) && parseFloat(t.priceChangePercent)>8)
+    // Filtramos solo USDT y descartamos pares con BTC, BUSD u otras monedas
+    const filtered = allTickers
+      .filter(t => 
+        t.symbol.endsWith("USDT") &&
+        !t.symbol.includes("BTC") &&
+        !t.symbol.includes("BUSD") &&
+        parseFloat(t.priceChangePercent) > 8
+      )
       .sort((a,b)=>parseFloat(b.priceChangePercent)-parseFloat(a.priceChangePercent))
       .slice(0,15);
 
-    const tableBody=document.getElementById("tableBody");
+    const tableBody = document.getElementById("tableBody");
     tableBody.innerHTML="";
 
-    const klinesPromises = filtered.map(async t => {
-      try {
-        const price=parseFloat(t.lastPrice);
-        const high=parseFloat(t.highPrice);
-        const low=parseFloat(t.lowPrice);
-        const faltante=((high-price)/(high-low))*100;
+    for(const t of filtered){
 
-        const klines=await fetch(`https://fapi.binance.com/fapi/v1/klines?symbol=${t.symbol}&interval=1h&limit=48`).then(r=>r.json());
-        const open48=parseFloat(klines[0][1]);
-        const close48=parseFloat(klines[47][4]);
-        const change48=((close48-open48)/open48)*100;
+      const price = parseFloat(t.lastPrice);
+      const high = parseFloat(t.highPrice);
+      const low = parseFloat(t.lowPrice);
 
-        const tr=document.createElement("tr");
-        tr.innerHTML=`
-          <td><b>${t.symbol.replace("USDT","")}</b></td>
-          <td style="color:#00c853">${parseFloat(t.priceChangePercent).toFixed(1)}%</td>
-          <td style="color:#ff9800">${change48.toFixed(1)}%</td>
-          <td style="color:${faltante<5?'#ff5252':'white'}">${faltante.toFixed(1)}%</td>
-        `;
-        tr.onclick=()=>{
-          if(checkLimit()) return;
-          if(!isLicenseActive()){clickCount++; localStorage.setItem("clickCount",clickCount);}
-          showDetails(t,change48,faltante);
-          sidebar.classList.add("hidden");
-        };
-        tableBody.appendChild(tr);
+      const faltante = ((high - price) / (high - low)) * 100;
 
-      } catch(e){
-        console.warn(`Error fetch klines ${t.symbol}`,e);
-      }
-    });
+      const klines = await fetch(
+        `https://api.binance.com/api/v3/klines?symbol=${t.symbol}&interval=1h&limit=48`
+      ).then(r=>r.json());
 
-    await Promise.allSettled(klinesPromises);
+      const open48 = parseFloat(klines[0][1]);
+      const close48 = parseFloat(klines[47][4]);
+      const change48 = ((close48 - open48) / open48) * 100;
+
+      const tr=document.createElement("tr");
+
+      tr.innerHTML=`
+        <td><b>${t.symbol.replace("USDT","")}</b></td>
+        <td style="color:#00c853">${parseFloat(t.priceChangePercent).toFixed(1)}%</td>
+        <td style="color:#ff9800">${change48.toFixed(1)}%</td>
+        <td style="color:${faltante<5?'#ff5252':'white'}">
+          ${faltante.toFixed(1)}%
+        </td>
+      `;
+
+      tr.onclick=()=>{
+        showDetails(t, change48, faltante);
+      };
+
+      tableBody.appendChild(tr);
+    }
+
+    statusBar.innerText = "Actualizado correctamente ✅";
 
   }catch(e){
-    statusBar.innerText="Error Binance ⚠️";
+    statusBar.innerText = "Error con Binance ⚠️";
   }
 }
 
-function showDetails(t,change48,faltante){
-  const price=parseFloat(t.lastPrice);
-  const high=parseFloat(t.highPrice);
-  const low=parseFloat(t.lowPrice);
+function showDetails(t, change48, faltante){
 
-  let alerta="";
-  if(faltante<5) alerta=`<p class="alert">🔥 ZONA IDEAL SHORT 🔥</p>`;
+  const price = parseFloat(t.lastPrice);
+  const high = parseFloat(t.highPrice);
+  const low = parseFloat(t.lowPrice);
+
+  let alerta = "";
+
+  if(faltante < 5){
+    alerta = `<p class="alert">🔥 ZONA IDEAL SHORT 🔥</p>`;
+  }
 
   document.getElementById("details").innerHTML=`
     <h2 style="color:#fcd535">${t.symbol}</h2>
+
     <p><b>Precio actual:</b> $${price}</p>
-    <p><b>Subida 24H:</b> ${parseFloat(t.priceChangePercent).toFixed(2)}%</p>
-    <p><b>Subida 48H:</b> ${change48.toFixed(2)}%</p>
+
+    <p style="color:#00c853">
+      <b>Subida 24H:</b> ${parseFloat(t.priceChangePercent).toFixed(2)}%
+    </p>
+
+    <p style="color:#00c853">
+      <b>Subida 48H:</b> ${change48.toFixed(2)}%
+    </p>
+
     <p><b>Mínimo 24H:</b> $${low}</p>
-    <p><b>Máximo 24H:</b> $${high}</p>
-    <p style="color:#ff5252;font-size:16px;">Falta ${faltante.toFixed(2)}% para tocar el máximo</p>
+    <p><b>Máximo 24H (100%):</b> $${high}</p>
+
+    <p style="color:#ff5252; font-size:16px;">
+      Falta ${faltante.toFixed(2)}% para tocar el máximo
+    </p>
+
     ${alerta}
   `;
-
-  document.querySelectorAll(".btn-binance").forEach(b=>b.style.display="block");
-  document.getElementById("linkBinanceWeb").href=`https://www.binance.com/es/futures/${t.symbol}`;
-  document.getElementById("linkBinanceIOS").href=`binance://futures/trade?symbol=${t.symbol}`;
-  document.getElementById("linkBinanceAndroid").href=`binance://futures/trade?symbol=${t.symbol}`;
 }
 
-function activateFromBlock(){
-  const code=document.getElementById("premiumCodeBlock").value.trim();
-  try{
-    atob(code);
-    const expiry=Date.now()+(365*24*60*60*1000);
-    localStorage.setItem("licenseExpiry",expiry);
-    localStorage.removeItem("clickCount");
-    alert("Licencia PRO activada por 365 días ✅");
-    location.reload();
-  }catch(e){alert("Código inválido");}
-}
-
-document.getElementById("search").oninput=(e)=>{
-  const val=e.target.value.toUpperCase();
-  document.querySelectorAll("#tableBody tr").forEach(tr=>{
-    tr.style.display=tr.innerText.includes(val)?"":"none";
-  });
-};
-
-checkLimit();
 loadPRO();
 setInterval(loadPRO,60000);
+
 </script>
+
 </body>
 </html>
