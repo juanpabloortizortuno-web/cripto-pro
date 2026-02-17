@@ -3,8 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-<title>CDC FUTURO-PRO</title>
-
+<title>CDC FUTURO-PRO SHORT</title>
 <style>
 :root {
   --bg-main:#0f1115;
@@ -38,7 +37,6 @@ td{padding:12px 8px;text-align:center;border-bottom:1px solid #333;font-size:13p
 .alert{font-weight:bold;font-size:16px;color:var(--accent-red);}
 </style>
 </head>
-
 <body>
 
 <div id="blockScreen">
@@ -85,20 +83,17 @@ td{padding:12px 8px;text-align:center;border-bottom:1px solid #333;font-size:13p
 
   <div class="main">
     <div id="details" class="card">Selecciona una moneda.</div>
-
     <div id="binanceLinks">
       <a id="linkBinanceWeb" class="btn-binance" target="_blank" style="display:none;">🌐 Binance Web</a>
       <a id="linkBinanceIOS" class="btn-binance" target="_blank" style="display:none;">📱 App (iOS)</a>
       <a id="linkBinanceAndroid" class="btn-binance" target="_blank" style="display:none;">📱 App (Android)</a>
     </div>
-
     <a href="https://wa.me/59177244375" target="_blank" class="whatsapp-btn">📲 WHATSAPP SOPORTE</a>
   </div>
 
 </div>
 
 <script>
-
 const sidebar=document.getElementById("sidebar");
 const statusBar=document.getElementById("statusBar");
 document.getElementById("menuToggle").onclick=()=>{sidebar.classList.toggle("hidden");};
@@ -125,7 +120,6 @@ function checkLimit(){
 }
 
 async function loadPRO(){
-
   if(checkLimit()) return;
 
   if(isLicenseActive()){
@@ -136,15 +130,14 @@ async function loadPRO(){
   }
 
   try{
-
     // FUTURES USDT-M PERPETUAL válidos
     const futuresInfo=await fetch("https://fapi.binance.com/fapi/v1/exchangeInfo").then(r=>r.json());
-
     const validFuturesUSDT=futuresInfo.symbols
       .filter(s=>s.status==="TRADING" && s.contractType==="PERPETUAL" && s.quoteAsset==="USDT")
       .map(s=>s.symbol);
 
-    const allTickers=await fetch("https://api.binance.com/api/v3/ticker/24hr").then(r=>r.json());
+    // Tickers FUTURES
+    const allTickers=await fetch("https://fapi.binance.com/fapi/v1/ticker/24hr").then(r=>r.json());
 
     const filtered=allTickers
       .filter(t=>validFuturesUSDT.includes(t.symbol) && parseFloat(t.priceChangePercent)>8)
@@ -155,54 +148,44 @@ async function loadPRO(){
     tableBody.innerHTML="";
 
     for(const t of filtered){
-
       const price=parseFloat(t.lastPrice);
       const high=parseFloat(t.highPrice);
       const low=parseFloat(t.lowPrice);
       const faltante=((high-price)/(high-low))*100;
 
-      const klines=await fetch(`https://api.binance.com/api/v3/klines?symbol=${t.symbol}&interval=1h&limit=48`).then(r=>r.json());
+      // Klines 48H en Futures
+      const klines=await fetch(`https://fapi.binance.com/fapi/v1/klines?symbol=${t.symbol}&interval=1h&limit=48`).then(r=>r.json());
       const open48=parseFloat(klines[0][1]);
       const close48=parseFloat(klines[47][4]);
       const change48=((close48-open48)/open48)*100;
 
       const tr=document.createElement("tr");
-
       tr.innerHTML=`
         <td><b>${t.symbol.replace("USDT","")}</b></td>
         <td style="color:#00c853">${parseFloat(t.priceChangePercent).toFixed(1)}%</td>
         <td style="color:#ff9800">${change48.toFixed(1)}%</td>
         <td style="color:${faltante<5?'#ff5252':'white'}">${faltante.toFixed(1)}%</td>
       `;
-
       tr.onclick=()=>{
         if(checkLimit()) return;
-        if(!isLicenseActive()){
-          clickCount++;
-          localStorage.setItem("clickCount",clickCount);
-        }
+        if(!isLicenseActive()){clickCount++; localStorage.setItem("clickCount",clickCount);}
         showDetails(t,change48,faltante);
         sidebar.classList.add("hidden");
       };
-
       tableBody.appendChild(tr);
     }
-
   }catch(e){
     statusBar.innerText="Error Binance ⚠️";
   }
 }
 
 function showDetails(t,change48,faltante){
-
   const price=parseFloat(t.lastPrice);
   const high=parseFloat(t.highPrice);
   const low=parseFloat(t.lowPrice);
 
   let alerta="";
-  if(faltante<5){
-    alerta=`<p class="alert">🔥 ZONA IDEAL SHORT 🔥</p>`;
-  }
+  if(faltante<5) alerta=`<p class="alert">🔥 ZONA IDEAL SHORT 🔥</p>`;
 
   document.getElementById("details").innerHTML=`
     <h2 style="color:#fcd535">${t.symbol}</h2>
@@ -230,9 +213,7 @@ function activateFromBlock(){
     localStorage.removeItem("clickCount");
     alert("Licencia PRO activada por 365 días ✅");
     location.reload();
-  }catch(e){
-    alert("Código inválido");
-  }
+  }catch(e){alert("Código inválido");}
 }
 
 document.getElementById("search").oninput=(e)=>{
