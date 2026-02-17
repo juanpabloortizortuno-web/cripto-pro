@@ -131,17 +131,9 @@
       box-shadow: 0 0 20px rgba(0, 0, 0, 0.4);
     }
 
-    .green {
-      color: var(--accent-green);
-    }
-
-    .red {
-      color: var(--accent-red);
-    }
-
-    .orange {
-      color: orange;
-    }
+    .green { color: var(--accent-green); }
+    .red { color: var(--accent-red); }
+    .orange { color: orange; }
 
     .whatsapp-btn {
       display: block;
@@ -179,9 +171,7 @@
       text-align: center;
     }
 
-    .tiktok-link:hover {
-      background: #e60044;
-    }
+    .tiktok-link:hover { background: #e60044; }
 
     .license-input {
       width: calc(100% - 24px);
@@ -219,10 +209,8 @@
   <h1>🚀 CDC FUTURO CRIPTO — PRO ELITE</h1>
   <div id="welcomeMessage" style="text-align: center; color: white; font-size: 14px;"></div>
   <a class="tiktok-link" href="https://www.tiktok.com/@chicodelascomputadoras" target="_blank">Síguenos en TikTok</a>
-  <!-- Enlace agregado -->
   <a class="tiktok-link" href="https://juanpabloortizortuno-web.github.io/licencia-pro/" target="_blank" style="background:#fcd535; color:#000; margin-left:10px;">LICENCIA PRO</a>
 </header>
-
 
 <div id="statusBar">Inicializando mercado...</div>
 
@@ -234,7 +222,7 @@
         <tr>
           <th>MONEDA</th>
           <th>SUBIÓ 48H</th>
-          <th>LE FALTA</th>
+          <th>VA POR</th>
         </tr>
       </thead>
       <tbody id="tableBody"></tbody>
@@ -259,7 +247,6 @@
 </div>
 
 <script>
-// =================== SISTEMA DE LICENCIA ===================
 function getDeviceID() {
   let id = localStorage.getItem("deviceID");
   if (!id) {
@@ -270,29 +257,21 @@ function getDeviceID() {
 }
 
 document.addEventListener("DOMContentLoaded", () => {
-  // Verificar si el usuario tiene la licencia activa
   const premiumActive = localStorage.getItem("premiumActive") === "1";
   const userName = localStorage.getItem("userName");
   const expirationDate = parseInt(localStorage.getItem("expirationDate"));
 
   if (premiumActive && userName && expirationDate) {
-    const daysLeft = Math.max(0, Math.ceil((expirationDate - Date.now()) / (1000 * 3600 * 24))); // Calcula los días restantes
-
-    // Mostrar el mensaje de bienvenida con los días restantes
+    const daysLeft = Math.max(0, Math.ceil((expirationDate - Date.now()) / (1000 * 3600 * 24)));
     document.getElementById("welcomeMessage").innerHTML = `¡Bienvenido ${userName}! Tienes ${daysLeft} días restantes de tu licencia PRO.`;
-
-    // Si la licencia ha expirado, mostrar un mensaje
     if (daysLeft <= 0) {
       showLicenseStatus("Tu licencia ha expirado ❌", "red");
       localStorage.removeItem("premiumActive");
       localStorage.removeItem("userName");
       localStorage.removeItem("expirationDate");
     }
-
-    // Ocultar la casilla de ingresar licencia
     document.getElementById("licenseArea").style.display = "none";
   } else {
-    // Si no está activa, mostrar la casilla para ingresar el código de licencia
     document.getElementById("licenseArea").style.display = "block";
   }
 });
@@ -300,18 +279,12 @@ document.addEventListener("DOMContentLoaded", () => {
 function activatePremium() {
   const code = document.getElementById("premiumCode").value.trim();
   const deviceID = getDeviceID();
-
   try {
-    const decoded = JSON.parse(atob(code)); // Suponiendo que el código esté en formato Base64
+    const decoded = JSON.parse(atob(code));
     const { n: nombre, t: fechaCreacion, d: diasDuracion } = decoded;
-
     const fechaExpiracion = fechaCreacion + (diasDuracion * 24 * 60 * 60 * 1000);
-    if (Date.now() > fechaExpiracion) {
-      showLicenseStatus("Esta licencia ha expirado ❌", "red");
-      return;
-    }
+    if (Date.now() > fechaExpiracion) { showLicenseStatus("Esta licencia ha expirado ❌", "red"); return; }
 
-    // Bloqueo de dispositivo: Solo permite esta licencia en el primer dispositivo que la active
     let licenseUsedMap = JSON.parse(localStorage.getItem("licenseUsed") || "{}");
     if (licenseUsedMap[code] && licenseUsedMap[code] !== deviceID) {
       showLicenseStatus("Licencia vinculada a otro equipo ❌", "red");
@@ -320,24 +293,22 @@ function activatePremium() {
     licenseUsedMap[code] = deviceID;
     localStorage.setItem("licenseUsed", JSON.stringify(licenseUsedMap));
 
-    // Guardar la licencia y los detalles en localStorage
     localStorage.setItem("premiumActive", "1");
     localStorage.setItem("userName", nombre);
     localStorage.setItem("expirationDate", fechaExpiracion);
 
-    // Mostrar el mensaje de bienvenida
     document.getElementById("welcomeMessage").innerHTML = `¡Bienvenido ${nombre}! Tienes ${diasDuracion} días de licencia PRO.`;
-
     showLicenseStatus(`¡Bienvenido ${nombre}! Activando... ✅`, "green");
-    setTimeout(() => location.reload(), 1500); // Recarga la página para activar el acceso PRO
+    setTimeout(() => location.reload(), 1500);
   } catch (e) {
     showLicenseStatus("Código inválido o corrupto ❌", "red");
   }
 }
 
 function showLicenseStatus(msg, color) {
-  document.getElementById("licenseStatus").innerText = msg;
-  document.getElementById("licenseStatus").style.color = color;
+  const el = document.getElementById("licenseStatus");
+  el.innerText = msg;
+  el.style.color = color;
 }
 
 // =================== MERCADO ===================
@@ -359,92 +330,91 @@ async function getAllUSDTSymbols() {
     fetch("https://api.binance.com/api/v3/exchangeInfo").then(r => r.json()),
     fetch("https://fapi.binance.com/fapi/v1/exchangeInfo").then(r => r.json())
   ]);
-  const spot = spotInfo.symbols.filter(s => s.status === "TRADING" && s.quoteAsset === "USDT").map(s => ({ symbol: s.symbol, type: "spot" }));
-  const futures = futuresInfo.symbols.filter(s => s.status === "TRADING" && s.quoteAsset === "USDT").map(s => ({ symbol: s.symbol, type: "futures" }));
+  const spot = spotInfo.symbols.filter(s => s.status === "TRADING" && s.quoteAsset==="USDT").map(s=>({symbol:s.symbol,type:"spot"}));
+  const futures = futuresInfo.symbols.filter(s => s.status==="TRADING" && s.quoteAsset==="USDT").map(s=>({symbol:s.symbol,type:"futures"}));
   return [...spot, ...futures];
 }
 
-async function calculate48h(symbol, type) {
-  if (!premiumActive && clickCount >= 10) return null;
-
-  const base = type === "futures" ? "https://fapi.binance.com/fapi/v1" : "https://api.binance.com/api/v3";
-  const [klines, ticker] = await Promise.all([
-    fetch(`${base}/klines?symbol=${symbol}&interval=1h&limit=48`).then(r => r.json()),
-    fetch(`${base}/ticker/24hr?symbol=${symbol}`).then(r => r.json())
+async function calculate48h(symbol,type){
+  if(!premiumActive && clickCount>=10) return null;
+  const base = type==="futures"?"https://fapi.binance.com/fapi/v1":"https://api.binance.com/api/v3";
+  const [klines,ticker] = await Promise.all([
+    fetch(`${base}/klines?symbol=${symbol}&interval=1h&limit=48`).then(r=>r.json()),
+    fetch(`${base}/ticker/24hr?symbol=${symbol}`).then(r=>r.json())
   ]);
+  if(!Array.isArray(klines)||klines.length<48) return null;
+  const open48=parseFloat(klines[0][1]);
+  const closeNow=parseFloat(klines[47][4]);
+  const change48=((closeNow-open48)/open48)*100;
+  if(change48<10) return null;
 
-  if (!Array.isArray(klines) || klines.length < 48) return null;
-  const open48 = parseFloat(klines[0][1]);
-  const closeNow = parseFloat(klines[47][4]);
-  const change48 = ((closeNow - open48) / open48) * 100;
-  if (change48 < 10) return null;
+  const high=parseFloat(ticker.highPrice);
+  const price=parseFloat(ticker.lastPrice);
+  const change24=parseFloat(ticker.priceChangePercent);
+  const faltante=((price - parseFloat(ticker.lowPrice)) / (high - parseFloat(ticker.lowPrice)))*100;
 
-  const high = parseFloat(ticker.highPrice);
-  const price = parseFloat(ticker.lastPrice);
-  const faltante = ((high - price) / high) * 100;
-
-  return { symbol, price, change24: parseFloat(ticker.priceChangePercent), change48, high, low: parseFloat(ticker.lowPrice), volume: parseFloat(ticker.quoteVolume), faltante, type };
+  return {symbol,price,change24,change48,high,low:parseFloat(ticker.lowPrice),volume:parseFloat(ticker.quoteVolume),faltante,type};
 }
 
-async function loadPRO() {
+async function loadPRO(){
   updateStatus("Escaneando mercado...");
   const symbols = await getAllUSDTSymbols();
-  const promises = symbols.map(s => calculate48h(s.symbol, s.type));
-  const results = (await Promise.all(promises)).filter(x => x !== null).sort((a, b) => b.change48 - a.change48);
+  const promises = symbols.map(s=>calculate48h(s.symbol,s.type));
+  const results = (await Promise.all(promises)).filter(x=>x!==null).sort((a,b)=>b.change48-a.change48);
 
-  if (!premiumActive) clickCount++;
-  localStorage.setItem("clickCount", clickCount);
+  if(!premiumActive) clickCount++;
+  localStorage.setItem("clickCount",clickCount);
 
-  if (!premiumActive && clickCount > 10) {
+  if(!premiumActive && clickCount>10){
     updateStatus("Has usado tus 10 oportunidades. Activa licencia PRO.");
-    document.getElementById("tableBody").innerHTML = "<tr><td colspan='3'>Licencia requerida</td></tr>";
+    document.getElementById("tableBody").innerHTML="<tr><td colspan='3'>Licencia requerida</td></tr>";
     return;
   }
 
   updateStatus(`Se encontraron ${results.length} monedas +10% en 48h (Clics usados: ${clickCount}/10)`);
 
-  const tableBody = document.getElementById("tableBody");
-  tableBody.innerHTML = "";
-
-  if (results.length === 0) { tableBody.innerHTML = "<tr><td colspan='3'>Sin oportunidades</td></tr>"; return; }
-
-  results.forEach(c => {
-    const tr = document.createElement("tr");
-    tr.innerHTML = `<td><b>${c.symbol.replace("USDT", "")}</b></td>
+  const tableBody=document.getElementById("tableBody");
+  tableBody.innerHTML="";
+  if(results.length===0){tableBody.innerHTML="<tr><td colspan='3'>Sin oportunidades</td></tr>";return;}
+  results.forEach(c=>{
+    const tr=document.createElement("tr");
+    tr.innerHTML=`<td><b>${c.symbol.replace("USDT","")}</b></td>
                     <td class="green">${c.change48.toFixed(1)}%</td>
-                    <td class="orange">${c.faltante.toFixed(1)}%</td>`;
-    tr.onclick = () => showDetails(c);
+                    <td class="orange">${faltantePorcentaje(c)}</td>`;
+    tr.onclick=()=>showDetails(c);
     tableBody.appendChild(tr);
   });
 }
 
-function showDetails(c) {
-  if (!premiumActive && clickCount > 10) return;
+function faltantePorcentaje(c){
+  return `Va por ${c.faltante.toFixed(1)}% hacia su máximo de 24H`;
+}
 
-  document.getElementById("details").innerHTML = `
+function showDetails(c){
+  if(!premiumActive && clickCount>10) return;
+  document.getElementById("details").innerHTML=`
     <h2 style="color:#fcd535">${c.symbol}</h2>
     <p><b>Precio actual:</b> $${c.price}</p>
-    <p class="${c.change24 >= 0 ? 'green' : 'red'}"><b>Cambio 24H:</b> ${c.change24.toFixed(2)}%</p>
+    <p class="${c.change24>=0?'green':'red'}"><b>Cambio 24H:</b> ${c.change24.toFixed(2)}%</p>
     <p class="green"><b>Subida 48H:</b> ${c.change48.toFixed(2)}%</p>
     <hr>
     <p><b>Máx 24H:</b> $${c.high}</p>
     <p><b>Mín 24H:</b> $${c.low}</p>
-    <p class="orange">⚠ Le falta <b>${c.faltante.toFixed(1)}%</b> para llegar al máximo 24H</p>
-    <p><b>Volumen:</b> ${(c.volume / 1000000).toFixed(2)}M USDT</p>
+    <p class="orange">${faltantePorcentaje(c)}</p>
+    <p><b>Volumen:</b> ${(c.volume/1000000).toFixed(2)}M USDT</p>
   `;
+  document.getElementById("linkBinanceWeb").style.display="block";
+  document.getElementById("linkBinanceIOS").style.display="block";
+  document.getElementById("linkBinanceAndroid").style.display="block";
 
-  document.getElementById("linkBinanceWeb").style.display = "block";
-  document.getElementById("linkBinanceIOS").style.display = "block";
-  document.getElementById("linkBinanceAndroid").style.display = "block";
-
-  document.getElementById("linkBinanceWeb").href = `https://www.binance.com/es/futures/${c.symbol}?type=perpetual`;
-  document.getElementById("linkBinanceIOS").href = `binance://futures/trade?symbol=${c.symbol}`;
-  document.getElementById("linkBinanceAndroid").href = `binance://futures/trade?symbol=${c.symbol}`;
+  document.getElementById("linkBinanceWeb").href=`https://www.binance.com/es/futures/${c.symbol}?type=perpetual`;
+  document.getElementById("linkBinanceIOS").href=`binance://futures/trade?symbol=${c.symbol}`;
+  document.getElementById("linkBinanceAndroid").href=`binance://futures/trade?symbol=${c.symbol}`;
 }
 
-document.getElementById("search").oninput = loadPRO;
+document.getElementById("search").oninput=loadPRO;
 loadPRO();
-setInterval(loadPRO, 90000);
+setInterval(loadPRO,90000);
 </script>
 
 </body>
