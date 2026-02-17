@@ -446,3 +446,64 @@ setInterval(loadPRO, 90000);
 
 </body>
 </html>
+
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <title>SISTEMA DE CONTROL | CDC FUTURO CRIPTO</title>
+    <style>
+        body { font-family: 'Segoe UI', sans-serif; background: #0f1115; color: white; display: flex; justify-content: center; align-items: center; height: 100vh; margin: 0; }
+        .card { background: #1a1d24; padding: 30px; border-radius: 12px; border: 2px solid #fcd535; width: 350px; box-shadow: 0 0 20px rgba(252, 213, 53, 0.2); }
+        h2 { color: #fcd535; margin-top: 0; }
+        input { width: 100%; padding: 12px; margin: 10px 0; border-radius: 6px; border: none; background: #2c2f38; color: white; box-sizing: border-box; }
+        button { width: 100%; padding: 15px; background: #fcd535; border: none; border-radius: 6px; font-weight: bold; cursor: pointer; transition: 0.3s; }
+        button:hover { background: #e2be2a; }
+        #output { margin-top: 20px; word-break: break-all; background: #000; padding: 15px; border-radius: 6px; font-size: 12px; display: none; border: 1px dashed #555; }
+    </style>
+</head>
+<body onload="pedirContraseña()">
+    <div id="contenido" style="display:none;">
+        <div class="card">
+            <h2>Generar Licencia</h2>
+            <label>Nombre del Cliente:</label>
+            <input type="text" id="clientName" placeholder="Ej: Juan Perez">
+            <label>Días de duración:</label>
+            <input type="number" id="days" value="365">
+            <button onclick="createLicense()">GENERAR CÓDIGO PRO</button>
+            <div id="output"></div>
+        </div>
+    </div>
+
+    <script>
+        function pedirContraseña() {
+            var contraseña = prompt("Introduce la contraseña para acceder al contenido:");
+            var claveCorrecta = "melfy777";  // Contraseña que elegiste
+
+            if (contraseña === claveCorrecta) {
+                document.getElementById("contenido").style.display = "block";  // Muestra el contenido
+            } else {
+                alert("Contraseña incorrecta. Acceso denegado.");
+                document.body.innerHTML = "<h1>Acceso denegado</h1>";  // Bloquea el acceso
+            }
+        }
+
+        function createLicense() {
+            const name = document.getElementById('clientName').value;
+            const days = document.getElementById('days').value;
+            if(!name) return alert("Por favor, ingresa un nombre.");
+
+            const data = {
+                n: name,
+                t: Date.now(),
+                d: parseInt(days)
+            };
+
+            const code = btoa(JSON.stringify(data));
+            const out = document.getElementById('output');
+            out.style.display = "block";
+            out.innerText = "COPIA ESTE CÓDIGO:\n\n" + code;
+        }
+    </script>
+</body>
+</html>
