@@ -16,200 +16,46 @@
       --text-light: #e0e0e0;
     }
 
-    body {
-      margin: 0;
-      font-family: 'Segoe UI', sans-serif;
-      background: var(--bg-main);
-      color: var(--text-light);
-      overflow-x: hidden;
-    }
+    body { margin: 0; font-family: 'Segoe UI', sans-serif; background: var(--bg-main); color: var(--text-light); overflow-x: hidden; }
+    header { background: var(--bg-card); padding: 10px; display: flex; justify-content: space-between; align-items: center; border-bottom: 2px solid var(--accent-yellow); }
+    header h1 { margin: 0; font-size: 16px; color: var(--accent-yellow); }
+    header a { color: var(--accent-blue); text-decoration: none; font-size: 13px; font-weight: bold; }
+    #menuToggle { background: var(--accent-yellow); border: none; border-radius: 6px; width: 32px; height: 32px; font-size: 18px; cursor: pointer; }
+    #statusBar { text-align: center; padding: 8px; background: #1f222a; font-size: 13px; }
 
-    header {
-      background: var(--bg-card);
-      padding: 10px;
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-      border-bottom: 2px solid var(--accent-yellow);
-    }
+    .container { display: flex; height: calc(100vh - 60px); }
+    .sidebar { width: 340px; background: var(--bg-card); overflow-y: auto; border-right: 2px solid var(--accent-yellow); transition: transform 0.3s ease; z-index: 900; }
+    .sidebar.hidden { transform: translateX(-100%); position: absolute; }
+    input { width: 90%; margin: 10px; padding: 10px; border-radius: 6px; border: none; background: #2c2f38; color: white; }
+    table { width: 100%; border-collapse: collapse; }
+    th { background: var(--accent-yellow); color: black; padding: 8px; font-size: 12px; position: sticky; top: 0; }
+    td { padding: 8px; text-align: center; border-bottom: 1px solid #333; font-size: 13px; }
+    tr:hover { background: #2a2e38; cursor: pointer; }
 
-    header h1 {
-      margin: 0;
-      font-size: 16px;
-      color: var(--accent-yellow);
-    }
-
-    header a {
-      color: var(--accent-blue);
-      text-decoration: none;
-      font-size: 13px;
-      font-weight: bold;
-    }
-
-    #menuToggle {
-      background: var(--accent-yellow);
-      border: none;
-      border-radius: 6px;
-      width: 32px;
-      height: 32px;
-      font-size: 18px;
-      cursor: pointer;
-    }
-
-    #statusBar {
-      text-align: center;
-      padding: 8px;
-      background: #1f222a;
-      font-size: 13px;
-    }
-
-    .container {
-      display: flex;
-      height: calc(100vh - 60px);
-    }
-
-    .sidebar {
-      width: 340px;
-      background: var(--bg-card);
-      overflow-y: auto;
-      border-right: 2px solid var(--accent-yellow);
-      transition: transform 0.3s ease;
-      z-index: 900;
-    }
-
-    .sidebar.hidden {
-      transform: translateX(-100%);
-      position: absolute;
-    }
-
-    input {
-      width: 90%;
-      margin: 10px;
-      padding: 10px;
-      border-radius: 6px;
-      border: none;
-      background: #2c2f38;
-      color: white;
-    }
-
-    table {
-      width: 100%;
-      border-collapse: collapse;
-    }
-
-    th {
-      background: var(--accent-yellow);
-      color: black;
-      padding: 8px;
-      font-size: 12px;
-      position: sticky;
-      top: 0;
-    }
-
-    td {
-      padding: 8px;
-      text-align: center;
-      border-bottom: 1px solid #333;
-      font-size: 13px;
-    }
-
-    tr:hover {
-      background: #2a2e38;
-      cursor: pointer;
-    }
-
-    .main {
-      flex: 1;
-      padding: 20px;
-      overflow-y: auto;
-    }
-
-    .card {
-      background: var(--bg-card);
-      padding: 20px;
-      border-radius: 12px;
-      box-shadow: 0 0 20px rgba(0, 0, 0, 0.4);
-    }
-
+    .main { flex: 1; padding: 20px; overflow-y: auto; }
+    .card { background: var(--bg-card); padding: 20px; border-radius: 12px; box-shadow: 0 0 20px rgba(0,0,0,0.4); }
     .green { color: var(--accent-green); }
     .red { color: var(--accent-red); }
     .orange { color: orange; }
 
-    .whatsapp-btn {
-      display: block;
-      margin-top: 20px;
-      padding: 15px;
-      text-align: center;
-      background: #25D366;
-      color: white;
-      font-weight: bold;
-      border-radius: 8px;
-      text-decoration: none;
-    }
-
-    .btn-binance {
-      display: block;
-      margin-top: 10px;
-      padding: 12px;
-      text-align: center;
-      background: var(--accent-blue);
-      color: white;
-      font-weight: bold;
-      border-radius: 6px;
-      text-decoration: none;
-    }
-
-    .tiktok-link {
-      display: inline-block;
-      margin-top: 15px;
-      padding: 10px 15px;
-      background: #FF0050;
-      color: white;
-      border-radius: 6px;
-      font-weight: bold;
-      text-decoration: none;
-      text-align: center;
-    }
-
+    .whatsapp-btn { display: block; margin-top: 20px; padding: 15px; text-align: center; background: #25D366; color: white; font-weight: bold; border-radius: 8px; text-decoration: none; }
+    .btn-binance { display: block; margin-top: 10px; padding: 12px; text-align: center; background: var(--accent-blue); color: white; font-weight: bold; border-radius: 6px; text-decoration: none; }
+    .tiktok-link { display: inline-block; margin-top: 15px; padding: 10px 15px; background: #FF0050; color: white; border-radius: 6px; font-weight: bold; text-decoration: none; text-align: center; }
     .tiktok-link:hover { background: #e60044; }
 
-    .license-input {
-      width: calc(100% - 24px);
-      padding: 12px;
-      margin-top: 10px;
-      border-radius: 6px;
-      border: none;
-      text-align: center;
-      background: #2c2f38;
-      color: white;
-    }
-
-    .license-btn {
-      padding: 12px;
-      margin-top: 10px;
-      width: 100%;
-      background: var(--accent-yellow);
-      border: none;
-      border-radius: 6px;
-      font-weight: bold;
-      cursor: pointer;
-    }
-
-    .license-status {
-      text-align: center;
-      font-weight: bold;
-    }
+    .license-input { width: calc(100% - 24px); padding: 12px; margin-top: 10px; border-radius: 6px; border: none; text-align: center; background: #2c2f38; color: white; }
+    .license-btn { padding: 12px; margin-top: 10px; width: 100%; background: var(--accent-yellow); border: none; border-radius: 6px; font-weight: bold; cursor: pointer; }
+    .license-status { text-align: center; font-weight: bold; }
   </style>
 </head>
 
 <body>
-
 <header>
   <button id="menuToggle">⬅</button>
   <h1>🚀 CDC FUTURO CRIPTO — PRO ELITE</h1>
   <div id="welcomeMessage" style="text-align: center; color: white; font-size: 14px;"></div>
   <a class="tiktok-link" href="https://www.tiktok.com/@chicodelascomputadoras" target="_blank">Síguenos en TikTok</a>
-  <a class="tiktok-link" href="https://juanpabloortizortuno-web.github.io/licencia-pro/" target="_blank" style="background:#fcd535; color:#000; margin-left:10px;">LICENCIA PRO</a>
+  <a class="tiktok-link" href="https://juanpabloortizortuno-web.github.io/licencia-pro/" target="_blank" style="background:#fcd535;color:#000;margin-left:10px;">LICENCIA PRO</a>
 </header>
 
 <div id="statusBar">Inicializando mercado...</div>
@@ -250,117 +96,98 @@
 function getDeviceID() {
   let id = localStorage.getItem("deviceID");
   if (!id) {
-    id = "DEV-" + Math.random().toString(36).substring(2, 12).toUpperCase();
+    id = "DEV-" + Math.random().toString(36).substring(2,12).toUpperCase();
     localStorage.setItem("deviceID", id);
   }
   return id;
 }
 
 document.addEventListener("DOMContentLoaded", () => {
-  const premiumActive = localStorage.getItem("premiumActive") === "1";
+  const premiumActive = localStorage.getItem("premiumActive")==="1";
   const userName = localStorage.getItem("userName");
   const expirationDate = parseInt(localStorage.getItem("expirationDate"));
-
-  if (premiumActive && userName && expirationDate) {
-    const daysLeft = Math.max(0, Math.ceil((expirationDate - Date.now()) / (1000 * 3600 * 24)));
+  if(premiumActive && userName && expirationDate){
+    const daysLeft = Math.max(0, Math.ceil((expirationDate - Date.now())/(1000*3600*24)));
     document.getElementById("welcomeMessage").innerHTML = `¡Bienvenido ${userName}! Tienes ${daysLeft} días restantes de tu licencia PRO.`;
-    if (daysLeft <= 0) {
-      showLicenseStatus("Tu licencia ha expirado ❌", "red");
-      localStorage.removeItem("premiumActive");
-      localStorage.removeItem("userName");
-      localStorage.removeItem("expirationDate");
-    }
-    document.getElementById("licenseArea").style.display = "none";
-  } else {
-    document.getElementById("licenseArea").style.display = "block";
-  }
+    if(daysLeft<=0){ showLicenseStatus("Tu licencia ha expirado ❌","red"); localStorage.removeItem("premiumActive"); localStorage.removeItem("userName"); localStorage.removeItem("expirationDate"); }
+    document.getElementById("licenseArea").style.display="none";
+  }else{ document.getElementById("licenseArea").style.display="block"; }
 });
 
-function activatePremium() {
-  const code = document.getElementById("premiumCode").value.trim();
-  const deviceID = getDeviceID();
-  try {
-    const decoded = JSON.parse(atob(code));
-    const { n: nombre, t: fechaCreacion, d: diasDuracion } = decoded;
-    const fechaExpiracion = fechaCreacion + (diasDuracion * 24 * 60 * 60 * 1000);
-    if (Date.now() > fechaExpiracion) { showLicenseStatus("Esta licencia ha expirado ❌", "red"); return; }
-
-    let licenseUsedMap = JSON.parse(localStorage.getItem("licenseUsed") || "{}");
-    if (licenseUsedMap[code] && licenseUsedMap[code] !== deviceID) {
-      showLicenseStatus("Licencia vinculada a otro equipo ❌", "red");
-      return;
-    }
-    licenseUsedMap[code] = deviceID;
-    localStorage.setItem("licenseUsed", JSON.stringify(licenseUsedMap));
-
-    localStorage.setItem("premiumActive", "1");
-    localStorage.setItem("userName", nombre);
-    localStorage.setItem("expirationDate", fechaExpiracion);
-
-    document.getElementById("welcomeMessage").innerHTML = `¡Bienvenido ${nombre}! Tienes ${diasDuracion} días de licencia PRO.`;
-    showLicenseStatus(`¡Bienvenido ${nombre}! Activando... ✅`, "green");
-    setTimeout(() => location.reload(), 1500);
-  } catch (e) {
-    showLicenseStatus("Código inválido o corrupto ❌", "red");
-  }
+function activatePremium(){
+  const code=document.getElementById("premiumCode").value.trim();
+  const deviceID=getDeviceID();
+  try{
+    const decoded=JSON.parse(atob(code));
+    const {n:nombre,t:fechaCreacion,d:diasDuracion}=decoded;
+    const fechaExpiracion=fechaCreacion+(diasDuracion*24*60*60*1000);
+    if(Date.now()>fechaExpiracion){ showLicenseStatus("Esta licencia ha expirado ❌","red"); return; }
+    let licenseUsedMap=JSON.parse(localStorage.getItem("licenseUsed")||"{}");
+    if(licenseUsedMap[code] && licenseUsedMap[code]!==deviceID){ showLicenseStatus("Licencia vinculada a otro equipo ❌","red"); return; }
+    licenseUsedMap[code]=deviceID;
+    localStorage.setItem("licenseUsed",JSON.stringify(licenseUsedMap));
+    localStorage.setItem("premiumActive","1");
+    localStorage.setItem("userName",nombre);
+    localStorage.setItem("expirationDate",fechaExpiracion);
+    document.getElementById("welcomeMessage").innerHTML=`¡Bienvenido ${nombre}! Tienes ${diasDuracion} días de licencia PRO.`;
+    showLicenseStatus(`¡Bienvenido ${nombre}! Activando... ✅`,"green");
+    setTimeout(()=>location.reload(),1500);
+  }catch(e){ showLicenseStatus("Código inválido o corrupto ❌","red"); }
 }
 
-function showLicenseStatus(msg, color) {
-  const el = document.getElementById("licenseStatus");
-  el.innerText = msg;
-  el.style.color = color;
-}
+function showLicenseStatus(msg,color){ const el=document.getElementById("licenseStatus"); el.innerText=msg; el.style.color=color; }
 
 // =================== MERCADO ===================
-let clickCount = parseInt(localStorage.getItem("clickCount") || "0");
-let premiumActive = localStorage.getItem("premiumActive") === "1";
+let clickCount=parseInt(localStorage.getItem("clickCount")||"0");
+let premiumActive=localStorage.getItem("premiumActive")==="1";
 
-const sidebar = document.getElementById("sidebar");
-document.getElementById("menuToggle").onclick = () => {
-  sidebar.classList.toggle("hidden");
-  document.getElementById("menuToggle").innerText = sidebar.classList.contains("hidden") ? "➡" : "⬅";
-};
+const sidebar=document.getElementById("sidebar");
+document.getElementById("menuToggle").onclick=()=>{ sidebar.classList.toggle("hidden"); document.getElementById("menuToggle").innerText=sidebar.classList.contains("hidden")?"➡":"⬅"; };
 
-function updateStatus(text) {
-  document.getElementById("statusBar").innerText = text;
-}
+function updateStatus(text){ document.getElementById("statusBar").innerText=text; }
 
-async function getAllUSDTSymbols() {
-  const [spotInfo, futuresInfo] = await Promise.all([
-    fetch("https://api.binance.com/api/v3/exchangeInfo").then(r => r.json()),
-    fetch("https://fapi.binance.com/fapi/v1/exchangeInfo").then(r => r.json())
+async function getAllUSDTSymbols(){
+  const [spotInfo,futuresInfo]=await Promise.all([
+    fetch("https://api.binance.com/api/v3/exchangeInfo").then(r=>r.json()),
+    fetch("https://fapi.binance.com/fapi/v1/exchangeInfo").then(r=>r.json())
   ]);
-  const spot = spotInfo.symbols.filter(s => s.status === "TRADING" && s.quoteAsset==="USDT").map(s=>({symbol:s.symbol,type:"spot"}));
-  const futures = futuresInfo.symbols.filter(s => s.status==="TRADING" && s.quoteAsset==="USDT").map(s=>({symbol:s.symbol,type:"futures"}));
-  return [...spot, ...futures];
+  const spot = spotInfo.symbols.filter(s=>s.status==="TRADING"&&s.quoteAsset==="USDT").map(s=>({symbol:s.symbol,type:"spot"}));
+  const futures = futuresInfo.symbols.filter(s=>s.status==="TRADING"&&s.quoteAsset==="USDT").map(s=>({symbol:s.symbol,type:"futures"}));
+  return [...spot,...futures];
 }
 
 async function calculate48h(symbol,type){
   if(!premiumActive && clickCount>=10) return null;
-  const base = type==="futures"?"https://fapi.binance.com/fapi/v1":"https://api.binance.com/api/v3";
-  const [klines,ticker] = await Promise.all([
-    fetch(`${base}/klines?symbol=${symbol}&interval=1h&limit=48`).then(r=>r.json()),
-    fetch(`${base}/ticker/24hr?symbol=${symbol}`).then(r=>r.json())
-  ]);
-  if(!Array.isArray(klines)||klines.length<48) return null;
-  const open48=parseFloat(klines[0][1]);
-  const closeNow=parseFloat(klines[47][4]);
-  const change48=((closeNow-open48)/open48)*100;
-  if(change48<10) return null;
+  const base=type==="futures"?"https://fapi.binance.com/fapi/v1":"https://api.binance.com/api/v3";
+  try{
+    const [klines,ticker]=await Promise.all([
+      fetch(`${base}/klines?symbol=${symbol}&interval=1h&limit=48`).then(r=>r.json()),
+      fetch(`${base}/ticker/24hr?symbol=${symbol}`).then(r=>r.json())
+    ]);
+    if(!Array.isArray(klines)||klines.length<48) return null;
+    const open48=parseFloat(klines[0][1]);
+    const closeNow=parseFloat(klines[47][4]);
+    if(isNaN(open48)||isNaN(closeNow)) return null;
+    const change48=((closeNow-open48)/open48)*100;
+    if(change48<10) return null;
 
-  const high=parseFloat(ticker.highPrice);
-  const price=parseFloat(ticker.lastPrice);
-  const change24=parseFloat(ticker.priceChangePercent);
-  const faltante=((price - parseFloat(ticker.lowPrice)) / (high - parseFloat(ticker.lowPrice)))*100;
+    const high=parseFloat(ticker.highPrice);
+    const low=parseFloat(ticker.lowPrice);
+    const price=parseFloat(ticker.lastPrice);
+    const change24=parseFloat(ticker.priceChangePercent);
+    const volume=parseFloat(ticker.quoteVolume);
+    if([high,low,price,change24,volume].some(v=>isNaN(v))) return null;
 
-  return {symbol,price,change24,change48,high,low:parseFloat(ticker.lowPrice),volume:parseFloat(ticker.quoteVolume),faltante,type};
+    const vaPor = ((price-low)/(high-low))*100;
+    return {symbol,price,change24,change48,high,low,volume,vaPor,type};
+  }catch(e){ return null; }
 }
 
 async function loadPRO(){
   updateStatus("Escaneando mercado...");
-  const symbols = await getAllUSDTSymbols();
-  const promises = symbols.map(s=>calculate48h(s.symbol,s.type));
-  const results = (await Promise.all(promises)).filter(x=>x!==null).sort((a,b)=>b.change48-a.change48);
+  const symbols=await getAllUSDTSymbols();
+  const promises=symbols.map(s=>calculate48h(s.symbol,s.type));
+  const results=(await Promise.all(promises)).filter(x=>x!==null).sort((a,b)=>b.change48-a.change48);
 
   if(!premiumActive) clickCount++;
   localStorage.setItem("clickCount",clickCount);
@@ -375,19 +202,16 @@ async function loadPRO(){
 
   const tableBody=document.getElementById("tableBody");
   tableBody.innerHTML="";
-  if(results.length===0){tableBody.innerHTML="<tr><td colspan='3'>Sin oportunidades</td></tr>";return;}
+  if(results.length===0){ tableBody.innerHTML="<tr><td colspan='3'>Sin oportunidades</td></tr>"; return; }
+
   results.forEach(c=>{
     const tr=document.createElement("tr");
     tr.innerHTML=`<td><b>${c.symbol.replace("USDT","")}</b></td>
                     <td class="green">${c.change48.toFixed(1)}%</td>
-                    <td class="orange">${faltantePorcentaje(c)}</td>`;
+                    <td class="orange">Va por ${c.vaPor.toFixed(1)}% hacia su máximo de 24H</td>`;
     tr.onclick=()=>showDetails(c);
     tableBody.appendChild(tr);
   });
-}
-
-function faltantePorcentaje(c){
-  return `Va por ${c.faltante.toFixed(1)}% hacia su máximo de 24H`;
 }
 
 function showDetails(c){
@@ -400,9 +224,10 @@ function showDetails(c){
     <hr>
     <p><b>Máx 24H:</b> $${c.high}</p>
     <p><b>Mín 24H:</b> $${c.low}</p>
-    <p class="orange">${faltantePorcentaje(c)}</p>
+    <p class="orange">Va por ${c.vaPor.toFixed(1)}% hacia su máximo de 24H</p>
     <p><b>Volumen:</b> ${(c.volume/1000000).toFixed(2)}M USDT</p>
   `;
+
   document.getElementById("linkBinanceWeb").style.display="block";
   document.getElementById("linkBinanceIOS").style.display="block";
   document.getElementById("linkBinanceAndroid").style.display="block";
