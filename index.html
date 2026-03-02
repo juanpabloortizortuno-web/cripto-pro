@@ -34,7 +34,6 @@
             justify-content: center; align-items: center; text-align: center;
         }
 
-        /* Panel de Administrador */
         #adminPanel {
             position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%);
             width: 320px; background: var(--bg-card); border: 2px solid var(--accent-gold);
@@ -43,19 +42,26 @@
         }
 
         header {
-            background: var(--bg-card); padding: 12px 20px; border-bottom: 1px solid var(--border);
+            background: var(--bg-card); padding: 12px 15px; border-bottom: 1px solid var(--border);
             display: flex; justify-content: space-between; align-items: center;
+            position: relative; z-index: 1001;
         }
 
         .brand { display: flex; align-items: center; gap: 10px; cursor: pointer; }
-        .brand i { color: var(--accent-gold); font-size: 24px; }
-        .brand h1 { font-size: 16px; margin: 0; letter-spacing: 1px; }
+        .brand i { color: var(--accent-gold); font-size: 20px; }
+        .brand h1 { font-size: 14px; margin: 0; letter-spacing: 0.5px; }
 
-        .social-links { display: flex; gap: 10px; }
+        /* BOTÓN MENÚ HAMBURGUESA */
+        #menuToggle {
+            background: var(--bg-input); border: 1px solid var(--border);
+            color: var(--accent-gold); padding: 8px 12px; border-radius: 6px;
+            cursor: pointer; margin-right: 10px; display: block;
+        }
+
+        .social-links { display: flex; gap: 5px; }
         .social-btn {
-            padding: 8px 12px; border-radius: 6px; text-decoration: none;
-            font-size: 12px; font-weight: bold; display: flex; align-items: center; gap: 6px;
-            transition: 0.3s;
+            padding: 6px 10px; border-radius: 6px; text-decoration: none;
+            font-size: 10px; font-weight: bold; display: flex; align-items: center; gap: 4px;
         }
         .tiktok { background: #000; color: white; border: 1px solid #333; }
         .licencia { background: var(--accent-gold); color: black; border: none; cursor: pointer; }
@@ -64,80 +70,81 @@
             background: #1e2329; color: var(--accent-gold);
             font-size: 11px; padding: 6px; text-align: center;
             border-bottom: 1px solid var(--border); text-transform: uppercase;
-            font-weight: 600; letter-spacing: 0.5px;
+            font-weight: 600;
         }
 
-        .container { display: flex; height: calc(100vh - 120px); }
+        .container { display: flex; height: calc(100vh - 100px); position: relative; }
 
+        /* SIDEBAR DESLIZANTE MEJORADO */
         .sidebar {
-            width: 380px; background: var(--bg-card);
+            width: 320px; background: var(--bg-card);
             border-right: 1px solid var(--border); display: flex; flex-direction: column;
+            position: absolute; left: 0; top: 0; height: 100%;
+            transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+            z-index: 1000;
         }
 
-        .search-container { padding: 15px; background: var(--bg-card); }
+        /* Clase para ocultar el menú en móviles */
+        .sidebar.hidden { transform: translateX(-100%); }
+
+        .search-container { padding: 15px; }
         #search {
             width: 100%; padding: 12px; background: var(--bg-input);
             border: 1px solid var(--border); border-radius: 8px; color: white;
-            box-sizing: border-box; outline: none; transition: 0.3s;
+            box-sizing: border-box; outline: none;
         }
-        #search:focus { border-color: var(--accent-gold); }
 
-        .filter-tabs { display: flex; padding: 0 15px 10px; gap: 8px; }
+        .filter-tabs { display: flex; padding: 0 15px 10px; gap: 5px; }
         .tab {
-            flex: 1; padding: 8px; font-size: 11px; background: #2b3139;
+            flex: 1; padding: 8px; font-size: 10px; background: #2b3139;
             border: none; border-radius: 4px; color: var(--text-dim);
-            cursor: pointer; font-weight: bold; transition: 0.2s;
+            cursor: pointer; font-weight: bold;
         }
         .tab.active { background: var(--accent-gold); color: black; }
 
         .table-wrapper { overflow-y: auto; flex: 1; }
         table { width: 100%; border-collapse: collapse; }
-        th { 
-            font-size: 10px; color: var(--text-dim); text-align: left;
-            padding: 12px 15px; position: sticky; top: 0; background: var(--bg-card);
-            border-bottom: 1px solid var(--border);
-        }
-        td { padding: 15px; font-size: 13px; border-bottom: 1px solid #1e2329; cursor: pointer; }
-        tr:hover { background: #1e2329; }
+        th { font-size: 9px; color: var(--text-dim); text-align: left; padding: 10px; background: var(--bg-card); position: sticky; top: 0; }
+        td { padding: 12px 10px; font-size: 12px; border-bottom: 1px solid #1e2329; cursor: pointer; }
 
         .main-content {
-            flex: 1; padding: 30px; overflow-y: auto; background: var(--bg-deep);
+            flex: 1; padding: 20px; overflow-y: auto; background: var(--bg-deep);
             display: flex; flex-direction: column; align-items: center;
+            width: 100%;
         }
 
         .crypto-card {
-            width: 100%; max-width: 600px; background: var(--bg-card);
+            width: 100%; max-width: 500px; background: var(--bg-card);
             border-radius: 16px; border: 1px solid var(--border);
-            padding: 30px; box-shadow: 0 10px 30px rgba(0,0,0,0.5);
+            padding: 20px; box-shadow: 0 10px 30px rgba(0,0,0,0.5);
         }
 
-        .price-hero { text-align: center; margin-bottom: 30px; }
-        .price-hero h2 { font-size: 42px; margin: 0; color: var(--accent-gold); }
-        .price-hero p { color: var(--text-dim); font-size: 18px; margin: 5px 0; }
+        .price-hero h2 { font-size: 32px; margin: 0; color: var(--accent-gold); text-align: center;}
+        .price-hero p { color: var(--text-dim); font-size: 14px; text-align: center; margin: 5px 0;}
 
-        .stats-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 15px; margin-bottom: 25px; }
-        .stat-box {
-            background: var(--bg-deep); padding: 15px; border-radius: 10px;
-            border: 1px solid var(--border); text-align: center;
-        }
-        .stat-box small { color: var(--text-dim); display: block; margin-bottom: 5px; font-size: 11px; }
-        .stat-box b { font-size: 16px; }
+        .stats-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-top: 20px; }
+        .stat-box { background: var(--bg-deep); padding: 12px; border-radius: 10px; border: 1px solid var(--border); text-align: center; }
+        .stat-box small { color: var(--text-dim); font-size: 10px; display: block; }
 
-        .actions { display: flex; flex-direction: column; gap: 12px; width: 100%; max-width: 600px; margin-top: 20px; }
-        .btn {
-            padding: 16px; border-radius: 8px; text-decoration: none; text-align: center;
-            font-weight: bold; font-size: 14px; transition: 0.3s; border: none; cursor: pointer;
-        }
+        .actions { display: flex; flex-direction: column; gap: 10px; width: 100%; max-width: 500px; margin-top: 20px; }
+        .btn { padding: 14px; border-radius: 8px; text-decoration: none; text-align: center; font-weight: bold; font-size: 13px; border: none; cursor: pointer; }
         .btn-primary { background: var(--accent-gold); color: black; }
         .btn-outline { background: transparent; border: 1px solid var(--border); color: white; }
-        .btn-ws { background: #25D366; color: white; display: flex; justify-content: center; align-items: center; gap: 10px; }
+        .btn-ws { background: #25D366; color: white; display: flex; justify-content: center; align-items: center; gap: 8px; }
 
-        .input-pro { width: 90%; padding: 12px; margin: 10px 0; background: #000; border: 1px solid var(--accent-gold); color: var(--accent-gold); text-align: center; font-weight: bold; border-radius: 8px;}
+        .input-pro { width: 90%; padding: 12px; margin: 10px 0; background: #000; border: 1px solid var(--accent-gold); color: var(--accent-gold); text-align: center; border-radius: 8px;}
 
         .green { color: var(--accent-green); }
         .red { color: var(--accent-red); }
         .blink-alert { animation: blink 1s infinite; font-weight: bold; background: rgba(248, 73, 96, 0.1) !important; }
         @keyframes blink { 50% { opacity: 0.6; } }
+
+        /* Ajustes específicos para móviles */
+        @media (max-width: 768px) {
+            .sidebar { width: 85%; }
+            .brand h1 { font-size: 12px; }
+            .social-btn span { display: none; } /* Oculta texto en botones sociales para ahorrar espacio */
+        }
     </style>
 </head>
 <body>
@@ -163,16 +170,19 @@
 </div>
 
 <header>
-    <div class="brand" onclick="accesoAdmin()">
-        <i class="fas fa-chart-line"></i>
-        <h1>CDC FUTURO-PRO <small style="color:var(--text-dim); font-size:9px;">v3.5</small></h1>
+    <div style="display: flex; align-items: center;">
+        <button id="menuToggle"><i class="fas fa-bars"></i></button>
+        <div class="brand" onclick="accesoAdmin()">
+            <i class="fas fa-chart-line"></i>
+            <h1>CDC FUTURO-PRO</h1>
+        </div>
     </div>
     <div class="social-links">
         <a href="https://www.tiktok.com/@chicodelascomputadoras" target="_blank" class="social-btn tiktok">
-            <i class="fab fa-tiktok"></i> TikTok
+            <i class="fab fa-tiktok"></i><span> TikTok</span>
         </a>
         <button onclick="document.getElementById('lockScreen').style.display='flex'" class="social-btn licencia">
-            <i class="fas fa-crown"></i> VIP ACCESS
+            <i class="fas fa-crown"></i><span> VIP</span>
         </button>
     </div>
 </header>
@@ -180,9 +190,9 @@
 <div id="statusBar">Sincronizando con Binance Futures Cloud...</div>
 
 <div class="container" id="appContent">
-    <div class="sidebar">
+    <div class="sidebar hidden" id="sidebar">
         <div class="search-container">
-            <input type="text" id="search" placeholder="🔍 Buscar moneda (Ej: SOL, BTC)...">
+            <input type="text" id="search" placeholder="🔍 Buscar moneda...">
         </div>
         <div class="filter-tabs">
             <button id="btnAll" class="tab active">TODAS</button>
@@ -215,13 +225,29 @@
             <a id="linkWeb" class="btn btn-primary" target="_blank" style="display:none;">🌐 OPERAR EN BINANCE WEB</a>
             <a id="linkApp" class="btn btn-outline" target="_blank" style="display:none;">📱 ABRIR EN APP MÓVIL</a>
             <a href="https://wa.me/59177244375" target="_blank" class="btn btn-ws">
-                <i class="fab fa-whatsapp"></i> SOPORTE VIP: 77244375
+                <i class="fab fa-whatsapp"></i> SOPORTE VIP
             </a>
         </div>
     </div>
 </div>
 
 <script>
+    // --- LÓGICA DEL MENÚ DESLIZANTE ---
+    const sidebar = document.getElementById("sidebar");
+    const menuToggle = document.getElementById("menuToggle");
+
+    menuToggle.onclick = (e) => {
+        e.stopPropagation();
+        sidebar.classList.toggle("hidden");
+    };
+
+    // Cerrar menú al hacer clic fuera (en el contenido principal)
+    document.querySelector(".main-content").onclick = () => {
+        if (!sidebar.classList.contains("hidden")) {
+            sidebar.classList.add("hidden");
+        }
+    };
+
     // --- SEGURIDAD Y LICENCIAS ---
     const ADMIN_KEY = "melfy777";
     const PREFIX = "CDC-2026-";
@@ -341,6 +367,8 @@
                     localStorage.setItem("cdc_usage_count", usages);
                 }
                 showDetail(c);
+                // Cerrar menú al seleccionar en móvil
+                if (window.innerWidth < 768) sidebar.classList.add("hidden");
             };
             body.appendChild(tr);
         });
@@ -362,7 +390,7 @@
                 <div class="stat-box"><small>DISTANCIA MÁX</small><b class="red">${c.distMax.toFixed(2)}%</b></div>
                 <div class="stat-box"><small>VOLATILIDAD</small><b class="green">ALTA</b></div>
             </div>
-            ${c.isAlert ? '<div style="background:var(--accent-red); color:white; padding:10px; border-radius:8px; text-align:center; font-weight:bold;">🔥 ALERTA DE POSIBLE REVERSIÓN</div>' : ''}
+            ${c.isAlert ? '<div style="background:var(--accent-red); color:white; padding:10px; border-radius:8px; text-align:center; font-weight:bold; margin-top:15px;">🔥 ALERTA DE POSIBLE REVERSIÓN</div>' : ''}
         `;
 
         document.getElementById("linkWeb").style.display = "block";
