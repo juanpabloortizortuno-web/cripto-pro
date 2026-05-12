@@ -1,408 +1,676 @@
+```html
 <!DOCTYPE html>
 <html lang="es">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>CDC FUTURO-PRO | VIP SCANNER</title>
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
-    <style>
-        :root {
-            --bg-deep: #080a0e;
-            --bg-card: #12161c;
-            --bg-input: #1b2129;
-            --accent-gold: #f3ba2f; 
-            --accent-green: #02c076;
-            --accent-red: #f84960;
-            --text-main: #eaecef;
-            --text-dim: #848e9c;
-            --border: #2b3139;
-        }
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>CDC FUTURO-PRO | SCANNER PRO</title>
 
-        body {
-            margin: 0;
-            font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
-            background: var(--bg-deep);
-            color: var(--text-main);
-            overflow: hidden;
-        }
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
 
-        /* Pantalla de Bloqueo */
-        #lockScreen {
-            position: fixed; top: 0; left: 0; width: 100%; height: 100%;
-            background: rgba(8, 10, 14, 0.98); backdrop-filter: blur(10px);
-            z-index: 10000; display: none; flex-direction: column;
-            justify-content: center; align-items: center; text-align: center;
-        }
+<style>
 
-        #adminPanel {
-            position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%);
-            width: 320px; background: var(--bg-card); border: 2px solid var(--accent-gold);
-            padding: 25px; border-radius: 15px; z-index: 20000; display: none;
-            box-shadow: 0 0 50px rgba(0,0,0,0.9); text-align: center;
-        }
+:root{
+--bg-deep:#080a0e;
+--bg-card:#12161c;
+--accent-gold:#f3ba2f;
+--accent-green:#02c076;
+--accent-red:#f84960;
+--text-main:#eaecef;
+--text-dim:#848e9c;
+--border:#2b3139;
+}
 
-        header {
-            background: var(--bg-card); padding: 12px 15px; border-bottom: 1px solid var(--border);
-            display: flex; justify-content: space-between; align-items: center;
-            position: relative; z-index: 1001;
-        }
+body{
+margin:0;
+font-family:Arial;
+background:var(--bg-deep);
+color:var(--text-main);
+overflow:hidden;
+}
 
-        .brand { display: flex; align-items: center; gap: 10px; cursor: pointer; }
-        .brand i { color: var(--accent-gold); font-size: 20px; }
-        .brand h1 { font-size: 14px; margin: 0; letter-spacing: 0.5px; }
+header{
+display:flex;
+justify-content:space-between;
+align-items:center;
+padding:12px;
+background:var(--bg-card);
+border-bottom:1px solid var(--border);
+}
 
-        /* BOTÓN MENÚ HAMBURGUESA */
-        #menuToggle {
-            background: var(--bg-input); border: 1px solid var(--border);
-            color: var(--accent-gold); padding: 8px 12px; border-radius: 6px;
-            cursor: pointer; margin-right: 10px; display: block;
-        }
+.brand{
+display:flex;
+align-items:center;
+gap:10px;
+cursor:pointer;
+}
 
-        .social-links { display: flex; gap: 5px; }
-        .social-btn {
-            padding: 6px 10px; border-radius: 6px; text-decoration: none;
-            font-size: 10px; font-weight: bold; display: flex; align-items: center; gap: 4px;
-        }
-        .tiktok { background: #000; color: white; border: 1px solid #333; }
-        .licencia { background: var(--accent-gold); color: black; border: none; cursor: pointer; }
+.brand i{
+color:var(--accent-gold);
+}
 
-        #statusBar {
-            background: #1e2329; color: var(--accent-gold);
-            font-size: 11px; padding: 6px; text-align: center;
-            border-bottom: 1px solid var(--border); text-transform: uppercase;
-            font-weight: 600;
-        }
+#menuToggle{
+background:#1b2129;
+border:1px solid var(--border);
+color:var(--accent-gold);
+padding:8px;
+border-radius:6px;
+cursor:pointer;
+}
 
-        .container { display: flex; height: calc(100vh - 100px); position: relative; }
+.container{
+display:flex;
+height:calc(100vh - 60px);
+}
 
-        /* SIDEBAR DESLIZANTE MEJORADO */
-        .sidebar {
-            width: 320px; background: var(--bg-card);
-            border-right: 1px solid var(--border); display: flex; flex-direction: column;
-            position: absolute; left: 0; top: 0; height: 100%;
-            transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-            z-index: 1000;
-        }
+.sidebar{
+width:320px;
+background:var(--bg-card);
+border-right:1px solid var(--border);
+position:absolute;
+height:100%;
+transition:.3s;
+overflow-y:auto;
+}
 
-        /* Clase para ocultar el menú en móviles */
-        .sidebar.hidden { transform: translateX(-100%); }
+.sidebar.hidden{
+transform:translateX(-100%);
+}
 
-        .search-container { padding: 15px; }
-        #search {
-            width: 100%; padding: 12px; background: var(--bg-input);
-            border: 1px solid var(--border); border-radius: 8px; color: white;
-            box-sizing: border-box; outline: none;
-        }
+table{
+width:100%;
+border-collapse:collapse;
+}
 
-        .filter-tabs { display: flex; padding: 0 15px 10px; gap: 5px; }
-        .tab {
-            flex: 1; padding: 8px; font-size: 10px; background: #2b3139;
-            border: none; border-radius: 4px; color: var(--text-dim);
-            cursor: pointer; font-weight: bold;
-        }
-        .tab.active { background: var(--accent-gold); color: black; }
+th{
+position:sticky;
+top:0;
+background:var(--bg-card);
+font-size:10px;
+padding:10px;
+color:var(--text-dim);
+}
 
-        .table-wrapper { overflow-y: auto; flex: 1; }
-        table { width: 100%; border-collapse: collapse; }
-        th { font-size: 9px; color: var(--text-dim); text-align: left; padding: 10px; background: var(--bg-card); position: sticky; top: 0; }
-        td { padding: 12px 10px; font-size: 12px; border-bottom: 1px solid #1e2329; cursor: pointer; }
+td{
+padding:12px;
+font-size:12px;
+border-bottom:1px solid #1e2329;
+cursor:pointer;
+}
 
-        .main-content {
-            flex: 1; padding: 20px; overflow-y: auto; background: var(--bg-deep);
-            display: flex; flex-direction: column; align-items: center;
-            width: 100%;
-        }
+.main{
+flex:1;
+display:flex;
+flex-direction:column;
+align-items:center;
+padding:15px;
+}
 
-        .crypto-card {
-            width: 100%; max-width: 500px; background: var(--bg-card);
-            border-radius: 16px; border: 1px solid var(--border);
-            padding: 20px; box-shadow: 0 10px 30px rgba(0,0,0,0.5);
-        }
+.card{
+background:var(--bg-card);
+padding:20px;
+border-radius:12px;
+border:1px solid var(--border);
+width:100%;
+max-width:520px;
+}
 
-        .price-hero h2 { font-size: 32px; margin: 0; color: var(--accent-gold); text-align: center;}
-        .price-hero p { color: var(--text-dim); font-size: 14px; text-align: center; margin: 5px 0;}
+.price-hero h2{
+font-size:30px;
+margin:5px 0;
+color:var(--accent-gold);
+text-align:center;
+}
 
-        .stats-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-top: 20px; }
-        .stat-box { background: var(--bg-deep); padding: 12px; border-radius: 10px; border: 1px solid var(--border); text-align: center; }
-        .stat-box small { color: var(--text-dim); font-size: 10px; display: block; }
+.price-hero p{
+text-align:center;
+color:var(--text-dim);
+margin:0;
+}
 
-        .actions { display: flex; flex-direction: column; gap: 10px; width: 100%; max-width: 500px; margin-top: 20px; }
-        .btn { padding: 14px; border-radius: 8px; text-decoration: none; text-align: center; font-weight: bold; font-size: 13px; border: none; cursor: pointer; }
-        .btn-primary { background: var(--accent-gold); color: black; }
-        .btn-outline { background: transparent; border: 1px solid var(--border); color: white; }
-        .btn-ws { background: #25D366; color: white; display: flex; justify-content: center; align-items: center; gap: 8px; }
+.stats-grid{
+display:grid;
+grid-template-columns:1fr 1fr;
+gap:10px;
+margin-top:20px;
+}
 
-        .input-pro { width: 90%; padding: 12px; margin: 10px 0; background: #000; border: 1px solid var(--accent-gold); color: var(--accent-gold); text-align: center; border-radius: 8px;}
+.stat-box{
+background:#0b0f14;
+padding:12px;
+border-radius:10px;
+border:1px solid var(--border);
+text-align:center;
+}
 
-        .green { color: var(--accent-green); }
-        .red { color: var(--accent-red); }
-        .blink-alert { animation: blink 1s infinite; font-weight: bold; background: rgba(248, 73, 96, 0.1) !important; }
-        @keyframes blink { 50% { opacity: 0.6; } }
+.stat-box small{
+color:var(--text-dim);
+font-size:10px;
+display:block;
+}
 
-        /* Ajustes específicos para móviles */
-        @media (max-width: 768px) {
-            .sidebar { width: 85%; }
-            .brand h1 { font-size: 12px; }
-            .social-btn span { display: none; } /* Oculta texto en botones sociales para ahorrar espacio */
-        }
-    </style>
+.actions{
+margin-top:15px;
+display:flex;
+flex-direction:column;
+gap:10px;
+width:100%;
+max-width:520px;
+}
+
+.btn{
+padding:12px;
+border-radius:8px;
+text-align:center;
+font-weight:bold;
+border:none;
+cursor:pointer;
+text-decoration:none;
+}
+
+.binance{
+background:var(--accent-gold);
+color:black;
+}
+
+.ws{
+background:#25D366;
+color:white;
+}
+
+.vip{
+background:#1b2129;
+color:var(--accent-gold);
+border:1px solid var(--accent-gold);
+}
+
+.green{
+color:var(--accent-green);
+}
+
+.red{
+color:var(--accent-red);
+}
+
+.alarm{
+animation:blink .5s infinite;
+font-weight:bold;
+}
+
+@keyframes blink{
+50%{opacity:.2;}
+}
+
+.rebote{
+background:rgba(248,73,96,0.12);
+}
+
+.alarmRow{
+background:rgba(248,73,96,0.25);
+}
+
+.input-pro{
+width:90%;
+padding:12px;
+margin:10px 0;
+background:black;
+border:1px solid var(--accent-gold);
+color:var(--accent-gold);
+text-align:center;
+border-radius:8px;
+}
+
+</style>
 </head>
+
 <body>
 
-<div id="adminPanel">
-    <h3 style="color:var(--accent-gold)">GENERADOR CDC VIP</h3>
-    <input type="text" id="adminUser" class="input-pro" placeholder="Nombre del Cliente">
-    <button onclick="generarLicencia()" class="btn btn-primary" style="width:100%">GENERAR 1 AÑO</button>
-    <div id="keyResult" style="margin-top:15px; color:white; font-size:11px; background:#000; padding:10px; border-radius:5px; display:none; word-break: break-all;"></div>
-    <br>
-    <button onclick="document.getElementById('adminPanel').style.display='none'" style="background:none; border:none; color:var(--text-dim); cursor:pointer; margin-top:10px;">Cerrar</button>
+<!-- ADMIN PANEL -->
+
+<div id="adminPanel" style="
+position:fixed;
+top:50%;
+left:50%;
+transform:translate(-50%,-50%);
+width:320px;
+background:#12161c;
+border:2px solid #f3ba2f;
+padding:25px;
+border-radius:15px;
+z-index:99999;
+display:none;
+text-align:center;
+">
+
+<h3 style="color:#f3ba2f;">GENERADOR CDC VIP</h3>
+
+<input type="text" id="adminUser" class="input-pro" placeholder="Nombre Cliente">
+
+<button onclick="generarLicencia()" class="btn binance" style="width:100%;">
+GENERAR 1 AÑO
+</button>
+
+<div id="keyResult" style="
+margin-top:15px;
+background:black;
+padding:10px;
+border-radius:8px;
+font-size:11px;
+display:none;
+word-break:break-all;
+"></div>
+
+<br>
+
+<button onclick="document.getElementById('adminPanel').style.display='none'"
+style="
+background:none;
+border:none;
+color:#848e9c;
+cursor:pointer;
+">
+Cerrar
+</button>
+
 </div>
 
-<div id="lockScreen">
-    <i class="fas fa-lock" style="font-size: 60px; color: var(--accent-gold); margin-bottom: 20px;"></i>
-    <h1 style="color:white">SISTEMA BLOQUEADO</h1>
-    <p id="lockMsg" style="color:var(--text-dim)">Has agotado tus 10 usos gratuitos o tu licencia venció.</p>
-    <input type="text" id="licenseInput" class="input-pro" placeholder="INGRESA TU CÓDIGO VIP">
-    <button onclick="activar()" class="btn btn-primary" style="width: 250px;">ACTIVAR LICENCIA</button>
-    <a href="https://wa.me/59177244375" class="btn btn-ws" style="width: 250px; margin-top: 10px;">
-        <i class="fab fa-whatsapp"></i> ADQUIRIR LICENCIA
-    </a>
+<!-- LOCK -->
+
+<div id="lockScreen" style="
+position:fixed;
+top:0;
+left:0;
+width:100%;
+height:100%;
+background:rgba(8,10,14,.98);
+backdrop-filter:blur(10px);
+z-index:99998;
+display:none;
+flex-direction:column;
+justify-content:center;
+align-items:center;
+text-align:center;
+">
+
+<i class="fas fa-lock"
+style="font-size:60px;color:#f3ba2f;margin-bottom:20px;"></i>
+
+<h1>SISTEMA BLOQUEADO</h1>
+
+<p id="lockMsg" style="color:#848e9c;">
+Has agotado los usos gratuitos
+</p>
+
+<input type="text"
+id="licenseInput"
+class="input-pro"
+placeholder="INGRESA LICENCIA">
+
+<button onclick="activar()"
+class="btn binance"
+style="width:260px;">
+ACTIVAR LICENCIA
+</button>
+
+<a href="https://wa.me/59177244375"
+target="_blank"
+class="btn ws"
+style="width:260px;margin-top:10px;">
+
+<i class="fab fa-whatsapp"></i>
+COMPRAR LICENCIA
+
+</a>
+
 </div>
 
 <header>
-    <div style="display: flex; align-items: center;">
-        <button id="menuToggle"><i class="fas fa-bars"></i></button>
-        <div class="brand" onclick="accesoAdmin()">
-            <i class="fas fa-chart-line"></i>
-            <h1>CDC FUTURO-PRO</h1>
-        </div>
-    </div>
-    <div class="social-links">
-        <a href="https://www.tiktok.com/@chicodelascomputadoras" target="_blank" class="social-btn tiktok">
-            <i class="fab fa-tiktok"></i><span> TikTok</span>
-        </a>
-        <button onclick="document.getElementById('lockScreen').style.display='flex'" class="social-btn licencia">
-            <i class="fas fa-crown"></i><span> VIP</span>
-        </button>
-    </div>
+
+<div style="display:flex;align-items:center;gap:10px;">
+
+<button id="menuToggle">
+<i class="fas fa-bars"></i>
+</button>
+
+<div class="brand" onclick="accesoAdmin()">
+<i class="fas fa-chart-line"></i>
+<b>CDC FUTURO-PRO</b>
+</div>
+
+</div>
+
+<div style="display:flex;gap:8px;">
+
+<a href="https://www.tiktok.com/@chicodelascomputadoras"
+target="_blank"
+class="btn vip">
+
+<i class="fab fa-tiktok"></i>
+TikTok
+
+</a>
+
+<button onclick="document.getElementById('lockScreen').style.display='flex'"
+class="btn vip">
+
+<i class="fas fa-crown"></i>
+VIP
+
+</button>
+
+</div>
+
 </header>
 
-<div id="statusBar">Sincronizando con Binance Futures Cloud...</div>
+<div class="container">
 
-<div class="container" id="appContent">
-    <div class="sidebar hidden" id="sidebar">
-        <div class="search-container">
-            <input type="text" id="search" placeholder="🔍 Buscar moneda...">
-        </div>
-        <div class="filter-tabs">
-            <button id="btnAll" class="tab active">TODAS</button>
-            <button id="btnStrong" class="tab">BULLISH (+2%)</button>
-        </div>
-        <div class="table-wrapper">
-            <table>
-                <thead>
-                    <tr>
-                        <th>ACTIVO</th>
-                        <th>CAMBIO 24H</th>
-                        <th>% DIST MÁX</th>
-                    </tr>
-                </thead>
-                <tbody id="cryptoList"></tbody>
-            </table>
-        </div>
-    </div>
+<div class="sidebar hidden" id="sidebar">
 
-    <div class="main-content">
-        <div id="detailView" class="crypto-card">
-            <div style="text-align: center; color: var(--text-dim);">
-                <i class="fas fa-mouse-pointer" style="font-size: 40px; margin-bottom: 15px;"></i>
-                <h3>SELECCIONE UN ACTIVO</h3>
-                <p>Análisis de algoritmos en tiempo real activo.</p>
-            </div>
-        </div>
+<table>
 
-        <div class="actions">
-            <a id="linkWeb" class="btn btn-primary" target="_blank" style="display:none;">🌐 OPERAR EN BINANCE WEB</a>
-            <a id="linkApp" class="btn btn-outline" target="_blank" style="display:none;">📱 ABRIR EN APP MÓVIL</a>
-            <a href="https://wa.me/59177244375" target="_blank" class="btn btn-ws">
-                <i class="fab fa-whatsapp"></i> SOPORTE VIP
-            </a>
-        </div>
-    </div>
+<thead>
+<tr>
+<th>CRIPTO</th>
+<th>CAMBIO</th>
+<th>ZONA</th>
+</tr>
+</thead>
+
+<tbody id="cryptoList"></tbody>
+
+</table>
+
+</div>
+
+<div class="main">
+
+<div class="card" id="detailView">
+SELECCIONA UNA MONEDA
+</div>
+
+<div class="actions">
+
+<a id="linkBinance"
+class="btn binance"
+target="_blank"
+style="display:none;">
+BINANCE
+</a>
+
+<a id="linkApp"
+class="btn vip"
+target="_blank"
+style="display:none;">
+ABRIR APP BINANCE
+</a>
+
+<a href="https://wa.me/59177244375"
+class="btn ws"
+target="_blank">
+
+WHATSAPP
+
+</a>
+
+</div>
+
+</div>
 </div>
 
 <script>
-    // --- LÓGICA DEL MENÚ DESLIZANTE ---
-    const sidebar = document.getElementById("sidebar");
-    const menuToggle = document.getElementById("menuToggle");
 
-    menuToggle.onclick = (e) => {
-        e.stopPropagation();
-        sidebar.classList.toggle("hidden");
-    };
+const ADMIN_KEY="melfy777";
+const PREFIX="CDC-2026-";
 
-    // Cerrar menú al hacer clic fuera (en el contenido principal)
-    document.querySelector(".main-content").onclick = () => {
-        if (!sidebar.classList.contains("hidden")) {
-            sidebar.classList.add("hidden");
-        }
-    };
+let usages=parseInt(localStorage.getItem("cdc_usage_count"))||0;
+let expiry=localStorage.getItem("cdc_expiry_date");
 
-    // --- SEGURIDAD Y LICENCIAS ---
-    const ADMIN_KEY = "melfy777";
-    const PREFIX = "CDC-2026-";
-    let usages = parseInt(localStorage.getItem("cdc_usage_count")) || 0;
-    let expiry = localStorage.getItem("cdc_expiry_date");
+function checkSecurity(){
 
-    function checkSecurity() {
-        const now = new Date().getTime();
-        if (expiry) {
-            if (now > parseInt(expiry)) {
-                document.getElementById("lockScreen").style.display = "flex";
-                document.getElementById("lockMsg").innerText = "Tu licencia de 1 año ha expirado.";
-                document.getElementById("appContent").innerHTML = "";
-                return false;
-            }
-            document.getElementById("statusBar").innerHTML = "👑 VIP ACTIVO - EXPIRA: " + new Date(parseInt(expiry)).toLocaleDateString();
-            return true;
-        }
-        if (usages >= 10) {
-            document.getElementById("lockScreen").style.display = "flex";
-            document.getElementById("appContent").innerHTML = "";
-            return false;
-        }
-        document.getElementById("statusBar").innerText = `MODO PRUEBA: ${usages}/10 INTENTOS`;
-        return true;
-    }
+const now=new Date().getTime();
 
-    function accesoAdmin() {
-        let p = prompt("PASSWORD ADMIN:");
-        if (p === ADMIN_KEY) document.getElementById("adminPanel").style.display = "block";
-    }
+if(expiry){
 
-    function generarLicencia() {
-        let u = document.getElementById("adminUser").value;
-        if(!u) return alert("Pon nombre");
-        let key = btoa(PREFIX + u + "-1YEAR").replace(/=/g, "");
-        document.getElementById("keyResult").innerText = key;
-        document.getElementById("keyResult").style.display = "block";
-    }
+if(now>parseInt(expiry)){
 
-    function activar() {
-        let val = document.getElementById("licenseInput").value;
-        try {
-            let dec = atob(val);
-            if(dec.startsWith(PREFIX) && dec.endsWith("-1YEAR")) {
-                let year = new Date().getTime() + (365 * 24 * 60 * 60 * 1000);
-                localStorage.setItem("cdc_expiry_date", year.toString());
-                alert("✅ ACTIVADO POR 1 AÑO");
-                location.reload();
-            } else { alert("❌ CLAVE INVÁLIDA"); }
-        } catch(e) { alert("❌ FORMATO INCORRECTO"); }
-    }
+document.getElementById("lockScreen").style.display="flex";
 
-    // --- LÓGICA DEL SCANNER ---
-    let allCryptos = [];
-    let filterStrong = false;
+document.getElementById("lockMsg").innerText=
+"Tu licencia expiró.";
 
-    document.getElementById("btnAll").onclick = () => { filterStrong = false; updateTabs("btnAll"); renderList(); };
-    document.getElementById("btnStrong").onclick = () => { filterStrong = true; updateTabs("btnStrong"); renderList(); };
-    function updateTabs(id) {
-        document.querySelectorAll(".tab").forEach(t => t.classList.remove("active"));
-        document.getElementById(id).classList.add("active");
-    }
+return false;
+}
 
-    async function getMarketData() {
-        if(!checkSecurity()) return;
-        try {
-            const [exInfo, tickers] = await Promise.all([
-                fetch("https://fapi.binance.com/fapi/v1/exchangeInfo").then(r => r.json()),
-                fetch("https://fapi.binance.com/fapi/v1/ticker/24hr").then(r => r.json())
-            ]);
+return true;
+}
 
-            const activeTrading = exInfo.symbols
-                .filter(s => s.status === "TRADING" && s.quoteAsset === "USDT")
-                .map(s => s.symbol);
+if(usages>=10){
 
-            allCryptos = tickers
-                .filter(t => activeTrading.includes(t.symbol))
-                .map(t => {
-                    const price = parseFloat(t.lastPrice);
-                    const high = parseFloat(t.highPrice);
-                    const low = parseFloat(t.lowPrice);
-                    const change = parseFloat(t.priceChangePercent);
-                    const distMax = ((high - price) / (high - low)) * 100;
-                    return {
-                        symbol: t.symbol, name: t.symbol.replace("USDT",""),
-                        price, change, high, low, distMax,
-                        isAlert: (distMax < 3.5 && change > 3.5)
-                    };
-                });
+document.getElementById("lockScreen").style.display="flex";
 
-            allCryptos.sort((a, b) => (a.isAlert === b.isAlert) ? b.change - a.change : a.isAlert ? -1 : 1);
-            renderList();
-        } catch (e) { console.log(e); }
-    }
+return false;
+}
 
-    function renderList() {
-        const body = document.getElementById("cryptoList");
-        const search = document.getElementById("search").value.toUpperCase();
-        body.innerHTML = "";
+return true;
+}
 
-        allCryptos.forEach(c => {
-            if(filterStrong && c.change < 2) return;
-            if(search && !c.symbol.includes(search)) return;
+function accesoAdmin(){
 
-            const tr = document.createElement("tr");
-            if(c.isAlert) tr.className = "blink-alert";
+let p=prompt("PASSWORD ADMIN:");
 
-            tr.innerHTML = `
-                <td><b style="color:white">${c.name}</b><br><small style="color:var(--text-dim)">USDT-M</small></td>
-                <td class="${c.change >= 0 ? 'green' : 'red'}" style="font-weight:bold">${c.change.toFixed(2)}%</td>
-                <td style="text-align:center">${c.distMax.toFixed(1)}%</td>
-            `;
-            tr.onclick = () => {
-                if(!expiry) {
-                    usages++;
-                    localStorage.setItem("cdc_usage_count", usages);
-                }
-                showDetail(c);
-                // Cerrar menú al seleccionar en móvil
-                if (window.innerWidth < 768) sidebar.classList.add("hidden");
-            };
-            body.appendChild(tr);
-        });
-    }
+if(p===ADMIN_KEY){
 
-    function showDetail(c) {
-        if(!checkSecurity()) return;
-        document.getElementById("detailView").innerHTML = `
-            <div class="price-hero">
-                <p>${c.symbol} PERPETUAL</p>
-                <h2>$${c.price}</h2>
-                <span class="${c.change >= 0 ? 'green' : 'red'}" style="font-weight:bold; font-size:20px;">
-                    ${c.change > 0 ? '▲' : '▼'} ${c.change}%
-                </span>
-            </div>
-            <div class="stats-grid">
-                <div class="stat-box"><small>MÁXIMO 24H</small><b>$${c.high}</b></div>
-                <div class="stat-box"><small>MÍNIMO 24H</small><b>$${c.low}</b></div>
-                <div class="stat-box"><small>DISTANCIA MÁX</small><b class="red">${c.distMax.toFixed(2)}%</b></div>
-                <div class="stat-box"><small>VOLATILIDAD</small><b class="green">ALTA</b></div>
-            </div>
-            ${c.isAlert ? '<div style="background:var(--accent-red); color:white; padding:10px; border-radius:8px; text-align:center; font-weight:bold; margin-top:15px;">🔥 ALERTA DE POSIBLE REVERSIÓN</div>' : ''}
-        `;
+document.getElementById("adminPanel").style.display="block";
+}
+}
 
-        document.getElementById("linkWeb").style.display = "block";
-        document.getElementById("linkApp").style.display = "block";
-        document.getElementById("linkWeb").href = `https://www.binance.com/es/futures/${c.symbol}`;
-        document.getElementById("linkApp").href = `binance://futures/trade?symbol=${c.symbol}`;
-    }
+function generarLicencia(){
 
-    document.getElementById("search").oninput = renderList;
-    getMarketData();
-    setInterval(getMarketData, 20000);
+let u=document.getElementById("adminUser").value;
+
+if(!u) return alert("Pon nombre");
+
+let key=btoa(PREFIX+u+"-1YEAR").replace(/=/g,"");
+
+document.getElementById("keyResult").style.display="block";
+
+document.getElementById("keyResult").innerText=key;
+}
+
+function activar(){
+
+let val=document.getElementById("licenseInput").value;
+
+try{
+
+let dec=atob(val);
+
+if(dec.startsWith(PREFIX) && dec.endsWith("-1YEAR")){
+
+let year=new Date().getTime()+(365*24*60*60*1000);
+
+localStorage.setItem("cdc_expiry_date",year.toString());
+
+alert("VIP ACTIVADO");
+
+location.reload();
+
+}else{
+
+alert("CLAVE INVALIDA");
+}
+
+}catch(e){
+
+alert("FORMATO INCORRECTO");
+}
+}
+
+let all=[];
+
+document.getElementById("menuToggle").onclick=()=>{
+
+document.getElementById("sidebar").classList.toggle("hidden");
+
+};
+
+async function load(){
+
+if(!checkSecurity()) return;
+
+const [ex,tick]=await Promise.all([
+
+fetch("https://fapi.binance.com/fapi/v1/exchangeInfo")
+.then(r=>r.json()),
+
+fetch("https://fapi.binance.com/fapi/v1/ticker/24hr")
+.then(r=>r.json())
+
+]);
+
+const active=ex.symbols
+.filter(s=>s.status==="TRADING")
+.map(s=>s.symbol);
+
+all=tick.filter(t=>active.includes(t.symbol)).map(t=>{
+
+const price=parseFloat(t.lastPrice);
+const high=parseFloat(t.highPrice);
+const low=parseFloat(t.lowPrice);
+const change=parseFloat(t.priceChangePercent);
+
+const distLow=((price-low)/(high-low))*100;
+
+return{
+symbol:t.symbol,
+name:t.symbol.replace("USDT",""),
+price,change,high,low,distLow
+};
+
+});
+
+all.sort((a,b)=>a.distLow-b.distLow);
+
+render();
+}
+
+function render(){
+
+const body=document.getElementById("cryptoList");
+
+body.innerHTML="";
+
+all.forEach(c=>{
+
+let alarma = c.distLow < 15 && Math.abs(c.change) >= 5;
+
+let rebote = c.distLow >= 5 && c.distLow <= 25 && c.change >= 5;
+
+let turtle = c.change <= -3;
+let rocket = c.change >= 5;
+
+const tr=document.createElement("tr");
+
+if(alarma) tr.classList.add("alarmRow");
+if(rebote) tr.classList.add("rebote");
+
+tr.innerHTML=`
+
+<td class="alarm">
+
+${c.name}
+${turtle?'🐢':''}
+${rocket?'⚡':''}
+${alarma?'🚨':''}
+
+</td>
+
+<td class="${c.change>=0?'green':'red'}">
+${c.change.toFixed(2)}%
+</td>
+
+<td>
+${c.distLow.toFixed(1)}%
+</td>
+
+`;
+
+tr.onclick=()=>show(c);
+
+body.appendChild(tr);
+
+});
+
+}
+
+function show(c){
+
+if(!expiry){
+
+usages++;
+
+localStorage.setItem("cdc_usage_count",usages);
+}
+
+document.getElementById("detailView").innerHTML=`
+
+<div class="price-hero">
+
+<p>${c.symbol}</p>
+
+<h2>$${c.price}</h2>
+
+<span class="${c.change>=0?'green':'red'}">
+
+${c.change.toFixed(2)}%
+
+</span>
+
+</div>
+
+<div class="stats-grid">
+
+<div class="stat-box">
+<small>MIN</small>
+${c.low}
+</div>
+
+<div class="stat-box">
+<small>MAX</small>
+${c.high}
+</div>
+
+<div class="stat-box">
+<small>REBOTE</small>
+${c.distLow.toFixed(1)}%
+</div>
+
+<div class="stat-box">
+<small>ZONA</small>
+${c.distLow<25?'🔥 ALERTA':'NORMAL'}
+</div>
+
+</div>
+
+`;
+
+document.getElementById("linkBinance").style.display="block";
+
+document.getElementById("linkBinance").href=
+`https://www.binance.com/es/futures/${c.symbol}`;
+
+document.getElementById("linkApp").style.display="block";
+
+document.getElementById("linkApp").href=
+`binance://futures/trade?symbol=${c.symbol}`;
+}
+
+load();
+
+setInterval(load,15000);
+
 </script>
 
 </body>
 </html>
+```
