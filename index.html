@@ -679,6 +679,14 @@ function render() {
             <td style="font-weight:bold;">
                 ${c.name}
                 ${alarma ? '🚨' : ''}
+
+                 ${c.change >= 12 
+                     ? '<span class="bomba" style="color:#02c076; font-weight:bold;"> 💣 EXPLOSIÓN</span>' 
+                        : ''}
+                   ${c.change <= -12 
+                    ? '<span class="cascada" style="color:#4fc3f7; font-weight:bold;"> 🌊 CASCADA</span>' 
+                     : ''}
+
                 ${volatil ? '<span style="color:#f3ba2f;"> 🔥 VOLÁTIL</span>' : ''}
             </td>
 
@@ -756,15 +764,33 @@ function show(c) {
                 <b>${c.distLow.toFixed(1)}%</b>
             </div>
 
-            <div class="stat-box">
-                <small>Estado</small>
+        
+                <div class="stat-box">
+                   <small>Señal</small>
 
-                <b style="color:${c.distLow < 25 ? '#f84960' : '#02c076'}">
+                  <b style="
+                 color:
+                  ${
+                 c.change >= 5
+            ? '#02c076'
+            : c.change <= -5
+            ? '#f84960'
+            : '#f3ba2f'
+        };
+        font-size:18px;
+    ">
 
-                    ${c.distLow < 25 ? 'COMPRA' : 'NORMAL'}
+        ${
+            c.change >= 5
+            ? '📈 ALCISTA'
+            : c.change <= -5
+            ? '📉 BAJISTA'
+            : '⚠️ NEUTRAL'
+          }
 
-                </b>
-            </div>
+            </b>
+          </div>
+
 
         </div>
     `;
