@@ -669,6 +669,18 @@ function render() {
 
         let volatil = Math.abs(c.change) >= 8 || c.distLow < 8;
 
+        let warningMove = Math.abs(c.change) >= 6 && Math.abs(c.change) < 12;
+
+        let bullish = c.change > 0 && c.price >= (c.high * 0.98);
+
+        let bearish = c.change < 0 && c.price <= (c.low * 1.02);
+
+        let doji = Math.abs(c.change) < 0.5;
+
+        let strongImpulse = Math.abs(c.change) >= 6;
+
+        let rebound = c.price <= (c.low * 1.03) && c.change > 1;
+
         const tr = document.createElement("tr");
 
         if(alarma) {
@@ -679,6 +691,12 @@ function render() {
             <td style="font-weight:bold;">
                 ${c.name}
                 ${alarma ? '🚨' : ''}
+                ${warningMove ? ' ⚠️ MOVIMIENTO FUERTE' : ''}
+                ${bullish ? ' 🟢 ALCISTA' : ''}
+                ${bearish ? ' 🔴 BAJISTA' : ''}
+                ${doji ? ' ⚪ DOJI' : ''}
+                ${strongImpulse ? ' 💥 IMPULSO' : ''}
+                ${rebound ? ' 🧲 REBOTE' : ''}
 
                  ${c.change >= 12 
                      ? '<span class="bomba" style="color:#02c076; font-weight:bold;"> 💣 EXPLOSIÓN</span>' 
