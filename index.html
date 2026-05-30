@@ -349,20 +349,23 @@
     }
 }
 #nuclearAlert{
-    position:absolute;
-    left:55%;
-    top:50%;
-    transform:translate(-50%,-50%);
+    background:rgba(243,186,47,0.12);
+    border-top:1px solid rgba(243,186,47,0.25);
+    border-bottom:1px solid rgba(243,186,47,0.25);
+
     color:#f3ba2f;
     font-weight:900;
     font-size:13px;
+
     text-align:center;
-    z-index:20;
-    width:40%;
+
+    padding:8px;
+
+    cursor:pointer;
+
     white-space:nowrap;
     overflow:hidden;
     text-overflow:ellipsis;
-    cursor:pointer;
 }
 @media (max-width: 600px) {
 
@@ -466,10 +469,6 @@
 
     </div>
 
-      <div id="nuclearAlert">
-        ☢️ ESCÁNER NUCLEAR ACTIVO
-    </div>
-
     <div style="display:flex; gap:8px;">
 
         <a href="https://www.tiktok.com/@chicodelascomputadoras"
@@ -489,6 +488,10 @@
     </div>
 
 </header>
+
+<div id="nuclearAlert">
+    ☢️ ESCÁNER NUCLEAR ACTIVO
+</div>
 
 <div class="container">
 
