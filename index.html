@@ -276,6 +276,79 @@
             font-weight: bold;
             outline: none;
         }
+            .intel-box{
+    margin-top:20px;
+    background:linear-gradient(145deg,#111722,#1b2129);
+    border:1px solid var(--accent-gold);
+    border-radius:18px;
+    padding:18px;
+}
+
+.intel-title{
+    text-align:center;
+    color:var(--accent-gold);
+    font-weight:bold;
+    margin-bottom:15px;
+    font-size:15px;
+}
+
+.intel-row{
+    display:flex;
+    justify-content:space-between;
+    padding:8px 0;
+    border-bottom:1px solid rgba(255,255,255,0.08);
+}
+
+.intel-row:last-child{
+    border-bottom:none;
+}
+
+.intel-label{
+    color:var(--text-dim);
+}
+
+.intel-value{
+    font-weight:bold;
+    color:white;
+}
+.search-box{
+    margin-top:15px;
+}
+
+.search-box input{
+    width:100%;
+    box-sizing:border-box;
+    padding:12px;
+    border-radius:10px;
+    border:1px solid var(--border);
+    background:#0d1117;
+    color:white;
+    font-size:14px;
+}
+
+.bot-saludo{
+    text-align:center;
+    margin-bottom:10px;
+    color:var(--accent-gold);
+    font-weight:bold;
+    animation:botMove 2s infinite ease-in-out;
+}
+
+@keyframes botMove{
+
+    0%{
+        transform:translateY(0px);
+    }
+
+    50%{
+        transform:translateY(-6px);
+    }
+
+    100%{
+        transform:translateY(0px);
+    }
+
+}
 
         @media (max-width: 600px) {
             .sidebar {
@@ -405,7 +478,19 @@
                 🔑 ACTIVAR LICENCIA
 
             </button>
+     <div class="search-box">
 
+    <div id="botSaludo" class="bot-saludo">
+        🤖 Hola, busca una moneda
+      </div>
+
+     <input
+        type="text"
+        id="searchCoin"
+        placeholder="Buscar BTC, ETH, SOL..."
+        onkeyup="buscarMoneda()">
+
+           </div>
         </div>
 
         <table>
@@ -599,8 +684,12 @@ function validarYActivar(val) {
     }
 
 }
-
 let all = [];
+
+let memoriaIA =
+JSON.parse(
+localStorage.getItem("cdc_memoria")
+) || [];
 
 document.getElementById("menuToggle").onclick = () => {
 
@@ -634,18 +723,20 @@ async function load() {
                 const high = parseFloat(t.highPrice);
                 const low = parseFloat(t.lowPrice);
                 const change = parseFloat(t.priceChangePercent);
+                const volume = parseFloat(t.quoteVolume);
 
                 const distLow = ((price - low) / (high - low)) * 100;
 
-                return {
-                    symbol: t.symbol,
-                    name: t.symbol.replace("USDT", ""),
-                    price,
-                    change,
-                    high,
-                    low,
-                    distLow
-                };
+                         return {
+                            symbol: t.symbol,
+                            name: t.symbol.replace("USDT", ""),
+                            price,
+                            change,
+                            high,
+                            low,
+                            distLow,
+                            volume
+                       };
 
             });
 
@@ -732,21 +823,150 @@ function render() {
     });
 
 }
+    function analizarExperiencia(c){
 
-function show(c) {
+    let historial = memoriaIA.filter(
+        x => x.symbol === c.symbol
+    );
 
-    if(!expiry) {
+    if(historial.length < 5){
+        return "📚 Aprendiendo...";
+    }
+
+    let promedio =
+        historial.reduce(
+            (a,b)=>a+b.change,
+            0
+        ) / historial.length;
+
+    if(promedio > 3){
+        return "🟢 Patrón históricamente alcista";
+    }
+
+    if(promedio < -3){
+        return "🔴 Patrón históricamente bajista";
+    }
+
+    return "🟡 Patrón neutral";
+}
+
+function aprender(c){
+
+    memoriaIA.push({
+        symbol: c.symbol,
+        price: c.price,
+        change: c.change,
+        distLow: c.distLow,
+        fecha: Date.now()
+    });
+
+    if(memoriaIA.length > 1000){
+        memoriaIA.shift();
+    }
+
+    localStorage.setItem(
+        "cdc_memoria",
+        JSON.stringify(memoriaIA)
+    );
+}
+
+function buscarMoneda(){
+
+    let filtro =
+        document.getElementById("searchCoin")
+        .value
+        .toLowerCase();
+
+    let filas =
+        document.querySelectorAll("#cryptoList tr");
+
+    filas.forEach(fila=>{
+
+        let texto =
+            fila.innerText.toLowerCase();
+
+        fila.style.display =
+            texto.includes(filtro)
+            ? ""
+            : "none";
+
+    });
+}
+function barra(valor,color){
+
+    return `
+    <div style="
+        height:8px;
+        background:#222;
+        border-radius:10px;
+        overflow:hidden;
+        margin-top:4px;
+        margin-bottom:10px;
+    ">
+        <div style="
+            width:${valor}%;
+            height:100%;
+            background:${color};
+        ">
+        </div>
+    </div>
+    `;
+}
+
+function show(c){
+
+    aprender(c);
+
+    if(!expiry){
 
         usages++;
 
-        localStorage.setItem("cdc_usage_count", usages);
+        localStorage.setItem(
+            "cdc_usage_count",
+            usages
+        );
 
         updateStatusUI();
 
-        if(usages > 10) return location.reload();
-
+        if(usages > 10){
+            location.reload();
+            return;
+        }
     }
+let fuerza =
+Math.min(100, Math.abs(c.change) * 8);
 
+let oportunidad =
+Math.max(0, 100 - c.distLow);
+
+let actividad =
+Math.min(100, c.volume / 10000000);
+
+let ballena =
+c.volume > 50000000 &&
+Math.abs(c.change) > 4;
+
+let alertaBallena = "";
+
+if(ballena){
+
+    alertaBallena = `
+    <div style="
+        background:rgba(243,186,47,.15);
+        border:1px solid #f3ba2f;
+        color:#f3ba2f;
+        padding:12px;
+        border-radius:12px;
+        margin-top:15px;
+        text-align:center;
+        font-weight:bold;
+    ">
+        🐋 ALERTA DE BALLENA
+        <br>
+        Posible entrada institucional
+    </div>
+    `;
+}
     document.getElementById("detailView").innerHTML = `
         <div class="price-hero">
 
@@ -764,53 +984,100 @@ function show(c) {
             </div>
 
         </div>
+  </div>
+ <div class="intel-box">
 
-        <div class="stats-grid">
+        <div class="intel-title">
+            🧠 CENTRO DE ANÁLISIS CDC
+        </div>
 
-            <div class="stat-box">
-                <small>Mínimo 24h</small>
-                <b>$${c.low}</b>
-            </div>
+        <div class="intel-row">
+            <span class="intel-label">💰 Valor Actual</span>
+            <span class="intel-value">$${c.price}</span>
+        </div>
 
-            <div class="stat-box">
-                <small>Máximo 24h</small>
-                <b>$${c.high}</b>
-            </div>
+        <div class="intel-row">
+            <span class="intel-label">🚀 Máximo 24h</span>
+            <span class="intel-value">$${c.high}</span>
+        </div>
 
-            <div class="stat-box">
-                <small>Dist. Suelo</small>
-                <b>${c.distLow.toFixed(1)}%</b>
-            </div>
+        <div class="intel-row">
+            <span class="intel-label">🛡️ Mínimo 24h</span>
+            <span class="intel-value">$${c.low}</span>
+        </div>
 
-        
-                <div class="stat-box">
-                   <small>Señal</small>
+        <div class="intel-row">
+            <span class="intel-label">📏 Distancia del Suelo</span>
+            <span class="intel-value">${c.distLow.toFixed(1)}%</span>
+        </div>
 
-                  <b style="
-                 color:
-                  ${
-                 c.change >= 5
-            ? '#02c076'
-            : c.change <= -5
-            ? '#f84960'
-            : '#f3ba2f'
-        };
-        font-size:18px;
-    ">
+  </div>
 
-        ${
-            c.change >= 5
-            ? '📈 ALCISTA'
-            : c.change <= -5
-            ? '📉 BAJISTA'
-            : '⚠️ NEUTRAL'
-          }
+    <div class="intel-row">
+        <span class="intel-label">📏 Distancia del Suelo</span>
+        <span class="intel-value">${c.distLow.toFixed(1)}%</span>
+    </div>
 
-            </b>
-          </div>
+    <div class="intel-row">
+        <span class="intel-label">📊 Tendencia</span>
+        <span class="intel-value">
+            ${
+                c.change >= 5
+                ? '📈 ALCISTA'
+                : c.change <= -5
+                ? '📉 BAJISTA'
+                : '⚠️ NEUTRAL'
+            }
+        </span>
+    </div>
 
+</div>
+
+        <div style="
+        margin-top:20px;
+        padding:15px;
+        background:#0d1117;
+        border:1px solid var(--border);
+        border-radius:15px;
+        ">
+
+        <h3 style="
+        text-align:center;
+        color:var(--accent-gold);
+        margin-top:0;
+        ">
+        🤖 CDC IA LIVE
+        </h3>
+
+        📈 Fuerza Mercado:
+        ${fuerza.toFixed(0)}%
+
+        ${barra(fuerza,"#02c076")}
+
+        🎯 Oportunidad:
+        ${oportunidad.toFixed(0)}%
+
+        ${barra(oportunidad,"#f3ba2f")}
+
+        💰 Actividad Capital:
+        ${actividad.toFixed(0)}%
+
+        ${barra(actividad,"#4fc3f7")}
+
+        <br>
+
+        📊 Volumen Detectado
+
+        <br><br>
+
+        <b>
+        $${Math.round(c.volume).toLocaleString()}
+        </b>
+
+        ${alertaBallena}
 
         </div>
+
     `;
 
     document.getElementById("linkBinance").style.display = "flex";
@@ -823,6 +1090,52 @@ function show(c) {
     document.getElementById("linkApp").href =
         `binance://futures/trade?symbol=${c.symbol}`;
 
+    const bot = document.getElementById("botSaludo");
+const experiencias = memoriaIA.length;
+
+const patron =
+    analizarExperiencia(c);
+
+let mensajeFinal = "";
+
+if(c.change >= 5){
+
+    mensajeFinal =
+    "🚀 Muestra fuerza alcista";
+
+}else if(c.change <= -5){
+
+    mensajeFinal =
+    "⚠️ Presenta presión bajista";
+
+}else{
+
+    mensajeFinal =
+    "🤖 Se encuentra en zona neutral";
+
+}
+
+bot.innerHTML =
+`
+📚 Registros: ${experiencias}
+<br><br>
+
+${patron}
+
+<br><br>
+
+${mensajeFinal}
+
+<br><br>
+
+📊 Cambio 24h:
+${c.change.toFixed(2)}%
+
+<br>
+
+🎯 Distancia al suelo:
+${c.distLow.toFixed(1)}%
+`;
 }
 
 load();
