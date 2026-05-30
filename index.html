@@ -347,31 +347,39 @@
     100%{
         transform:translateY(0px);
     }
-
 }
 #nuclearAlert{
     position:absolute;
-    left:50%;
+    left:55%;
     top:50%;
     transform:translate(-50%,-50%);
     color:#f3ba2f;
     font-weight:900;
-    font-size:14px;
+    font-size:13px;
     text-align:center;
     z-index:20;
-    width:50%;
+    width:40%;
     white-space:nowrap;
     overflow:hidden;
     text-overflow:ellipsis;
+    cursor:pointer;
 }
-        @media (max-width: 600px) {
-            .sidebar {
-                width: 88%;
-            }
+@media (max-width: 600px) {
 
-            .price-hero h2 {
-                font-size: 32px;
-         }
+    .sidebar {
+        width: 88%;
+    }
+
+    .price-hero h2 {
+        font-size: 32px;
+    }
+
+    #nuclearAlert{
+        left:62%;
+        top:60%;
+        width:32%;
+        font-size:11px;
+    }
 }
     </style>
 </head>
