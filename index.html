@@ -1118,13 +1118,21 @@ if(ballena){
 
     document.getElementById("linkApp").style.display = "flex";
 
-    document.getElementById("linkApp").href =
-        `binance://futures/trade?symbol=${c.symbol}`;
+   document.getElementById("linkApp").onclick = function(e){
+
+    e.preventDefault();
+
+    const webLink =
+    `https://www.binance.com/es-LA/futures/${c.symbol}`;
+
+    window.location.href = webLink;
+
+};
 
     const bot = document.getElementById("botSaludo");
-const experiencias = memoriaIA.length;
+    const experiencias = memoriaIA.length;
 
-const patron =
+    const patron =
     analizarExperiencia(c);
 
 let mensajeFinal = "";
