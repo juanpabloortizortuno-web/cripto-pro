@@ -364,6 +364,40 @@
 
     width:100%;
     box-s
+}
+
+.floating-buttons{
+    position:fixed;
+    right:15px;
+    bottom:20px;
+    display:flex;
+    flex-direction:column;
+    gap:10px;
+    z-index:9999;
+}
+
+.float-btn{
+    width:60px;
+    height:60px;
+    border-radius:50%;
+    display:flex;
+    align-items:center;
+    justify-content:center;
+    text-decoration:none;
+    font-size:24px;
+    box-shadow:0 4px 15px rgba(0,0,0,.4);
+}
+
+.float-binance{
+    background:#f3ba2f;
+    color:#000;
+}
+
+.float-app{
+    background:#1b2129;
+    color:#f3ba2f;
+    border:1px solid #f3ba2f;
+}
 @media (max-width: 600px) {
 
     .sidebar{
@@ -551,27 +585,29 @@
 
         </div>
 
-        <div class="actions">
+  <div class="floating-buttons">
 
-            <a id="linkBinance"
-                class="btn binance"
-                target="_blank"
-                style="display:none;">
+    <a id="linkBinance"
+       class="float-btn float-binance"
+       target="_blank"
+       style="display:none;"
+       title="Binance Web">
 
-                <i class="fas fa-external-link-alt"></i>
-                BINANCE WEB
+       <i class="fas fa-chart-line"></i>
 
-            </a>
+    </a>
 
-            <a id="linkApp"
-                class="btn vip"
-                target="_blank"
-                style="display:none;">
+    <a id="linkApp"
+       class="float-btn float-app"
+       target="_blank"
+       style="display:none;"
+       title="Binance App">
 
-                <i class="fas fa-mobile"></i>
-                APP BINANCE
+       <i class="fas fa-mobile-alt"></i>
 
-            </a>
+    </a>
+
+</div>
 
         </div>
 
