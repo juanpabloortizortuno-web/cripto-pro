@@ -617,7 +617,7 @@
 
 <script>
 
-const ADMIN_KEY = "melfy777";
+const ADMIN_KEY = "melfy7E#";
 const PREFIX = "CDC-2026-";
 
 let usages = parseInt(localStorage.getItem("cdc_usage_count")) || 0;
@@ -746,6 +746,7 @@ function validarYActivar(val) {
 }
 let all = [];
 let historialNuclear = {};
+let velocidadMonedas = {};
 let memoriaIA =
 JSON.parse(
 localStorage.getItem("cdc_memoria")
@@ -791,20 +792,39 @@ async function load() {
                                distLow <= 35 &&
                                change >= 8;
 
-                        return {
-                               symbol: t.symbol,
-                               name: t.symbol.replace("USDT", ""),
-                               price,
-                               change,
-                               high,
-                               low,
-                               distLow,
-                               volume,
-                               impulsoSuelo
-                             };
+                      return {
+                              symbol: t.symbol,
+                              name: t.symbol.replace("USDT", ""),
+                              price,
+                              change,
+                              high,
+                              low,
+                              distLow,
+                              volume,
+                              impulsoSuelo,
+                              velocidad: 0
+                         };
 
             });
 
+                   all.forEach(c => {
+
+                    let anterior =
+                        velocidadMonedas[c.symbol];
+
+                    if(anterior !== undefined){
+
+                   c.velocidad =
+                       c.change - anterior;
+
+                       }
+
+                     velocidadMonedas[c.symbol] =
+                  c.change;
+
+      });
+
+    
        all.sort((a, b) => a.distLow - b.distLow);
 
         render();
@@ -1214,89 +1234,34 @@ ${c.distLow.toFixed(1)}%
 }
 function updateNuclearAlert(){
 
-    const box = document.getElementById("nuclearAlert");
+    const box =
+    document.getElementById("nuclearAlert");
 
     if(!box || !all.length) return;
-let desdeSuelo = all
-    .filter(c => c.impulsoSuelo)
-    .sort((a,b) => b.change - a.change)[0];
 
-if(desdeSuelo){
+    let misil =
+    all
+    .filter(c => c.velocidad > 0)
+    .sort((a,b) => b.velocidad - a.velocidad)[0];
 
-    box.innerHTML =
-    `🚀 DESPEGANDO DESDE EL SUELO: ${desdeSuelo.symbol} +${desdeSuelo.change.toFixed(2)}%`;
+    if(misil){
 
-    box.onclick = () =>
-    abrirMonedaNuclear(desdeSuelo.symbol);
+        let nivel = "⚡ IMPULSO";
 
-    return;
-}
-    let bigBang =
-    all.find(c => c.change >= 30);
+        if(misil.velocidad >= 0.5)
+            nivel = "🚀 MISIL";
 
-    if(bigBang){
+        if(misil.velocidad >= 1)
+            nivel = "☢️ NUCLEAR";
 
-        box.innerHTML =
-        `🌌 BIG BANG: ${bigBang.symbol} 🚀 +${bigBang.change.toFixed(2)}%`;
-
-        box.onclick = () =>
-        abrirMonedaNuclear(bigBang.symbol);
-
-        return;
-    }
-
-    let supernova =
-    all.find(c => c.change >= 20);
-
-    if(supernova){
+        if(misil.velocidad >= 2)
+            nivel = "🌌 HIPERVELOCIDAD";
 
         box.innerHTML =
-        `🔥 SUPERNOVA: ${supernova.symbol} 🚀 +${supernova.change.toFixed(2)}%`;
+        `${nivel}: ${misil.symbol} | +${misil.velocidad.toFixed(2)}%`;
 
         box.onclick = () =>
-        abrirMonedaNuclear(supernova.symbol);
-
-        return;
-    }
-
-    let armagedon =
-    all.find(c => c.change >= 15);
-
-    if(armagedon){
-
-        box.innerHTML =
-        `💥 ARMAGEDÓN: ${armagedon.symbol} 🚀 +${armagedon.change.toFixed(2)}%`;
-
-        box.onclick = () =>
-        abrirMonedaNuclear(armagedon.symbol);
-
-        return;
-    }
-
-    let nuclear =
-    all.find(c => c.change >= 10);
-
-    if(nuclear){
-
-        box.innerHTML =
-        `☢️ ALERTA NUCLEAR: ${nuclear.symbol} 🚀 +${nuclear.change.toFixed(2)}%`;
-
-        box.onclick = () =>
-        abrirMonedaNuclear(nuclear.symbol);
-
-        return;
-    }
-
-    let despegue =
-    all.find(c => c.change >= 5);
-
-    if(despegue){
-
-        box.innerHTML =
-        `🚀 DESPEGUE: ${despegue.symbol} +${despegue.change.toFixed(2)}%`;
-
-        box.onclick = () =>
-        abrirMonedaNuclear(despegue.symbol);
+        abrirMonedaNuclear(misil.symbol);
 
         return;
     }
@@ -1305,6 +1270,7 @@ if(desdeSuelo){
     "☢️ ESCÁNER NUCLEAR ACTIVO";
 
 }
+
 function abrirMonedaNuclear(symbol){
 
     const nombre =
@@ -1333,7 +1299,7 @@ function abrirMonedaNuclear(symbol){
 
 load();
 
-setInterval(load, 15000);
+setInterval(load, 3000);
 
 </script>
 
