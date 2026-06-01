@@ -352,18 +352,14 @@
     background:rgba(243,186,47,0.12);
     border-top:1px solid rgba(243,186,47,0.25);
     border-bottom:1px solid rgba(243,186,47,0.25);
-
     color:#f3ba2f;
     font-weight:900;
     font-size:13px;
-
     text-align:center;
     padding:8px;
-
     cursor:pointer;
-
     width:100%;
-    box-s
+    box-sizing:border-box;
 }
 
 .floating-buttons{
@@ -583,10 +579,32 @@
 
             </div>
 
-        </div>
+ </div>
+<div id="paperBox" style="
+position:fixed;
+left:15px;
+bottom:20px;
+background:#12161c;
+border:1px solid #f3ba2f;
+border-radius:15px;
+padding:12px;
+width:220px;
+z-index:9999;
+display:none;
+font-size:12px;
+">
+🧪 PAPER TRADING
+</div>
 
   <div class="floating-buttons">
+     <a id="simuladorBtn"
+   class="float-btn vip"
+   onclick="abrirSimulador()"
+   title="Simulador">
 
+   🧪
+
+   </a>
     <a id="linkBinance"
        class="float-btn float-binance"
        target="_blank"
@@ -745,12 +763,23 @@ function validarYActivar(val) {
 
 }
 let all = [];
+let operacionPaper =
+JSON.parse(
+localStorage.getItem("cdc_paper")
+) || null;
 let historialNuclear = {};
 let velocidadMonedas = {};
 let memoriaIA =
 JSON.parse(
 localStorage.getItem("cdc_memoria")
 ) || [];
+let monedaActual = null;
+let simulacion =
+JSON.parse(
+localStorage.getItem(
+"cdc_simulacion"
+)
+) || null;
 
 document.getElementById("menuToggle").onclick = () => {
 
@@ -830,6 +859,17 @@ async function load() {
         render();
 
          updateNuclearAlert();
+
+         actualizarPaper();
+        
+if(operacionPaper){
+
+    const actual =
+    all.find(
+        x => x.symbol === operacionPaper.symbol
+    );
+
+}
 
 } catch(e) {}
 
@@ -1000,7 +1040,174 @@ function barra(valor,color){
     `;
 }
 
+function comprarPaper(c){
+
+    operacionPaper = {
+
+        symbol: c.symbol,
+
+        entry: c.price,
+
+        fecha: Date.now()
+
+    };
+
+    localStorage.setItem(
+        "cdc_paper",
+        JSON.stringify(operacionPaper)
+    );
+
+    actualizarPaper();
+
+}
+function actualizarPaper(){
+
+    const box =
+    document.getElementById("paperBox");
+
+    if(!operacionPaper){
+
+        box.style.display = "none";
+        return;
+
+    }
+
+if(!simulacion){
+
+    box.style.display = "block";
+
+    box.innerHTML = `
+    🧪 PAPER TRADING
+    <br><br>
+
+    ${operacionPaper.symbol}
+    <br>
+
+    Entrada:
+    $${operacionPaper.entry}
+    `;
+
+    return;
+}
+
+const actual =
+all.find(
+    x => x.symbol === simulacion.symbol
+);
+
+    if(!actual) return;
+
+  let pnl =
+(
+    (
+        actual.price -
+        operacionPaper.entry
+    )
+    /
+    operacionPaper.entry
+) * 100;
+
+let pnlReal = pnl;
+
+let extraSim = "";
+
+if(
+    simulacion &&
+    simulacion.symbol === operacionPaper.symbol
+){
+
+let gananciaUsd =
+(
+    pnlReal / 100
+)
+*
+simulacion.capital
+*
+simulacion.leverage;
+
+    extraSim = `
+    <br><br>
+
+    💰 Capital:
+    $${simulacion.capital}
+
+    <br>
+
+    ⚡ X${simulacion.leverage}
+    <br>
+     Posición:
+     ${simulacion.side}
+
+    <br><br>
+
+    <b style="
+    color:${gananciaUsd >= 0 ? '#02c076' : '#f84960'};
+    font-size:18px;
+    ">
+    $${gananciaUsd.toFixed(2)}
+    </b>
+    `;
+
+}
+
+    box.style.display = "block";
+
+    box.innerHTML = `
+    🧪 PAPER TRADING
+    <br><br>
+
+   ${operacionPaper.symbol}
+    <br>
+
+    Entrada:
+    $${operacionPaper.entry}
+
+    <br>
+
+    Actual:
+    $${actual.price}
+
+    <br><br>
+
+    <b style="
+    color:${pnl >= 0 ? '#02c076' : '#f84960'};
+    ">
+    ${pnlReal.toFixed(2)}%
+    </b>
+
+    ${extraSim}
+
+    <br><br>
+
+    <button
+    onclick="cerrarPaper()"
+    style="
+    background:#f84960;
+    color:white;
+    border:none;
+    padding:6px 10px;
+    border-radius:8px;
+    cursor:pointer;
+    ">
+    Cerrar
+    </button>
+    `;
+}
+function cerrarPaper(){
+
+    operacionPaper = null;
+
+    localStorage.removeItem(
+        "cdc_paper"
+    );
+
+    actualizarPaper();
+
+}
+
 function show(c){
+
+    monedaActual = c;
 
     aprender(c);
 
@@ -1070,35 +1277,27 @@ if(ballena){
                 ${c.change.toFixed(2)}%
             </div>
 
-        </div>
   </div>
- <div class="intel-box">
+<div class="intel-box">
 
-        <div class="intel-title">
-            🧠 CENTRO DE ANÁLISIS CDC
-        </div>
+    <div class="intel-title">
+        🧠 CENTRO DE ANÁLISIS CDC
+    </div>
 
-        <div class="intel-row">
-            <span class="intel-label">💰 Valor Actual</span>
-            <span class="intel-value">$${c.price}</span>
-        </div>
+    <div class="intel-row">
+        <span class="intel-label">💰 Valor Actual</span>
+        <span class="intel-value">$${c.price}</span>
+    </div>
 
-        <div class="intel-row">
-            <span class="intel-label">🚀 Máximo 24h</span>
-            <span class="intel-value">$${c.high}</span>
-        </div>
+    <div class="intel-row">
+        <span class="intel-label">🚀 Máximo 24h</span>
+        <span class="intel-value">$${c.high}</span>
+    </div>
 
-        <div class="intel-row">
-            <span class="intel-label">🛡️ Mínimo 24h</span>
-            <span class="intel-value">$${c.low}</span>
-        </div>
-
-        <div class="intel-row">
-            <span class="intel-label">📏 Distancia del Suelo</span>
-            <span class="intel-value">${c.distLow.toFixed(1)}%</span>
-        </div>
-
-  </div>
+    <div class="intel-row">
+        <span class="intel-label">🛡️ Mínimo 24h</span>
+        <span class="intel-value">$${c.low}</span>
+    </div>
 
     <div class="intel-row">
         <span class="intel-label">📏 Distancia del Suelo</span>
@@ -1153,19 +1352,32 @@ if(ballena){
 
         <br>
 
-        📊 Volumen Detectado
+      📊 Volumen Detectado
 
-        <br><br>
+         <br><br>
 
-        <b>
-        $${Math.round(c.volume).toLocaleString()}
-        </b>
+         <b>
+         $${Math.round(c.volume).toLocaleString()}
+         </b>
 
-        ${alertaBallena}
+           ${alertaBallena}
 
-        </div>
+         <br><br>
 
-    `;
+     <button
+        onclick="comprarPaper({
+        symbol:'${c.symbol}',
+        price:${c.price}
+    })"
+       class="btn vip"
+           style="width:100%;">
+
+          🧪 SIMULAR COMPRA
+
+</button>
+
+</div>
+`;
 
     document.getElementById("linkBinance").style.display = "flex";
 
@@ -1296,12 +1508,176 @@ function abrirMonedaNuclear(symbol){
     }
 
 }
+function cargarMonedasSimulador(){
+
+    const select =
+    document.getElementById("simboloInput");
+
+    select.innerHTML = "";
+
+    all.forEach(c => {
+
+        select.innerHTML += `
+        <option value="${c.symbol}">
+            ${c.symbol}
+        </option>
+        `;
+
+    });
+
+}
+
+function abrirSimulador(){
+
+    cargarMonedasSimulador();
+
+    document.getElementById(
+        "simuladorPanel"
+    ).style.display = "flex";
+}
+
+function cerrarSimulador(){
+
+    document.getElementById(
+        "simuladorPanel"
+    ).style.display = "none";
+}
+
+function crearSimulacion(){
+
+    let capital =
+    parseFloat(
+        document.getElementById("capitalInput").value
+    );
+
+    let leverage =
+    parseFloat(
+        document.getElementById("leverageInput").value
+    );
+
+    if(!capital || !leverage){
+
+        alert("Completa los datos");
+        return;
+
+    }
+
+    let side =
+    document.getElementById("sideInput").value;
+
+    let symbol =
+    document.getElementById("simboloInput").value;
+
+    simulacion = {
+
+        capital: capital,
+        leverage: leverage,
+        side: side,
+        symbol: symbol
+
+    };
+
+    localStorage.setItem(
+        "cdc_simulacion",
+        JSON.stringify(simulacion)
+    );
+
+    const moneda =
+    all.find(
+        x => x.symbol === symbol
+    );
+
+    if(!moneda){
+
+        alert("Moneda no encontrada");
+        return;
+
+    }
+
+    operacionPaper = {
+
+        symbol: symbol,
+        entry: moneda.price,
+        fecha: Date.now()
+
+    };
+
+    localStorage.setItem(
+        "cdc_paper",
+        JSON.stringify(operacionPaper)
+    );
+
+    alert(
+        "✅ Simulación creada en " +
+        symbol
+    );
+
+    cerrarSimulador();
+
+    actualizarPaper();
+
+}
 
 load();
 
 setInterval(load, 3000);
 
 </script>
+
+<div id="simuladorPanel" class="overlay-panel">
+
+    <h2 style="color:#f3ba2f;">
+    📈 BINANCE FUTURES USDS-M
+    </h2>
+
+    <select
+    id="simboloInput"
+    class="input-pro">
+    </select>
+
+    <input
+    id="capitalInput"
+    class="input-pro"
+    type="number"
+    placeholder="Capital ($)"
+>
+
+<select
+    id="sideInput"
+    class="input-pro">
+
+    <option value="LONG">
+        📈 LONG
+    </option>
+
+    <option value="SHORT">
+        📉 SHORT
+    </option>
+
+   </select>
+
+    <input
+    id="leverageInput"
+    class="input-pro"
+    type="number"
+    placeholder="Apalancamiento (10,20,50...)"
+    >
+
+    <button
+        onclick="crearSimulacion()"
+        class="btn binance"
+        style="width:300px;">
+        CREAR SIMULACIÓN
+    </button>
+
+    <button
+        onclick="cerrarSimulador()"
+        class="btn vip"
+        style="width:300px;margin-top:10px;">
+        CERRAR
+    </button>
+
+</div>
 
 </body>
 </html>
