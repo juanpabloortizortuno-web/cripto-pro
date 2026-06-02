@@ -382,6 +382,13 @@
     text-decoration:none;
     font-size:24px;
     box-shadow:0 4px 15px rgba(0,0,0,.4);
+
+    transition:.15s;
+    touch-action:manipulation;
+}
+
+.float-btn:active{
+    transform:scale(0.92);
 }
 
 .float-binance{
@@ -596,7 +603,7 @@ font-size:12px;
 🧪 PAPER TRADING
 </div>
 
-  <div class="floating-buttons">
+  <div id="floatingButtons" class="floating-buttons">
      <a id="simuladorBtn"
    class="float-btn vip"
    onclick="abrirSimulador()"
@@ -1510,17 +1517,15 @@ function abrirMonedaNuclear(symbol){
 }
 function cargarMonedasSimulador(){
 
-    const select =
-    document.getElementById("simboloInput");
+    const lista =
+    document.getElementById("listaMonedas");
 
-    select.innerHTML = "";
+    lista.innerHTML = "";
 
     all.forEach(c => {
 
-        select.innerHTML += `
+        lista.innerHTML += `
         <option value="${c.symbol}">
-            ${c.symbol}
-        </option>
         `;
 
     });
@@ -1617,6 +1622,51 @@ function crearSimulacion(){
     actualizarPaper();
 
 }
+// ===== BOTONES FLOTANTES MOVIBLES =====
+
+const flotante =
+document.getElementById("floatingButtons");
+
+let moviendo = false;
+let offsetX = 0;
+let offsetY = 0;
+
+flotante.addEventListener("touchstart",(e)=>{
+
+    moviendo = true;
+
+    offsetX =
+    e.touches[0].clientX -
+    flotante.offsetLeft;
+
+    offsetY =
+    e.touches[0].clientY -
+    flotante.offsetTop;
+
+});
+
+document.addEventListener("touchmove",(e)=>{
+
+    if(!moviendo) return;
+
+    flotante.style.left =
+    (e.touches[0].clientX - offsetX) + "px";
+
+    flotante.style.top =
+    (e.touches[0].clientY - offsetY) + "px";
+
+    flotante.style.right = "auto";
+    flotante.style.bottom = "auto";
+
+});
+
+document.addEventListener("touchend",()=>{
+
+    moviendo = false;
+
+});
+
+// ===== FIN BOTONES MOVIBLES =====
 
 load();
 
@@ -1629,11 +1679,13 @@ setInterval(load, 3000);
     <h2 style="color:#f3ba2f;">
     📈 BINANCE FUTURES USDS-M
     </h2>
+<input
+id="simboloInput"
+class="input-pro"
+list="listaMonedas"
+placeholder="Escribe BTCUSDT, ETHUSDT, SOLUSDT...">
 
-    <select
-    id="simboloInput"
-    class="input-pro">
-    </select>
+<datalist id="listaMonedas"></datalist>
 
     <input
     id="capitalInput"
