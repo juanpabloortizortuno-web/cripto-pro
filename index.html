@@ -865,9 +865,19 @@ async function load() {
 
         render();
 
-         updateNuclearAlert();
+// Mantener búsqueda activa
+const buscador =
+document.getElementById("searchCoin");
 
-         actualizarPaper();
+if(buscador && buscador.value.trim() !== ""){
+
+    buscarMoneda();
+
+}
+
+updateNuclearAlert();
+
+actualizarPaper();
         
 if(operacionPaper){
 
@@ -1670,7 +1680,18 @@ document.addEventListener("touchend",()=>{
 
 load();
 
-setInterval(load, 3000);
+setInterval(()=>{
+
+    if(
+        document.activeElement.id !==
+        "searchCoin"
+    ){
+
+        load();
+
+    }
+
+},3000);
 
 </script>
 
