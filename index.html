@@ -522,7 +522,7 @@
 </header>
 
 <div id="nuclearAlert">
-    ☢️ ESCÁNER NUCLEAR ACTIVO
+    🏆 MONEDA GANADORA DEL MOMENTO
 </div>
 
 <div class="container">
@@ -1461,6 +1461,7 @@ ${c.change.toFixed(2)}%
 ${c.distLow.toFixed(1)}%
 `;
 }
+
 function updateNuclearAlert(){
 
     const box =
@@ -1468,35 +1469,35 @@ function updateNuclearAlert(){
 
     if(!box || !all.length) return;
 
-    let misil =
+    let ganador =
     all
-    .filter(c => c.velocidad > 0)
-    .sort((a,b) => b.velocidad - a.velocidad)[0];
+    .filter(c =>
+        c.velocidad > 0 &&
+        c.change > 0
+    )
+    .sort((a,b)=>
+        b.velocidad - a.velocidad
+    )[0];
 
-    if(misil){
-
-        let nivel = "⚡ IMPULSO";
-
-        if(misil.velocidad >= 0.5)
-            nivel = "🚀 MISIL";
-
-        if(misil.velocidad >= 1)
-            nivel = "☢️ NUCLEAR";
-
-        if(misil.velocidad >= 2)
-            nivel = "🌌 HIPERVELOCIDAD";
+    if(!ganador){
 
         box.innerHTML =
-        `${nivel}: ${misil.symbol} | +${misil.velocidad.toFixed(2)}%`;
-
-        box.onclick = () =>
-        abrirMonedaNuclear(misil.symbol);
-
+        "🏆 BUSCANDO MONEDA GANADORA...";
         return;
+
     }
 
-    box.innerHTML =
-    "☢️ ESCÁNER NUCLEAR ACTIVO";
+    box.innerHTML = `
+    🏆 GANADORA:
+    ${ganador.symbol.replace("USDT","")}
+    🚀 +${ganador.change.toFixed(2)}%
+    ⚡ ${ganador.velocidad.toFixed(2)}
+    `;
+
+    box.onclick = () =>
+    abrirMonedaNuclear(
+        ganador.symbol
+    );
 
 }
 
