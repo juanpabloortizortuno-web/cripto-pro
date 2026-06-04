@@ -776,6 +776,7 @@ localStorage.getItem("cdc_paper")
 ) || null;
 let historialNuclear = {};
 let velocidadMonedas = {};
+let alarmaActiva = {};
 let memoriaIA =
 JSON.parse(
 localStorage.getItem("cdc_memoria")
@@ -838,6 +839,9 @@ async function load() {
                               distLow,
                               volume,
                               impulsoSuelo,
+                              agotamientoAlcista:
+                              change > 10 &&
+                              distLow > 70,
                               velocidad: 0
                          };
 
@@ -860,7 +864,81 @@ async function load() {
 
       });
 
-    
+                  all.forEach(c => {
+
+                  c.perdidaImpulso =
+
+                  c.change > 5 &&
+
+                  c.velocidad < -0.50;
+
+      });
+                 all.forEach(c => {
+
+   if(
+    c.riesgoCaida >= 5 &&
+    !alarmaActiva[c.symbol]
+    ){
+    alarmaActiva[c.symbol] = true;
+
+    reproducirAlarma();
+
+    alert(
+        "🚨 CDC FUTURO-PRO\n\n" +
+        c.symbol +
+        "\nPérdida de potencia detectada\n" +
+        "\nPosible caída próxima"
+      );
+   }
+
+
+    if(c.riesgoCaida < 2){
+
+        alarmaActiva[c.symbol] = false;
+
+    }
+
+   });
+
+   all.forEach(c => {
+
+    let puntos = 0;
+
+    // Agotamiento
+    if(c.agotamientoAlcista) puntos += 1;
+
+    // Pierde velocidad
+    if(c.perdidaImpulso) puntos += 2;
+
+    // Muy lejos del suelo
+    if(c.distLow > 75) puntos += 1;
+
+    // Subió demasiado
+    if(c.change > 12) puntos += 1;
+
+    // Mucho volumen
+    if(c.volume > 50000000) puntos += 1;
+
+    // Volumen muy grande y pierde impulso
+    if(
+        c.volume > 50000000 &&
+        c.perdidaImpulso
+    ){
+        puntos += 2;
+    }
+
+    // Subió mucho pero ya se frena
+    if(
+        c.change > 8 &&
+        c.velocidad < -1
+    ){
+        puntos += 2;
+    }
+
+    c.riesgoCaida = puntos;
+
+});
+
        all.sort((a, b) => a.distLow - b.distLow);
 
         render();
@@ -891,7 +969,24 @@ if(operacionPaper){
 } catch(e) {}
 
 }
+function detectarCaida(c){
 
+    let perdidaImpulso =
+        c.velocidad < -1;
+
+    let volumenAlto =
+        c.volume > 50000000;
+
+    let lejosDelSuelo =
+        c.distLow > 40;
+
+    return (
+        perdidaImpulso &&
+        volumenAlto &&
+        lejosDelSuelo
+    );
+
+}
 function render() {
 
     const body = document.getElementById("cryptoList");
@@ -903,7 +998,8 @@ function render() {
         let alarma = c.distLow < 15 && Math.abs(c.change) >= 4;
 
         let volatil = Math.abs(c.change) >= 8 || c.distLow < 8;
-
+        let posibleCaida =
+        detectarCaida(c);
         let warningMove = Math.abs(c.change) >= 6 && Math.abs(c.change) < 12;
 
         let bullish = c.change > 0 && c.price >= (c.high * 0.98);
@@ -932,6 +1028,10 @@ function render() {
                 ${doji ? ' ⚪ DOJI' : ''}
                 ${strongImpulse ? ' 💥 IMPULSO' : ''}
                 ${rebound ? ' 🧲 REBOTE' : ''}
+                ${c.agotamientoAlcista ? ' ⚠️ AGOTAMIENTO' : ''}
+                ${c.perdidaImpulso ? ' 🧯 PIERDE FUERZA' : ''}
+                ${c.riesgoCaida >= 3 ? ' 🚨 POSIBLE CAÍDA' : ''}
+                ${posibleCaida ? ' 🔴 POSIBLE CAÍDA 🚨' : ''}
 
                  ${c.change >= 12 
                      ? '<span class="bomba" style="color:#02c076; font-weight:bold;"> 💣 EXPLOSIÓN</span>' 
@@ -1679,6 +1779,24 @@ document.addEventListener("touchend",()=>{
 
 // ===== FIN BOTONES MOVIBLES =====
 
+
+document.getElementById("menuToggle").onclick = () => {
+
+    document.getElementById("sidebar")
+    .classList.toggle("hidden");
+
+};
+
+function reproducirAlarma(){
+
+    const audio = new Audio(
+        "https://actions.google.com/sounds/v1/alarms/alarm_clock.ogg"
+    );
+
+    audio.play();
+
+}
+
 load();
 
 setInterval(()=>{
@@ -1687,9 +1805,7 @@ setInterval(()=>{
         document.activeElement.id !==
         "searchCoin"
     ){
-
         load();
-
     }
 
 },3000);
