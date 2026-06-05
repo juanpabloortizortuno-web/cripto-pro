@@ -61,12 +61,22 @@
 
         .badge-premium { background: rgba(14, 203, 129, 0.1) !important; color: var(--accent-green) !important; border: 1px solid rgba(14, 203, 129, 0.2) !important; }
 
-        #menuToggle {
-            background: transparent; border: none; color: var(--text-dim);
-            font-size: 18px; cursor: pointer; padding: 5px;
-        }
+       #menuToggle {
+    background: transparent;
+    border: none;
+    color: var(--text-dim);
+    font-size: 18px;
+    cursor: pointer;
+    padding: 5px;
+}
 
-        #nuclearAlert {
+.hidden{
+    display:none !important;
+    width:0 !important;
+    min-width:0 !important;
+}
+
+#nuclearAlert {
             background: #060b16;
             border-bottom: 1px solid rgba(255, 255, 255, 0.03);
             color: #fff; font-weight: 600; font-size: 12px; text-align: center;
@@ -238,7 +248,13 @@
         .float-btn { width: 48px; height: 48px; border-radius: 50%; display: flex; align-items: center; justify-content: center; text-decoration: none; font-size: 18px; border: none; cursor: pointer; box-shadow: 0 4px 12px rgba(0,0,0,0.5); }
         .float-binance { background: var(--accent-gold); color: #000; }
         .float-app { background: #060b16; color: var(--accent-glow); border: 1px solid var(--accent-glow); }
+
+
         .float-sim { background: var(--accent-green); color: #000; font-weight: bold; }
+
+        .hidden{
+         display:none !important;
+         }
 
         #paperBox { position: fixed; left: 20px; bottom: 50px; background: var(--bg-card); border: 1px solid var(--accent-gold); border-radius: 10px; padding: 12px; width: 210px; z-index: 9999; display: none; font-size: 12px; }
 
@@ -966,7 +982,23 @@ ordenadas.forEach(c => {
         const bearish = c.change < 0;
         const doji = c.change === 0;
         const rebound = c.low > 0 && ((c.price - c.low) / c.low * 100) <= 2 && c.change > 1;
+let zona = 50;
 
+if(c.high > c.low){
+
+    zona =
+    (
+        (c.price - c.low)
+        /
+        (c.high - c.low)
+    ) * 100;
+
+}
+
+zona = Math.max(
+    0,
+    Math.min(100, zona)
+);
         tr.innerHTML = `
             <td style="font-weight:700; color:#fff;">
                 ${symbol.replace('USDT', '')}
@@ -978,10 +1010,20 @@ ordenadas.forEach(c => {
             </td>
             <td style="text-align:right; font-weight:700; color:${c.change >= 0 ? 'var(--accent-green)' : 'var(--accent-glow)'};">
                 ${c.change >= 0 ? '+' : ''}${c.change.toFixed(2)}%
-            </td>
-            <td style="text-align:right; color:var(--text-dim); font-weight:600;">
-                $${c.price > 100 ? c.price.toFixed(2) : c.price.toFixed(4)}
-            </td>
+        <td
+style="
+text-align:right;
+font-weight:700;
+color:${
+    zona > 70
+    ? 'var(--accent-green)'
+    : zona < 30
+    ? 'var(--accent-glow)'
+    : '#f3ba2f'
+};
+">
+${zona.toFixed(0)}%
+</td>
         `;
         fragmento.appendChild(tr);
     });
@@ -1000,12 +1042,25 @@ function seleccionarMoneda(symbol) {
     actualizarTacometroDerecho();
 
     document.getElementById("linkBinance").style.display = "flex";
+
     document.getElementById("linkBinance").href =
     `https://www.binance.com/es/futures/${symbol}`;
 
+document.getElementById("sidebar")
+.classList.add("hidden");
+
     document.getElementById("linkApp").style.display = "flex";
+
     document.getElementById("linkApp").href =
     `bnc://app.binance.com/en/futures/${symbol}`;
+
+    if(window.innerWidth < 950){
+
+        document.getElementById("sidebar")
+        .classList.add("hidden");
+
+    }
+
 }
 
 // --- PROCESAMIENTO DE TEXTO EN PANELES CENTRAL Y DERECHO ---
@@ -1448,31 +1503,54 @@ function activar(){
 
 // ARRANQUE DEL SISTEMA
 document.addEventListener("DOMContentLoaded", () => {
+
     verificarLicencia();
+
     const ahora = new Date();
 
     document.getElementById("footerTime").innerHTML =
         `<i class="far fa-clock"></i> Seguimiento activo desde: ${ahora.toLocaleTimeString()}`;
-           
 
-    const guardadas = localStorage.getItem("cdc_simulaciones");
+    // BOTÓN MENÚ
+    document.getElementById("menuToggle").onclick = () => {
+
+        document.getElementById("sidebar")
+        .classList.toggle("hidden");
+
+    };
+
+    const guardadas =
+    localStorage.getItem("cdc_simulaciones");
 
     if (guardadas) {
+
         try {
-            simulaciones = JSON.parse(guardadas);
+
+            simulaciones =
+            JSON.parse(guardadas);
+
         } catch (e) {
-            console.error("Error cargando simulaciones:", e);
+
+            console.error(
+                "Error cargando simulaciones:",
+                e
+            );
+
         }
+
     }
 
     actualizarPaperTradingUI();
 
     obtenerDatosBinance();
 
-   setInterval(() => {
-    obtenerDatosBinance();
-    actualizarPaperTradingUI();
-}, 2000);
+    setInterval(() => {
+
+        obtenerDatosBinance();
+
+        actualizarPaperTradingUI();
+
+    }, 2000);
 
 });
 
