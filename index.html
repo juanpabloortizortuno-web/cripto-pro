@@ -512,9 +512,11 @@ let cerebroCDC = {};
 let ema7CDC = {};
 let ema25CDC = {};
 let ema99CDC = {};
+let noticiasCDC = {};
 
 let emaDataCDC = {};
 let radarCDC = [];
+let avisosBinance = {};
 
 let listaParaDespegarCDC = {};
 let colaEMA = [];
@@ -860,6 +862,13 @@ function detectarDespegueEMA(symbol){
         return false;
 
     return true;
+}
+function obtenerNoticiaCDC(symbol){
+
+    if(noticiasCDC[symbol])
+        return noticiasCDC[symbol];
+
+    return null;
 }
 async function procesarColaEMA(){
 
@@ -1337,6 +1346,8 @@ function actualizarPanelCentral() {
 
     const colorCambio = c.change >= 0 ? 'var(--accent-green)' : 'var(--accent-glow)';
     const signoCambio = c.change >= 0 ? '+' : '';
+const noticia =
+obtenerNoticiaCDC(selectedCoin);
     
     // Cálculo de la distancia al suelo (simulación de proximidad al mínimo de 24h)
     let rango24h = c.high - c.low;
@@ -1344,7 +1355,42 @@ function actualizarPanelCentral() {
     if(distLow > 100) distLow = 100;
 
     document.getElementById("detailView").innerHTML = `
-        <div class="price-hero">
+    
+   ${avisosBinance[selectedCoin] ? `
+
+<div style="
+background:rgba(243,186,47,.08);
+border:1px solid rgba(243,186,47,.4);
+border-radius:10px;
+padding:8px;
+margin-bottom:15px;
+overflow:hidden;
+white-space:nowrap;
+">
+
+<div style="
+color:#f3ba2f;
+font-size:11px;
+font-weight:900;
+margin-bottom:4px;
+">
+⚠️ AVISO BINANCE
+</div>
+
+<marquee
+scrollamount="4"
+style="
+color:#fff;
+font-size:12px;
+">
+${avisosBinance[selectedCoin]}
+</marquee>
+
+</div>
+
+` : ''}
+
+<div class="price-hero">
             <p style="font-size:14px; font-weight:700; color:var(--accent-gold); margin:0; letter-spacing:1px;">🔥 FUTUROS: ${selectedCoin}</p>
             <h2>$${c.price.toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 4})}</h2>
             <span style="color:${colorCambio}; font-weight:900; font-size:20px; text-shadow: 0 0 10px ${colorCambio};">
