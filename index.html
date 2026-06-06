@@ -148,15 +148,15 @@ td:nth-child(3){
         }
 
         /* COLUMNA 3: Panel del Tacómetro Derecho */
-.column-right {
-    width: 520px;
-    min-width: 520px;
-    padding: 20px;
-    overflow-y: auto;
-    background: #040812;
-    display: flex;
-    flex-direction: column;
-    gap: 20px;
+.column-right{
+    width:420px;
+    min-width:420px;
+    padding:20px;
+    overflow-y:auto;
+    background:#040812;
+    display:flex;
+    flex-direction:column;
+    gap:20px;
 }
 
 
@@ -269,48 +269,88 @@ display: flex; flex-direction: column; gap: 10px; z-index: 9999; }
 
         footer { height: 35px; background: #040812; border-top: 1px solid rgba(255, 255, 255, 0.02); display: flex; justify-content: space-between; align-items: center; padding: 0 20px; font-size: 11px; color: #475569; }
 
-  .sidebar {
-   width: 300px;
-   min-width: 300px;
-   background: #060b16;
-   border-right: 1px solid rgba(255,255,255,.03);
-   display: flex;
-   flex-direction: column;
+.sidebar{
+   width:300px;
+   min-width:300px;
+   background:#060b16;
+   border-right:1px solid rgba(255,255,255,.03);
+   display:flex;
+   flex-direction:column;
 }
 
- @media (max-width:950px){
+.hidden{
+   display:none !important;
+}
+
+@media (max-width:950px){
 
     body{
-        overflow:auto;
-    }
-
-    .container{
-        flex-direction:row;
-        overflow-x:auto;
-        overflow-y:hidden;
-        height:calc(100vh - 95px);
-        gap:10px;
-    }
-
-    .sidebar{
-        width:220px;
-        min-width:220px;
-        height:100%;
+        overflow-x:hidden;
         overflow-y:auto;
     }
 
+    .container{
+        display:flex;
+        flex-direction:column;
+        height:auto;
+        overflow:visible;
+    }
+
+    .sidebar{
+        width:100%;
+        min-width:100%;
+        height:280px;
+        overflow-y:auto;
+        overflow-x:hidden;
+        border-right:none;
+        border-bottom:1px solid rgba(255,255,255,.05);
+    }
+
+    .main-workspace{
+        display:flex;
+        flex-direction:column;
+        overflow:visible;
+    }
+
     .column-center{
-        flex:1;
-        min-width:350px;
-        padding:12px;
+        width:100%;
+        min-width:100%;
+        padding:10px;
+        border-right:none;
+        box-sizing:border-box;
     }
 
     .column-right{
-        width:260px;
-        min-width:260px;
-        padding:12px;
+        width:100%;
+        min-width:100%;
+        padding:10px;
+        box-sizing:border-box;
     }
 
+    .gauge-box{
+        transform:scale(.85);
+        margin:auto;
+    }
+
+    table{
+        width:100%;
+        table-layout:auto;
+    }
+
+    th,
+    td{
+        font-size:11px;
+        padding:8px;
+    }
+
+    .floating-buttons{
+        right:10px;
+        bottom:10px;
+    }
+
+    #paperBox{
+        display:none !important;
+    }
 }
     </style>
 </head>
@@ -1451,6 +1491,17 @@ function seleccionarMoneda(symbol) {
     document.getElementById("linkApp").style.display = "flex";
     document.getElementById("linkApp").href =
     `bnc://app.binance.com/en/futures/${symbol}`;
+
+    if(window.innerWidth <= 950){
+
+        document.getElementById("sidebar").style.display = "none";
+
+        document.getElementById("columnCenter").style.flex = "1";
+
+        document.getElementById("columnRight").style.width = "240px";
+        document.getElementById("columnRight").style.minWidth = "240px";
+    }
+
 }
 
 // --- PROCESAMIENTO DE TEXTO EN PANELES CENTRAL Y DERECHO ---
@@ -2012,6 +2063,28 @@ document.getElementById("emaRadarBtn")
 
 document.getElementById("emaRadarBtn").onclick = abrirRadarEMA;
 
+document.getElementById("menuToggle").onclick = () => {
+
+    const sidebar =
+    document.getElementById("sidebar");
+
+    if(window.innerWidth <= 950){
+
+        if(
+            getComputedStyle(sidebar).display === "none"
+        ){
+            sidebar.style.display = "flex";
+        }else{
+            sidebar.style.display = "none";
+        }
+
+    }else{
+
+        sidebar.classList.toggle("hidden");
+
+    }
+
+};
 // ARRANQUE DEL SISTEMA
 document.addEventListener("DOMContentLoaded", () => {
     verificarLicencia();
@@ -2041,7 +2114,27 @@ document.addEventListener("DOMContentLoaded", () => {
 }, 3000);
 
 });
+const menuBtn =
+document.getElementById("menuToggle");
 
+menuBtn.addEventListener("click",()=>{
+
+    const sidebar =
+    document.getElementById("sidebar");
+
+    if(window.innerWidth <= 950){
+
+        if(
+            sidebar.style.display === "none"
+        ){
+            sidebar.style.display = "flex";
+        }else{
+            sidebar.style.display = "none";
+        }
+
+    }
+
+});
 </script>
 
 <!-- PANEL RADAR EMA -->
