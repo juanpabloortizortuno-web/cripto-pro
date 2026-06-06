@@ -59,24 +59,15 @@
             border: 1px solid rgba(243, 186, 47, 0.2);
         }
 
-        .badge-premium { background: rgba(14, 203, 129, 0.1) !important; color: var(--accent-green) !important; border: 1px solid rgba(14, 203, 129, 0.2) !important; }
+        .badge-premium { background: rgba(14, 203, 129, 0.1) !important; 
+color: var(--accent-green) !important; border: 1px solid rgba(14, 203, 129, 0.2) !important; }
 
-       #menuToggle {
-    background: transparent;
-    border: none;
-    color: var(--text-dim);
-    font-size: 18px;
-    cursor: pointer;
-    padding: 5px;
-}
+        #menuToggle {
+            background: transparent; border: none; color: var(--text-dim);
+            font-size: 18px; cursor: pointer; padding: 5px;
+        }
 
-.hidden{
-    display:none !important;
-    width:0 !important;
-    min-width:0 !important;
-}
-
-#nuclearAlert {
+        #nuclearAlert {
             background: #060b16;
             border-bottom: 1px solid rgba(255, 255, 255, 0.03);
             color: #fff; font-weight: 600; font-size: 12px; text-align: center;
@@ -91,13 +82,13 @@
         }
 
         /* COLUMNA 1: Listado Izquierdo */
-        .sidebar {
-            width: 320px;
-            min-width: 320px;
-            background: #060b16;
-            border-right: 1px solid rgba(255, 255, 255, 0.03);
-            display: flex;
-            flex-direction: column;
+ .sidebar {
+   width: 220px;
+min-width: 220px;
+    background: #060b16;
+    border-right: 1px solid rgba(255,255,255,.03);
+    display: flex;
+    flex-direction: column;
         }
 
         .sidebar-header { padding: 16px; display: flex; flex-direction: column; gap: 12px; }
@@ -148,6 +139,7 @@
     flex-direction: column;
     gap: 20px;
 }
+
 
         /* TARJETAS PREMIUM CON BORDE REFINADO */
         .card {
@@ -244,17 +236,15 @@
         .input-pro { width: 100%; max-width: 300px; padding: 14px; margin: 10px 0; background: var(--bg-input); border: 1px solid var(--border); color: #fff; text-align: center; border-radius: 8px; font-size: 16px; outline: none; font-family: inherit; }
 
         /* BOTONES FLOTANTES REDUCIDOS PARA NO ESTORBAR */
-        .floating-buttons { position: fixed; right: 20px; bottom: 50px; display: flex; flex-direction: column; gap: 10px; z-index: 9999; }
-        .float-btn { width: 48px; height: 48px; border-radius: 50%; display: flex; align-items: center; justify-content: center; text-decoration: none; font-size: 18px; border: none; cursor: pointer; box-shadow: 0 4px 12px rgba(0,0,0,0.5); }
+
+        .floating-buttons { position: fixed; right: 20px; bottom: 50px; 
+
+display: flex; flex-direction: column; gap: 10px; z-index: 9999; }
+        
+.float-btn { width: 48px; height: 48px; border-radius: 50%; display: flex; align-items: center; justify-content: center; text-decoration: none; font-size: 18px; border: none; cursor: pointer; box-shadow: 0 4px 12px rgba(0,0,0,0.5); }
         .float-binance { background: var(--accent-gold); color: #000; }
         .float-app { background: #060b16; color: var(--accent-glow); border: 1px solid var(--accent-glow); }
-
-
         .float-sim { background: var(--accent-green); color: #000; font-weight: bold; }
-
-        .hidden{
-         display:none !important;
-         }
 
         #paperBox { position: fixed; left: 20px; bottom: 50px; background: var(--bg-card); border: 1px solid var(--accent-gold); border-radius: 10px; padding: 12px; width: 210px; z-index: 9999; display: none; font-size: 12px; }
 
@@ -273,10 +263,13 @@
 <!-- PANEL ADMINISTRADOR VIP (OCULTO) -->
 <div id="adminPanel" class="overlay-panel">
     <h2 style="color:var(--accent-gold);">GENERADOR VIP</h2>
-    <input type="text" id="adminUser" class="input-pro" placeholder="NOMBRE CLIENTE">
+   
+
+ <input type="text" id="adminUser" class="input-pro" placeholder="NOMBRE CLIENTE">
     <button onclick="generarLicencia()" class="btn binance" style="width:100%; max-width:300px;">GENERAR 1 AÑO</button>
     <div id="keyResult" style="margin-top:20px; background:#000; padding:15px; border-radius:10px; font-size:11px; display:none; word-break:break-all; color:var(--accent-gold); border: 1px dashed var(--accent-gold);"></div>
-    <button onclick="document.getElementById('adminPanel').style.display='none'" style="margin-top:20px; color:var(--text-dim); background:none; border:none; cursor:pointer;">Cerrar</button>
+   
+ <button onclick="document.getElementById('adminPanel').style.display='none'" style="margin-top:20px; color:var(--text-dim); background:none; border:none; cursor:pointer;">Cerrar</button>
 </div>
 
 
@@ -454,7 +447,24 @@ color:#f3ba2f;
 <div id="paperBox">🧪 PAPER TRADING</div>
 
 <div id="floatingButtons" class="floating-buttons">
-    <button id="simuladorBtn" class="float-btn float-sim" onclick="abrirSimulador()">🧪</button>
+
+   <button
+id="simuladorBtn"
+class="float-btn float-sim"
+onclick="abrirSimulador()">
+🧪
+</button>
+
+<button
+id="emaRadarBtn"
+class="float-btn"
+style="
+background:#f3ba2f;
+color:#000;
+font-weight:900;
+">
+🚀
+</button>
     <a id="linkBinance" class="float-btn float-binance" target="_blank" style="display:none;"><i class="fas fa-chart-line"></i></a>
     <a id="linkApp" class="float-btn float-app" target="_blank" style="display:none;"><i class="fas fa-mobile-alt"></i></a>
 </div>
@@ -499,6 +509,16 @@ let reboteCDC = {};
 let riesgoCDC = {};
 let senalCDC = {};
 let cerebroCDC = {};
+let ema7CDC = {};
+let ema25CDC = {};
+let ema99CDC = {};
+
+let emaDataCDC = {};
+let radarCDC = [];
+
+let listaParaDespegarCDC = {};
+let colaEMA = [];
+let procesandoEMA = false;
 
 // LLAVE SECRETA DE ENCRIPCIÓN PARA SEGURIDAD LOCAL
 const ADMIN_KEY = "melfy7E#";
@@ -673,10 +693,201 @@ function buscarMoneda() {
 
 }
 
-// Conexión limpia con la API pública de Binance para traer precios de futuros
+function calcularEMA(datos, periodo){
+
+    if(!datos || datos.length === 0)
+        return 0;
+
+    let k = 2 / (periodo + 1);
+
+    let ema = datos[0];
+
+    for(let i = 1; i < datos.length; i++){
+
+        ema =
+        datos[i] * k +
+        ema * (1 - k);
+
+    }
+
+    return ema;
+
+}
+
+
+
+async function obtenerEMAs(symbol){
+
+    try{
+
+        const r = await fetch(
+            `https://fapi.binance.com/fapi/v1/klines?symbol=${symbol}&interval=1h&limit=120`
+        );
+
+        const velas = await r.json();
+
+        const cierres =
+        velas.map(v => parseFloat(v[4]));
+
+        const ema7 =
+        calcularEMA(cierres, 7);
+
+        const ema7Prev =
+        calcularEMA(
+            cierres.slice(0,-1),
+            7
+        );
+
+        const ema25 =
+        calcularEMA(cierres, 25);
+
+        const ema99 =
+        calcularEMA(cierres, 99);
+
+        emaDataCDC[symbol] = {
+
+            ema7,
+            ema7Prev,
+            ema25,
+            ema99
+
+        };
+
+        ema7CDC[symbol] = ema7;
+        ema25CDC[symbol] = ema25;
+        ema99CDC[symbol] = ema99;
+
+        return true;
+
+    }catch(e){
+
+        console.log(
+            "Error EMA:",
+            symbol,
+            e
+        );
+
+        return false;
+
+    }
+
+}
+function evaluarCDC(symbol){
+
+    const c = cachedData[symbol];
+    const e = emaDataCDC[symbol];
+
+    if(!e || !c)
+        return null;
+
+    // Tendencia principal
+    if(e.ema25 <= e.ema99)
+        return null;
+
+    // Distancia a EMA25
+    let distanciaEMA25 =
+    Math.abs(
+        c.price - e.ema25
+    ) / e.ema25 * 100;
+
+    // Muy lejos = ignorar
+    if(distanciaEMA25 > 4)
+        return null;
+
+    let score = 0;
+    let estado = "🟢 CONSOLIDACIÓN";
+
+    score += 40;
+
+    // EMA7 girando arriba
+    if(e.ema7 > e.ema7Prev){
+
+        score += 20;
+
+        estado = "🔥 ACELERACIÓN";
+
+    }
+
+    // Precio encima EMA25
+    if(c.price > e.ema25)
+        score += 15;
+
+    // Cambio positivo
+    if(c.change > 0)
+        score += 10;
+
+    // Velocidad positiva
+    if(c.velocidad > 0)
+        score += 15;
+
+    // Despegue
+    if(
+        e.ema7 > e.ema25 &&
+        c.velocidad > 0.20
+    ){
+
+        estado = "🚀 DESPEGUE";
+
+        score += 10;
+
+    }
+
+    return {
+
+        symbol,
+        score,
+        estado
+
+    };
+
+}
+
+function detectarDespegueEMA(symbol){
+
+    const e = emaDataCDC[symbol];
+    const c = cachedData[symbol];
+
+    if(!e || !c)
+        return false;
+
+    if(e.ema25 <= e.ema99)
+        return false;
+
+    if(e.ema7 <= e.ema25)
+        return false;
+
+    if(e.ema7 <= e.ema7Prev)
+        return false;
+
+    return true;
+}
+async function procesarColaEMA(){
+
+    if(procesandoEMA)
+        return;
+    procesandoEMA = true;
+    while(colaEMA.length > 0){
+        const symbol = colaEMA.shift();
+        try{
+            await obtenerEMAs(symbol);
+        }catch(e){
+            console.log(
+                "Error cola EMA:",
+                symbol
+            );
+        }
+        delete emaDataCDC[symbol + "_loading"];
+        await new Promise(
+            r => setTimeout(r,150)
+        );
+    }
+    procesandoEMA = false;
+}
 
 
 async function obtenerDatosBinance() {
+
+radarCDC = [];
 
     try {
 
@@ -687,13 +898,18 @@ async function obtenerDatosBinance() {
         const data = await response.json();
 
         data.forEach(item => {
+const precio =
+parseFloat(item.lastPrice);
 
-            if (
-                item.symbol.endsWith("USDT")
-            ) {
+if(
+    !item.symbol.endsWith("USDT") ||
+    precio < 0.0010
+){
+    return;
+}
 
-                let change =
-                parseFloat(item.priceChangePercent);
+          let change =
+        parseFloat(item.priceChangePercent);
 
         let anterior =
         cambioAnterior[item.symbol];
@@ -713,7 +929,7 @@ volumenReal / 1000000;
         cambioAnterior[item.symbol] =
         change;
 
-     cachedData[item.symbol] = {
+cachedData[item.symbol] = {
     symbol:item.symbol,
     price:parseFloat(item.lastPrice),
     change:change,
@@ -721,9 +937,24 @@ volumenReal / 1000000;
     high:parseFloat(item.highPrice),
     low:parseFloat(item.lowPrice),
     volume:parseFloat(item.volume),
-    fuerzaVolumen
+    fuerzaVolumen,
+
+    ema7:0,
+    ema25:0,
+    ema99:0
 };
 
+if(
+    !emaDataCDC[item.symbol] &&
+    !emaDataCDC[item.symbol + "_loading"]
+){
+
+    emaDataCDC[item.symbol + "_loading"] = true;
+
+    colaEMA.push(item.symbol);
+
+    procesarColaEMA();
+}
 
 let whaleScore = 0;
 
@@ -897,8 +1128,7 @@ if(
 }
 
 cerebroCDC[item.symbol] = cerebro;
-
-    }
+listaParaDespegarCDC[item.symbol] = false;
 
 });
 
@@ -923,6 +1153,81 @@ if(
 ){
     actualizarTablaIzquierda();
 }
+
+Object.keys(cachedData).forEach(symbol=>{
+
+    const c = cachedData[symbol];
+
+    if(!c) return;
+
+    let scoreDespegue = 0;
+
+    if(c.change > 0)
+        scoreDespegue += 20;
+
+    if(c.volume > 1000000)
+        scoreDespegue += 20;
+
+    if(c.velocidad > 0)
+        scoreDespegue += 20;
+
+    if(
+        estadoBallena[symbol] ===
+        "🐋 BALLENA DETECTADA"
+    ){
+        scoreDespegue += 20;
+    }
+
+    let posicion = 0;
+
+    if(c.high > c.low){
+
+        posicion =
+        (
+            (c.price - c.low)
+            /
+            (c.high - c.low)
+        ) * 100;
+
+    }
+
+const e = emaDataCDC[symbol];
+
+if(e){
+
+    const distanciaEMA25 =
+    Math.abs(
+        c.price - e.ema25
+    ) / e.ema25 * 100;
+
+    if(distanciaEMA25 < 3)
+        scoreDespegue += 30;
+
+    if(e.ema7 > e.ema7Prev)
+        scoreDespegue += 30;
+
+    if(e.ema25 > e.ema99)
+        scoreDespegue += 40;
+
+    // NUEVO FILTRO
+    if(e.ema7 > e.ema25)
+        scoreDespegue += 40;
+    else
+        scoreDespegue -= 50;
+
+    if(distanciaEMA25 > 6)
+        scoreDespegue -= 50;
+}
+
+    if(scoreDespegue >= 100){
+
+        listaParaDespegarCDC[symbol] = true;
+
+        fuerzaContinuidad[symbol] =
+        (fuerzaContinuidad[symbol] || 0) + 50;
+    }
+
+});
 
 if(selectedCoin){
     actualizarPanelCentral();
@@ -982,23 +1287,7 @@ ordenadas.forEach(c => {
         const bearish = c.change < 0;
         const doji = c.change === 0;
         const rebound = c.low > 0 && ((c.price - c.low) / c.low * 100) <= 2 && c.change > 1;
-let zona = 50;
 
-if(c.high > c.low){
-
-    zona =
-    (
-        (c.price - c.low)
-        /
-        (c.high - c.low)
-    ) * 100;
-
-}
-
-zona = Math.max(
-    0,
-    Math.min(100, zona)
-);
         tr.innerHTML = `
             <td style="font-weight:700; color:#fff;">
                 ${symbol.replace('USDT', '')}
@@ -1010,20 +1299,10 @@ zona = Math.max(
             </td>
             <td style="text-align:right; font-weight:700; color:${c.change >= 0 ? 'var(--accent-green)' : 'var(--accent-glow)'};">
                 ${c.change >= 0 ? '+' : ''}${c.change.toFixed(2)}%
-        <td
-style="
-text-align:right;
-font-weight:700;
-color:${
-    zona > 70
-    ? 'var(--accent-green)'
-    : zona < 30
-    ? 'var(--accent-glow)'
-    : '#f3ba2f'
-};
-">
-${zona.toFixed(0)}%
-</td>
+            </td>
+            <td style="text-align:right; color:var(--text-dim); font-weight:600;">
+                $${c.price > 100 ? c.price.toFixed(2) : c.price.toFixed(4)}
+            </td>
         `;
         fragmento.appendChild(tr);
     });
@@ -1042,25 +1321,12 @@ function seleccionarMoneda(symbol) {
     actualizarTacometroDerecho();
 
     document.getElementById("linkBinance").style.display = "flex";
-
     document.getElementById("linkBinance").href =
     `https://www.binance.com/es/futures/${symbol}`;
 
-document.getElementById("sidebar")
-.classList.add("hidden");
-
     document.getElementById("linkApp").style.display = "flex";
-
     document.getElementById("linkApp").href =
     `bnc://app.binance.com/en/futures/${symbol}`;
-
-    if(window.innerWidth < 950){
-
-        document.getElementById("sidebar")
-        .classList.add("hidden");
-
-    }
-
 }
 
 // --- PROCESAMIENTO DE TEXTO EN PANELES CENTRAL Y DERECHO ---
@@ -1501,60 +1767,176 @@ function activar(){
     validarYActivar(key);
 }
 
+function cerrarRadarEMA(){
+
+    document.getElementById(
+        "emaRadarPanel"
+    ).style.display = "none";
+
+}
+
+function abrirRadarEMA(){
+
+console.log("RADAR ABIERTO");
+
+    let html = "";
+
+Object.keys(listaParaDespegarCDC)
+.filter(symbol => listaParaDespegarCDC[symbol] === true)
+.slice(0,5)
+.forEach(symbol=>{
+
+        const c = cachedData[symbol];
+
+        if(!c) return;
+
+        html += `
+        <div
+        onclick="
+        seleccionarMoneda('${symbol}');
+        cerrarRadarEMA();
+        "
+        style="
+        background:#111;
+        border:1px solid #f3ba2f;
+        padding:12px;
+        margin-bottom:10px;
+        border-radius:8px;
+        cursor:pointer;
+        ">
+
+        🚀 <b>${symbol}</b>
+
+        <br>
+
+        Cambio:
+        ${c.change.toFixed(2)}%
+
+        </div>
+        `;
+    });
+
+    if(html === ""){
+
+        html = `
+        <div style="
+        text-align:center;
+        padding:20px;
+        ">
+        No hay monedas EMA detectadas.
+        </div>
+        `;
+    }
+
+    document.getElementById(
+        "emaRadarLista"
+    ).innerHTML = html;
+
+const panel =
+document.getElementById("emaRadarPanel");
+
+panel.style.display = "block";
+panel.style.top = "auto";
+panel.style.left = "auto";
+
+panel.style.right = "80px";
+panel.style.bottom = "50px";
+panel.style.width = "250px";
+}
+
+/* CONECTAR BOTÓN 🚀 */
+console.log(
+document.getElementById("emaRadarBtn")
+);
+
+document.getElementById("emaRadarBtn").onclick = abrirRadarEMA;
+
 // ARRANQUE DEL SISTEMA
 document.addEventListener("DOMContentLoaded", () => {
-
     verificarLicencia();
-
     const ahora = new Date();
 
     document.getElementById("footerTime").innerHTML =
         `<i class="far fa-clock"></i> Seguimiento activo desde: ${ahora.toLocaleTimeString()}`;
+           
 
-    // BOTÓN MENÚ
-    document.getElementById("menuToggle").onclick = () => {
-
-        document.getElementById("sidebar")
-        .classList.toggle("hidden");
-
-    };
-
-    const guardadas =
-    localStorage.getItem("cdc_simulaciones");
+    const guardadas = localStorage.getItem("cdc_simulaciones");
 
     if (guardadas) {
-
         try {
-
-            simulaciones =
-            JSON.parse(guardadas);
-
+            simulaciones = JSON.parse(guardadas);
         } catch (e) {
-
-            console.error(
-                "Error cargando simulaciones:",
-                e
-            );
-
+            console.error("Error cargando simulaciones:", e);
         }
-
     }
 
     actualizarPaperTradingUI();
 
     obtenerDatosBinance();
 
-    setInterval(() => {
-
-        obtenerDatosBinance();
-
-        actualizarPaperTradingUI();
-
-    }, 2000);
+   setInterval(() => {
+    obtenerDatosBinance();
+    actualizarPaperTradingUI();
+}, 3000);
 
 });
 
 </script>
+
+<!-- PANEL RADAR EMA -->
+<div
+id="emaRadarPanel"
+style="
+display:none;
+position:fixed;
+top:120px;
+right:20px;
+width:320px;
+height:auto;
+background:#111;
+border:2px solid #f3ba2f;
+border-radius:12px;
+z-index:999999;
+padding:15px;
+box-shadow:0 0 20px rgba(243,186,47,.3);
+">
+
+<h2 style="
+color:#f3ba2f;
+text-align:center;
+margin-bottom:15px;
+">
+🚀 TOP 5 DESPEGUES EMA
+</h2>
+
+<div
+id="cdcThinking"
+style="
+background:#0b1628;
+border:2px solid #f3ba2f;
+border-radius:12px;
+padding:10px;
+margin-bottom:15px;
+color:#fff;
+font-size:13px;
+line-height:1.5;
+">
+💭 CDC ANALIZANDO MERCADO...
+</div>
+
+<div id="emaRadarLista"></div>
+
+<div style="text-align:center;margin-top:15px;">
+
+<button
+onclick="cerrarRadarEMA()"
+class="btn vip">
+Cerrar
+</button>
+
+</div>
+
+</div>
 
 </body>
 </html>
