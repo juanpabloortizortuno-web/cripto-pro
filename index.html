@@ -82,14 +82,14 @@ color: var(--accent-green) !important; border: 1px solid rgba(14, 203, 129, 0.2)
         }
 
         /* COLUMNA 1: Listado Izquierdo */
- .sidebar {
-   width: 220px;
-min-width: 220px;
-    background: #060b16;
-    border-right: 1px solid rgba(255,255,255,.03);
-    display: flex;
-    flex-direction: column;
-        }
+.sidebar {
+   width: 300px;
+   min-width: 300px;
+   background: #060b16;
+   border-right: 1px solid rgba(255,255,255,.03);
+   display: flex;
+   flex-direction: column;
+}
 
         .sidebar-header { padding: 16px; display: flex; flex-direction: column; gap: 12px; }
 
@@ -108,6 +108,25 @@ min-width: 220px;
 
         .table-wrapper { overflow-y: auto; flex: 1; }
         table { width: 100%; border-collapse: collapse; }
+table{
+    table-layout:fixed;
+}
+
+th:nth-child(1),
+td:nth-child(1){
+    width:55%;
+}
+
+th:nth-child(2),
+td:nth-child(2){
+    width:20%;
+}
+
+th:nth-child(3),
+td:nth-child(3){
+    width:25%;
+}
+
         th {
             position: sticky; top: 0; background: #060b16;
             font-size: 11px; font-weight: 600; padding: 12px 16px;
@@ -250,12 +269,37 @@ display: flex; flex-direction: column; gap: 10px; z-index: 9999; }
 
         footer { height: 35px; background: #040812; border-top: 1px solid rgba(255, 255, 255, 0.02); display: flex; justify-content: space-between; align-items: center; padding: 0 20px; font-size: 11px; color: #475569; }
 
-        @media (max-width: 950px) {
-            .container { flex-direction: column; overflow-y: auto; }
-            .sidebar { width: 100%; min-width: 0; height: auto; }
-            .main-workspace { flex-direction: column; height: auto; overflow: visible; }
-            .column-right { width: 100%; min-width: 0; }
-        }
+       @media (max-width: 950px) {
+
+    body{
+        overflow:auto;
+    }
+
+    .container{
+        flex-direction:row;
+        overflow:hidden;
+        height:calc(100vh - 95px);
+    }
+
+    .sidebar{
+        width:160px;
+        min-width:160px;
+        height:100%;
+        overflow-y:auto;
+    }
+
+    .column-center{
+        flex:1;
+        padding:10px;
+    }
+
+    .column-right{
+        width:280px;
+        min-width:280px;
+        padding:10px;
+    }
+
+}
     </style>
 </head>
 <body>
@@ -1268,7 +1312,34 @@ const fragmento = document.createDocumentFragment();
 
 const ordenadas =
 Object.values(cachedData)
-.sort((a,b)=>a.change-b.change);
+.sort((a,b)=>{
+
+    let zonaA = 50;
+    let zonaB = 50;
+
+    if(a.high > a.low){
+
+        zonaA =
+        (
+            (a.price - a.low)
+            /
+            (a.high - a.low)
+        ) * 100;
+    }
+
+    if(b.high > b.low){
+
+        zonaB =
+        (
+            (b.price - b.low)
+            /
+            (b.high - b.low)
+        ) * 100;
+    }
+
+    return zonaA - zonaB;
+
+});
 
 ordenadas.forEach(c => {
 
@@ -1297,23 +1368,49 @@ ordenadas.forEach(c => {
         const doji = c.change === 0;
         const rebound = c.low > 0 && ((c.price - c.low) / c.low * 100) <= 2 && c.change > 1;
 
-        tr.innerHTML = `
-            <td style="font-weight:700; color:#fff;">
-                ${symbol.replace('USDT', '')}
-                ${warningMove ? ' <span style="font-size:10px; color:var(--accent-gold); font-weight:900;">⚠️ MOVIMIENTO</span>' : ''}
-                ${bullish ? ' <span style="font-size:11px; color:var(--accent-green);">🟢</span>' : ''}
-                ${bearish ? ' <span style="font-size:11px; color:var(--accent-glow);">🔴</span>' : ''}
-                ${volatil ? ' <span style="font-size:10px; color:var(--accent-gold); font-weight:900;">🔥 VOLÁTIL</span>' : ''}
-                ${rebound ? ' <span style="font-size:10px; color:var(--accent-green); font-weight:900;">🧲 REBOTE</span>' : ''}
-            </td>
-            <td style="text-align:right; font-weight:700; color:${c.change >= 0 ? 'var(--accent-green)' : 'var(--accent-glow)'};">
-                ${c.change >= 0 ? '+' : ''}${c.change.toFixed(2)}%
-            </td>
-            <td style="text-align:right; color:var(--text-dim); font-weight:600;">
-                $${c.price > 100 ? c.price.toFixed(2) : c.price.toFixed(4)}
-            </td>
-        `;
-        fragmento.appendChild(tr);
+
+let zona = 50;
+
+if(c.high > c.low){
+
+    zona =
+    (
+        (c.price - c.low)
+        /
+        (c.high - c.low)
+    ) * 100;
+
+}
+
+zona = Math.max(
+    0,
+    Math.min(100, zona)
+);
+
+tr.innerHTML = `
+    <td style="font-weight:700; color:#fff;">
+        ${symbol.replace('USDT', '')}
+        ${warningMove ? ' <span style="font-size:10px; color:var(--accent-gold); font-weight:900;">⚠️ MOVIMIENTO</span>' : ''}
+        ${bullish ? ' <span style="font-size:11px; color:var(--accent-green);">🟢</span>' : ''}
+        ${bearish ? ' <span style="font-size:11px; color:var(--accent-glow);">🔴</span>' : ''}
+        ${volatil ? ' <span style="font-size:10px; color:var(--accent-gold); font-weight:900;">🔥 VOLÁTIL</span>' : ''}
+        ${rebound ? ' <span style="font-size:10px; color:var(--accent-green); font-weight:900;">🧲 REBOTE</span>' : ''}
+    </td>
+
+    <td style="text-align:right; font-weight:700; color:${c.change >= 0 ? 'var(--accent-green)' : 'var(--accent-glow)'};">
+        ${c.change >= 0 ? '+' : ''}${c.change.toFixed(2)}%
+    </td>
+
+      <td style="
+    text-align:right;
+    font-weight:900;
+    color:${zona < 20 ? '#0ecb81' : zona > 80 ? '#ff2a3b' : '#f3ba2f'};
+    ">
+    ${zona.toFixed(0)}%
+    </td>
+`;
+
+fragmento.appendChild(tr);
     });
 
     tbody.innerHTML = "";
