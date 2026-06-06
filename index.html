@@ -269,7 +269,16 @@ display: flex; flex-direction: column; gap: 10px; z-index: 9999; }
 
         footer { height: 35px; background: #040812; border-top: 1px solid rgba(255, 255, 255, 0.02); display: flex; justify-content: space-between; align-items: center; padding: 0 20px; font-size: 11px; color: #475569; }
 
-       @media (max-width: 950px) {
+  .sidebar {
+   width: 300px;
+   min-width: 300px;
+   background: #060b16;
+   border-right: 1px solid rgba(255,255,255,.03);
+   display: flex;
+   flex-direction: column;
+}
+
+  @media (max-width:950px){
 
     body{
         overflow:auto;
@@ -277,26 +286,28 @@ display: flex; flex-direction: column; gap: 10px; z-index: 9999; }
 
     .container{
         flex-direction:row;
-        overflow:hidden;
+        overflow-x:auto;
+        overflow-y:hidden;
         height:calc(100vh - 95px);
     }
 
     .sidebar{
-        width:160px;
-        min-width:160px;
+        width:140px;
+        min-width:140px;
         height:100%;
         overflow-y:auto;
     }
 
     .column-center{
         flex:1;
-        padding:10px;
+        min-width:280px;
+        padding:8px;
     }
 
     .column-right{
-        width:280px;
-        min-width:280px;
-        padding:10px;
+        width:180px;
+        min-width:180px;
+        padding:8px;
     }
 
 }
@@ -1388,7 +1399,13 @@ zona = Math.max(
 );
 
 tr.innerHTML = `
-    <td style="font-weight:700; color:#fff;">
+    <td style="
+font-weight:700;
+color:#fff;
+white-space:nowrap;
+overflow:hidden;
+text-overflow:ellipsis;
+">
         ${symbol.replace('USDT', '')}
         ${warningMove ? ' <span style="font-size:10px; color:var(--accent-gold); font-weight:900;">⚠️ MOVIMIENTO</span>' : ''}
         ${bullish ? ' <span style="font-size:11px; color:var(--accent-green);">🟢</span>' : ''}
