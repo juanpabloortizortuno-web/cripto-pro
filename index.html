@@ -296,15 +296,15 @@ display: flex; flex-direction: column; gap: 10px; z-index: 9999; }
         overflow:visible;
     }
 
-    .sidebar{
-        width:100%;
-        min-width:100%;
-        height:280px;
-        overflow-y:auto;
-        overflow-x:hidden;
-        border-right:none;
-        border-bottom:1px solid rgba(255,255,255,.05);
-    }
+ .sidebar{
+    width:100%;
+    min-width:100%;
+    height:100vh;
+    overflow-y:auto;
+    overflow-x:hidden;
+    border-right:none;
+    border-bottom:1px solid rgba(255,255,255,.05);
+}
 
     .main-workspace{
         display:flex;
@@ -2075,6 +2075,12 @@ document.getElementById("menuToggle").onclick = () => {
             getComputedStyle(sidebar).display === "none"
         ){
             sidebar.style.display = "flex";
+sidebar.style.position = "fixed";
+sidebar.style.top = "60px";
+sidebar.style.left = "0";
+sidebar.style.zIndex = "99999";
+sidebar.style.background = "#060b16";
+sidebar.style.height = "calc(100vh - 60px)";
         }else{
             sidebar.style.display = "none";
         }
