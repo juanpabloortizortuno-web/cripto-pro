@@ -1496,10 +1496,11 @@ function seleccionarMoneda(symbol) {
 
         document.getElementById("sidebar").style.display = "none";
 
-        document.getElementById("columnCenter").style.flex = "1";
+        window.scrollTo({
+            top:0,
+            behavior:"smooth"
+        });
 
-        document.getElementById("columnRight").style.width = "240px";
-        document.getElementById("columnRight").style.minWidth = "240px";
     }
 
 }
@@ -2085,56 +2086,33 @@ document.getElementById("menuToggle").onclick = () => {
     }
 
 };
-// ARRANQUE DEL SISTEMA
+
 document.addEventListener("DOMContentLoaded", () => {
+
     verificarLicencia();
-    const ahora = new Date();
-
-    document.getElementById("footerTime").innerHTML =
-        `<i class="far fa-clock"></i> Seguimiento activo desde: ${ahora.toLocaleTimeString()}`;
-           
-
-    const guardadas = localStorage.getItem("cdc_simulaciones");
-
-    if (guardadas) {
-        try {
-            simulaciones = JSON.parse(guardadas);
-        } catch (e) {
-            console.error("Error cargando simulaciones:", e);
-        }
-    }
-
-    actualizarPaperTradingUI();
-
-    obtenerDatosBinance();
-
-   setInterval(() => {
-    obtenerDatosBinance();
-    actualizarPaperTradingUI();
-}, 3000);
-
-});
-const menuBtn =
-document.getElementById("menuToggle");
-
-menuBtn.addEventListener("click",()=>{
-
-    const sidebar =
-    document.getElementById("sidebar");
 
     if(window.innerWidth <= 950){
 
-        if(
-            sidebar.style.display === "none"
-        ){
-            sidebar.style.display = "flex";
-        }else{
-            sidebar.style.display = "none";
-        }
+        document.getElementById("sidebar").style.display = "none";
 
     }
 
+    const ahora = new Date();
+
+    document.getElementById("footerTime").innerHTML =
+    `<i class="far fa-clock"></i> Seguimiento activo desde: ${ahora.toLocaleTimeString()}`;
+
+    obtenerDatosBinance();
+
+    setInterval(() => {
+
+        obtenerDatosBinance();
+        actualizarPaperTradingUI();
+
+    },3000);
+
 });
+
 </script>
 
 <!-- PANEL RADAR EMA -->
