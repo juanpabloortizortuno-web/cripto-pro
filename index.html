@@ -327,7 +327,7 @@
 
 <div id="floatingButtons" class="floating-buttons">
     <button id="simuladorBtn" class="float-btn float-sim" onclick="abrirSimulador()">🧪</button>
-    <button id="emaRadarBtn" class="float-btn" style="background:#f3ba2f; color:#000; font-weight:900;">🚀</button>
+    <button id="emaRadarBtn" class="float-btn" style="background:#ff2a3b; color:#fff; font-weight:900;">📉</button>
     <a id="linkBinance" class="float-btn float-binance" target="_blank" style="display:none;"><i class="fas fa-chart-line"></i></a>
     <a id="linkApp" class="float-btn float-app" target="_blank" style="display:none;"><i class="fas fa-mobile-alt"></i></a>
 </div>
@@ -354,10 +354,8 @@
 <script>
 let cachedData = {};
 let selectedCoin = null;
-let historicalPrices = {};
 let velocidadMonedas = {};
 let fuerzaContinuidad = {};
-let originalPageTitle = document.title;
 let simulaciones = [];
 let cambioAnterior = {};
 let fuerzaCompradora = {};
@@ -370,52 +368,8 @@ let reboteCDC = {};
 let riesgoCDC = {};
 let senalCDC = {};
 let cerebroCDC = {};
-let ema7CDC = {};
-let ema25CDC = {};
-let ema99CDC = {};
-let noticiasCDC = {};
-let emaDataCDC = {};
-let radarCDC = [];
-let avisosBinance = {};
-let listaParaDespegarCDC = {};
-let colaEMA = [];
-let procesandoEMA = false;
-let modoCDC = "NORMAL";
 let prediccionCDC = {};
-
-let estrategiaActualEMA = "top_despegues";
-
-// FUNCIÓN ACTUALIZADA: CAPTURA EL GIRO EXACTO EN EL MÁXIMO
-function detectarCaidaFuerteCDC(symbol){
-    const e = emaDataCDC[symbol];
-    const c = cachedData[symbol];
-
-    if(!e || !c)
-        return false;
-
-    if(
-        e.ema25 > e.ema99 &&
-        e.ema7Prev >= e.ema25 && 
-        e.ema7 < e.ema25 &&
-        c.price < e.ema25 &&
-        c.velocidad < 0
-    ){
-        return true;
-    }
-
-    return false;
-}
-
-async function detectarRendimientoCDC(){
-    const inicio = performance.now();
-    for(let i=0;i<1000000;i++){ Math.sqrt(i); }
-    const tiempo = performance.now() - inicio;
-    if(tiempo < 8){ modoCDC = "ULTRA"; }
-    else if(tiempo < 15){ modoCDC = "ALTO"; }
-    else if(tiempo < 30){ modoCDC = "NORMAL"; }
-    else{ modoCDC = "LIGERO"; }
-    console.log("CDC MODE:", modoCDC);
-}
+let estrategiaActualEMA = "caida_picos"; 
 
 const ADMIN_KEY = "melfy7E#";
 const PREFIX = "CDC-2026-";
@@ -484,72 +438,29 @@ function buscarMoneda() {
     else{ saludo.innerText = `🔍 Encontré ${encontradas} coincidencias`; }
 }
 
-function calcularEMA(datos, periodo){
-    if(!datos || datos.length === 0) return 0;
-    let k = 2 / (periodo + 1);
-    let ema = datos[0];
-    for(let i = 1; i < datos.length; i++){ ema = datos[i] * k + ema * (1 - k); }
-    return ema;
-}
-
-async function obtenerEMAs(symbol){
-    try{
-        const r = await fetch(`https://fapi.binance.com/fapi/v1/klines?symbol=${symbol}&interval=1h&limit=120`);
-        const velas = await r.json();
-        const closures = velas.map(v => parseFloat(v[4]));
-        const ema7 = calcularEMA(closures, 7);
-        const ema7Prev = calcularEMA(closures.slice(0,-1), 7);
-        const ema25 = calcularEMA(closures, 25);
-        const ema99 = calcularEMA(closures, 99);
-
-        emaDataCDC[symbol] = { ema7, ema7Prev, ema25, ema99 };
-        ema7CDC[symbol] = ema7;
-        ema25CDC[symbol] = ema25;
-        ema99CDC[symbol] = ema99;
-        return true;
-    }catch(e){
-        console.log("Error EMA:", symbol, e);
-        return false;
-    }
-}
-
 function calcularPrediccionCDC(symbol){
     const c = cachedData[symbol];
-    const e = emaDataCDC[symbol];
-    if(!c || !e) return null;
+    if(!c) return null;
 
     let subida = 0; let caida = 0;
-    if(e.ema7 > e.ema25) subida += 20; else caida += 20;
-    if(e.ema25 > e.ema99) subida += 20; else caida += 20;
-    if(c.change > 0) subida += 15; else caida += 15;
-    if(c.velocidad > 0) subida += 15; else caida += 15;
-    if(estadoBallena[symbol] === "🐋 BALLENA DETECTADA"){ subida += 15; }
-    if(fuerzaCompradora[symbol] > fuerzaVendedora[symbol]){ subida += 15; }else{ caida += 15; }
+    if(c.change > 0) subida += 30; else caida += 30;
+    if(c.velocidad > 0) subida += 30; else caida += 30;
+    if(estadoBallena[symbol] === "🐋 BALLENA DETECTADA"){ subida += 20; }
+    if(fuerzaCompradora[symbol] > fuerzaVendedora[symbol]){ subida += 20; }else{ caida += 20; }
 
     subida = Math.min(100, subida);
     caida = Math.min(100, caida);
 
     let exhaustion = 20;
-    if(c.change > 5 && c.velocidad < 0){ exhaustion = 80; }
-    else if(c.change > 3 && c.velocidad < 0){ exhaustion = 60; }
+    let rango = c.high - c.low;
+    let distHigh = rango > 0 ? ((c.high - c.price) / rango) * 100 : 100;
+    if(distHigh < 3 && c.velocidad < 0){ exhaustion = 95; }
+    else if(c.change > 5 && c.velocidad < 0){ exhaustion = 80; }
 
     prediccionCDC[symbol] = { subida, caida, agotamiento: exhaustion };
 }
 
-async function procesarColaEMA(){
-    if(procesandoEMA) return;
-    procesandoEMA = true;
-    while(colaEMA.length > 0){
-        const symbol = colaEMA.shift();
-        try{ await obtenerEMAs(symbol); }catch(e){ console.log("Error cola EMA:", symbol); }
-        delete emaDataCDC[symbol + "_loading"];
-        await new Promise(r => setTimeout(r,100));
-    }
-    procesandoEMA = false;
-}
-
 async function obtenerDatosBinance() {
-    radarCDC = [];
     try {
         const response = await fetch('https://fapi.binance.com/fapi/v1/ticker/24hr');
         const data = await response.json();
@@ -573,15 +484,8 @@ async function obtenerDatosBinance() {
                 high: parseFloat(item.highPrice),
                 low: parseFloat(item.lowPrice),
                 volume: parseFloat(item.volume),
-                fuerzaVolumen,
-                ema7:0, ema25:0, ema99:0
+                fuerzaVolumen: fuerzaVolumen
             };
-            
-            if(!emaDataCDC[item.symbol] && !emaDataCDC[item.symbol + "_loading"]){
-                emaDataCDC[item.symbol + "_loading"] = true;
-                colaEMA.push(item.symbol);
-                procesarColaEMA();
-            }
             
             let whaleScore = 0;
             if(change > 4) whaleScore++;
@@ -608,7 +512,6 @@ async function obtenerDatosBinance() {
             
             senalCDC[item.symbol] = change > 3 ? "COMPRAR" : change < -3 ? "VENDER" : "ESPERAR";
             
-            let cerebro = "NEUTRAL";
             let scoreCDC = 0;
             if(change > 0) scoreCDC += 10;
             if(velocidad > 0) scoreCDC += 20;
@@ -619,14 +522,6 @@ async function obtenerDatosBinance() {
             if(estadoBallena[item.symbol] === "🐋 BALLENA DETECTADA") scoreCDC += 30;
             if(scoreCDC > 100) scoreCDC = 100;
             fuerzaContinuidad[item.symbol] = scoreCDC;
-            
-            if(change > 0 && velocidad > 0 && parseFloat(item.volume) > 1000000){ cerebro = "🟢 ACUMULACION"; }
-            if(estadoBallena[item.symbol] === "🐋 BALLENA DETECTADA"){ cerebro = "🐋 BALLENA"; }
-            if(change > 5 && velocidad > 1){ cerebro = "🚀 RUPTURA"; }
-            if(change > 8 && velocidad > 2){ cerebro = "💥 EXPLOSION"; }
-            if(change < -5 && velocidad < -1){ cerebro = "📉 DISTRIBUCION"; }
-            cerebroCDC[item.symbol] = cerebro;
-            listaParaDespegarCDC[item.symbol] = false;
         });
         
         let mejorMoneda = null;
@@ -638,27 +533,6 @@ async function obtenerDatosBinance() {
         actualizarAlertaGanadora();
         
         if(document.activeElement.id !== "searchCoin"){ actualizarTablaIzquierda(); }
-        
-        Object.keys(cachedData).forEach(symbol=>{
-            const c = cachedData[symbol];
-            if(!c) return;
-            let scoreDespegue = 0;
-            if(c.change > 0) scoreDespegue += 20;
-            if(c.volume > 1000000) scoreDespegue += 20;
-            if(c.velocidad > 0) scoreDespegue += 20;
-            if(estadoBallena[symbol] === "🐋 BALLENA DETECTADA"){ scoreDespegue += 20; }
-            
-            const e = emaDataCDC[symbol];
-            if(e && e.ema7 && e.ema25 && e.ema99){
-                const distanciaEMA25 = Math.abs(c.price - e.ema25) / e.ema25 * 100;
-                if(distanciaEMA25 < 3) scoreDespegue += 30;
-                if(e.ema7 > e.ema7Prev) scoreDespegue += 30;
-                if(e.ema25 > e.ema99) scoreDespegue += 40;
-                if(e.ema7 > e.ema25) scoreDespegue += 40; else scoreDespegue -= 50;
-                if(distanciaEMA25 > 6) scoreDespegue -= 50;
-            }
-            if(scoreDespegue >= 70){ listaParaDespegarCDC[symbol] = true; }
-        });
         
         if(selectedCoin){
             calcularPrediccionCDC(selectedCoin);
@@ -673,6 +547,7 @@ async function obtenerDatosBinance() {
         console.error("Error leyendo datos de Binance:", error);
     }
 }
+
 function actualizarTablaIzquierda() {
     const tbody = document.getElementById("cryptoList");
     if (!tbody) return;
@@ -709,9 +584,7 @@ function actualizarTablaIzquierda() {
         let strongImpulse = Math.abs(c.change) >= 6;
         let rebound = c.price <= (c.low * 1.03) && c.change > 1;
 
-        if (alarma) {
-            tr.style.background = "rgba(248, 73, 96, 0.12)";
-        }
+        if (alarma) tr.style.background = "rgba(248, 73, 96, 0.12)";
 
         let badgeZona = "NEUTRAL";
         let colorBadge = "#64748b";
@@ -730,14 +603,8 @@ function actualizarTablaIzquierda() {
                 ${doji ? ' ⚪ DOJI' : ''}
                 ${strongImpulse ? ' 💥 IMPULSO' : ''}
                 ${rebound ? ' 🧲 REBOTE' : ''}
-
-                ${c.change >= 12 
-                    ? '<span class="bomba" style="color:var(--accent-green); font-weight:bold; font-size:11px;"> 💣 EXPLOSIÓN</span>' 
-                    : ''}
-                ${c.change <= -12 
-                    ? '<span class="cascada" style="color:var(--accent-glow); font-weight:bold; font-size:11px;"> 🌊 CASCADA</span>' 
-                    : ''}
-
+                ${c.change >= 12 ? '<span style="color:var(--accent-green); font-weight:bold; font-size:11px;"> 💣 EXPLOSIÓN</span>' : ''}
+                ${c.change <= -12 ? '<span style="color:var(--accent-glow); font-weight:bold; font-size:11px;"> 🌊 CASCADA</span>' : ''}
                 ${volatil ? '<span style="color:var(--accent-gold); font-size:11px;"> 🔥 VOLÁTIL</span>' : ''}
             </td>
             <td style="text-align:right; font-weight:700; color:${colorCambio};">
@@ -753,6 +620,7 @@ function actualizarTablaIzquierda() {
     tbody.innerHTML = "";
     tbody.appendChild(fragmento);
 }
+
 function seleccionarMoneda(symbol) {
     selectedCoin = symbol;
     calcularPrediccionCDC(symbol);
@@ -993,41 +861,95 @@ function activar(){
 
 function cerrarRadarEMA() { document.getElementById("emaRadarPanel").style.display = "none"; }
 
+// =========================================================================
+// NUEVO MOTOR CDC INSTANTÁNEO: DETECCIÓN INMEDIATA DE GIRONES EN EL "PICO"
+// =========================================================================
 function abrirRadarEMA(){
     let html = "";
     
-    if (estrategiaActualEMA === "top_despegues") {
-        Object.keys(listaParaDespegarCDC).filter(symbol => listaParaDespegarCDC[symbol] === true).slice(0,5).forEach(symbol=>{
-            const c = cachedData[symbol];
-            if(!c) return;
-            html += `
-            <div onclick="seleccionarMoneda('${symbol}'); cerrarRadarEMA();" style="background:#111; border:1px solid #f3ba2f; padding:12px; margin-bottom:10px; border-radius:8px; cursor:pointer;">
-                🚀 <b>${symbol}</b><br>Cambio: ${c.change.toFixed(2)}%
-            </div>`;
-        });
-        if(html === ""){ html = `<div style="text-align:center; padding:20px;">No hay monedas EMA detectadas.</div>`; }
-    } 
-    else if (estrategiaActualEMA === "caida_emas") {
-        let encontradasCaida = 0;
-        Object.keys(cachedData).forEach(symbol => {
-            if(detectarCaidaFuerteCDC(symbol) && encontradasCaida < 5) {
-                encontradasCaida++;
-                const c = cachedData[symbol];
-                html += `
-                <div onclick="seleccionarMoneda('${symbol}'); cerrarRadarEMA();" style="background:#111; border:1px solid #ff2a3b; padding:12px; margin-bottom:10px; border-radius:8px; cursor:pointer;">
-                    📉 <b>${symbol}</b><br>Cambio: ${c.change.toFixed(2)}% <span style="color:#ff2a3b; font-size:11px; font-weight:bold;">[GIRO CUMBRE]</span>
-                </div>`;
+    if (estrategiaActualEMA === "caida_picos") {
+        let candidatos = [];
+
+        Object.values(cachedData).forEach(c => {
+            // Filtro de liquidez mínima (Volumen > 1.5M USDT)
+            if (c.volume > 1500000 && c.change > 2) {
+                // Evaluamos matemáticamente la distancia al pico más alto de las últimas 24h
+                let rango24h = c.high - c.low;
+                let distanciaAlPico = rango24h > 0 ? ((c.high - c.price) / rango24h) * 100 : 100;
+                
+                // CRITERIO: La moneda está en el PICO (Arriba el 82% del rango) Y su velocidad actual es NEGATIVA (Cae)
+                if (distanciaAlPico <= 18 && c.velocidad < 0) {
+                    // Calculamos un Score de Gravedad (A mayor caída instantánea y volumen, sube en el top)
+                    let scoreGravedad = Math.abs(c.velocidad) * 50 + (c.volume / 2000000);
+                    candidatos.push({
+                        symbol: c.symbol,
+                        change: c.change,
+                        volume: c.volume,
+                        distPico: distanciaAlPico,
+                        velocidad: c.velocidad,
+                        score: scoreGravedad
+                    });
+                }
             }
         });
-        if(html === ""){ html = `<div style="text-align:center; padding:20px;">Buscando giros en máximos...</div>`; }
+
+        // Ordenar: Las que caen con más rabia desde el pico salen PRIMERO
+        candidatos.sort((a, b) => b.score - a.score);
+        let topPicos = candidatos.slice(0, 5);
+
+        topPicos.forEach(item => {
+            html += `
+            <div onclick="seleccionarMoneda('${item.symbol}'); cerrarRadarEMA();" style="background:#0b0f19; border:1px solid #ff2a3b; padding:12px; margin-bottom:10px; border-radius:8px; cursor:pointer; position:relative;">
+                <span style="position:absolute; right:10px; top:12px; font-size:10px; color:#ff2a3b; font-weight:bold; background:rgba(255,42,59,0.1); padding:2px 6px; border-radius:4px;">📉 GIRO</span>
+                <b>${item.symbol.replace("USDT","")}</b> <span style="font-size:10px; color:var(--text-dim);">USDT</span><br>
+                <span style="font-size:12px; color:#64748b;">En Cima 24h: <span style="color:#0ecb81; font-weight:bold;">${(100 - item.distPico).toFixed(1)}%</span></span><br>
+                <span style="font-size:11px; color:#ff2a3b; font-weight:bold;">Caída instantánea: ${item.velocidad.toFixed(2)}%</span>
+            </div>`;
+        });
+
+        if(html === ""){ 
+            html = `
+            <div style="text-align:center; padding:25px; color:#475569; font-size:12px;">
+                <i class="fas fa-bolt" style="color:#f3ba2f; margin-bottom:10px; font-size:18px;"></i><br>
+                Monitoreando picos en tiempo real... Sin demoras HTTP.
+            </div>`; 
+        }
+    } 
+    else if (estrategiaActualEMA === "top_despegues") {
+        let despegues = [];
+        Object.values(cachedData).forEach(c => {
+            if (c.volume > 1500000 && c.change > 0 && c.velocidad > 0.1) {
+                let rango24h = c.high - c.low;
+                let distanciaAlSuelo = rango24h > 0 ? ((c.price - c.low) / rango24h) * 100 : 0;
+                
+                // Criterio: Saliendo del suelo (primeros 35% del canal) con velocidad positiva
+                if (distanciaAlSuelo <= 35) {
+                    despegues.push(c);
+                }
+            }
+        });
+
+        despegues.sort((a,b) => b.velocidad - a.velocidad);
+        let topDespegues = despegues.slice(0, 5);
+
+        topDespegues.forEach(c => {
+            html += `
+            <div onclick="seleccionarMoneda('${c.symbol}'); cerrarRadarEMA();" style="background:#0b0f19; border:1px solid #0ecb81; padding:12px; margin-bottom:10px; border-radius:8px; cursor:pointer;">
+                🚀 <b>${c.symbol.replace("USDT","")}</b> <span style="font-size:10px; color:var(--text-dim);">USDT</span><br>
+                Cambio: <span style="color:var(--accent-green); font-weight:bold;">+${c.change.toFixed(2)}%</span> | Vel: +${c.velocidad.toFixed(2)}
+            </div>`;
+        });
+        if(html === ""){ html = `<div style="text-align:center; padding:20px; color:#64748b;">Buscando despegues desde el suelo...</div>`; }
     }
 
     document.getElementById("emaRadarLista").innerHTML = html;
-
     const panel = document.getElementById("emaRadarPanel");
     panel.style.display = "block";
-    panel.style.top = "auto"; panel.style.left = "auto";
-    panel.style.right = "80px"; panel.style.bottom = "50px"; panel.style.width = "250px";
+    panel.style.top = "auto"; 
+    panel.style.left = "auto";
+    panel.style.right = "80px"; 
+    panel.style.bottom = "50px"; 
+    panel.style.width = "260px";
 }
 
 document.getElementById("emaRadarBtn").onclick = abrirRadarEMA;
@@ -1052,18 +974,18 @@ document.addEventListener("DOMContentLoaded", () => {
     if (guardadas) { try { simulaciones = JSON.parse(guardadas); } catch (e) {} }
     actualizarPaperTradingUI();
     obtenerDatosBinance();
-    setInterval(() => { obtenerDatosBinance(); actualizarPaperTradingUI(); }, 5000);
+    setInterval(() => { obtenerDatosBinance(); }, 2000); // Frecuencia óptima cada 2 segundos
 });
 </script>
 
-<div id="emaRadarPanel" style="display:none; position:fixed; width:320px; background:#111; border:2px solid #f3ba2f; border-radius:12px; z-index:999999; padding:15px; box-shadow:0 0 20px rgba(243,186,47,.3);">
+<div id="emaRadarPanel" style="display:none; position:fixed; width:320px; background:#111; border:2px solid #ff2a3b; border-radius:12px; z-index:999999; padding:15px; box-shadow:0 0 20px rgba(255,42,59,.2);">
     <div style="margin-bottom: 12px; text-align: center;">
-        <select id="selectEstrategiaEMA" onchange="estrategiaActualEMA = this.value; abrirRadarEMA();" style="width:100%; padding:8px; background:#050914; color:#fff; border:1px solid #f3ba2f; border-radius:6px; font-weight:bold; outline:none; font-family:inherit;">
-            <option value="top_despegues">🚀 TOP 5 DESPEGUES EMA</option>
-            <option value="caida_emas">📉 CAIDA DE EMAS (GIROS)</option>
+        <select id="selectEstrategiaEMA" onchange="estrategiaActualEMA = this.value; abrirRadarEMA();" style="width:100%; padding:8px; background:#050914; color:#fff; border:1px solid #ff2a3b; border-radius:6px; font-weight:bold; outline:none; font-family:inherit;">
+            <option value="caida_picos">📉 PICO MÁS ALTO (GIROS)</option>
+            <option value="top_despegues">🚀 DESPEGUES DESDE EL SUELO</option>
         </select>
     </div>
-    <div id="cdcThinking" style="background:#0b1628; border:2px solid #f3ba2f; border-radius:12px; padding:10px; margin-bottom:15px; color:#fff; font-size:13px; line-height:1.5;">💭 CDC ANALIZANDO MERCADO...</div>
+    <div id="cdcThinking" style="background:#0b1628; border:1px solid rgba(255,255,255,0.05); border-radius:12px; padding:10px; margin-bottom:15px; color:#fff; font-size:13px; line-height:1.5; text-align:center;">⚡ MOTOR EN TIEMPO REAL ACTIVO</div>
     <div id="emaRadarLista"></div>
     <div style="text-align:center; margin-top:15px;"><button onclick="cerrarRadarEMA()" class="btn vip">Cerrar</button></div>
 </div>
