@@ -383,6 +383,29 @@ let procesandoEMA = false;
 let modoCDC = "NORMAL";
 let prediccionCDC = {};
 
+let estrategiaActualEMA = "top_despegues";
+
+// FUNCIÓN ACTUALIZADA: CAPTURA EL GIRO EXACTO EN EL MÁXIMO
+function detectarCaidaFuerteCDC(symbol){
+    const e = emaDataCDC[symbol];
+    const c = cachedData[symbol];
+
+    if(!e || !c)
+        return false;
+
+    if(
+        e.ema25 > e.ema99 &&
+        e.ema7Prev >= e.ema25 && 
+        e.ema7 < e.ema25 &&
+        c.price < e.ema25 &&
+        c.velocidad < 0
+    ){
+        return true;
+    }
+
+    return false;
+}
+
 async function detectarRendimientoCDC(){
     const inicio = performance.now();
     for(let i=0;i<1000000;i++){ Math.sqrt(i); }
@@ -642,6 +665,10 @@ async function obtenerDatosBinance() {
             actualizarPanelCentral();
             actualizarTacometroDerecho();
         }
+
+        if(document.getElementById("emaRadarPanel").style.display === "block"){
+            abrirRadarEMA();
+        }
     } catch (error) {
         console.error("Error leyendo datos de Binance:", error);
     }
@@ -652,7 +679,6 @@ function actualizarTablaIzquierda() {
 
     const fragmento = document.createDocumentFragment();
     
-    // Mantenemos tu ordenación matemática basada en la zona (Suelo/Techo)
     const ordenadas = Object.values(cachedData).sort((a,b)=>{
         let zonaA = 50; let zonaB = 50;
         if(a.high > a.low){ zonaA = ((a.price - a.low) / (a.high - a.low)) * 100; }
@@ -666,13 +692,11 @@ function actualizarTablaIzquierda() {
         tr.setAttribute('data-symbol', symbol);
         tr.onclick = () => seleccionarMoneda(symbol);
 
-        // Resaltado de la moneda seleccionada con tus estilos originales
         if (selectedCoin && selectedCoin === symbol) {
             tr.style.background = "rgba(243, 186, 47, 0.12)";
             tr.style.borderLeft = "4px solid var(--accent-gold)";
         }
 
-        // --- CÁLCULO DE ALERTAS Y EMERGENCIAS MATEMÁTICAS ---
         let rango24h = c.high - c.low;
         let distLow = rango24h > 0 ? ((c.price - c.low) / (c.high - c.low)) * 100 : 0;
 
@@ -685,12 +709,10 @@ function actualizarTablaIzquierda() {
         let strongImpulse = Math.abs(c.change) >= 6;
         let rebound = c.price <= (c.low * 1.03) && c.change > 1;
 
-        // Fondo traslúcido de advertencia si se activa la alarma crítica de suelo
         if (alarma) {
             tr.style.background = "rgba(248, 73, 96, 0.12)";
         }
 
-        // Configuración de etiquetas de zona originales
         let badgeZona = "NEUTRAL";
         let colorBadge = "#64748b";
         if(distLow > 75) { badgeZona = "SOBRECOMPRA"; colorBadge = "var(--accent-glow)"; }
@@ -698,7 +720,6 @@ function actualizarTablaIzquierda() {
 
         let colorCambio = c.change > 0 ? "var(--accent-green)" : c.change < 0 ? "var(--accent-glow)" : "var(--text-main)";
 
-        // Construcción de la fila inyectando el inventario de emojis e indicadores
         tr.innerHTML = `
             <td style="font-weight:700; word-break: break-word;">
                 ${symbol.replace("USDT","")} <span style="font-size:10px; color:var(--text-dim);">USDT</span>
@@ -974,16 +995,33 @@ function cerrarRadarEMA() { document.getElementById("emaRadarPanel").style.displ
 
 function abrirRadarEMA(){
     let html = "";
-    Object.keys(listaParaDespegarCDC).filter(symbol => listaParaDespegarCDC[symbol] === true).slice(0,5).forEach(symbol=>{
-        const c = cachedData[symbol];
-        if(!c) return;
-        html += `
-        <div onclick="seleccionarMoneda('${symbol}'); cerrarRadarEMA();" style="background:#111; border:1px solid #f3ba2f; padding:12px; margin-bottom:10px; border-radius:8px; cursor:pointer;">
-            🚀 <b>${symbol}</b><br>Cambio: ${c.change.toFixed(2)}%
-        </div>`;
-    });
+    
+    if (estrategiaActualEMA === "top_despegues") {
+        Object.keys(listaParaDespegarCDC).filter(symbol => listaParaDespegarCDC[symbol] === true).slice(0,5).forEach(symbol=>{
+            const c = cachedData[symbol];
+            if(!c) return;
+            html += `
+            <div onclick="seleccionarMoneda('${symbol}'); cerrarRadarEMA();" style="background:#111; border:1px solid #f3ba2f; padding:12px; margin-bottom:10px; border-radius:8px; cursor:pointer;">
+                🚀 <b>${symbol}</b><br>Cambio: ${c.change.toFixed(2)}%
+            </div>`;
+        });
+        if(html === ""){ html = `<div style="text-align:center; padding:20px;">No hay monedas EMA detectadas.</div>`; }
+    } 
+    else if (estrategiaActualEMA === "caida_emas") {
+        let encontradasCaida = 0;
+        Object.keys(cachedData).forEach(symbol => {
+            if(detectarCaidaFuerteCDC(symbol) && encontradasCaida < 5) {
+                encontradasCaida++;
+                const c = cachedData[symbol];
+                html += `
+                <div onclick="seleccionarMoneda('${symbol}'); cerrarRadarEMA();" style="background:#111; border:1px solid #ff2a3b; padding:12px; margin-bottom:10px; border-radius:8px; cursor:pointer;">
+                    📉 <b>${symbol}</b><br>Cambio: ${c.change.toFixed(2)}% <span style="color:#ff2a3b; font-size:11px; font-weight:bold;">[GIRO CUMBRE]</span>
+                </div>`;
+            }
+        });
+        if(html === ""){ html = `<div style="text-align:center; padding:20px;">Buscando giros en máximos...</div>`; }
+    }
 
-    if(html === ""){ html = `<div style="text-align:center; padding:20px;">No hay monedas EMA detectadas.</div>`; }
     document.getElementById("emaRadarLista").innerHTML = html;
 
     const panel = document.getElementById("emaRadarPanel");
@@ -1019,7 +1057,12 @@ document.addEventListener("DOMContentLoaded", () => {
 </script>
 
 <div id="emaRadarPanel" style="display:none; position:fixed; width:320px; background:#111; border:2px solid #f3ba2f; border-radius:12px; z-index:999999; padding:15px; box-shadow:0 0 20px rgba(243,186,47,.3);">
-    <h2 style="color:#f3ba2f; text-align:center; margin-bottom:15px;">🚀 TOP 5 DESPEGUES EMA</h2>
+    <div style="margin-bottom: 12px; text-align: center;">
+        <select id="selectEstrategiaEMA" onchange="estrategiaActualEMA = this.value; abrirRadarEMA();" style="width:100%; padding:8px; background:#050914; color:#fff; border:1px solid #f3ba2f; border-radius:6px; font-weight:bold; outline:none; font-family:inherit;">
+            <option value="top_despegues">🚀 TOP 5 DESPEGUES EMA</option>
+            <option value="caida_emas">📉 CAIDA DE EMAS (GIROS)</option>
+        </select>
+    </div>
     <div id="cdcThinking" style="background:#0b1628; border:2px solid #f3ba2f; border-radius:12px; padding:10px; margin-bottom:15px; color:#fff; font-size:13px; line-height:1.5;">💭 CDC ANALIZANDO MERCADO...</div>
     <div id="emaRadarLista"></div>
     <div style="text-align:center; margin-top:15px;"><button onclick="cerrarRadarEMA()" class="btn vip">Cerrar</button></div>
