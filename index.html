@@ -90,7 +90,7 @@
         .sidebar-header { padding: 16px; display: flex; flex-direction: column; gap: 12px; }
 
         .search-box input {
-            width: 100%; box-sizing: border-box; padding: 12px 16px;
+            width: 100%; box-sizing: border-box; padding: 12px 15px;
             border-radius: 10px; border: 1px solid rgba(255, 255, 255, 0.08);
             background: var(--bg-input); color: #fff; font-size: 13px; outline: none;
         }
@@ -105,8 +105,8 @@
         .table-wrapper { overflow-y: auto; flex: 1; }
         table { width: 100%; border-collapse: collapse; table-layout: fixed; }
 
-        th:nth-child(1), td:nth-child(1){ width:55%; }
-        th:nth-child(2), td:nth-child(2){ width:20%; }
+        th:nth-child(1), td:nth-child(1){ width:50%; }
+        th:nth-child(2), td:nth-child(2){ width:25%; }
         th:nth-child(3), td:nth-child(3){ width:25%; }
 
         th {
@@ -185,7 +185,7 @@
         .barra-progreso { height: 100%; transition: width 0.4s; }
 
         .grid-indicators { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-top: 15px; }
-        .indicator-box { background: #060b14; border: 1px solid rgba(255,255,255,0.03); border-radius: 10px; padding: 14px; box-sizing: border-box; }
+        .container-box, .indicator-box { background: #060b14; border: 1px solid rgba(255,255,255,0.03); border-radius: 10px; padding: 14px; box-sizing: border-box; }
         .indicator-label { font-size: 11px; color: #64748b; font-weight: 600; display: flex; align-items: center; gap: 6px; text-transform: uppercase; }
         .indicator-value { font-size: 20px; font-weight: 900; margin: 8px 0 4px 0; }
 
@@ -268,7 +268,7 @@
     </div>
 </header>
 
-<div id="nuclearAlert">🏆 BUSCANDO MONEDA GANADORA...</div>
+<div id="nuclearAlert">🏆 MONITOR DE REVERSIÓN EXTREMA ACTIVO...</div>
 
 <div class="container">
 
@@ -276,9 +276,8 @@
         <div class="sidebar-header">
             <button onclick="document.getElementById('activationPanel').style.display='flex'" class="btn vip" style="width:100%; font-size:11px; padding:8px;"><i class="fas fa-crown"></i> ACTIVAR LICENCIA</button>
             <div class="search-box">
-                <div id="botSaludo" class="bot-saludo" style="margin-bottom:8px;">🤖 Hola, busca una moneda</div>
-                <div id="whaleAlert" style="display:none; margin-top:10px; padding:10px; background:rgba(243,186,47,.1); border:1px solid #f3ba2f; border-radius:8px; font-size:12px; font-weight:bold; color:#f3ba2f;">🐋 ESCANEANDO BALLENAS...</div>
-                <input type="text" id="searchCoin" placeholder="Buscar BTC, ETH, SOL..." onkeyup="buscarMoneda()">
+                <div id="botSaludo" class="bot-saludo" style="margin-bottom:8px;">🤖 Buscando giros (&lt; 20 USDT) desde el máximo</div>
+                <input type="text" id="searchCoin" placeholder="Buscar low-caps..." onkeyup="buscarMoneda()">
             </div>
         </div>
         <div class="table-wrapper">
@@ -287,7 +286,7 @@
                     <tr>
                         <th>CRIPTO</th>
                         <th style="text-align:right;">CAMBIO</th>
-                        <th style="text-align:right;">ZONA</th>
+                        <th style="text-align:right;">DIST. MAX</th>
                     </tr>
                 </thead>
                 <tbody id="cryptoList"></tbody>
@@ -302,10 +301,10 @@
                 <div style="text-align:center; padding:60px 20px; color:var(--text-dim);">
                     <i class="fas fa-chart-line" style="font-size:55px; margin-bottom:20px; color:#f3ba2f; opacity:.8;"></i>
                     <h2 style="margin:0; color:#f3ba2f; font-size:24px; font-weight:900; letter-spacing:1px;">CDC FUTURO-PRO</h2>
-                    <div style="margin-top:10px; font-size:13px; color:#0ecb81; font-weight:700; letter-spacing:1px;">TRADING EN FUTUROS</div>
+                    <div style="margin-top:10px; font-size:13px; color:#ff2a3b; font-weight:700; letter-spacing:1px;">DETECTOR BAJO-VALOR (&lt; 20 USDT) | CAÍDA RÁPIDA 2% - 5%</div>
                     <div style="margin-top:8px; font-size:12px; color:#64748b; font-weight:600;">Hecho en Bolivia 🇧🇴</div>
                     <p style="margin-top:25px; font-size:14px; line-height:1.8; color:#94a3b8;">
-                        Selecciona una moneda del panel izquierdo para iniciar el análisis inteligente CDC y detectar oportunidades de mercado en tiempo real.
+                        Selecciona una moneda de bajo precio a la izquierda para analizar reversión inmediata del mercado.
                     </p>
                 </div>
             </div>
@@ -315,7 +314,7 @@
             <div class="card" id="thermometerView" style="width:100%; height:100%;">
                 <div style="text-align:center; padding:60px 0; color:var(--text-dim);">
                     <i class="fas fa-gauge-high" style="font-size:50px; margin-bottom:15px; color:var(--text-dim); opacity:0.2;"></i>
-                    <p style="font-size:14px;">🌡️ TERMÓMETRO CDC<br>Relojes de velocidad listos para registrar aceleración.</p>
+                    <p style="font-size:14px;">🌡️ TERMÓMETRO CDC<br>Relojes de velocidad listos para registrar aceleración bajista.</p>
                 </div>
             </div>
         </div>
@@ -327,19 +326,19 @@
 
 <div id="floatingButtons" class="floating-buttons">
     <button id="simuladorBtn" class="float-btn float-sim" onclick="abrirSimulador()">🧪</button>
-    <button id="emaRadarBtn" class="float-btn" style="background:#ff2a3b; color:#fff; font-weight:900;">📉</button>
+    <button id="emaRadarBtn" class="float-btn" onclick="abrirRadarDespegue()" style="background:#0ecb81; color:#fff; font-weight:900;">⚡</button>
     <a id="linkBinance" class="float-btn float-binance" target="_blank" style="display:none;"><i class="fas fa-chart-line"></i></a>
     <a id="linkApp" class="float-btn float-app" target="_blank" style="display:none;"><i class="fas fa-mobile-alt"></i></a>
 </div>
 
 <div id="simuladorPanel" class="overlay-panel">
     <h2 style="color:var(--accent-gold); font-size:20px;">📈 BINANCE FUTURES USDS-M</h2>
-    <input id="simboloInput" class="input-pro" list="listaMonedas" placeholder="Escribe BTCUSDT, ETHUSDT...">
+    <input id="simboloInput" class="input-pro" list="listaMonedas" placeholder="Escribe moneda...">
     <datalist id="listaMonedas"></datalist>
     <input id="capitalInput" class="input-pro" type="number" placeholder="Capital ($)">
     <select id="sideInput" class="input-pro">
-        <option value="LONG">📈 LONG (COMPRA)</option>
         <option value="SHORT">📉 SHORT (VENTA)</option>
+        <option value="LONG">📈 LONG (COMPRA)</option>
     </select>
     <input id="leverageInput" class="input-pro" type="number" placeholder="Apalancamiento (10x, 20x...)">
     <button onclick="crearSimulacion()" class="btn binance" style="width:100%; max-width:300px;">CREAR SIMULACIÓN</button>
@@ -348,28 +347,23 @@
 
 <footer>
     <div id="footerTime"><i class="far fa-clock"></i> Seguimiento activo desde: 00:00:00</div>
-    <div><i class="fas fa-wave-square" style="color:var(--accent-green);"></i> Actualizando cada 2s</div>
+    <div><i class="fas fa-wave-square" style="color:var(--accent-glow);"></i> Actualizando cada 2s</div>
 </footer>
 
 <script>
 let cachedData = {};
 let selectedCoin = null;
-let velocidadMonedas = {};
-let fuerzaContinuidad = {};
-let simulaciones = [];
 let cambioAnterior = {};
 let fuerzaCompradora = {};
-let estadoBallena = {};
 let fuerzaVendedora = {};
 let soporteCDC = {};
 let resistenciaCDC = {};
-let continuidadCDC = {};
-let reboteCDC = {};
 let riesgoCDC = {};
 let senalCDC = {};
 let cerebroCDC = {};
 let prediccionCDC = {};
-let estrategiaActualEMA = "caida_picos"; 
+let simulaciones = [];
+let originalPageTitle = document.title;
 
 const ADMIN_KEY = "melfy7E#";
 const PREFIX = "CDC-2026-";
@@ -393,30 +387,6 @@ function verificarLicencia(){
     return true;
 }
 
-function detectarBallena(moneda){
-    const whale = document.getElementById("whaleAlert");
-    if(!moneda){ whale.style.display = "none"; return; }
-    let score = 0;
-    if(moneda.volume > 1000000) score++;
-    if(moneda.change > 4) score++;
-    if(moneda.velocidad > 0.5) score++;
-
-    if(score >= 2){
-        let mensaje = "";
-        if(moneda.change > 8 && moneda.velocidad > 1){ mensaje = "💣 POSIBLE EXPLOSIÓN"; }
-        else if(moneda.change > 4){ mensaje = "🚀 BALLENA COMPRANDO"; }
-        else if(moneda.change < -4){ mensaje = "⚠️ DISTRIBUCIÓN"; }
-        else { mensaje = "🐋 MOVIMIENTO INSTITUCIONAL"; }
-
-        whale.style.display = "block";
-        whale.innerHTML = `${mensaje}<br>${moneda.symbol}<br>Cambio: ${moneda.change.toFixed(2)}%<br>Velocidad: ${moneda.velocidad.toFixed(2)}`;
-        whale.style.cursor = "pointer";
-        whale.onclick = () => { seleccionarMoneda(moneda.symbol); };
-    } else {
-        whale.style.display = "none";
-    }
-}
-
 function buscarMoneda() {
     const query = document.getElementById('searchCoin').value.toUpperCase().trim();
     const rows = document.querySelectorAll('#cryptoList tr');
@@ -433,31 +403,9 @@ function buscarMoneda() {
     });
 
     const saludo = document.getElementById('botSaludo');
-    if(query === ''){ saludo.innerText = "🤖 Hola, busca una moneda"; }
+    if(query === ''){ saludo.innerText = "🤖 Buscando giros (< 20 USDT) desde el máximo"; }
     else if(encontradas === 0){ saludo.innerText = "❌ No encontré esa cripto"; }
     else{ saludo.innerText = `🔍 Encontré ${encontradas} coincidencias`; }
-}
-
-function calcularPrediccionCDC(symbol){
-    const c = cachedData[symbol];
-    if(!c) return null;
-
-    let subida = 0; let caida = 0;
-    if(c.change > 0) subida += 30; else caida += 30;
-    if(c.velocidad > 0) subida += 30; else caida += 30;
-    if(estadoBallena[symbol] === "🐋 BALLENA DETECTADA"){ subida += 20; }
-    if(fuerzaCompradora[symbol] > fuerzaVendedora[symbol]){ subida += 20; }else{ caida += 20; }
-
-    subida = Math.min(100, subida);
-    caida = Math.min(100, caida);
-
-    let exhaustion = 20;
-    let rango = c.high - c.low;
-    let distHigh = rango > 0 ? ((c.high - c.price) / rango) * 100 : 100;
-    if(distHigh < 3 && c.velocidad < 0){ exhaustion = 95; }
-    else if(c.change > 5 && c.velocidad < 0){ exhaustion = 80; }
-
-    prediccionCDC[symbol] = { subida, caida, agotamiento: exhaustion };
 }
 
 async function obtenerDatosBinance() {
@@ -467,69 +415,54 @@ async function obtenerDatosBinance() {
         
         data.forEach(item => {
             const precio = parseFloat(item.lastPrice);
-            if(!item.symbol.endsWith("USDT") || precio < 0.0010){ return; }
+            
+            // FILTRO MODIFICADO: Solo queremos monedas MENORES A 20 USDT y que terminen en USDT
+            if(!item.symbol.endsWith("USDT") || precio >= 20.00){ return; }
             let change = parseFloat(item.priceChangePercent);
+            
             let anterior = cambioAnterior[item.symbol];
-            if(anterior === undefined){ anterior = change; }
-            let velocidad = change - anterior;
-            let volumenReal = parseFloat(item.quoteVolume);
-            let fuerzaVolumen = volumenReal / 1000000;
-            cambioAnterior[item.symbol] = change;
+            if(anterior === undefined){ anterior = precio; }
+            
+            let velocidadPrecio = ((precio - anterior) / anterior) * 100;
+            cambioAnterior[item.symbol] = precio;
+            
+            let high = parseFloat(item.highPrice);
+            let low = parseFloat(item.lowPrice);
+            
+            let rango24h = high - low;
+            let posicionPorcentaje = rango24h > 0 ? ((precio - low) / rango24h) * 100 : 0;
+            let caidaDesdeMaximo = rango24h > 0 ? ((high - precio) / high) * 100 : 0;
             
             cachedData[item.symbol] = {
                 symbol: item.symbol,
                 price: precio,
                 change: change,
-                velocidad: velocidad,
-                high: parseFloat(item.highPrice),
-                low: parseFloat(item.lowPrice),
-                volume: parseFloat(item.volume),
-                fuerzaVolumen: fuerzaVolumen
+                velocidad: velocidadPrecio,
+                high: high,
+                low: low,
+                volume: parseFloat(item.quoteVolume),
+                posicionPorcentaje: posicionPorcentaje, 
+                caidaDesdeMaximo: caidaDesdeMaximo     
             };
             
-            let whaleScore = 0;
-            if(change > 4) whaleScore++;
-            if(velocidad > 0.5) whaleScore++;
-            if(parseFloat(item.volume) > 1000000) whaleScore++;
+            fuerzaVendedora[item.symbol] = Math.max(0, (caidaDesdeMaximo * 15) + (-velocidadPrecio * 50));
+            soporteCDC[item.symbol] = low;
+            resistenciaCDC[item.symbol] = high;
             
-            estadoBallena[item.symbol] = whaleScore >= 2 ? "🐋 BALLENA DETECTADA" : "NORMAL";
-            fuerzaCompradora[item.symbol] = Math.max(0, (change * 5) + (velocidad * 20) + (fuerzaVolumen * 0.05));
-            fuerzaVendedora[item.symbol] = Math.max(0, (-change * 5) + (-velocidad * 20));
+            let cerebro = "ESTABLE";
+            if (caidaDesdeMaximo >= 2.0 && caidaDesdeMaximo <= 5.0 && velocidadPrecio < 0) {
+                cerebro = "🚨 GIRO CONFIRMADO";
+            } else if (posicionPorcentaje >= 95) {
+                cerebro = "👑 TECHOS EXTREMOS";
+            }
+            cerebroCDC[item.symbol] = cerebro;
             
-            soporteCDC[item.symbol] = parseFloat(item.lowPrice);
-            resistenciaCDC[item.symbol] = parseFloat(item.highPrice);
-            reboteCDC[item.symbol] = ((precio - soporteCDC[item.symbol]) / soporteCDC[item.symbol]) * 100;
-            
-            if(change > 0 && velocidad > 0){ continuidadCDC[item.symbol] = "FUERTE"; }
-            else if(change > 0){ continuidadCDC[item.symbol] = "MODERADA"; }
-            else { continuidadCDC[item.symbol] = "DEBIL"; }
-            
-            let riesgo = 0;
-            if(Math.abs(change) > 8) riesgo += 40;
-            if(Math.abs(velocidad) > 2) riesgo += 30;
-            if(fuerzaVendedora[item.symbol] > fuerzaCompradora[item.symbol]) riesgo += 30;
-            riesgoCDC[item.symbol] = riesgo > 60 ? "ALTO" : riesgo > 30 ? "MEDIO" : "BAJO";
-            
-            senalCDC[item.symbol] = change > 3 ? "COMPRAR" : change < -3 ? "VENDER" : "ESPERAR";
-            
-            let scoreCDC = 0;
-            if(change > 0) scoreCDC += 10;
-            if(velocidad > 0) scoreCDC += 20;
-            if(parseFloat(item.volume) > 1000000) scoreCDC += 20;
-            
-            const distanciaSoporte = ((precio - soporteCDC[item.symbol]) / soporteCDC[item.symbol]) * 100;
-            if(distanciaSoporte < 3) scoreCDC += 20;
-            if(estadoBallena[item.symbol] === "🐋 BALLENA DETECTADA") scoreCDC += 30;
-            if(scoreCDC > 100) scoreCDC = 100;
-            fuerzaContinuidad[item.symbol] = scoreCDC;
+            let riesgo = "BAJO";
+            if (Math.abs(velocidadPrecio) > 0.5) riesgo = "ALTO VELOCIDAD";
+            riesgoCDC[item.symbol] = riesgo;
+            senalCDC[item.symbol] = caidaDesdeMaximo >= 2.0 && caidaDesdeMaximo <= 5.0 ? "SHORT RÁPIDO" : "ESPERAR TECHOS";
         });
         
-        let mejorMoneda = null;
-        Object.values(cachedData).forEach(c => {
-            if(!mejorMoneda || c.velocidad > mejorMoneda.velocidad){ mejorMoneda = c; }
-        });
-        
-        detectarBallena(mejorMoneda);
         actualizarAlertaGanadora();
         
         if(document.activeElement.id !== "searchCoin"){ actualizarTablaIzquierda(); }
@@ -541,10 +474,10 @@ async function obtenerDatosBinance() {
         }
 
         if(document.getElementById("emaRadarPanel").style.display === "block"){
-            abrirRadarEMA();
+            abrirRadarDespegue();
         }
     } catch (error) {
-        console.error("Error leyendo datos de Binance:", error);
+        console.error("Error procesando datos Binance:", error);
     }
 }
 
@@ -554,11 +487,15 @@ function actualizarTablaIzquierda() {
 
     const fragmento = document.createDocumentFragment();
     
-    const ordenadas = Object.values(cachedData).sort((a,b)=>{
-        let zonaA = 50; let zonaB = 50;
-        if(a.high > a.low){ zonaA = ((a.price - a.low) / (a.high - a.low)) * 100; }
-        if(b.high > b.low){ zonaB = ((b.price - b.low) / (b.high - b.low)) * 100; }
-        return zonaA - zonaB;
+    // MEJORA: Ordenamiento prioritario. Los giros válidos (caída entre 2 y 5% y velocidad negativa) van PRIMERO.
+    const ordenadas = Object.values(cachedData).sort((a, b) => {
+        let aEsGiro = a.caidaDesdeMaximo >= 2.0 && a.caidaDesdeMaximo <= 5.0 && a.velocidad < 0;
+        let bEsGiro = b.caidaDesdeMaximo >= 2.0 && b.caidaDesdeMaximo <= 5.0 && b.velocidad < 0;
+        
+        if (aEsGiro && !bEsGiro) return -1;
+        if (!aEsGiro && bEsGiro) return 1;
+        
+        return b.posicionPorcentaje - a.posicionPorcentaje;
     });
 
     ordenadas.forEach(c => {
@@ -572,46 +509,26 @@ function actualizarTablaIzquierda() {
             tr.style.borderLeft = "4px solid var(--accent-gold)";
         }
 
-        let rango24h = c.high - c.low;
-        let distLow = rango24h > 0 ? ((c.price - c.low) / (c.high - c.low)) * 100 : 0;
+        let esFiltroPerfecto = c.caidaDesdeMaximo >= 2.0 && c.caidaDesdeMaximo <= 5.0 && c.velocidad < 0;
 
-        let alarma = distLow < 15 && Math.abs(c.change) >= 4;
-        let volatil = Math.abs(c.change) >= 8 || distLow < 8;
-        let warningMove = Math.abs(c.change) >= 6 && Math.abs(c.change) < 12;
-        let bullish = c.change > 0 && c.price >= (c.high * 0.98);
-        let bearish = c.change < 0 && c.price <= (c.low * 1.02);
-        let doji = Math.abs(c.change) < 0.5;
-        let strongImpulse = Math.abs(c.change) >= 6;
-        let rebound = c.price <= (c.low * 1.03) && c.change > 1;
+        if (esFiltroPerfecto) {
+            tr.style.background = "rgba(255, 42, 59, 0.15)";
+        }
 
-        if (alarma) tr.style.background = "rgba(248, 73, 96, 0.12)";
-
-        let badgeZona = "NEUTRAL";
-        let colorBadge = "#64748b";
-        if(distLow > 75) { badgeZona = "SOBRECOMPRA"; colorBadge = "var(--accent-glow)"; }
-        else if(distLow < 25) { badgeZona = "SOBREVENTA"; colorBadge = "var(--accent-green)"; }
-
-        let colorCambio = c.change > 0 ? "var(--accent-green)" : c.change < 0 ? "var(--accent-glow)" : "var(--text-main)";
+        let colorCambio = c.change > 0 ? "var(--accent-green)" : "var(--accent-glow)";
 
         tr.innerHTML = `
-            <td style="font-weight:700; word-break: break-word;">
+            <td style="font-weight:700;">
                 ${symbol.replace("USDT","")} <span style="font-size:10px; color:var(--text-dim);">USDT</span>
-                ${alarma ? '🚨' : ''}
-                ${warningMove ? ' ⚠️ MOVIMIENTO FUERTE' : ''}
-                ${bullish ? ' 🟢 ALCISTA' : ''}
-                ${bearish ? ' 🔴 BAJISTA' : ''}
-                ${doji ? ' ⚪ DOJI' : ''}
-                ${strongImpulse ? ' 💥 IMPULSO' : ''}
-                ${rebound ? ' 🧲 REBOTE' : ''}
-                ${c.change >= 12 ? '<span style="color:var(--accent-green); font-weight:bold; font-size:11px;"> 💣 EXPLOSIÓN</span>' : ''}
-                ${c.change <= -12 ? '<span style="color:var(--accent-glow); font-weight:bold; font-size:11px;"> 🌊 CASCADA</span>' : ''}
-                ${volatil ? '<span style="color:var(--accent-gold); font-size:11px;"> 🔥 VOLÁTIL</span>' : ''}
+                ${esFiltroPerfecto ? '<span style="color:var(--accent-gold); font-size:10px; font-weight:900; display:block;">⚡ CAPTURA GIRO CDC</span>' : ''}
             </td>
             <td style="text-align:right; font-weight:700; color:${colorCambio};">
                 ${c.change > 0 ? '+' : ''}${c.change.toFixed(2)}%
+                <span style="display:block; font-size:10px; color:${c.velocidad >= 0 ? 'var(--accent-green)' : 'var(--accent-glow)'};">Vel: ${c.velocidad.toFixed(2)}</span>
             </td>
-            <td style="text-align:right;">
-                <span style="font-size:10px; font-weight:700; color:${colorBadge};">${badgeZona}</span>
+            <td style="text-align:right; font-weight:700; color:#e2e8f0;">
+                -${c.caidaDesdeMaximo.toFixed(2)}%
+                <span style="display:block; font-size:9px; color:var(--text-dim);">Rango: ${c.posicionPorcentaje.toFixed(0)}%</span>
             </td>
         `;
         fragmento.appendChild(tr);
@@ -639,57 +556,58 @@ function seleccionarMoneda(symbol) {
     }
 }
 
+function calcularPrediccionCDC(symbol){
+    const c = cachedData[symbol];
+    if(!c) return;
+
+    let subida = 0; let caida = 0;
+    if (c.caidaDesdeMaximo >= 2.0 && c.caidaDesdeMaximo <= 5.0) {
+        caida = 85; subida = 15;
+    } else if (c.posicionPorcentaje > 85) {
+        caida = 60; subida = 40;
+    } else {
+        caida = 50; subida = 50;
+    }
+
+    let agotamiento = (c.posicionPorcentaje >= 95 && Math.abs(c.velocidad) < 0.1) ? 100 : Math.round(c.posicionPorcentaje);
+    prediccionCDC[symbol] = { subida, caida, agotamiento };
+}
+
 function actualizarPanelCentral() {
     const c = cachedData[selectedCoin];
     if (!c) return;
 
     const colorCambio = c.change >= 0 ? 'var(--accent-green)' : 'var(--accent-glow)';
-    const signoCambio = c.change >= 0 ? '+' : '';
-    const p = prediccionCDC[selectedCoin];
-    
-    let rango24h = c.high - c.low;
-    let distLow = rango24h > 0 ? ((c.price - c.low) / c.low) * 100 : 0;
-    if(distLow > 100) distLow = 100;
-
     document.getElementById("detailView").innerHTML = `
         <div class="price-hero">
-            <p style="font-size:14px; font-weight:700; color:var(--accent-gold); margin:0; letter-spacing:1px;">🔥 FUTUROS: ${selectedCoin}</p>
+            <p style="font-size:14px; font-weight:700; color:var(--accent-gold); margin:0; letter-spacing:1px;">⚡ RASTREO BAJO-VALOR (&lt; 20 USDT): ${selectedCoin}</p>
             <h2>$${c.price.toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 4})}</h2>
-            <span style="color:${colorCambio}; font-weight:900; font-size:20px; text-shadow: 0 0 10px ${colorCambio};">
-                ${signoCambio}${c.change.toFixed(2)}%
+            <span style="color:${colorCambio}; font-weight:900; font-size:20px;">
+                ${c.change >= 0 ? '+' : ''}${c.change.toFixed(2)}%
             </span>
         </div>
 
         <div class="intel-box">
-            <div class="intel-title">🧠 CDC INTELIGENTE</div>
-            <div class="intel-row"><span class="intel-label">🚀 SUBIDA</span><span class="intel-value">${p?.subida || 0}%</span></div>
-            <div class="intel-row"><span class="intel-label">📉 CAÍDA</span><span class="intel-value">${p?.caida || 0}%</span></div>
-            <div class="intel-row"><span class="intel-label">⚠️ AGOTAMIENTO</span><span class="intel-value">${p?.agotamiento || 0}%</span></div>
+            <div class="intel-title">🧠 EVALUACIÓN DE TECHOS E INVERSIÓN RAPIDA</div>
+            <div class="intel-row"><span class="intel-label">DISTANCIA CAÍDA DEL TECHOMAX:</span><span class="intel-value" style="color:var(--accent-glow); font-size:16px;">-${c.caidaDesdeMaximo.toFixed(2)}%</span></div>
+            <div class="intel-row"><span class="intel-label">VELOCIDAD INMEDIATA DE MOVIMIENTO:</span><span class="intel-value" style="color:${c.velocidad >= 0 ? 'var(--accent-green)' : 'var(--accent-glow)'};">${c.velocidad.toFixed(4)}%</span></div>
+            <div class="intel-row"><span class="intel-label">POSICIÓN TOTAL EN RANGO (0-100%):</span><span class="intel-value">${c.posicionPorcentaje.toFixed(1)}%</span></div>
         </div>
 
         <div class="intel-box">
-            <div class="intel-title"><i class="fas fa-chart-bar"></i> MÉTRICAS DE RADAR</div>
-            <div class="intel-row"><span class="intel-label">FUERZA CDC</span><span class="intel-value" style="color:#0ecb81;">${fuerzaContinuidad[selectedCoin]}%</span></div>
-            <div class="intel-row"><span class="intel-label">FUERZA VENTA</span><span class="intel-value">${(fuerzaVendedora[selectedCoin] || 0).toFixed(1)}</span></div>
-            <div class="intel-row"><span class="intel-label">SOPORTE</span><span class="intel-value">$${(soporteCDC[selectedCoin] || 0).toFixed(4)}</span></div>
-            <div class="intel-row"><span class="intel-label">RESISTENCIA</span><span class="intel-value">$${(resistenciaCDC[selectedCoin] || 0).toFixed(4)}</span></div>
-            <div class="intel-row"><span class="intel-label">CONTINUIDAD</span><span class="intel-value">${continuidadCDC[selectedCoin]}</span></div>
-            <div class="intel-row"><span class="intel-label">REBOTE</span><span class="intel-value">${(reboteCDC[selectedCoin] || 0).toFixed(2)}%</span></div>
-            <div class="intel-row"><span class="intel-label">RIESGO</span><span class="intel-value">${riesgoCDC[selectedCoin]}</span></div>
-            <div class="intel-row"><span class="intel-label">SEÑAL CDC</span><span class="intel-value" style="color:#f3ba2f;">${senalCDC[selectedCoin]}</span></div>
-        </div>
-        
-        <div class="intel-box">
-            <div class="intel-title"><i class="fas fa-flag-checkered"></i> MÉTRICAS DE OPERACIÓN</div>
-            <div class="intel-row"><span class="intel-label">MÁXIMO 24H:</span><span class="intel-value" style="color:var(--accent-green);">$${c.high.toLocaleString()}</span></div>
-            <div class="intel-row"><span class="intel-label">MÍNIMO 24H:</span><span class="intel-value" style="color:var(--accent-glow);">$${c.low.toLocaleString()}</span></div>
+            <div class="intel-title"><i class="fas fa-chart-bar"></i> MÉTRICAS ESPECÍFICAS DE PRESIÓN</div>
+            <div class="intel-row"><span class="intel-label">MÁXIMO EN 24 HORAS (100% TECHOMAX):</span><span class="intel-value" style="color:var(--accent-green);">$${c.high.toLocaleString()}</span></div>
+            <div class="intel-row"><span class="intel-label">MÍNIMO EN 24 HORAS (0% BASE):</span><span class="intel-value" style="color:var(--accent-glow);">$${c.low.toLocaleString()}</span></div>
+            <div class="intel-row"><span class="intel-label">ESTADO DEL MOTOR:</span><span class="intel-value" style="color:var(--accent-gold); font-weight:bold;">${cerebroCDC[selectedCoin]}</span></div>
+            <div class="intel-row"><span class="intel-label">SEÑAL SELECCIONADA:</span><span class="intel-value" style="color:#fff; background:var(--accent-glow); padding:2px 6px; border-radius:4px;">${senalCDC[selectedCoin]}</span></div>
+            
             <div style="margin-top:15px;">
                 <div style="display:flex; justify-content:space-between; font-size:12px; margin-bottom:6px;">
-                    <span style="color:#64748b; font-weight:600;">📉 DISTANCIA AL SUELO MIN:</span>
-                    <span style="color:var(--accent-gold); font-weight:700;">${distLow.toFixed(1)}%</span>
+                    <span style="color:#64748b; font-weight:600;">📈 UBICACIÓN DE DISTANCIA GENERAL (MIN A MAX):</span>
+                    <span style="color:var(--accent-gold); font-weight:700;">${c.posicionPorcentaje.toFixed(1)}%</span>
                 </div>
                 <div class="barra-contenedor">
-                    <div class="barra-progreso" style="width:${distLow}%; background:linear-gradient(90deg, var(--accent-glow), var(--accent-gold), var(--accent-green));"></div>
+                    <div class="barra-progreso" style="width:${c.posicionPorcentaje}%; background:linear-gradient(90deg, var(--accent-glow), var(--accent-gold), var(--accent-green));"></div>
                 </div>
             </div>
         </div>
@@ -700,59 +618,56 @@ function actualizarTacometroDerecho() {
     const c = cachedData[selectedCoin];
     if (!c) return;
 
-    let velocidadMotor = c.change; 
-    let porcentajeAceleracion = Math.min(100, Math.max(0, (velocidadMotor + 10) * 5)); 
-    let angulo = (porcentajeAceleracion / 100) * 180 - 90;
-
+    let angulo = (c.posicionPorcentaje / 100) * 180 - 90;
     const p = prediccionCDC[selectedCoin] || { subida: 0, caida: 0, agotamiento: 0 };
-    let estado = "ANALIZANDO"; let colorEstado = "#f3ba2f";
-
-    if (p.subida >= 70) { estado = "🚀 POSIBLE SUBIDA"; colorEstado = "#0ecb81"; }
-    else if (p.caida >= 70) { estado = "📉 POSIBLE CAÍDA"; colorEstado = "#ff2a3b"; }
-    else if (p.agotamiento >= 70) { estado = "⚠️ AGOTAMIENTO"; colorEstado = "#f3ba2f"; }
-    else { estado = "⏳ SIN DIRECCIÓN"; colorEstado = "#ffffff"; }
+    
+    let estado = "EVALUANDO GIRO";
+    let colorEstado = "#f3ba2f";
+    if(c.caidaDesdeMaximo >= 2.0 && c.caidaDesdeMaximo <= 5.0) {
+        estado = "📉 CAÍDA ÓPTIMA (SHORT)";
+        colorEstado = "var(--accent-glow)";
+    } else if(c.posicionPorcentaje >= 98) {
+        estado = "⚠️ AGOTADO EN EL TECHO";
+        colorEstado = "var(--accent-gold)";
+    }
 
     document.getElementById("thermometerView").innerHTML = `
-        <div class="intel-title"><i class="fas fa-gauge-high"></i> TACÓMETRO INTEGRADO DE PRESIÓN</div>
+        <div class="intel-title"><i class="fas fa-gauge-high"></i> ANALIZADOR DE GIRO (MÁXIMOS HASTA EL SUELO)</div>
         
         <div class="gauge-box">
             <div class="gauge-body"></div>
             <div class="gauge-color-arc"></div>
-            <div class="gauge-number n0">0</div>
-            <div class="gauge-number n20">20</div>
-            <div class="gauge-number n40">40</div>
-            <div class="gauge-number n60">60</div>
-            <div class="gauge-number n80">80</div>
-            <div class="gauge-number n100">100</div>
+            <div class="gauge-number n0">0%</div>
+            <div class="gauge-number n50">50%</div>
+            <div class="gauge-number n100">100%</div>
             <div class="gauge-needle-wrapper" style="transform: rotate(${angulo}deg);"><div class="gauge-needle"></div></div>
             <div class="gauge-center-node"></div>
         </div>
 
-        <div class="gauge-display-val">${c.change >= 0 ? '+' : ''}${c.change.toFixed(2)}%</div>
+        <div class="gauge-display-val">-${c.caidaDesdeMaximo.toFixed(2)}%</div>
+        <div style="text-align:center; font-size:11px; color:#64748b; font-weight:bold;">DISTANCIA BAJADA DESDE EL TECHO MAX</div>
         <div id="estadoCDC" style="text-align:center; font-size:18px; font-weight:900; margin-top:10px; color:${colorEstado};">${estado}</div>
-        <p style="text-align:center; font-size:11px; color:#475569; font-weight:600; margin:0 0 15px 0; letter-spacing:1px;">PRESIÓN DEL MOTOR</p>
         
         <div style="margin-top:15px; background:#060b16; border:1px solid rgba(243,186,47,.25); border-radius:10px; padding:10px;">
-            <div style="font-size:11px; font-weight:900; color:#f3ba2f; margin-bottom:8px; text-align:center;">🔮 MOTOR CDC</div>
-            <div style="font-size:11px;">🚀 Subida <div class="barra-contenedor"><div class="barra-progreso" style="width:${p.subida}%; background:#0ecb81;"></div></div></div>
-            <div style="font-size:11px;">📉 Caída <div class="barra-contenedor"><div class="barra-progreso" style="width:${p.caida}%; background:#ff2a3b;"></div></div></div>
-            <div style="font-size:11px;">⚠️ Agotamiento <div class="barra-contenedor"><div class="barra-progreso" style="width:${p.agotamiento}%; background:#f3ba2f;"></div></div></div>
+            <div style="font-size:11px; font-weight:900; color:#f3ba2f; margin-bottom:8px; text-align:center;">🔮 PROYECCIÓN DE MOVIMIENTO RÁPIDO</div>
+            <div style="font-size:11px;">📉 Probabilidad de Caída Continua <div class="barra-contenedor"><div class="barra-progreso" style="width:${p.caida}%; background:#ff2a3b;"></div></div></div>
+            <div style="font-size:11px;">⚠️ Nivel de Agotamiento en Techo Max <div class="barra-contenedor"><div class="barra-progreso" style="width:${p.agotamiento}%; background:#f3ba2f;"></div></div></div>
         </div>
 
         <div class="grid-indicators">
             <div class="indicator-box">
-                <div class="indicator-label"><i class="fas fa-bolt" style="color:var(--accent-gold);"></i> VOLUMEN</div>
-                <div class="indicator-value" style="color:#fff;">$${(c.volume / 1000000).toFixed(1)}M</div>
+                <div class="indicator-label"><i class="fas fa-bolt" style="color:var(--accent-gold);"></i> VELOCIDAD</div>
+                <div class="indicator-value" style="color:${c.velocidad >= 0 ? 'var(--accent-green)' : 'var(--accent-glow)'};">${c.velocidad.toFixed(2)}%</div>
             </div>
             <div class="indicator-box">
-                <div class="indicator-label"><i class="fas fa-fire" style="color:var(--accent-green);"></i> MOTOR</div>
-                <div class="indicator-value" style="color:var(--accent-green);">${porcentajeAceleracion.toFixed(0)}%</div>
+                <div class="indicator-label"><i class="fas fa-fire" style="color:var(--accent-glow);"></i> CAÍDA CRITICA</div>
+                <div class="indicator-value" style="color:var(--accent-glow);">${c.caidaDesdeMaximo.toFixed(1)}%</div>
             </div>
         </div>
 
         <div style="display:grid; grid-template-columns:1fr 1fr; gap:10px; margin-top:15px;">
-            <a href="https://www.binance.com/es/futures/${selectedCoin}" target="_blank" class="btn binance" style="font-size:11px;"><i class="fas fa-chart-line"></i> WEB FUTURES</a>
-            <a href="https://wa.me/59177244375?text=Proyecto%20TecnoMan%20-%20Analizando%20${selectedCoin}" target="_blank" class="btn ws" style="font-size:11px;"><i class="fab fa-whatsapp"></i> COMPARTIR</a>
+            <a href="https://www.binance.com/es/futures/${selectedCoin}" target="_blank" class="btn binance" style="font-size:11px;"><i class="fas fa-chart-line"></i> EMPEZAR SHORT</a>
+            <a href="https://wa.me/59177244375?text=Proyecto%20TecnoMan%20-%20Giro%20En%20${selectedCoin}" target="_blank" class="btn ws" style="font-size:11px;"><i class="fab fa-whatsapp"></i> COMPARTIR</a>
         </div>
     `;
 }
@@ -760,12 +675,19 @@ function actualizarTacometroDerecho() {
 function actualizarAlertaGanadora(){
     const monedas = Object.values(cachedData);
     if(monedas.length === 0) return;
-    let ganadora = monedas[0];
-    monedas.forEach(c => { if(c.velocidad > ganadora.velocidad){ ganadora = c; } });
-
+    
+    let objetivos = monedas.filter(m => m.caidaDesdeMaximo >= 2.0 && m.caidaDesdeMaximo <= 5.0 && m.velocidad < 0);
     const alerta = document.getElementById("nuclearAlert");
-    alerta.innerHTML = `🏆 MONEDA GANADORA: <b style="color:#f3ba2f">${ganadora.symbol.replace("USDT","")}</b> | ACELERACIÓN: <b style="color:#0ecb81">${ganadora.velocidad.toFixed(2)}</b>`;
-    alerta.onclick = () => { seleccionarMoneda(ganadora.symbol); };
+    
+    if(objetivos.length > 0) {
+        objetivos.sort((a,b) => a.velocidad - b.velocidad);
+        let ganadora = objetivos[0];
+        alerta.innerHTML = `🏆 MONEDA EN GIRO DETECTADA: <b style="color:var(--accent-gold)">${ganadora.symbol.replace("USDT","")}</b> ($${ganadora.price}) | VEL: <b style="color:var(--accent-glow)">${ganadora.velocidad.toFixed(3)}%</b> | DIST: <b style="color:var(--accent-gold)">-${ganadora.caidaDesdeMaximo.toFixed(2)}%</b>`;
+        alerta.onclick = () => { seleccionarMoneda(ganadora.symbol); };
+    } else {
+        alerta.innerHTML = `🏆 BUSCANDO ACTIVOS AGOTADOS BAJO LOS 20 USDT...`;
+        alerta.onclick = null;
+    }
 }
 
 function abrirSimulador() { document.getElementById("simuladorPanel").style.display = "flex"; }
@@ -777,8 +699,8 @@ function crearSimulacion() {
     const side = document.getElementById("sideInput").value;
     const lev = parseInt(document.getElementById("leverageInput").value);
 
-    if (!sym || isNaN(cap) || isNaN(lev)) return alert("Por favor, completa todos los campos del motor");
-    if (!cachedData[sym]) return alert("Moneda no soportada");
+    if (!sym || isNaN(cap) || isNaN(lev)) return alert("Completa los datos");
+    if (!cachedData[sym]) return alert("Moneda no válida o sobrepasa los 20 USDT");
 
     const nuevaSim = { symbol: sym, capital: cap, side: side, leverage: lev, entryPrice: cachedData[sym].price };
     simulaciones.push(nuevaSim);
@@ -805,11 +727,8 @@ function actualizarPaperTradingUI() {
 
         htmlContent += `
             <div style="border-bottom:1px solid rgba(255,255,255,0.03); padding:4px 0; margin-bottom:4px;">
-                <div style="font-weight:700; color:#fff;">${sim.symbol.replace('USDT','')} (${sim.side} ${sim.leverage}x)</div>
-                <div style="font-size:11px; color:var(--text-dim);">Entrada: $${sim.entryPrice.toLocaleString()}</div>
-                <div style="font-size:11px; font-weight:700; color:${color}; margin-top:2px;">
-                    PNL: ${pnlPorcentaje >= 0 ? '+' : ''}${pnlPorcentaje.toFixed(2)}% ($${pnlDinero.toFixed(2)})
-                </div>
+                <div style="font-weight:700; color:#fff;">${sim.symbol.replace('USDT','')} (${sim.side})</div>
+                <div style="font-size:11px; color:var(--text-dim);">PnL: <b style="color:${color};">${pnlPorcentaje >= 0 ? '+' : ''}${pnlPorcentaje.toFixed(2)}%</b></div>
             </div>
         `;
     });
@@ -829,7 +748,6 @@ function accesoAdmin(){
         clickCount = 0;
         const clave = prompt("Ingrese la clave maestra:");
         if(clave === ADMIN_KEY){ document.getElementById("adminPanel").style.display = "flex"; }
-        else { alert("Clave incorrecta"); }
     }
 }
 
@@ -850,7 +768,7 @@ function validarYActivar(val){
             alert("VIP ACTIVADO");
             location.reload();
         }else{ alert("CÓDIGO INVÁLIDO"); }
-    }catch(e){ alert("ERROR EN LICENCIA"); }
+    }catch(e){ alert("ERROR"); }
 }
 
 function activar(){
@@ -859,100 +777,48 @@ function activar(){
     validarYActivar(key);
 }
 
-function cerrarRadarEMA() { document.getElementById("emaRadarPanel").style.display = "none"; }
+function cerrarRadarDespegue() { document.getElementById("emaRadarPanel").style.display = "none"; }
 
-// =========================================================================
-// NUEVO MOTOR CDC INSTANTÁNEO: DETECCIÓN INMEDIATA DE GIRONES EN EL "PICO"
-// =========================================================================
-function abrirRadarEMA(){
+// CONFIGURACIÓN DEL BOTÓN DE RAYO (⚡) - RADAR DE SUELOS Y DESPEGUES IMNINENTES
+function abrirRadarDespegue(){
     let html = "";
-    
-    if (estrategiaActualEMA === "caida_picos") {
-        let candidatos = [];
+    let candidatos = [];
 
-        Object.values(cachedData).forEach(c => {
-            // Filtro de liquidez mínima (Volumen > 1.5M USDT)
-            if (c.volume > 1500000 && c.change > 2) {
-                // Evaluamos matemáticamente la distancia al pico más alto de las últimas 24h
-                let rango24h = c.high - c.low;
-                let distanciaAlPico = rango24h > 0 ? ((c.high - c.price) / rango24h) * 100 : 100;
-                
-                // CRITERIO: La moneda está en el PICO (Arriba el 82% del rango) Y su velocidad actual es NEGATIVA (Cae)
-                if (distanciaAlPico <= 18 && c.velocidad < 0) {
-                    // Calculamos un Score de Gravedad (A mayor caída instantánea y volumen, sube en el top)
-                    let scoreGravedad = Math.abs(c.velocidad) * 50 + (c.volume / 2000000);
-                    candidatos.push({
-                        symbol: c.symbol,
-                        change: c.change,
-                        volume: c.volume,
-                        distPico: distanciaAlPico,
-                        velocidad: c.velocidad,
-                        score: scoreGravedad
-                    });
-                }
-            }
-        });
-
-        // Ordenar: Las que caen con más rabia desde el pico salen PRIMERO
-        candidatos.sort((a, b) => b.score - a.score);
-        let topPicos = candidatos.slice(0, 5);
-
-        topPicos.forEach(item => {
-            html += `
-            <div onclick="seleccionarMoneda('${item.symbol}'); cerrarRadarEMA();" style="background:#0b0f19; border:1px solid #ff2a3b; padding:12px; margin-bottom:10px; border-radius:8px; cursor:pointer; position:relative;">
-                <span style="position:absolute; right:10px; top:12px; font-size:10px; color:#ff2a3b; font-weight:bold; background:rgba(255,42,59,0.1); padding:2px 6px; border-radius:4px;">📉 GIRO</span>
-                <b>${item.symbol.replace("USDT","")}</b> <span style="font-size:10px; color:var(--text-dim);">USDT</span><br>
-                <span style="font-size:12px; color:#64748b;">En Cima 24h: <span style="color:#0ecb81; font-weight:bold;">${(100 - item.distPico).toFixed(1)}%</span></span><br>
-                <span style="font-size:11px; color:#ff2a3b; font-weight:bold;">Caída instantánea: ${item.velocidad.toFixed(2)}%</span>
-            </div>`;
-        });
-
-        if(html === ""){ 
-            html = `
-            <div style="text-align:center; padding:25px; color:#475569; font-size:12px;">
-                <i class="fas fa-bolt" style="color:#f3ba2f; margin-bottom:10px; font-size:18px;"></i><br>
-                Monitoreando picos en tiempo real... Sin demoras HTTP.
-            </div>`; 
+    Object.keys(cachedData).forEach(symbol => {
+        const c = cachedData[symbol];
+        // Buscamos monedas que estén muy abajo en su rango de 24 horas (cerca del 0% de rango, es decir, en el suelo) y con fuerza alcista inicial (velocidad > 0)
+        if(c.posicionPorcentaje <= 15 && c.velocidad > 0) {
+            candidatos.push(c);
         }
-    } 
-    else if (estrategiaActualEMA === "top_despegues") {
-        let despegues = [];
-        Object.values(cachedData).forEach(c => {
-            if (c.volume > 1500000 && c.change > 0 && c.velocidad > 0.1) {
-                let rango24h = c.high - c.low;
-                let distanciaAlSuelo = rango24h > 0 ? ((c.price - c.low) / rango24h) * 100 : 0;
-                
-                // Criterio: Saliendo del suelo (primeros 35% del canal) con velocidad positiva
-                if (distanciaAlSuelo <= 35) {
-                    despegues.push(c);
-                }
-            }
-        });
+    });
 
-        despegues.sort((a,b) => b.velocidad - a.velocidad);
-        let topDespegues = despegues.slice(0, 5);
+    // Ordenamos para ver las que están más hundidas en el suelo primero
+    candidatos.sort((a, b) => a.posicionPorcentaje - b.posicionPorcentaje);
+    let topSuelos = candidatos.slice(0, 5);
 
-        topDespegues.forEach(c => {
-            html += `
-            <div onclick="seleccionarMoneda('${c.symbol}'); cerrarRadarEMA();" style="background:#0b0f19; border:1px solid #0ecb81; padding:12px; margin-bottom:10px; border-radius:8px; cursor:pointer;">
-                🚀 <b>${c.symbol.replace("USDT","")}</b> <span style="font-size:10px; color:var(--text-dim);">USDT</span><br>
-                Cambio: <span style="color:var(--accent-green); font-weight:bold;">+${c.change.toFixed(2)}%</span> | Vel: +${c.velocidad.toFixed(2)}
-            </div>`;
-        });
-        if(html === ""){ html = `<div style="text-align:center; padding:20px; color:#64748b;">Buscando despegues desde el suelo...</div>`; }
+    topSuelos.forEach(item => {
+        html += `
+        <div onclick="seleccionarMoneda('${item.symbol}'); cerrarRadarDespegue();" style="background:#050914; border:2px solid var(--accent-green); padding:12px; margin-bottom:10px; border-radius:8px; cursor:pointer; position:relative;">
+            📈 <b>${item.symbol.replace("USDT","")}</b> <span style="font-size:10px; color:var(--text-dim);">USDT</span>
+            <span style="position:absolute; right:10px; top:12px; background:rgba(14,203,129,0.15); color:var(--accent-green); font-size:10px; font-weight:900; padding:2px 6px; border-radius:4px;">SUELO 24H</span>
+            <br>
+            <span style="font-size:11px; display:block; margin-top:4px;">Precio Actual: <b style="color:#fff;">$${item.price}</b></span>
+            <span style="display:block; font-size:11px; color:var(--accent-green); font-weight:bold;">Velocidad Rebote: +${item.velocidad.toFixed(3)}%</span>
+            <span style="display:block; font-size:10px; color:var(--text-dim);">Ubicación Rango: ${item.posicionPorcentaje.toFixed(1)}% (Cerca del Suelo)</span>
+        </div>`;
+    });
+
+    if(html === ""){ 
+        html = `
+        <div style="text-align:center; padding:25px; color:#475569; font-size:12px;">
+            <i class="fas fa-spinner fa-spin" style="color:var(--accent-green); margin-bottom:10px; font-size:18px;"></i><br>
+            Buscando activos de bajo valor (&lt; 20 USDT) que estén en mínimos de 24h y listos para despegar...
+        </div>`; 
     }
 
     document.getElementById("emaRadarLista").innerHTML = html;
-    const panel = document.getElementById("emaRadarPanel");
-    panel.style.display = "block";
-    panel.style.top = "auto"; 
-    panel.style.left = "auto";
-    panel.style.right = "80px"; 
-    panel.style.bottom = "50px"; 
-    panel.style.width = "260px";
+    document.getElementById("emaRadarPanel").style.display = "block";
 }
-
-document.getElementById("emaRadarBtn").onclick = abrirRadarEMA;
 
 document.getElementById("menuToggle").onclick = () => {
     const sidebar = document.getElementById("sidebar");
@@ -974,20 +840,16 @@ document.addEventListener("DOMContentLoaded", () => {
     if (guardadas) { try { simulaciones = JSON.parse(guardadas); } catch (e) {} }
     actualizarPaperTradingUI();
     obtenerDatosBinance();
-    setInterval(() => { obtenerDatosBinance(); }, 2000); // Frecuencia óptima cada 2 segundos
+    setInterval(() => { obtenerDatosBinance(); actualizarPaperTradingUI(); }, 2000);
 });
 </script>
 
-<div id="emaRadarPanel" style="display:none; position:fixed; width:320px; background:#111; border:2px solid #ff2a3b; border-radius:12px; z-index:999999; padding:15px; box-shadow:0 0 20px rgba(255,42,59,.2);">
-    <div style="margin-bottom: 12px; text-align: center;">
-        <select id="selectEstrategiaEMA" onchange="estrategiaActualEMA = this.value; abrirRadarEMA();" style="width:100%; padding:8px; background:#050914; color:#fff; border:1px solid #ff2a3b; border-radius:6px; font-weight:bold; outline:none; font-family:inherit;">
-            <option value="caida_picos">📉 PICO MÁS ALTO (GIROS)</option>
-            <option value="top_despegues">🚀 DESPEGUES DESDE EL SUELO</option>
-        </select>
+<div id="emaRadarPanel" style="display:none; position:fixed; bottom:110px; right:20px; width:320px; background:#111; border:2px solid var(--accent-green); border-radius:12px; z-index:999999; padding:15px; box-shadow:0 0 20px rgba(14,203,129,.3);">
+    <div id="cdcThinking" style="background:#0b1628; border:1px solid var(--accent-green); border-radius:12px; padding:10px; margin-bottom:15px; color:#fff; font-size:12px; text-align:center; font-weight:bold;">
+        💭 RADAR DE DESPEGUE INMINENTE:<br>Filtrando monedas de bajo valor (&lt; 20 USDT) en mínimos de 24h.
     </div>
-    <div id="cdcThinking" style="background:#0b1628; border:1px solid rgba(255,255,255,0.05); border-radius:12px; padding:10px; margin-bottom:15px; color:#fff; font-size:13px; line-height:1.5; text-align:center;">⚡ MOTOR EN TIEMPO REAL ACTIVO</div>
     <div id="emaRadarLista"></div>
-    <div style="text-align:center; margin-top:15px;"><button onclick="cerrarRadarEMA()" class="btn vip">Cerrar</button></div>
+    <div style="text-align:center; margin-top:15px;"><button onclick="cerrarRadarDespegue()" class="btn vip" style="width:100%;">Cerrar</button></div>
 </div>
 
 </body>
