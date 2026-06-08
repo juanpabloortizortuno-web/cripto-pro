@@ -4,7 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>CDC FUTURO-PRO | PROYECTO TECNOMAN</title>
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;900&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght=300;400;500;600;700;900&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
     <style>
         :root {
@@ -336,7 +336,7 @@
             <div class="card" id="thermometerView" style="width:100%; height:100%;">
                 <div style="text-align:center; padding:60px 0; color:var(--text-dim);">
                     <i class="fas fa-gauge-high" style="font-size:50px; margin-bottom:15px; color:var(--text-dim); opacity:0.2;"></i>
-                    <p style="font-size:14px;">🌡️ TERMÓMETRO CDC<br>Relojes de velocidad listos para registrar aceleración bajista.</p>
+                    <p style="font-size:14px;">🌡️ TERMÓMETRO CDC<br>Relojes de velocidad listos para registrar acceleration bajista.</p>
                 </div>
             </div>
         </div>
@@ -500,6 +500,7 @@ async function obtenerDatosBinance() {
         let hayDerrumbeGlobal = false;
         let monedasConAlertaExtrema = [];
         
+        // STEP 1: Guardamos en caché todos los datos de Binance primero de forma limpia
         data.forEach(item => {
             const precio = parseFloat(item.lastPrice);
             
@@ -531,9 +532,10 @@ async function obtenerDatosBinance() {
             let precioHace2Min = historialPrecios2Min[item.symbol][0];
             let caidaReal2Min = ((precioHace2Min - precio) / precioHace2Min) * 100;
             
-            let enTopeMaximo = (posicionPorcentaje >= 98.5); 
+            // LÓGICA CORREGIDA: Está en zona alta diaria (>85%) y cae súbitamente en 2 min
+            let enZonaAlta = (posicionPorcentaje >= 85.0); 
             let esMonedaRapida = (parseFloat(item.quoteVolume) > 15000000); 
-            let alertaDerrumbe = enTopeMaximo && esMonedaRapida && (caidaReal2Min > 0.25); 
+            let alertaDerrumbe = enZonaAlta && esMonedaRapida && (caidaReal2Min > 0.20); 
             
             if(alertaDerrumbe) {
                 hayDerrumbeGlobal = true;
@@ -576,16 +578,13 @@ async function obtenerDatosBinance() {
             senalCDC[item.symbol] = alertaDerrumbe ? "SHORT INMINENTE" : (caidaDesdeMaximo >= 2.0 && caidaDesdeMaximo <= 5.0 ? "SHORT RÁPIDO" : "ESPERAR TECHOS");
         });
         
-        // PRIORIDAD NÚMERO 1: Si hay monedas con Alerta Extrema, forzar enfoque automático al panel principal
+        // STEP 2: Con los datos ya en memoria, forzamos la redirección automática si hay una Alerta Máxima
         if (monedasConAlertaExtrema.length > 0) {
-            // Ordenar por la que tenga mayor caída en 2 minutos para priorizar la más violenta
             monedasConAlertaExtrema.sort((a, b) => b.caida - a.caida);
             let monedaPrioritaria = monedasConAlertaExtrema[0].symbol;
             
-            // Forzar selección automática si no estaba ya seleccionada
             if (selectedCoin !== monedaPrioritaria) {
                 selectedCoin = monedaPrioritaria;
-                calcularPrediccionCDC(selectedCoin);
                 
                 document.getElementById("linkBinance").style.display = "flex";
                 document.getElementById("linkBinance").href = `https://www.binance.com/es/futures/${selectedCoin}`;
@@ -594,6 +593,7 @@ async function obtenerDatosBinance() {
             }
         }
         
+        // STEP 3: Ejecutamos alertas visuales, de audio y el redibujado de las vistas
         if (hayDerrumbeGlobal) {
             playAlarmSound();
         }
