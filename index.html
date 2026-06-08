@@ -393,19 +393,54 @@ function buscarMoneda() {
     let encontradas = 0;
 
     rows.forEach(row => {
-        const symbol = row.getAttribute('data-symbol');
-        if(symbol.includes(query)){
+        const symbol = row.getAttribute('data-symbol') || '';
+        
+        // Si no hay búsqueda, mostrar todas
+        if (query === '') {
             row.style.display = '';
             encontradas++;
-        }else{
+            return;
+        }
+
+        // 1. Búsqueda clásica por nombre (Ej: ALLO, BTC, SOL)
+        let coincideNombre = symbol.includes(query);
+        
+        // 2. Búsqueda inteligente por comportamiento de "Velocidad/Giro"
+        let coincideComportamiento = false;
+        const infoMoneda = cachedData[symbol];
+        
+        if (infoMoneda) {
+            if (query === 'VELOCIDAD' || query === 'EXPLOSIVA') {
+                // Filtra monedas con volatilidad extrema (Velocidad mayor a 0.50% o menor a -0.50%)
+                coincideComportamiento = Math.abs(infoMoneda.velocidad) > 0.50;
+            } else if (query === 'GIRO') {
+                // Filtra solo las que están en zona de giro CDC óptimo
+                coincideComportamiento = infoMoneda.caidaDesdeMaximo >= 2.0 && infoMoneda.caidaDesdeMaximo <= 5.0 && infoMoneda.velocidad < 0;
+            }
+        }
+
+        // Mostrar fila si cumple alguna condición
+        if (coincideNombre || coincideComportamiento) {
+            row.style.display = '';
+            encontradas++;
+        } else {
             row.style.display = 'none';
         }
     });
 
+    // Actualizar el bot de saludo con instrucciones dinámicas
     const saludo = document.getElementById('botSaludo');
-    if(query === ''){ saludo.innerText = "🤖 Buscando giros (< 20 USDT) desde el máximo"; }
-    else if(encontradas === 0){ saludo.innerText = "❌ No encontré esa cripto"; }
-    else{ saludo.innerText = `🔍 Encontré ${encontradas} coincidencias`; }
+    if (query === '') { 
+        saludo.innerText = "🤖 Buscando giros (< 20 USDT) desde el máximo"; 
+    } else if (query === 'VELOCIDAD') {
+        saludo.innerText = `⚡ Mostrando ${encontradas} monedas con movimiento ultra rápido`;
+    } else if (query === 'GIRO') {
+        saludo.innerText = `📉 Mostrando ${encontradas} capturas de giro confirmadas`;
+    } else if (encontradas === 0) { 
+        saludo.innerText = "❌ No encontré esa cripto o filtro"; 
+    } else { 
+        saludo.innerText = `🔍 Encontré ${encontradas} coincidencias para "${query}"`; 
+    }
 }
 
 async function obtenerDatosBinance() {
