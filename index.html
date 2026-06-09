@@ -386,7 +386,9 @@ let cerebroCDC = {};
 let prediccionCDC = {};
 let simulaciones = [];
 let originalPageTitle = document.title;
-let audioCtx = null;
+
+// Registro de última moneda que habló para no saturar
+let ultimaMonedaHablada = "";
 
 // Historial para rastrear los últimos 2 minutos exactos (60 lecturas de 2 segundos)
 let historialPrecios2Min = {}; 
@@ -394,32 +396,38 @@ let historialPrecios2Min = {};
 const ADMIN_KEY = "melfy7E#";
 const PREFIX = "CDC-2026-";
 
+// Inicializa o desbloquea los permisos de voz (Crucial para celulares Android/iOS)
 function initAudio() {
-    if (!audioCtx) {
-        audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+    if ('speechSynthesis' in window) {
+        // Reproducir un texto vacío en el primer clic del usuario desbloquea el canal de voz móvil
+        let utterance = new SpeechSynthesisUtterance("");
+        window.speechSynthesis.speak(utterance);
     }
 }
 
-function playAlarmSound() {
+// Nueva función optimizada de Voz Nativa para Computadora y Celular
+function playAlarmVoice(coinName) {
     try {
-        initAudio();
-        if (audioCtx.state === 'suspended') {
-            audioCtx.resume();
+        if ('speechSynthesis' in window) {
+            // Cancelar cualquier voz residual previa para que no se acumule retraso
+            window.speechSynthesis.cancel();
+
+            // Limpiamos el texto (ej. "BTCUSDT" pasa a ser "BTC")
+            let nombreLimpio = coinName.replace("USDT", "");
+            
+            // Texto que se va a repetir 2 veces exactamente
+            let textoAlerta = `Alerta, ${nombreLimpio}. Alerta, ${nombreLimpio}`;
+            
+            let utterance = new SpeechSynthesisUtterance(textoAlerta);
+            utterance.lang = 'es-ES'; // Configurado en español
+            utterance.rate = 1.0;     // Velocidad normal
+            utterance.pitch = 1.0;    // Tono balanceado
+            
+            window.speechSynthesis.speak(utterance);
         }
-        let osc = audioCtx.createOscillator();
-        let gain = audioCtx.createGain();
-        osc.type = 'sawtooth';
-        osc.frequency.setValueAtTime(880, audioCtx.currentTime); 
-        osc.frequency.exponentialRampToValueAtTime(440, audioCtx.currentTime + 0.15);
-        
-        gain.gain.setValueAtTime(0.3, audioCtx.currentTime);
-        gain.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + 0.2);
-        
-        osc.connect(gain);
-        gain.connect(audioCtx.destination);
-        osc.start();
-        osc.stop(audioCtx.currentTime + 0.2);
-    } catch(e) { console.log("Audio bloqueado o no soportado"); }
+    } catch(e) { 
+        console.log("Síntesis de voz bloqueada o no soportada en este dispositivo:", e); 
+    }
 }
 
 function verificarLicencia(){
@@ -591,13 +599,18 @@ async function obtenerDatosBinance() {
                 document.getElementById("linkApp").style.display = "flex";
                 document.getElementById("linkApp").href = `bnc://app.binance.com/en/futures/${selectedCoin}`;
             }
+
+            // Lógica de Voz: Si la moneda prioritaria en derrumbe cambió, habla de inmediato.
+            if(ultimaMonedaHablada !== monedaPrioritaria) {
+                ultimaMonedaHablada = monedaPrioritaria;
+                playAlarmVoice(monedaPrioritaria);
+            }
+        } else {
+            // Si ya no hay derrumbes en el mercado, reiniciamos el rastreo de voz para futuros disparadores
+            ultimaMonedaHablada = "";
         }
         
-        // STEP 3: Ejecutamos alertas visuales, de audio y el redibujado de las vistas
-        if (hayDerrumbeGlobal) {
-            playAlarmSound();
-        }
-
+        // STEP 3: Ejecutamos alertas visuales y el redibujado de las vistas
         actualizarAlertaGanadora(hayDerrumbeGlobal);
         
         if(document.activeElement.id !== "searchCoin"){ actualizarTablaIzquierda(); }
@@ -851,7 +864,7 @@ function actualizarAlertaGanadora(hayDerrumbe) {
     }
 }
 
-function abrirSimulador() { document.getElementById("simuladorPanel").style.display = "flex"; }
+function abrirSimulador() { initAudio(); document.getElementById("simuladorPanel").style.display = "flex"; }
 function cerrarSimulador() { document.getElementById("simuladorPanel").style.display = "none"; }
 
 function crearSimulacion() {
@@ -948,6 +961,7 @@ function activar(){
 function cerrarRadarDespegue() { document.getElementById("emaRadarPanel").style.display = "none"; }
 
 function abrirRadarDespegue(){
+    initAudio();
     let html = "";
     let candidatos = [];
 
@@ -986,6 +1000,7 @@ function abrirRadarDespegue(){
 }
 
 document.getElementById("menuToggle").onclick = () => {
+    initAudio();
     const sidebar = document.getElementById("sidebar");
     if(window.innerWidth <= 950){
         if(getComputedStyle(sidebar).display === "none"){
@@ -1006,7 +1021,9 @@ document.addEventListener("DOMContentLoaded", () => {
     actualizarPaperTradingUI();
     obtenerDatosBinance();
     
-    document.body.addEventListener('click', initAudio, { once: true });
+    // Captura cualquier interacción inicial del usuario en la pantalla para activar el audio en móvil
+    document.body.addEventListener('click', initAudio, { once: false });
+    document.body.addEventListener('touchstart', initAudio, { once: false });
     
     setInterval(() => { obtenerDatosBinance(); actualizarPaperTradingUI(); }, 2000);
 });
