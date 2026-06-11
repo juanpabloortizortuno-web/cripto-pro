@@ -73,7 +73,6 @@
             transition: background 0.3s;
         }
 
-        /* ALARMA DINÁMICA DE FUERZA EXTREMA */
         .fuerza-extrema-alert {
             background: #ff2a3b !important;
             color: #fff !important;
@@ -194,13 +193,29 @@
         .n100 { right: 10px; bottom: 5px; }
         .gauge-display-val { font-size: 42px; font-weight: 900; color: #fff; text-align: center; margin-top: 5px; }
 
-        /* EFECTO INTERMITENTE / BLINK PARPADEANTE */
         .blink-status {
             animation: blinker-glow 0.6s linear infinite;
         }
 
         @keyframes blinker-glow {
             50% { opacity: 0.3; text-shadow: 0 0 15px rgba(255, 42, 59, 1); transform: scale(1.05); }
+        }
+
+        .diamond-container {
+            perspective: 1000px;
+            display: inline-block;
+            margin-bottom: 25px;
+        }
+        .rotated-diamond {
+            font-size: 65px;
+            color: #f3ba2f;
+            display: inline-block;
+            animation: spinDiamond 3s linear infinite;
+            text-shadow: 0 0 20px rgba(243, 186, 47, 0.6);
+        }
+        @keyframes spinDiamond {
+            0% { transform: rotateY(0deg); }
+            100% { transform: rotateY(360deg); }
         }
 
         .barra-contenedor { height: 6px; background: #111827; border-radius: 4px; overflow: hidden; margin: 6px 0; }
@@ -266,7 +281,9 @@
 </div>
 
 <div id="lockScreen" class="overlay-panel">
-    <i class="fas fa-crown" style="font-size:70px; color:var(--accent-gold); margin-bottom:25px;"></i>
+    <div class="diamond-container">
+        <i class="fas fa-gem rotated-diamond"></i>
+    </div>
     <h1 style="color:var(--accent-gold);">SISTEMA BLOQUEADO</h1>
     <p id="lockMsg" style="color:var(--text-dim);">Has agotado tus 10 usos gratuitos.</p>
     <input type="text" id="licenseInput" class="input-pro" placeholder="CÓDIGO DE LICENCIA">
@@ -321,7 +338,9 @@
         <div class="column-center" id="columnCenter">
             <div class="card" id="detailView" style="width:100%;">
                 <div style="text-align:center; padding:60px 20px; color:var(--text-dim);">
-                    <i class="fas fa-chart-line" style="font-size:55px; margin-bottom:20px; color:#f3ba2f; opacity:.8;"></i>
+                    <div class="diamond-container">
+                        <i class="fas fa-gem rotated-diamond"></i>
+                    </div>
                     <h2 style="margin:0; color:#f3ba2f; font-size:24px; font-weight:900; letter-spacing:1px;">CDC FUTURO-PRO</h2>
                     <div style="margin-top:10px; font-size:13px; color:#ff2a3b; font-weight:700; letter-spacing:1px;">DETECTOR BAJO-VALOR (&lt; 20 USDT) | CAÍDA RÁPIDA 2% - 5%</div>
                     <div style="margin-top:8px; font-size:12px; color:#64748b; font-weight:600;">Hecho en Bolivia 🇧🇴</div>
@@ -387,46 +406,46 @@ let prediccionCDC = {};
 let simulaciones = [];
 let originalPageTitle = document.title;
 
-// Registro de última moneda que habló para no saturar
 let ultimaMonedaHablada = "";
-
-// Historial para rastrear los últimos 2 minutos exactos (60 lecturas de 2 segundos)
 let historialPrecios2Min = {}; 
 
 const ADMIN_KEY = "melfy7E#";
 const PREFIX = "CDC-2026-";
 
-// Inicializa o desbloquea los permisos de voz (Crucial para celulares Android/iOS)
 function initAudio() {
     if ('speechSynthesis' in window) {
-        // Reproducir un texto vacío en el primer clic del usuario desbloquea el canal de voz móvil
         let utterance = new SpeechSynthesisUtterance("");
         window.speechSynthesis.speak(utterance);
     }
 }
 
-// Nueva función optimizada de Voz Nativa para Computadora y Celular
+// LOCUCIÓN MEJORADA CON COLA ININTERRUMPIDA: Espera de manera fluida a que termine la frase anterior
 function playAlarmVoice(coinName) {
     try {
         if ('speechSynthesis' in window) {
-            // Cancelar cualquier voz residual previa para que no se acumule retraso
-            window.speechSynthesis.cancel();
-
-            // Limpiamos el texto (ej. "BTCUSDT" pasa a ser "BTC")
+            // CONTROL DE CORTE DE VOZ: Si la IA ya está hablando, se descarta el corte abrupto para permitir que termine de pronunciar todas las palabras.
+            if (window.speechSynthesis.speaking) {
+                return; 
+            }
+            
             let nombreLimpio = coinName.replace("USDT", "");
-            
-            // Texto que se va a repetir 2 veces exactamente
-            let textoAlerta = `Alerta, ${nombreLimpio}. Alerta, ${nombreLimpio}`;
-            
+            let textoAlerta = `Atención. Se ha detectado fuerza extrema en el mercado de ${nombreLimpio}. Monitoreando caída inmediata.`;
             let utterance = new SpeechSynthesisUtterance(textoAlerta);
-            utterance.lang = 'es-ES'; // Configurado en español
-            utterance.rate = 1.0;     // Velocidad normal
-            utterance.pitch = 1.0;    // Tono balanceado
+            
+            let voces = window.speechSynthesis.getVoices();
+            let vozEspanol = voces.find(v => v.lang.includes('es-ES') && v.name.includes('Google')) || 
+                             voces.find(v => v.lang.includes('es')) || voces[0];
+            
+            if (vozEspanol) utterance.voice = vozEspanol;
+            
+            utterance.lang = 'es-ES';
+            utterance.rate = 0.92;  
+            utterance.pitch = 1.05; 
             
             window.speechSynthesis.speak(utterance);
         }
     } catch(e) { 
-        console.log("Síntesis de voz bloqueada o no soportada en este dispositivo:", e); 
+        console.log("Síntesis de voz bloqueada:", e); 
     }
 }
 
@@ -508,7 +527,6 @@ async function obtenerDatosBinance() {
         let hayDerrumbeGlobal = false;
         let monedasConAlertaExtrema = [];
         
-        // STEP 1: Guardamos en caché todos los datos de Binance primero de forma limpia
         data.forEach(item => {
             const precio = parseFloat(item.lastPrice);
             
@@ -540,7 +558,6 @@ async function obtenerDatosBinance() {
             let precioHace2Min = historialPrecios2Min[item.symbol][0];
             let caidaReal2Min = ((precioHace2Min - precio) / precioHace2Min) * 100;
             
-            // LÓGICA CORREGIDA: Está en zona alta diaria (>85%) y cae súbitamente en 2 min
             let enZonaAlta = (posicionPorcentaje >= 85.0); 
             let esMonedaRapida = (parseFloat(item.quoteVolume) > 15000000); 
             let alertaDerrumbe = enZonaAlta && esMonedaRapida && (caidaReal2Min > 0.20); 
@@ -586,7 +603,6 @@ async function obtenerDatosBinance() {
             senalCDC[item.symbol] = alertaDerrumbe ? "SHORT INMINENTE" : (caidaDesdeMaximo >= 2.0 && caidaDesdeMaximo <= 5.0 ? "SHORT RÁPIDO" : "ESPERAR TECHOS");
         });
         
-        // STEP 2: Con los datos ya en memoria, forzamos la redirección automática si hay una Alerta Máxima
         if (monedasConAlertaExtrema.length > 0) {
             monedasConAlertaExtrema.sort((a, b) => b.caida - a.caida);
             let monedaPrioritaria = monedasConAlertaExtrema[0].symbol;
@@ -600,17 +616,14 @@ async function obtenerDatosBinance() {
                 document.getElementById("linkApp").href = `bnc://app.binance.com/en/futures/${selectedCoin}`;
             }
 
-            // Lógica de Voz: Si la moneda prioritaria en derrumbe cambió, habla de inmediato.
             if(ultimaMonedaHablada !== monedaPrioritaria) {
                 ultimaMonedaHablada = monedaPrioritaria;
                 playAlarmVoice(monedaPrioritaria);
             }
         } else {
-            // Si ya no hay derrumbes en el mercado, reiniciamos el rastreo de voz para futuros disparadores
             ultimaMonedaHablada = "";
         }
         
-        // STEP 3: Ejecutamos alertas visuales y el redibujado de las vistas
         actualizarAlertaGanadora(hayDerrumbeGlobal);
         
         if(document.activeElement.id !== "searchCoin"){ actualizarTablaIzquierda(); }
@@ -621,8 +634,9 @@ async function obtenerDatosBinance() {
             actualizarTacometroDerecho();
         }
 
-        if(document.getElementById("emaRadarPanel").style.display === "block"){
-            abrirRadarDespegue();
+        const radarEl = document.getElementById("emaRadarPanel");
+        if(radarEl && radarEl.style.display === "block"){
+            renderizarListaRadar();
         }
     } catch (error) {
         console.error("Error procesando datos Binance:", error);
@@ -962,6 +976,11 @@ function cerrarRadarDespegue() { document.getElementById("emaRadarPanel").style.
 
 function abrirRadarDespegue(){
     initAudio();
+    document.getElementById("emaRadarPanel").style.display = "block";
+    renderizarListaRadar();
+}
+
+function renderizarListaRadar(){
     let html = "";
     let candidatos = [];
 
@@ -991,12 +1010,12 @@ function abrirRadarDespegue(){
         html = `
         <div style="text-align:center; padding:25px; color:#475569; font-size:12px;">
             <i class="fas fa-spinner fa-spin" style="color:var(--accent-green); margin-bottom:10px; font-size:18px;"></i><br>
-            Buscando activos de bajo valor (&lt; 20 USDT) que estén en mínimos de 24h y listos para despegar...
+            Buscando activos de bajo valor (&lt; 20 USDT) que estén en mínimos of 24h...
         </div>`; 
     }
 
-    document.getElementById("emaRadarLista").innerHTML = html;
-    document.getElementById("emaRadarPanel").style.display = "block";
+    const listaEl = document.getElementById("emaRadarLista");
+    if(listaEl) { listaEl.innerHTML = html; }
 }
 
 document.getElementById("menuToggle").onclick = () => {
@@ -1021,7 +1040,6 @@ document.addEventListener("DOMContentLoaded", () => {
     actualizarPaperTradingUI();
     obtenerDatosBinance();
     
-    // Captura cualquier interacción inicial del usuario en la pantalla para activar el audio en móvil
     document.body.addEventListener('click', initAudio, { once: false });
     document.body.addEventListener('touchstart', initAudio, { once: false });
     
