@@ -440,14 +440,14 @@
         </a>
 
         <a href="https://wa.me/59177244375" target="_blank" title="WhatsApp"
-           style="display:flex;align-items:center;gap:8px;padding:0 15px;height:34px;border-radius:20px;
+           style="display:flex;align-items:center;justify-content:center;gap:8px;padding:0 15px;height:34px;border-radius:20px;
                   background:linear-gradient(135deg,#25D366 0%,#128C7E 100%);
                   color:#fff;font-size:13px;font-weight:700;text-decoration:none;
                   box-shadow:0 2px 12px rgba(37,211,102,0.4);border:1px solid rgba(37,211,102,0.3);
-                  white-space:nowrap;transition:all 0.2s;"
+                  white-space:nowrap;transition:all 0.2s;min-width:34px;"
            onmouseover="this.style.transform='translateY(-2px)';this.style.boxShadow='0 6px 20px rgba(37,211,102,0.6)'"
            onmouseout="this.style.transform='translateY(0)';this.style.boxShadow='0 2px 12px rgba(37,211,102,0.4)'">
-            <i class="fab fa-whatsapp" style="font-size:16px;"></i>
+            <i class="fab fa-whatsapp" style="font-size:20px;"></i>
             <span class="wa-label">WhatsApp</span>
         </a>
 
@@ -664,14 +664,14 @@ function hablar(texto, esMasculino) {
     u.volume = 1;
 
     if (esMasculino) {
-        // Voz masculina: natural, ni muy grave, ritmo de locutor
-        u.pitch = 1.0;
-        u.rate  = 0.92;
+        // Voz masculina: grave y clara en móvil
+        u.pitch = 0.85;
+        u.rate  = 0.88;
         if (vozMasculina) u.voice = vozMasculina;
     } else {
-        // Voz femenina: natural, cálida, sin ser demasiado aguda
-        u.pitch = 1.1;
-        u.rate  = 0.90;
+        // Voz femenina: natural, sin sonar aguda en móvil
+        u.pitch = 0.92;
+        u.rate  = 0.86;
         if (vozFemenina) u.voice = vozFemenina;
     }
 
