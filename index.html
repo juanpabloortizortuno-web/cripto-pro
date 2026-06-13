@@ -351,15 +351,119 @@
             .floating-buttons { right: 10px; bottom: 10px; }
             #paperBox { display: none !important; }
         }
+
+        /* ───────────────────────────────────────────────
+           PANTALLA DE INICIO (SPLASH) ESTILO CDC
+        ─────────────────────────────────────────────── */
+        #splashScreen {
+            position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+            background: radial-gradient(circle at 50% 45%, #0b1426 0%, #030712 75%);
+            display: flex; flex-direction: column; align-items: center; justify-content: center;
+            z-index: 999999;
+            transition: opacity 0.7s ease, visibility 0.7s ease;
+        }
+        #splashScreen.splash-hide { opacity: 0; visibility: hidden; pointer-events: none; }
+
+        .splash-diamond-wrap { perspective: 700px; margin-bottom: 36px; }
+        .splash-diamond {
+            width: 64px; height: 64px;
+            background: linear-gradient(135deg, #f3ba2f 0%, #fff7d6 45%, #f3ba2f 100%);
+            transform: rotate(45deg);
+            animation: splashSpin 2.4s linear infinite, splashGlow 1.8s ease-in-out infinite alternate;
+        }
+        @keyframes splashSpin {
+            from { transform: rotate(45deg) rotateY(0deg) rotateX(0deg); }
+            to   { transform: rotate(45deg) rotateY(360deg) rotateX(360deg); }
+        }
+        @keyframes splashGlow {
+            from { box-shadow: 0 0 25px rgba(243,186,47,0.45), 0 0 55px rgba(243,186,47,0.20); }
+            to   { box-shadow: 0 0 45px rgba(243,186,47,0.85), 0 0 110px rgba(243,186,47,0.45); }
+        }
+
+        .splash-title {
+            font-size: 52px; font-weight: 900; letter-spacing: 6px;
+            color: #f3ba2f; margin: 0;
+            text-shadow: 0 0 25px rgba(243,186,47,0.65);
+            animation: splashPulse 1.6s ease-in-out infinite alternate;
+        }
+        @keyframes splashPulse {
+            from { opacity: 0.82; text-shadow: 0 0 18px rgba(243,186,47,0.5); }
+            to   { opacity: 1;    text-shadow: 0 0 40px rgba(243,186,47,0.95); }
+        }
+        .splash-subtitle {
+            margin-top: 12px; font-size: 12px; font-weight: 700;
+            letter-spacing: 4px; text-transform: uppercase; color: #64748b;
+        }
+        .splash-bar-wrap {
+            width: 160px; height: 3px; margin-top: 30px; border-radius: 4px;
+            background: rgba(255,255,255,0.06); overflow: hidden;
+        }
+        .splash-bar {
+            height: 100%; width: 0%; border-radius: 4px;
+            background: linear-gradient(90deg, #f3ba2f, #ffe28a, #f3ba2f);
+            animation: splashLoad 2.2s ease-in-out forwards;
+        }
+        @keyframes splashLoad { from { width: 0%; } to { width: 100%; } }
     </style>
 </head>
 <body>
 
-<div id="adminPanel" class="overlay-panel">
+<div id="splashScreen">
+    <div class="splash-diamond-wrap">
+        <div class="splash-diamond"></div>
+    </div>
+    <h1 class="splash-title">CDC</h1>
+    <div class="splash-subtitle">FUTURO · PRO</div>
+    <div class="splash-bar-wrap"><div class="splash-bar"></div></div>
+</div>
+
+
+<div id="adminPanel" class="overlay-panel" style="overflow-y:auto; justify-content:flex-start; padding:30px 0;">
     <h2 style="color:var(--accent-gold);">GENERADOR VIP</h2>
     <input type="text" id="adminUser" class="input-pro" placeholder="NOMBRE CLIENTE">
     <button onclick="generarLicencia()" class="btn binance" style="width:100%; max-width:300px;">GENERAR 1 AÑO</button>
     <div id="keyResult" style="margin-top:20px; background:#000; padding:15px; border-radius:10px; font-size:11px; display:none; word-break:break-all; color:var(--accent-gold); border: 1px dashed var(--accent-gold);"></div>
+
+    <div style="width:100%; max-width:320px; margin-top:30px; border-top:1px solid rgba(255,255,255,0.05); padding-top:20px;">
+        <h2 style="color:var(--accent-gold); font-size:16px; text-align:center;">⚙️ CONFIGURACIÓN DEL ALGORITMO CDC</h2>
+
+        <div style="font-size:11px; color:var(--text-dim); font-weight:700; text-transform:uppercase; margin:14px 0 6px;">Pesos del modelo de predicción (pts)</div>
+        <label style="font-size:11px; color:#cbd5e1;">Posición en rango 24h</label>
+        <input type="number" step="1" id="cfg_pesoRango" class="input-pro" style="margin:4px 0 10px;">
+        <label style="font-size:11px; color:#cbd5e1;">Momentum 2 minutos</label>
+        <input type="number" step="1" id="cfg_pesoMomentum" class="input-pro" style="margin:4px 0 10px;">
+        <label style="font-size:11px; color:#cbd5e1;">Tendencia sostenida</label>
+        <input type="number" step="1" id="cfg_pesoTendencia" class="input-pro" style="margin:4px 0 10px;">
+        <label style="font-size:11px; color:#cbd5e1;">RSI corto plazo</label>
+        <input type="number" step="1" id="cfg_pesoRSI" class="input-pro" style="margin:4px 0 10px;">
+
+        <div style="font-size:11px; color:var(--text-dim); font-weight:700; text-transform:uppercase; margin:14px 0 6px;">Umbrales de alertas automáticas</div>
+        <label style="font-size:11px; color:#cbd5e1;">🚀 BOMBA — cambio mínimo en 2 min (%)</label>
+        <input type="number" step="0.01" id="cfg_umbralBombaCambio2m" class="input-pro" style="margin:4px 0 10px;">
+        <label style="font-size:11px; color:#cbd5e1;">💥 DERRUMBE — cambio máximo en 2 min (%, negativo)</label>
+        <input type="number" step="0.01" id="cfg_umbralDerrumbeCambio2m" class="input-pro" style="margin:4px 0 10px;">
+        <label style="font-size:11px; color:#cbd5e1;">⚠️ AGOTAMIENTO — posición mínima en rango (%)</label>
+        <input type="number" step="0.1" id="cfg_umbralAgotamientoPos" class="input-pro" style="margin:4px 0 10px;">
+
+        <div style="font-size:11px; color:var(--text-dim); font-weight:700; text-transform:uppercase; margin:14px 0 6px;">🧠 Auto-aprendizaje CDC</div>
+        <label style="font-size:12px; color:#cbd5e1; display:flex; align-items:center; gap:8px; margin:6px 0 10px;">
+            <input type="checkbox" id="cfg_autoAprendizaje" style="width:16px; height:16px;">
+            Activar recalibración automática de pesos
+        </label>
+        <label style="font-size:11px; color:#cbd5e1;">Velocidad de ajuste (pts por evaluación)</label>
+        <input type="number" step="0.1" id="cfg_learningRate" class="input-pro" style="margin:4px 0 10px;">
+
+        <div id="aprendizajeStats" style="font-size:11px; color:#94a3b8; background:#060b16; border:1px solid rgba(255,255,255,0.05); border-radius:8px; padding:10px; text-align:center; margin-bottom:10px;">
+            📊 Señales evaluadas: <b style="color:#fff;">0</b> &nbsp;|&nbsp; ✅ Precisión: <b style="color:var(--accent-gold);">—</b>
+        </div>
+        <button onclick="reiniciarAprendizajeCDC()" class="btn vip" style="width:100%; margin-bottom:10px;">🔄 Reiniciar Estadísticas</button>
+
+        <div style="display:flex; gap:10px; margin-top:10px;">
+            <button onclick="guardarConfigDesdeFormulario()" class="btn ws" style="flex:1;">💾 GUARDAR</button>
+            <button onclick="restaurarConfigCDC()" class="btn vip" style="flex:1;">↩️ RESTAURAR</button>
+        </div>
+    </div>
+
     <button onclick="document.getElementById('adminPanel').style.display='none'" style="margin-top:20px; color:var(--text-dim); background:none; border:none; cursor:pointer;">Cerrar</button>
 </div>
 
@@ -595,6 +699,190 @@ let historialVelocidad = {};
 
 const ADMIN_KEY = "melfy7E#";
 const PREFIX = "CDC-2026-";
+
+// ─────────────────────────────────────────────────────────────
+// CONFIGURACIÓN AJUSTABLE DEL ALGORITMO CDC (editable desde el panel admin)
+// ─────────────────────────────────────────────────────────────
+let CDC_CONFIG = {
+    // Pesos máximos (en puntos) de cada factor del modelo de predicción
+    pesoRango: 30,       // Posición en el rango 24h
+    pesoMomentum: 25,    // Momentum de 2 minutos
+    pesoTendencia: 20,   // Tendencia sostenida (velocidad promedio + ciclos)
+    pesoRSI: 10,         // RSI de corto plazo (sobrecompra/sobreventa)
+    // Umbrales de disparo de alertas automáticas
+    umbralBombaCambio2m: 0.35,      // % mínimo en 2 min para activar BOMBA
+    umbralDerrumbeCambio2m: -0.25,  // % máximo (negativo) en 2 min para activar DERRUMBE
+    umbralAgotamientoPos: 94.0,     // % mínimo de rango 24h para activar AGOTAMIENTO
+    // Sistema de auto-aprendizaje
+    autoAprendizaje: true,  // si está activo, los pesos se recalibran solos según aciertos reales
+    learningRate: 0.4       // velocidad de ajuste de pesos (puntos por ciclo de evaluación)
+};
+
+function cargarConfigCDC() {
+    try {
+        const guardada = localStorage.getItem("cdc_config");
+        if (guardada) {
+            const parsed = JSON.parse(guardada);
+            CDC_CONFIG = Object.assign({}, CDC_CONFIG, parsed);
+        }
+    } catch(e) { console.log("Error cargando configuración CDC:", e); }
+}
+
+function guardarConfigCDC(mostrarAlerta = true) {
+    try {
+        localStorage.setItem("cdc_config", JSON.stringify(CDC_CONFIG));
+        if (mostrarAlerta) alert("✅ Configuración guardada correctamente");
+    } catch(e) { console.log("Error guardando configuración CDC:", e); }
+}
+
+function restaurarConfigCDC() {
+    CDC_CONFIG = {
+        pesoRango: 30, pesoMomentum: 25, pesoTendencia: 20, pesoRSI: 10,
+        umbralBombaCambio2m: 0.35, umbralDerrumbeCambio2m: -0.25, umbralAgotamientoPos: 94.0,
+        autoAprendizaje: true, learningRate: 0.4
+    };
+    guardarConfigCDC(false);
+    rellenarFormularioConfigCDC();
+    alert("↩️ Valores por defecto restaurados");
+}
+
+function rellenarFormularioConfigCDC() {
+    const campos = ["pesoRango","pesoMomentum","pesoTendencia","pesoRSI","umbralBombaCambio2m","umbralDerrumbeCambio2m","umbralAgotamientoPos","learningRate"];
+    campos.forEach(id => {
+        const el = document.getElementById("cfg_" + id);
+        if (el) el.value = CDC_CONFIG[id];
+    });
+    const chk = document.getElementById("cfg_autoAprendizaje");
+    if (chk) chk.checked = !!CDC_CONFIG.autoAprendizaje;
+    actualizarStatsAprendizajeUI();
+}
+
+function guardarConfigDesdeFormulario() {
+    const campos = ["pesoRango","pesoMomentum","pesoTendencia","pesoRSI","umbralBombaCambio2m","umbralDerrumbeCambio2m","umbralAgotamientoPos","learningRate"];
+    campos.forEach(id => {
+        const el = document.getElementById("cfg_" + id);
+        if (el) {
+            const val = parseFloat(el.value);
+            if (!isNaN(val)) CDC_CONFIG[id] = val;
+        }
+    });
+    const chk = document.getElementById("cfg_autoAprendizaje");
+    if (chk) CDC_CONFIG.autoAprendizaje = chk.checked;
+    guardarConfigCDC(true);
+}
+
+// ─────────────────────────────────────────────────────────────
+// SISTEMA DE AUTO-APRENDIZAJE CDC
+// Registra cada predicción, espera ~2 minutos, compara con el
+// resultado real del precio y ajusta los pesos del modelo para
+// que los factores que más aciertan pesen más con el tiempo.
+// ─────────────────────────────────────────────────────────────
+let historialPredicciones = [];      // predicciones pendientes de evaluar
+let statsAprendizajeCDC = { total: 0, aciertos: 0 };
+
+const VENTANA_EVALUACION_MS = 2 * 60 * 1000; // 2 minutos, igual que cambioReal2Min
+const LIMITES_PESOS = {
+    pesoRango:     [10, 45],
+    pesoMomentum:  [10, 40],
+    pesoTendencia: [5, 35],
+    pesoRSI:       [2, 20]
+};
+
+function cargarStatsAprendizajeCDC() {
+    try {
+        const guardado = localStorage.getItem("cdc_learning_stats");
+        if (guardado) {
+            const parsed = JSON.parse(guardado);
+            statsAprendizajeCDC = Object.assign(statsAprendizajeCDC, parsed);
+        }
+    } catch(e) {}
+}
+
+function guardarStatsAprendizajeCDC() {
+    try { localStorage.setItem("cdc_learning_stats", JSON.stringify(statsAprendizajeCDC)); } catch(e) {}
+}
+
+function reiniciarAprendizajeCDC() {
+    statsAprendizajeCDC = { total: 0, aciertos: 0 };
+    historialPredicciones = [];
+    guardarStatsAprendizajeCDC();
+    actualizarStatsAprendizajeUI();
+    alert("🧠 Estadísticas de aprendizaje reiniciadas");
+}
+
+// Registra una nueva predicción (máx. 1 por símbolo cada 30s para no saturar)
+function registrarPrediccionCDC(symbol, precioEntrada, prediccionSubida, factores) {
+    const ahora = Date.now();
+    const yaPendiente = historialPredicciones.find(p => p.symbol === symbol && (ahora - p.timestamp) < 30000);
+    if (yaPendiente) return;
+
+    historialPredicciones.push({ symbol, timestamp: ahora, precioEntrada, prediccionSubida, factores });
+    if (historialPredicciones.length > 400) historialPredicciones.shift();
+}
+
+// Evalúa predicciones que ya cumplieron su ventana de tiempo y ajusta los pesos
+function evaluarAprendizajeCDC() {
+    const ahora = Date.now();
+    const pendientes = [];
+
+    historialPredicciones.forEach(p => {
+        if (ahora - p.timestamp < VENTANA_EVALUACION_MS) { pendientes.push(p); return; }
+
+        const c = cachedData[p.symbol];
+        if (!c) return; // ya no hay datos de esa moneda, descartar
+
+        const cambioReal = ((c.price - p.precioEntrada) / p.precioEntrada) * 100;
+        const subioReal = cambioReal > 0;
+        const acierto = (p.prediccionSubida === subioReal);
+
+        statsAprendizajeCDC.total++;
+        if (acierto) statsAprendizajeCDC.aciertos++;
+
+        if (CDC_CONFIG.autoAprendizaje) {
+            const lr = CDC_CONFIG.learningRate || 0.4;
+            const signoReal = subioReal ? 1 : -1;
+
+            const mapaFactores = { rango: "pesoRango", momentum: "pesoMomentum", tendencia: "pesoTendencia", rsi: "pesoRSI" };
+
+            Object.keys(p.factores).forEach(factorKey => {
+                const valorFactor = p.factores[factorKey];
+                if (Math.abs(valorFactor) < 0.01) return; // factor no participó, no se ajusta
+
+                const cfgKey = mapaFactores[factorKey];
+                if (!cfgKey || !(cfgKey in CDC_CONFIG)) return;
+
+                const signoFactor = Math.sign(valorFactor);
+                const ajuste = (signoFactor === signoReal) ? lr : -lr;
+
+                let nuevoValor = CDC_CONFIG[cfgKey] + ajuste;
+                const [min, max] = LIMITES_PESOS[cfgKey] || [2, 50];
+                CDC_CONFIG[cfgKey] = Math.max(min, Math.min(max, nuevoValor));
+            });
+        }
+    });
+
+    if (pendientes.length !== historialPredicciones.length) {
+        historialPredicciones = pendientes;
+        guardarStatsAprendizajeCDC();
+        guardarConfigCDC(false);
+        actualizarStatsAprendizajeUI();
+    }
+}
+
+function actualizarStatsAprendizajeUI() {
+    const el = document.getElementById("aprendizajeStats");
+    if (!el) return;
+    const total = statsAprendizajeCDC.total;
+    const aciertos = statsAprendizajeCDC.aciertos;
+    const precision = total > 0 ? ((aciertos / total) * 100).toFixed(1) : "—";
+    el.innerHTML = `📊 Señales evaluadas: <b style="color:#fff;">${total}</b> &nbsp;|&nbsp; ✅ Precisión: <b style="color:var(--accent-gold);">${precision}${total > 0 ? '%' : ''}</b>`;
+
+    // Refrescar también los valores de pesos en el formulario (pueden haber cambiado solos)
+    ["pesoRango","pesoMomentum","pesoTendencia","pesoRSI"].forEach(id => {
+        const inp = document.getElementById("cfg_" + id);
+        if (inp && document.activeElement !== inp) inp.value = CDC_CONFIG[id].toFixed(1);
+    });
+}
 
     function initAudio() { if ('speechSynthesis' in window) { let u = new SpeechSynthesisUtterance(""); window.speechSynthesis.speak(u); } }
 
@@ -939,7 +1227,7 @@ async function obtenerDatosBinance() {
             //    Requiere: volumen mínimo + cambio 2min fuerte + velocidad positiva promedio + al menos 3/5 ciclos subiendo
             let alertaBombaSubida = 
                 esMonedaRapida &&
-                cambioReal2Min > 0.35 &&       // sube fuerte en 2 min
+                cambioReal2Min > CDC_CONFIG.umbralBombaCambio2m &&  // sube fuerte en 2 min (configurable)
                 velPromedio > 0 &&              // tendencia positiva sostenida
                 ciclosSubiendo >= 3 &&          // mayoría de ciclos recientes son alcistas
                 posicionPorcentaje < 92;        // no está ya en techo extremo (evita entrar tarde)
@@ -949,14 +1237,14 @@ async function obtenerDatosBinance() {
             let alertaDerrumbe = 
                 enZonaAlta &&
                 esMonedaRapida &&
-                cambioReal2Min < -0.25 &&       // cae fuerte en 2 min
+                cambioReal2Min < CDC_CONFIG.umbralDerrumbeCambio2m &&  // cae fuerte en 2 min (configurable)
                 velPromedio < 0 &&              // tendencia negativa sostenida
                 ciclosBajando >= 3;             // mayoría de ciclos recientes son bajistas
 
             // 3. ⚠️ AGOTAMIENTO — Precio en techo, momentum frenando, cerca de reversión
             //    Requiere: zona muy alta + velocidad casi cero + aún con algo de impulso previo
             let alertaAgotamientoSubida = 
-                posicionPorcentaje >= 94.0 &&
+                posicionPorcentaje >= CDC_CONFIG.umbralAgotamientoPos &&  // zona de techo (configurable)
                 esMonedaRapida &&
                 Math.abs(velocidadPrecio) < 0.008 &&   // velocidad casi detenida
                 cambioReal2Min > 0.3 &&                 // tuvo impulso reciente (llegó con fuerza)
@@ -975,7 +1263,10 @@ async function obtenerDatosBinance() {
                 cambioReal2Min: cambioReal2Min,
                 alertaDerrumbe: alertaDerrumbe,
                 alertaBombaSubida: alertaBombaSubida,
-                alertaAgotamientoSubida: alertaAgotamientoSubida
+                alertaAgotamientoSubida: alertaAgotamientoSubida,
+                velPromedio: velPromedio,
+                ciclosSubiendo: ciclosSubiendo,
+                ciclosBajando: ciclosBajando
             };
             
             soporteCDC[item.symbol] = low;
@@ -1168,39 +1459,98 @@ function seleccionarMoneda(symbol) {
     }
 }
 
+// Calcula un RSI simplificado a partir del historial de precios de 2 minutos (ciclos de ~2s)
+function calcularRSI(symbol, periodo = 14) {
+    const precios = historialPrecios2Min[symbol];
+    if (!precios || precios.length < periodo + 1) return null;
+
+    let ganancias = 0, perdidas = 0;
+    const datos = precios.slice(-(periodo + 1));
+    for (let i = 1; i < datos.length; i++) {
+        const diff = datos[i] - datos[i - 1];
+        if (diff > 0) ganancias += diff;
+        else perdidas += Math.abs(diff);
+    }
+    if (ganancias + perdidas === 0) return 50;
+    const rs = ganancias / (perdidas || 1e-10);
+    return 100 - (100 / (1 + rs));
+}
+
 function calcularPrediccionCDC(symbol){
     const c = cachedData[symbol];
     if(!c) return;
 
-    let subida = 50; let caida = 50;
+    // ─────────────────────────────────────────────────────────────
+    // MODELO MULTI-FACTOR (escala interna de -100 a +100)
+    // Positivo = sesgo alcista | Negativo = sesgo bajista
+    // Los pesos provienen de CDC_CONFIG (ajustables desde el panel admin
+    // y auto-calibrados por el sistema de aprendizaje)
+    // ─────────────────────────────────────────────────────────────
+    const w = CDC_CONFIG;
+    let score = 0;
 
-    // Base: posición en el rango — si está arriba, más probabilidad de caída
-    // Si está abajo, más probabilidad de subida
-    let biasSubida = Math.round(100 - c.posicionPorcentaje); // 0% rango = 100% prob subida
-    let biasCaida  = Math.round(c.posicionPorcentaje);       // 100% rango = 100% prob caída
+    // 1. POSICIÓN EN EL RANGO 24H — reversión a la media
+    //    0% (suelo) => +pesoRango | 100% (techo) => -pesoRango
+    const contribRango = (50 - c.posicionPorcentaje) * (w.pesoRango / 50);
+    score += contribRango;
 
-    subida = biasSubida;
-    caida  = biasCaida;
+    // 2. MOMENTUM DE 2 MINUTOS — continuación de tendencia
+    const contribMomentum = Math.max(-w.pesoMomentum, Math.min(w.pesoMomentum, c.cambioReal2Min * (w.pesoMomentum / 2)));
+    score += contribMomentum;
 
-    // Ajuste por señal fuerte detectada — sube la confianza
-    if (c.alertaDerrumbe)          { caida = Math.min(97, caida + 30);  subida = 100 - caida; }
-    else if (c.alertaBombaSubida)  { subida = Math.min(95, subida + 25); caida = 100 - subida; }
-    else if (c.alertaAgotamientoSubida) { caida = Math.min(92, caida + 20); subida = 100 - caida; }
-    else if (c.caidaDesdeMaximo >= 2.0 && c.caidaDesdeMaximo <= 5.0) {
-        caida = Math.min(85, caida + 15); subida = 100 - caida;
+    // 3. TENDENCIA SOSTENIDA — velocidad promedio + ciclos consecutivos
+    const velPromedio    = c.velPromedio    || 0;
+    const ciclosSubiendo = c.ciclosSubiendo || 0;
+    const ciclosBajando  = c.ciclosBajando  || 0;
+    let tendencia = Math.max(-w.pesoTendencia, Math.min(w.pesoTendencia, velPromedio * (w.pesoTendencia * 5)));
+    if (ciclosSubiendo >= 4) tendencia += w.pesoTendencia * 0.25;
+    if (ciclosBajando  >= 4) tendencia -= w.pesoTendencia * 0.25;
+    const contribTendencia = Math.max(-w.pesoTendencia, Math.min(w.pesoTendencia, tendencia));
+    score += contribTendencia;
+
+    // 4. RSI DE CORTO PLAZO — sobrecompra/sobreventa
+    const rsi = calcularRSI(symbol, 14);
+    let contribRSI = 0;
+    if (rsi !== null) {
+        const factorRSI = (w.pesoRSI / 10) * 0.5;
+        if (rsi > 70) contribRSI = -(rsi - 70) * factorRSI;       // sobrecompra => presión bajista
+        else if (rsi < 30) contribRSI = (30 - rsi) * factorRSI;   // sobreventa  => presión alcista
+    }
+    score += contribRSI;
+
+    // 5. CONFIRMACIÓN POR VOLUMEN — amplifica o reduce la confianza de la señal
+    if (c.volume > 30000000) {
+        score *= 1.20;       // volumen fuerte: más confianza en la dirección detectada
+    } else if (c.volume < 1000000) {
+        score *= 0.6;        // volumen muy bajo: señal poco confiable
     }
 
-    // Ajuste por momentum 2 minutos
-    if (c.cambioReal2Min > 0.5)       subida = Math.min(95, subida + 10);
-    else if (c.cambioReal2Min < -0.5) caida  = Math.min(95, caida  + 10);
+    // 6. REFUERZO POR ALERTAS YA CONFIRMADAS (garantiza coherencia visual)
+    if (c.alertaBombaSubida)            score = Math.max(score, 40);
+    else if (c.alertaDerrumbe)          score = Math.min(score, -40);
+    else if (c.alertaAgotamientoSubida) score = Math.min(score, -15);
+    else if (c.caidaDesdeMaximo >= 2.0 && c.caidaDesdeMaximo <= 5.0 && c.velocidad < 0) {
+        score = Math.min(score, -10);
+    }
 
-    // Normalizar para que sumen 100
-    let total = subida + caida;
-    subida = Math.round((subida / total) * 100);
-    caida  = 100 - subida;
+    // Limitar score final dentro de -100..100
+    score = Math.max(-100, Math.min(100, score));
+
+    // Convertir score a probabilidades (50% = neutral, capadas entre 5% y 95%)
+    let subida = Math.round(50 + score / 2);
+    subida = Math.max(5, Math.min(95, subida));
+    let caida = 100 - subida;
 
     let agotamiento = Math.round(c.posicionPorcentaje);
-    prediccionCDC[symbol] = { subida, caida, agotamiento };
+    prediccionCDC[symbol] = { subida, caida, agotamiento, rsi: rsi !== null ? Math.round(rsi) : null };
+
+    // ─── Registro para el sistema de auto-aprendizaje ───
+    registrarPrediccionCDC(symbol, c.price, subida >= 50, {
+        rango: contribRango,
+        momentum: contribMomentum,
+        tendencia: contribTendencia,
+        rsi: contribRSI
+    });
 }
 
 function actualizarPanelCentral() {
@@ -1286,6 +1636,18 @@ function actualizarTacometroDerecho() {
         colorEstado = "var(--accent-glow)";
     }
 
+    // RSI de corto plazo para el indicador visual
+    const rsiVal = (prediccionCDC[selectedCoin] || {}).rsi;
+    let rsiTexto = "—";
+    let colorRSI = "#94a3b8";
+    let estadoRSI = "CALCULANDO";
+    if (rsiVal !== null && rsiVal !== undefined) {
+        rsiTexto = rsiVal.toFixed(0);
+        if (rsiVal >= 70) { colorRSI = "#ff2a3b"; estadoRSI = "SOBRECOMPRA"; }
+        else if (rsiVal <= 30) { colorRSI = "#0ecb81"; estadoRSI = "SOBREVENTA"; }
+        else { colorRSI = "#f3ba2f"; estadoRSI = "NEUTRAL"; }
+    }
+
     document.getElementById("thermometerView").innerHTML = `
         <div class="intel-title"><i class="fas fa-gauge-high"></i> TACOMENTRO DE EMPUJE GENERAL (0% AL 100%)</div>
         
@@ -1307,9 +1669,12 @@ function actualizarTacometroDerecho() {
             <div style="font-size:11px; font-weight:900; color:#f3ba2f; margin-bottom:8px; text-align:center;">🔮 PROYECCIÓN DINÁMICA DEL ALGORITMO</div>
             <div style="font-size:11px;">🚀 Probabilidad de Continuidad Alcista <div class="barra-contenedor"><div class="barra-progreso" style="width:${p.subida}%; background:#0ecb81;"></div></div></div>
             <div style="font-size:11px;">📉 Probabilidad de Caída o Reversión <div class="barra-contenedor"><div class="barra-progreso" style="width:${p.caida}%; background:#ff2a3b;"></div></div></div>
+            <div style="font-size:10px; color:#64748b; text-align:center; margin-top:8px; border-top:1px solid rgba(255,255,255,0.04); padding-top:6px;">
+                🧠 ${CDC_CONFIG.autoAprendizaje ? 'Auto-aprendizaje activo' : 'Auto-aprendizaje pausado'} ${statsAprendizajeCDC.total > 0 ? `· ${((statsAprendizajeCDC.aciertos/statsAprendizajeCDC.total)*100).toFixed(1)}% de precisión (${statsAprendizajeCDC.total} señales)` : '· recopilando primeras señales...'}
+            </div>
         </div>
 
-        <div class="grid-indicators">
+        <div class="grid-indicators" style="grid-template-columns: 1fr 1fr 1fr;">
             <div class="indicator-box">
                 <div class="indicator-label"><i class="fas fa-bolt"></i> IMPULSO 2 MIN</div>
                 <div class="indicator-value" style="color:${c.cambioReal2Min >= 0 ? '#0ecb81' : '#ff2a3b'};">${c.cambioReal2Min > 0 ? '+' : ''}${c.cambioReal2Min.toFixed(2)}%</div>
@@ -1317,6 +1682,11 @@ function actualizarTacometroDerecho() {
             <div class="indicator-box">
                 <div class="indicator-label"><i class="fas fa-compress-alt"></i> CAÍDA TECHOMAX</div>
                 <div class="indicator-value" style="color:#f3ba2f;">-${c.caidaDesdeMaximo.toFixed(1)}%</div>
+            </div>
+            <div class="indicator-box">
+                <div class="indicator-label"><i class="fas fa-wave-square"></i> RSI (14)</div>
+                <div class="indicator-value" style="color:${colorRSI};">${rsiTexto}</div>
+                <div style="font-size:9px; color:var(--text-dim); font-weight:700; text-transform:uppercase;">${estadoRSI}</div>
             </div>
         </div>
 
@@ -1418,7 +1788,10 @@ function accesoAdmin(){
     if(clickCount >= 5){
         clickCount = 0;
         const clave = prompt("Ingrese la clave maestra:");
-        if(clave === ADMIN_KEY){ document.getElementById("adminPanel").style.display = "flex"; }
+        if(clave === ADMIN_KEY){
+            document.getElementById("adminPanel").style.display = "flex";
+            rellenarFormularioConfigCDC();
+        }
     }
 }
 
@@ -1519,7 +1892,18 @@ document.getElementById("menuToggle").onclick = () => {
     }else{ sidebar.classList.toggle("hidden"); }
 };
 document.addEventListener("DOMContentLoaded", () => {
+    cargarConfigCDC();
+    cargarStatsAprendizajeCDC();
     verificarLicencia();
+
+    // Ocultar pantalla de inicio (splash) después de la animación
+    setTimeout(() => {
+        const splash = document.getElementById("splashScreen");
+        if (splash) {
+            splash.classList.add("splash-hide");
+            setTimeout(() => splash.remove(), 800);
+        }
+    }, 2200);
     const ahora = new Date();
     document.getElementById("footerTime").innerHTML = `<i class="far fa-clock"></i> Seguimiento activo desde: ${ahora.toLocaleTimeString()}`;
     const guardadas = localStorage.getItem("cdc_simulaciones");
@@ -1530,7 +1914,7 @@ document.addEventListener("DOMContentLoaded", () => {
     document.body.addEventListener('click', initAudio, { once: false });
     document.body.addEventListener('touchstart', initAudio, { once: false });
     
-    setInterval(() => { obtenerDatosBinance(); actualizarPaperTradingUI(); }, 2000);
+    setInterval(() => { obtenerDatosBinance(); actualizarPaperTradingUI(); evaluarAprendizajeCDC(); }, 2000);
 });
 </script>
 
