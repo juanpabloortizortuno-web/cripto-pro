@@ -404,6 +404,20 @@
             animation: splashLoad 2.2s ease-in-out forwards;
         }
         @keyframes splashLoad { from { width: 0%; } to { width: 100%; } }
+
+.btn-fijar-radar { 
+            padding: 5px 12px; 
+            border-radius: 6px; 
+            border: none; 
+            cursor: pointer; 
+            font-weight: bold; 
+            transition: all 0.3s; 
+            color: white; 
+            margin-left: 10px; 
+        }
+        .fijado-off { background: #ff2a3b; }
+        .fijado-on { background: #0ecb81; box-shadow: 0 0 10px #0ecb81; }
+
     </style>
 </head>
 <body>
@@ -696,7 +710,68 @@ let timestampLlegada = {}; // Registra cuándo apareció cada alerta por primera
 let historialPrecios2Min = {};
 // Historial de velocidad para detectar tendencia sostenida (últimos 5 ciclos = 10 seg)
 let historialVelocidad = {};
+let radarFijado = false;
+        let contadorAvisosMismoEstado = 0;
+        let ultimaAlertaVoz = "";
 
+        function alternarFijacionRadar() {
+            const btn = document.getElementById("btnFijarRadar");
+            radarFijado = !radarFijado;
+ 
+if (radarFijado) {
+    btn.className = "btn-fijar-radar fijado-on";
+    btn.style.background = "#0ecb81";
+    btn.style.color = "#000";
+    btn.textContent = "🟢 SEGUIMIENTO EXCLUSIVO";
+
+
+reproducirAlertaVoz("Seguimiento exclusivo activado. Monitoreando únicamente la moneda seleccionada.");
+
+    contadorAvisosMismoEstado = 0;
+
+} else {
+
+    btn.className = "btn-fijar-radar fijado-off";
+    btn.style.background = "#ff2a3b";
+    btn.style.color = "#fff";
+    btn.textContent = "🔴 RADAR AUTOMÁTICO";
+
+    document.getElementById("alertaMonedaFija").style.display = "none";
+
+    reproducirAlertaVoz("Radar automático activado. Retomando el análisis completo del mercado.");
+}
+        }
+
+        function evaluarMonedaFijada(coin) {
+            const panelAlerta = document.getElementById("alertaMonedaFija");
+            panelAlerta.style.display = "block";
+            let mensaje = "";
+            let simbolo = coin.symbol.replace("USDT", "");
+            
+            if (coin.scoring >= 60) {
+                panelAlerta.style.background = "rgba(14, 203, 129, 0.15)";
+                panelAlerta.style.color = "#0ecb81";
+                mensaje = `CDC detecta fuerza alcista en ${simbolo}. Se sugiere SEGUIR ADENTRO.`;
+            } else if (coin.scoring <= 40) {
+                panelAlerta.style.background = "rgba(255, 42, 59, 0.15)";
+                panelAlerta.style.color = "#ff2a3b";
+                mensaje = `¡Atención! Pérdida de momentum en ${simbolo}. SALIDA inmediata.`;
+            } else {
+                panelAlerta.style.background = "rgba(243, 186, 47, 0.15)";
+                panelAlerta.style.color = "#f3ba2f";
+                mensaje = `Moneda ${simbolo} en zona lateral. Vigila de cerca.`;
+            }
+
+            panelAlerta.innerHTML = mensaje;
+
+            if (ultimaAlertaVoz !== mensaje || contadorAvisosMismoEstado >= 15) {
+                reproducirAlertaVoz(mensaje);
+                ultimaAlertaVoz = mensaje;
+                contadorAvisosMismoEstado = 0;
+            } else {
+                contadorAvisosMismoEstado++;
+            }
+        }
 const ADMIN_KEY = "melfy7E#";
 const PREFIX = "CDC-2026-";
 
@@ -1316,7 +1391,7 @@ async function obtenerDatosBinance() {
             const puedeoCambiar = !audioHablando && (ahora - tiempoUltimoCambioAuto) >= BLOQUEO_CAMBIO_MS;
 
             // Solo cambia de moneda si el audio terminó Y pasaron 5 segundos
-            if (selectedCoin !== foco.symbol && puedeoCambiar) {
+            if (!radarFijado && selectedCoin !== foco.symbol && puedeoCambiar) {
                 tiempoUltimoCambioAuto = ahora;
                 selectedCoin = foco.symbol;
                 document.getElementById("linkBinance").style.display = "flex";
@@ -1324,31 +1399,62 @@ async function obtenerDatosBinance() {
                 document.getElementById("linkApp").style.display = "flex";
                 document.getElementById("linkApp").href = `bnc://app.binance.com/en/futures/${selectedCoin}`;
             }
+if (radarFijado) {
 
-            if(ultimaMonedaHablada !== foco.symbol || ultimoTipoAlertaHablada !== foco.tipo) {
-                if (!audioHablando) {
-                    ultimaMonedaHablada = foco.symbol;
-                    ultimoTipoAlertaHablada = foco.tipo;
-                    playAlarmVoice(foco.symbol, foco.tipo);
-                }
-            }
-        } else {
-            ultimaMonedaHablada = "";
-            ultimoTipoAlertaHablada = "";
-        }
-        
-        actualizarAlertaGanadora(alertaActivaGlobal);
-        if(document.activeElement.id !== "searchCoin"){ actualizarTablaIzquierda(); }
-        
-        if(selectedCoin){
-            calcularPrediccionCDC(selectedCoin);
-            actualizarPanelCentral();
-            actualizarTacometroDerecho();
-        }
+    if (
+        foco.symbol === selectedCoin &&
+        (
+            ultimaMonedaHablada !== foco.symbol ||
+            ultimoTipoAlertaHablada !== foco.tipo
+        )
+    ) {
 
-        if(document.getElementById("emaRadarPanel").style.display === "block"){
-            abrirRadarDespegue();
+        if (!audioHablando) {
+            ultimaMonedaHablada = foco.symbol;
+            ultimoTipoAlertaHablada = foco.tipo;
+            playAlarmVoice(foco.symbol, foco.tipo);
         }
+    }
+
+} else {
+
+    if (
+        ultimaMonedaHablada !== foco.symbol ||
+        ultimoTipoAlertaHablada !== foco.tipo
+    ) {
+
+        if (!audioHablando) {
+            ultimaMonedaHablada = foco.symbol;
+            ultimoTipoAlertaHablada = foco.tipo;
+            playAlarmVoice(foco.symbol, foco.tipo);
+        }
+    }
+
+}
+
+} else {
+    ultimaMonedaHablada = "";
+    ultimoTipoAlertaHablada = "";
+}
+
+actualizarAlertaGanadora(alertaActivaGlobal);
+
+if(document.activeElement.id !== "searchCoin"){
+    actualizarTablaIzquierda();
+}
+
+if(selectedCoin){
+    calcularPrediccionCDC(selectedCoin);
+    actualizarPanelCentral();
+    actualizarTacometroDerecho();
+}
+
+if(document.getElementById("emaRadarPanel").style.display === "block"){
+    abrirRadarDespegue();
+}
+      
+
+
     } catch (error) {
         console.error("Error procesando datos Binance:", error);
     }
@@ -1558,8 +1664,8 @@ function actualizarPanelCentral() {
     if (!c) return;
 
     const colorCambio = c.change >= 0 ? 'var(--accent-green)' : 'var(--accent-glow)';
+    const simbolo = selectedCoin.replace("USDT","");
 
-    // Badge de alarma integrado en el nombre (reemplaza el modal emergente)
     let badgeAlarma = '';
     if (c.alertaBombaSubida) {
         badgeAlarma = `<span style="display:inline-flex;align-items:center;gap:5px;background:#0ecb81;color:#000;font-size:11px;font-weight:900;padding:3px 10px;border-radius:20px;margin-left:8px;animation:blinker-glow 0.6s linear infinite;">🚀 BOMBA ACTIVA</span>`;
@@ -1570,39 +1676,85 @@ function actualizarPanelCentral() {
     }
 
     document.getElementById("detailView").innerHTML = `
-        <div class="price-hero">
-            <p style="font-size:14px; font-weight:700; color:var(--accent-gold); margin:0; letter-spacing:1px; display:flex; align-items:center; justify-content:center; flex-wrap:wrap; gap:4px;">
-                ⚡ MONITOREO: ${selectedCoin.replace("USDT","")} <span style="font-size:11px;color:#64748b;">USDT</span>${badgeAlarma}
-            </p>
-            <h2>$${c.price.toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 4})}</h2>
-            <span style="color:${colorCambio}; font-weight:900; font-size:20px;">
-                ${c.change >= 0 ? '+' : ''}${c.change.toFixed(2)}%
-            </span>
+
+        <!-- CABECERA: NOMBRE + PRECIO + CAMBIO -->
+        <div style="text-align:center; padding-bottom:14px; border-bottom:1px solid rgba(255,255,255,0.05); margin-bottom:14px;">
+            <div style="font-size:13px; font-weight:700; color:#64748b; letter-spacing:2px; text-transform:uppercase; margin-bottom:4px;">
+                ⚡ MONITOREO EN TIEMPO REAL
+            </div>
+            <div style="font-size:26px; font-weight:900; color:#fff; letter-spacing:1px; display:flex; align-items:center; justify-content:center; gap:8px; flex-wrap:wrap;">
+                ${simbolo} <span style="font-size:14px; color:#64748b; font-weight:600;">USDT</span>${badgeAlarma}
+            </div>
+            <div style="font-size:52px; font-weight:900; color:#0ecb81; line-height:1.1; margin:6px 0;">
+                $${c.price.toLocaleString(undefined,{minimumFractionDigits:2,maximumFractionDigits:4})}
+            </div>
+            <div style="font-size:22px; font-weight:900; color:${colorCambio};">
+                ${c.change >= 0 ? '+' : ''}${c.change.toFixed(2)}% <span style="font-size:12px; color:#64748b; font-weight:600;">cambio 24h</span>
+            </div>
         </div>
 
-        <div class="intel-box">
-            <div class="intel-title">🧠 EVALUACIÓN DE VOLUMEN Y MOMENTUM VERTICAL</div>
-            <div class="intel-row"><span class="intel-label">DISTANCIA GENERAL AL TECHOMAX:</span><span class="intel-value" style="color:var(--accent-gold); font-size:15px;">-${c.caidaDesdeMaximo.toFixed(2)}%</span></div>
-            <div class="intel-row"><span class="intel-label">RENDIMIENTO BLOQUE DE 2 MINUTOS:</span><span class="intel-value" style="color:${c.cambioReal2Min >= 0 ? 'var(--accent-green)' : 'var(--accent-glow)'}; font-size:15px; font-weight:bold;">${c.cambioReal2Min > 0 ? '+' : ''}${c.cambioReal2Min.toFixed(3)}%</span></div>
-            <div class="intel-row"><span class="intel-label">VELOCIDAD DE ENTRADA INMEDIATA (2s):</span><span class="intel-value" style="color:${c.velocidad >= 0 ? 'var(--accent-green)' : 'var(--accent-glow)'};">${c.velocidad.toFixed(4)}%</span></div>
-            <div class="intel-row"><span class="intel-label">UBICACIÓN EXCLUSIVA DE RANGO EN 24H:</span><span class="intel-value">${c.posicionPorcentaje.toFixed(1)}%</span></div>
+        <!-- BOTÓN RADAR -->
+        <div style="text-align:center; margin-bottom:14px;">
+            <button id="btnFijarRadar" onclick="alternarFijacionRadar()"
+                style="padding:10px 24px; font-size:14px; font-weight:900; border:none; border-radius:8px; cursor:pointer;
+                background:${radarFijado ? '#0ecb81' : '#ff2a3b'}; color:${radarFijado ? '#000' : '#fff'}; width:100%; max-width:320px;">
+                ${radarFijado ? "🟢 SEGUIMIENTO EXCLUSIVO" : "🔴 RADAR AUTOMÁTICO"}
+            </button>
         </div>
 
+        <!-- ALERTA MONEDA FIJA -->
+        <div id="alertaMonedaFija" style="display:none; padding:10px; margin-bottom:12px; border-radius:6px; font-weight:bold; text-align:center;"></div>
+
+        <!-- BLOQUE 1: MOMENTUM Y VOLUMEN -->
         <div class="intel-box">
-            <div class="intel-title"><i class="fas fa-chart-bar"></i> REGISTROS ESPECÍFICOS DEL SISTEMA</div>
-            <div class="intel-row"><span class="intel-label">TECHO DIARIO MÁXIMO (100%):</span><span class="intel-value" style="color:var(--accent-green);">$${c.high.toLocaleString()}</span></div>
-            <div class="intel-row"><span class="intel-label">BASE DIARIA MÍNIMA (0%):</span><span class="intel-value" style="color:var(--accent-glow);">$${c.low.toLocaleString()}</span></div>
-            <div class="intel-row"><span class="intel-label">ESTADO DEL MOTOR:</span><span class="intel-value" style="font-weight:bold;">${cerebroCDC[selectedCoin]}</span></div>
-            <div class="intel-row"><span class="intel-label">SEÑAL SELECCIONADA:</span><span class="intel-value" style="color:#fff; background:${c.alertaBombaSubida ? '#0ecb81' : 'var(--accent-glow)'}; padding:2px 6px; border-radius:4px;">${senalCDC[selectedCoin]}</span></div>
-            
-            <div style="margin-top:15px;">
-                <div style="display:flex; justify-content:space-between; font-size:12px; margin-bottom:6px;">
-                    <span style="color:#64748b; font-weight:600;">📈 DESPLAZAMIENTO DEL RANGO GENERAL:</span>
-                    <span style="color:var(--accent-gold); font-weight:700;">${c.posicionPorcentaje.toFixed(1)}%</span>
+            <div class="intel-title">🧠 EVALUACIÓN DE VOLUMEN Y MOMENTUM</div>
+            <div class="intel-row">
+                <span class="intel-label">📍 Posición en Rango 24h</span>
+                <span class="intel-value" style="color:#fff;">${c.posicionPorcentaje.toFixed(1)}%</span>
+            </div>
+            <div class="intel-row">
+                <span class="intel-label">⏱️ Rendimiento últimos 2 min</span>
+                <span class="intel-value" style="color:${c.cambioReal2Min >= 0 ? 'var(--accent-green)' : 'var(--accent-glow)'}; font-size:15px; font-weight:bold;">${c.cambioReal2Min > 0 ? '+' : ''}${c.cambioReal2Min.toFixed(3)}%</span>
+            </div>
+            <div class="intel-row">
+                <span class="intel-label">⚡ Velocidad instantánea (2s)</span>
+                <span class="intel-value" style="color:${c.velocidad >= 0 ? 'var(--accent-green)' : 'var(--accent-glow)'};">${c.velocidad.toFixed(4)}%</span>
+            </div>
+            <div class="intel-row">
+                <span class="intel-label">🎯 Distancia al TechoMax</span>
+                <span class="intel-value" style="color:var(--accent-gold); font-size:15px;">-${c.caidaDesdeMaximo.toFixed(2)}%</span>
+            </div>
+            <!-- Barra de posición de rango -->
+            <div style="margin-top:10px;">
+                <div style="display:flex; justify-content:space-between; font-size:11px; color:#64748b; margin-bottom:4px;">
+                    <span>SUELO 0%</span>
+                    <span style="color:var(--accent-gold); font-weight:700;">Rango: ${c.posicionPorcentaje.toFixed(1)}%</span>
+                    <span>TECHO 100%</span>
                 </div>
                 <div class="barra-contenedor">
                     <div class="barra-progreso" style="width:${c.posicionPorcentaje}%; background:linear-gradient(90deg, var(--accent-glow), var(--accent-gold), var(--accent-green));"></div>
                 </div>
+            </div>
+        </div>
+
+        <!-- BLOQUE 2: NIVELES Y SEÑAL -->
+        <div class="intel-box">
+            <div class="intel-title"><i class="fas fa-chart-bar"></i> NIVELES Y SEÑAL CDC</div>
+            <div class="intel-row">
+                <span class="intel-label">📈 Techo Diario (100%)</span>
+                <span class="intel-value" style="color:var(--accent-green);">$${c.high.toLocaleString()}</span>
+            </div>
+            <div class="intel-row">
+                <span class="intel-label">📉 Suelo Diario (0%)</span>
+                <span class="intel-value" style="color:var(--accent-glow);">$${c.low.toLocaleString()}</span>
+            </div>
+            <div class="intel-row">
+                <span class="intel-label">🤖 Estado del Motor</span>
+                <span class="intel-value" style="font-weight:bold;">${cerebroCDC[selectedCoin]}</span>
+            </div>
+            <div class="intel-row">
+                <span class="intel-label">📡 Señal Activa</span>
+                <span class="intel-value" style="color:#fff; background:${c.alertaBombaSubida ? '#0ecb81' : (c.alertaDerrumbe ? '#ff2a3b' : '#334155')}; color:${c.alertaBombaSubida ? '#000' : '#fff'}; padding:3px 10px; border-radius:6px; font-size:12px;">${senalCDC[selectedCoin]}</span>
             </div>
         </div>
     `;
@@ -1612,35 +1764,37 @@ function actualizarTacometroDerecho() {
     const c = cachedData[selectedCoin];
     if (!c) return;
 
-    let angulo = (c.posicionPorcentaje / 100) * 180 - 90;
-    const p = prediccionCDC[selectedCoin] || { subida: 50, caida: 50, agotamiento: 50 };
+    // Convertir posicionPorcentaje (0-100) a ángulo del tacómetro (-100 a +100 del estilo imagen)
+    // Mapeamos 0%→ -100 (rojo), 50%→ 0 (centro), 100%→ +100 (verde)
+    const cdcVal = (c.posicionPorcentaje - 50) * 2; // rango -100 a +100
+    const p = prediccionCDC[selectedCoin] || { subida: 50, caida: 50 };
     
-    let estado = "ANALIZANDO MOVIMIENTOS";
+    // Ángulo de la aguja: -100 → -135°, 0 → 0°, +100 → +135°
+    const needleAngle = (cdcVal / 100) * 135;
+
+    let estado = "ANALIZANDO";
     let colorEstado = "#f3ba2f";
     let claseBlink = "";
+    let etiquetaAlerta = "";
     
     if (c.alertaBombaSubida) {
-        estado = "🚀 ¡TODA POTENCIA! SUBIDA EXPLOSIVA ACTIVA";
-        colorEstado = "#0ecb81";
-        claseBlink = "blink-status";
+        estado = "REVENTANDO"; colorEstado = "#0ecb81"; claseBlink = "blink-status";
+        etiquetaAlerta = `<div style="margin:6px auto;background:#0ecb81;color:#000;font-size:12px;font-weight:900;padding:5px 18px;border-radius:6px;display:inline-block;animation:blinker-glow 0.5s linear infinite;letter-spacing:1px;">🚀 TODA POTENCIA LONG</div>`;
     } else if (c.alertaDerrumbe) {
-        estado = "💥 ¡FUERZA EXTREMA! REVERSIÓN BAJISTA CRÍTICA";
-        colorEstado = "#ff2a3b";
-        claseBlink = "blink-status"; 
+        estado = "FUERZA EXTREMA"; colorEstado = "#ff2a3b"; claseBlink = "blink-status";
+        etiquetaAlerta = `<div style="margin:6px auto;background:#ff2a3b;color:#fff;font-size:12px;font-weight:900;padding:5px 18px;border-radius:6px;display:inline-block;animation:blinker-glow 0.5s linear infinite;letter-spacing:1px;">💥 SHORT INMINENTE</div>`;
     } else if (c.alertaAgotamientoSubida) {
-        estado = "⚠️ ALERTA: SUBIDA TOTALMENTE AGOTADA";
-        colorEstado = "#f3ba2f";
-        claseBlink = "blink-status";
-    } else if(c.caidaDesdeMaximo >= 2.0 && c.caidaDesdeMaximo <= 5.0) {
-        estado = "📉 CAÍDA ÓPTIMA PARA SHORT";
-        colorEstado = "var(--accent-glow)";
+        estado = "AGOTAMIENTO"; colorEstado = "#f3ba2f"; claseBlink = "blink-status";
+        etiquetaAlerta = `<div style="margin:6px auto;background:#f3ba2f;color:#000;font-size:12px;font-weight:900;padding:5px 18px;border-radius:6px;display:inline-block;animation:blinker-glow 0.7s linear infinite;letter-spacing:1px;">⚠️ SUBIDA AGOTADA</div>`;
+    } else if (c.caidaDesdeMaximo >= 2.0 && c.caidaDesdeMaximo <= 5.0) {
+        estado = "GIRO CDC"; colorEstado = "#ff2a3b";
+        etiquetaAlerta = `<div style="margin:6px auto;background:rgba(255,42,59,0.2);color:#ff2a3b;font-size:12px;font-weight:900;padding:5px 18px;border-radius:6px;display:inline-block;border:1px solid #ff2a3b;">📉 CAÍDA PARA SHORT</div>`;
+    } else {
+        etiquetaAlerta = `<div style="margin:6px auto;background:rgba(243,186,47,0.1);color:#f3ba2f;font-size:12px;font-weight:900;padding:5px 18px;border-radius:6px;display:inline-block;border:1px solid rgba(243,186,47,0.3);">🔎 MONITOREANDO</div>`;
     }
 
-    // RSI de corto plazo para el indicador visual
     const rsiVal = (prediccionCDC[selectedCoin] || {}).rsi;
-    let rsiTexto = "—";
-    let colorRSI = "#94a3b8";
-    let estadoRSI = "CALCULANDO";
+    let rsiTexto = "—", colorRSI = "#94a3b8", estadoRSI = "CALCULANDO";
     if (rsiVal !== null && rsiVal !== undefined) {
         rsiTexto = rsiVal.toFixed(0);
         if (rsiVal >= 70) { colorRSI = "#ff2a3b"; estadoRSI = "SOBRECOMPRA"; }
@@ -1648,39 +1802,134 @@ function actualizarTacometroDerecho() {
         else { colorRSI = "#f3ba2f"; estadoRSI = "NEUTRAL"; }
     }
 
-    document.getElementById("thermometerView").innerHTML = `
-        <div class="intel-title"><i class="fas fa-gauge-high"></i> TACOMENTRO DE EMPUJE GENERAL (0% AL 100%)</div>
-        
-        <div class="gauge-box">
-            <div class="gauge-body"></div>
-            <div class="gauge-color-arc"></div>
-            <div class="gauge-number n0">0%</div>
-            <div class="gauge-number n50">50%</div>
-            <div class="gauge-number n100">100%</div>
-            <div class="gauge-needle-wrapper" style="transform: rotate(${angulo}deg);"><div class="gauge-needle" style="background:${colorEstado}; box-shadow:0 0 10px ${colorEstado};"></div></div>
-            <div class="gauge-center-node"></div>
-        </div>
+    // Generar destellos eléctricos SVG si la fuerza es extrema
+    const lightning = (Math.abs(cdcVal) > 70) ? `
+        <g opacity="0.85" style="animation:blinker-glow 0.3s linear infinite;">
+            <line x1="185" y1="80" x2="210" y2="55" stroke="${colorEstado}" stroke-width="2"/>
+            <line x1="210" y1="55" x2="200" y2="40" stroke="${colorEstado}" stroke-width="1.5"/>
+            <line x1="200" y1="40" x2="220" y2="20" stroke="${colorEstado}" stroke-width="1"/>
+            <line x1="185" y1="85" x2="215" y2="70" stroke="${colorEstado}" stroke-width="1.5"/>
+        </g>` : '';
 
-        <div class="gauge-display-val">${c.posicionPorcentaje.toFixed(1)}%</div>
-        <div style="text-align:center; font-size:11px; color:#64748b; font-weight:bold;">POSICIÓN DE PRECIO EN SU RANGO DE 24 HORAS</div>
-        <div style="text-align:center; font-size:16px; font-weight:900; margin-top:10px; color:${colorEstado};">${estado}</div>
-        
-        <div style="margin-top:15px; background:#060b16; border:1px solid rgba(243,186,47,.25); border-radius:10px; padding:10px;">
-            <div style="font-size:11px; font-weight:900; color:#f3ba2f; margin-bottom:8px; text-align:center;">🔮 PROYECCIÓN DINÁMICA DEL ALGORITMO</div>
-            <div style="font-size:11px;">🚀 Probabilidad de Continuidad Alcista <div class="barra-contenedor"><div class="barra-progreso" style="width:${p.subida}%; background:#0ecb81;"></div></div></div>
-            <div style="font-size:11px;">📉 Probabilidad de Caída o Reversión <div class="barra-contenedor"><div class="barra-progreso" style="width:${p.caida}%; background:#ff2a3b;"></div></div></div>
-            <div style="font-size:10px; color:#64748b; text-align:center; margin-top:8px; border-top:1px solid rgba(255,255,255,0.04); padding-top:6px;">
-                🧠 ${CDC_CONFIG.autoAprendizaje ? 'Auto-aprendizaje activo' : 'Auto-aprendizaje pausado'} ${statsAprendizajeCDC.total > 0 ? `· ${((statsAprendizajeCDC.aciertos/statsAprendizajeCDC.total)*100).toFixed(1)}% de precisión (${statsAprendizajeCDC.total} señales)` : '· recopilando primeras señales...'}
+    // Flechas de momentum (>>>>>>)
+    const arrowColor = cdcVal > 30 ? '#0ecb81' : (cdcVal < -30 ? '#ff2a3b' : '#f3ba2f');
+    const arrowDir = cdcVal >= 0 ? '›' : '‹';
+    const arrows = Array(7).fill(arrowDir).join('');
+
+    document.getElementById("thermometerView").innerHTML = `
+        <div style="text-align:center; padding:0 0 6px 0;">
+            <div style="display:flex; align-items:center; justify-content:center; gap:8px; margin-bottom:4px;">
+                <span style="font-size:14px;">🌡️</span>
+                <span style="font-size:13px; font-weight:900; color:#fff; letter-spacing:1px;">TERMÓMETRO CDC</span>
+                <span style="font-size:10px; font-weight:700; padding:2px 8px; border-radius:4px; background:rgba(14,203,129,0.15); color:#0ecb81; border:1px solid rgba(14,203,129,0.3);">EN TIEMPO REAL</span>
+            </div>
+
+            <!-- SVG TACÓMETRO PRINCIPAL -->
+            <div style="position:relative; display:inline-block; margin:0 auto;">
+            <svg viewBox="0 0 400 220" width="100%" style="max-width:380px; display:block; margin:0 auto;">
+                <defs>
+                    <!-- Gradiente del arco: rojo → amarillo → verde -->
+                    <linearGradient id="arcGrad" x1="0%" y1="0%" x2="100%" y2="0%">
+                        <stop offset="0%" stop-color="#ff2a3b"/>
+                        <stop offset="25%" stop-color="#ff6b00"/>
+                        <stop offset="50%" stop-color="#f3ba2f"/>
+                        <stop offset="75%" stop-color="#90ee44"/>
+                        <stop offset="100%" stop-color="#0ecb81"/>
+                    </linearGradient>
+                    <!-- Gradiente del arco interior oscuro -->
+                    <radialGradient id="bgGrad" cx="50%" cy="100%" r="80%">
+                        <stop offset="0%" stop-color="#0a1428"/>
+                        <stop offset="100%" stop-color="#030712"/>
+                    </radialGradient>
+                    <!-- Brillo en el extremo activo -->
+                    <filter id="glowFilter" x="-50%" y="-50%" width="200%" height="200%">
+                        <feGaussianBlur stdDeviation="4" result="blur"/>
+                        <feMerge><feMergeNode in="blur"/><feMergeNode in="SourceGraphic"/></feMerge>
+                    </filter>
+                    <filter id="needleGlow">
+                        <feGaussianBlur stdDeviation="3" result="blur"/>
+                        <feMerge><feMergeNode in="blur"/><feMergeNode in="SourceGraphic"/></feMerge>
+                    </filter>
+                </defs>
+
+                <!-- Fondo oscuro -->
+                <rect width="400" height="220" fill="transparent"/>
+
+                <!-- Arco exterior decorativo (sombra) -->
+                <path d="M 30 190 A 170 170 0 0 1 370 190" fill="none" stroke="#111827" stroke-width="28" stroke-linecap="round"/>
+                <!-- Arco de color rojo→verde -->
+                <path d="M 30 190 A 170 170 0 0 1 370 190" fill="none" stroke="url(#arcGrad)" stroke-width="22" stroke-linecap="round"/>
+                <!-- Arco interior oscuro para efecto profundidad -->
+                <path d="M 42 190 A 158 158 0 0 1 358 190" fill="none" stroke="#030712" stroke-width="8"/>
+
+                <!-- Marcas de tick -->
+                ${[-100,-80,-60,-40,-20,0,20,40,60,80,100].map(v => {
+                    const a = (v/100)*135 * Math.PI/180 - Math.PI/2 - (Math.PI*0.25);
+                    const r1=148, r2=138, r3=125;
+                    const cx=200, cy=190;
+                    const isMajor = v % 20 === 0;
+                    const r = isMajor ? r2 : r1;
+                    return `<line x1="${cx+r1*Math.cos(a)}" y1="${cy+r1*Math.sin(a)}" x2="${cx+r*Math.cos(a)}" y2="${cy+r*Math.sin(a)}" stroke="rgba(255,255,255,0.4)" stroke-width="${isMajor?2:1}"/>
+                    ${isMajor ? `<text x="${cx+r3*Math.cos(a)}" y="${cy+r3*Math.sin(a)}" fill="rgba(255,255,255,0.7)" font-size="11" font-weight="700" text-anchor="middle" dominant-baseline="middle">${v}</text>` : ''}`;
+                }).join('')}
+
+                <!-- Destellos eléctricos si fuerza extrema -->
+                ${lightning}
+
+                <!-- Aguja con glow -->
+                <g transform="translate(200,190) rotate(${needleAngle})" filter="url(#needleGlow)">
+                    <line x1="0" y1="0" x2="0" y2="-130" stroke="${colorEstado}" stroke-width="3" stroke-linecap="round"/>
+                    <polygon points="0,-130 -4,-110 4,-110" fill="${colorEstado}"/>
+                </g>
+                <!-- Centro de la aguja -->
+                <circle cx="200" cy="190" r="10" fill="#fff" filter="url(#needleGlow)"/>
+                <circle cx="200" cy="190" r="5" fill="${colorEstado}"/>
+
+                <!-- Valor central grande -->
+                <text x="200" y="148" fill="${colorEstado}" font-size="42" font-weight="900" text-anchor="middle" filter="url(#glowFilter)">${cdcVal >= 0 ? '+' : ''}${cdcVal.toFixed(1)}</text>
+                <text x="200" y="168" fill="rgba(255,255,255,0.5)" font-size="11" font-weight="700" text-anchor="middle">FUERZA CDC</text>
+
+                <!-- Labels laterales -->
+                <text x="18" y="200" fill="#ff2a3b" font-size="11" font-weight="900" text-anchor="middle">-100</text>
+                <text x="382" y="200" fill="#0ecb81" font-size="11" font-weight="900" text-anchor="middle">100</text>
+            </svg>
+            </div>
+
+            <!-- Estado con badge -->
+            <div style="text-align:center; margin:-4px 0 6px 0;">
+                <div class="${claseBlink}" style="font-size:22px; font-weight:900; color:${colorEstado}; text-shadow:0 0 20px ${colorEstado}80; letter-spacing:1px;">${estado}</div>
+                ${etiquetaAlerta}
+            </div>
+
+            <!-- Flechas de momentum -->
+            <div style="text-align:center; font-size:22px; color:${arrowColor}; letter-spacing:2px; margin:4px 0; font-weight:900; opacity:0.8;">${arrows}</div>
+            <div style="text-align:center; font-size:10px; color:#64748b; margin-bottom:8px;">
+                Entrada de capital &bull; ${cdcVal > 0 ? 'Compradores dominando' : 'Vendedores dominando'} &bull; ${Math.abs(cdcVal) > 60 ? 'Momento explosivo' : 'Momento moderado'}
             </div>
         </div>
 
+        <!-- Proyección dinámica -->
+        <div style="background:#060b16; border:1px solid rgba(243,186,47,.25); border-radius:10px; padding:10px; margin-bottom:12px;">
+            <div style="font-size:11px; font-weight:900; color:#f3ba2f; margin-bottom:8px; text-align:center;">🔮 PROYECCIÓN DINÁMICA DEL ALGORITMO</div>
+            <div style="font-size:11px; margin-bottom:4px;">🚀 Probabilidad Alcista: <b style="color:#0ecb81;">${p.subida}%</b>
+                <div class="barra-contenedor"><div class="barra-progreso" style="width:${p.subida}%; background:#0ecb81;"></div></div>
+            </div>
+            <div style="font-size:11px;">📉 Probabilidad Bajista: <b style="color:#ff2a3b;">${p.caida}%</b>
+                <div class="barra-contenedor"><div class="barra-progreso" style="width:${p.caida}%; background:#ff2a3b;"></div></div>
+            </div>
+            <div style="font-size:10px; color:#64748b; text-align:center; margin-top:8px; border-top:1px solid rgba(255,255,255,0.04); padding-top:6px;">
+                🧠 ${CDC_CONFIG.autoAprendizaje ? 'Auto-aprendizaje activo' : 'Auto-aprendizaje pausado'} ${statsAprendizajeCDC.total > 0 ? `· ${((statsAprendizajeCDC.aciertos/statsAprendizajeCDC.total)*100).toFixed(1)}% precisión (${statsAprendizajeCDC.total} señales)` : '· recopilando señales...'}
+            </div>
+        </div>
+
+        <!-- Indicadores 3 columnas -->
         <div class="grid-indicators" style="grid-template-columns: 1fr 1fr 1fr;">
             <div class="indicator-box">
-                <div class="indicator-label"><i class="fas fa-bolt"></i> IMPULSO 2 MIN</div>
+                <div class="indicator-label"><i class="fas fa-bolt"></i> IMPULSO 2M</div>
                 <div class="indicator-value" style="color:${c.cambioReal2Min >= 0 ? '#0ecb81' : '#ff2a3b'};">${c.cambioReal2Min > 0 ? '+' : ''}${c.cambioReal2Min.toFixed(2)}%</div>
             </div>
             <div class="indicator-box">
-                <div class="indicator-label"><i class="fas fa-compress-alt"></i> CAÍDA TECHOMAX</div>
+                <div class="indicator-label"><i class="fas fa-compress-alt"></i> TECHOMAX</div>
                 <div class="indicator-value" style="color:#f3ba2f;">-${c.caidaDesdeMaximo.toFixed(1)}%</div>
             </div>
             <div class="indicator-box">
@@ -1690,6 +1939,7 @@ function actualizarTacometroDerecho() {
             </div>
         </div>
 
+        <!-- Botones -->
         <div style="display:grid; grid-template-columns:1fr 1fr; gap:10px; margin-top:15px;">
             <a href="https://www.binance.com/es/futures/${selectedCoin}" target="_blank" class="btn ${c.alertaBombaSubida ? 'binance-long' : 'binance'}" style="font-size:11px;"><i class="fas fa-chart-line"></i> OPERAR YA</a>
             <a href="https://wa.me/59177244375?text=Proyecto%20TecnoMan%20-%20Alerta%20Activa%20${selectedCoin}" target="_blank" class="btn ws" style="font-size:11px;"><i class="fab fa-whatsapp"></i> COMPARTIR</a>
