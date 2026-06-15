@@ -128,10 +128,27 @@
             font-size: 24px;
             display: flex; align-items: center; justify-content: center;
             animation: pulse-btn 2s infinite;
+            opacity: 0; pointer-events: none; transition: opacity 0.4s;
+        }
+        #btnRadarExplosivo.techo-activo {
+            opacity: 1; pointer-events: auto;
         }
         @keyframes pulse-btn {
             0%,100% { box-shadow: 0 4px 20px rgba(243,186,47,0.5); }
             50% { box-shadow: 0 4px 35px rgba(243,186,47,0.9); }
+        }
+        /* Botón inline de techo al lado del precio */
+        #btnTechoPrecio {
+            display: none;
+            align-items: center; gap: 5px;
+            background: transparent; border: none; cursor: pointer;
+            animation: techo-parpadeo 0.8s infinite alternate;
+            padding: 0; margin-left: 6px; vertical-align: middle;
+        }
+        #btnTechoPrecio.visible { display: inline-flex; }
+        @keyframes techo-parpadeo {
+            from { opacity: 0.3; transform: scale(0.9); }
+            to   { opacity: 1;   transform: scale(1.1); }
         }
         .radar-contador {
             position: absolute; top: -4px; right: -4px;
@@ -1269,6 +1286,10 @@ function hablar(texto, esMasculino) {
     // Si todavía está en bloqueo, no interrumpir
     if (Date.now() < audioBloqueadoHasta) return;
 
+    // En móvil: siempre voz femenina (más clara en altavoces de celular)
+    const esMobile = /Android|iPhone|iPad|iPod|Mobile/i.test(navigator.userAgent);
+    if (esMobile) esMasculino = false;
+
     // Cancelar cualquier cosa pendiente y hablar
     window.speechSynthesis.cancel();
 
@@ -1277,14 +1298,13 @@ function hablar(texto, esMasculino) {
     u.volume = 1;
 
     if (esMasculino) {
-        // Voz masculina: grave y clara en móvil
         u.pitch = 0.85;
         u.rate  = 0.88;
         if (vozMasculina) u.voice = vozMasculina;
     } else {
-        // Voz femenina: natural, sin sonar aguda en móvil
-        u.pitch = 0.92;
-        u.rate  = 0.86;
+        // Voz femenina: natural, clara en móvil
+        u.pitch = 1.0;
+        u.rate  = 0.90;
         if (vozFemenina) u.voice = vozFemenina;
     }
 
@@ -1662,7 +1682,7 @@ async function obtenerDatosBinance() {
                 document.getElementById("linkBinance").style.display = "flex";
                 document.getElementById("linkBinance").href = `https://www.binance.com/es/futures/${selectedCoin}`;
                 document.getElementById("linkApp").style.display = "flex";
-                document.getElementById("linkApp").href = `bnc://app.binance.com/en/futures/${selectedCoin}`;
+                document.getElementById("linkApp").href = `https://app.binance.com/en/futures/${selectedCoin}`;
             }
 if (radarFijado) {
 
@@ -1822,7 +1842,7 @@ function seleccionarMoneda(symbol) {
     document.getElementById("linkBinance").style.display = "flex";
     document.getElementById("linkBinance").href = `https://www.binance.com/es/futures/${symbol}`;
     document.getElementById("linkApp").style.display = "flex";
-    document.getElementById("linkApp").href = `bnc://app.binance.com/en/futures/${symbol}`;
+    document.getElementById("linkApp").href = `https://app.binance.com/en/futures/${symbol}`;
 
     if(window.innerWidth <= 950){
         document.getElementById("sidebar").style.display = "none";
@@ -2360,6 +2380,18 @@ function actualizarContadorRadar() {
         contEl.textContent = total > 99 ? '99+' : total;
         contEl.style.background = total > 5 ? '#ff2a3b' : total > 0 ? '#f3ba2f' : '#334155';
     }
+    // Mostrar/ocultar botón flotante amarillo según monedas en techo
+    const btnRad = document.getElementById('btnRadarExplosivo');
+    if (btnRad) {
+        if (totalTecho > 0) btnRad.classList.add('techo-activo');
+        else btnRad.classList.remove('techo-activo');
+    }
+    // Mostrar/ocultar botón inline al lado del precio
+    const btnInline = document.getElementById('btnTechoPrecio');
+    if (btnInline) {
+        if (totalTecho > 0) btnInline.classList.add('visible');
+        else btnInline.classList.remove('visible');
+    }
     // Si el panel está abierto, re-renderizar
     if (radarAbierto) renderizarRadar();
 }
@@ -2484,8 +2516,13 @@ function actualizarPanelCentral() {
             <div style="font-size:26px; font-weight:900; color:#fff; letter-spacing:1px; display:flex; align-items:center; justify-content:center; gap:8px; flex-wrap:wrap;">
                 ${simbolo} <span style="font-size:14px; color:#64748b; font-weight:600;">USDT</span>${badgeAlarma}
             </div>
-            <div style="font-size:52px; font-weight:900; color:#0ecb81; line-height:1.1; margin:6px 0;">
-                $${c.price.toLocaleString(undefined,{minimumFractionDigits:2,maximumFractionDigits:4})}
+            <div style="display:flex; align-items:center; justify-content:center; gap:8px; margin:6px 0;">
+                <div style="font-size:52px; font-weight:900; color:#0ecb81; line-height:1.1;">
+                    $${c.price.toLocaleString(undefined,{minimumFractionDigits:2,maximumFractionDigits:4})}
+                </div>
+                <button id="btnTechoPrecio" onclick="abrirRadarExplosivo(); filtrarRadar('techo');" title="Monedas en máximo → a punto de caer">
+                    <span style="font-size:22px;">🔴</span>
+                </button>
             </div>
             <div style="font-size:22px; font-weight:900; color:${colorCambio};">
                 ${c.change >= 0 ? '+' : ''}${c.change.toFixed(2)}% <span style="font-size:12px; color:#64748b; font-weight:600;">cambio 24h</span>
