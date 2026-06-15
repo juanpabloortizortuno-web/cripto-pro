@@ -870,6 +870,11 @@
             style="background:rgba(243,186,47,0.15);color:#f3ba2f;border-color:rgba(243,186,47,0.4);">
             🌐 TODAS
         </button>
+        <button class="radar-tab" id="tabTecho" onclick="filtrarRadar('techo')"
+            style="background:rgba(255,60,0,0.2);color:#ff3c00;border-color:rgba(255,60,0,0.4);position:relative;">
+            🔴 EN MÁXIMO → CAE
+            <span style="position:absolute;top:-6px;right:-6px;background:#ff3c00;color:#fff;font-size:9px;font-weight:900;padding:1px 5px;border-radius:8px;" id="contTecho">0</span>
+        </button>
         <button class="radar-tab" id="tabMomentum" onclick="filtrarRadar('momentum')"
             style="background:rgba(255,165,0,0.15);color:#ffa500;border-color:transparent;position:relative;">
             ⭐ MOMENTUM ALTO
@@ -890,11 +895,6 @@
         <button class="radar-tab" id="tabAgotado" onclick="filtrarRadar('agotado')"
             style="background:rgba(243,186,47,0.1);color:#f3ba2f;border-color:transparent;">
             ⚠️ AGOTÁNDOSE
-        </button>
-        <button class="radar-tab" id="tabTecho" onclick="filtrarRadar('techo')"
-            style="background:rgba(255,60,0,0.15);color:#ff3c00;border-color:transparent;position:relative;">
-            🔴 EN TECHO → CAÍDA
-            <span style="position:absolute;top:-6px;right:-6px;background:#ff3c00;color:#fff;font-size:9px;font-weight:900;padding:1px 5px;border-radius:8px;" id="contTecho">0</span>
         </button>
     </div>
 
@@ -960,6 +960,9 @@ let radarFijado = false;
 
 // ── CORRELACIÓN BTC/ETH ──────────────────────────────────────
 let btcEthHistorial = { BTCUSDT: [], ETHUSDT: [] };
+// Seguimiento del máximo de 48h (guardamos el high más alto visto en las últimas 24 horas de ciclos)
+let maximo48h = {};       // symbol -> precio más alto visto en las últimas ~43200 lecturas
+let maximo48hTimestamp = {}; // cuándo se registró ese máximo
 let btcEthInfluencia = {}; // symbol -> { btcCorr, ethCorr }
 let techoScoreHistorial = {}; // historial de score de techo
         let contadorAvisosMismoEstado = 0;
@@ -1597,6 +1600,17 @@ async function obtenerDatosBinance() {
             
             soporteCDC[item.symbol] = low;
             resistenciaCDC[item.symbol] = high;
+
+            // Actualizar máximo de 48h (high más alto visto históricamente)
+            if (!maximo48h[item.symbol] || high > maximo48h[item.symbol]) {
+                maximo48h[item.symbol] = high;
+                maximo48hTimestamp[item.symbol] = Date.now();
+            }
+            // Almacenar en cachedData para usarlo en detección
+            cachedData[item.symbol].high48h = maximo48h[item.symbol];
+            cachedData[item.symbol].caidaDesdeMaximo48h = maximo48h[item.symbol] > 0
+                ? ((maximo48h[item.symbol] - precio) / maximo48h[item.symbol]) * 100
+                : 999;
             
             // Asignación de estado cerebral del bot
             let cerebro = "ESTABLE";
@@ -1904,11 +1918,12 @@ function detectarListaParaDespegar(c) {
 function calcularScoreTecho(c) {
     let score = 0;
 
-    // 1. POSICIÓN EN RANGO — entre más cerca del 100%, más crítico
-    if (c.posicionPorcentaje >= 97) score += 35;
-    else if (c.posicionPorcentaje >= 94) score += 28;
-    else if (c.posicionPorcentaje >= 90) score += 20;
-    else score += 10; // 88-89%
+    // 1. QUÉ TAN CERCA DEL MÁXIMO — usa el más cercano entre 24h y 48h
+    const distMax = Math.min(c.caidaDesdeMaximo, c.caidaDesdeMaximo48h !== undefined ? c.caidaDesdeMaximo48h : 999);
+    if (distMax <= 0.2) score += 35;
+    else if (distMax <= 0.5) score += 28;
+    else if (distMax <= 1.0) score += 20;
+    else score += 10;
 
     // 2. PÉRDIDA DE IMPULSO — lo más importante: momentum frenando o negativo
     const velPromAbs = Math.abs(c.velPromedio || 0);
@@ -1949,14 +1964,23 @@ function calcularScoreTecho(c) {
 }
 
 function detectarEnTechoProximaCaida(c) {
-    // Solo monedas que YA llegaron al máximo del día (>=88% del rango 24h)
-    if (c.posicionPorcentaje < 88) return false;
-    // Volumen mínimo para que la señal sea válida
+    // CRITERIO PRINCIPAL: precio debe estar a <=1.5% del máximo de 24h O del máximo de 48h
+    const enMaximo24h = c.caidaDesdeMaximo <= 1.5;
+    const enMaximo48h = (c.caidaDesdeMaximo48h !== undefined) && (c.caidaDesdeMaximo48h <= 1.5);
+    if (!enMaximo24h && !enMaximo48h) return false;
+
+    // Volumen mínimo
     if ((c.volume || 0) < 5000000) return false;
-    // No incluir monedas que siguen subiendo fuerte (esas van a BOMBA/MOMENTUM)
-    // Solo las que subieron y ahora frenan o caen
-    const sigueExplotando = c.cambioReal2Min > 0.5 && (c.velPromedio || 0) > 0.01 && c.ciclosSubiendo >= 4;
-    if (sigueExplotando) return false;
+
+    // CRITERIO DE AGOTAMIENTO: debe mostrar pérdida de impulso, NO seguir subiendo
+    // Requiere AL MENOS 2 de estas señales:
+    const velFrenando  = (c.velPromedio || 0) <= 0.003;
+    const noSubeEn2min = c.cambioReal2Min <= 0.1;
+    const ciclosBajan  = (c.ciclosBajando || 0) >= 2;
+
+    const agotamiento = [velFrenando, noSubeEn2min, ciclosBajan].filter(Boolean).length;
+    if (agotamiento < 2) return false;
+
     return true;
 }
 
@@ -1966,7 +1990,8 @@ function generarPronosticosCaida(c) {
     const pred = prediccionCDC[c.symbol];
     const infl = btcEthInfluencia[c.symbol];
 
-    if (c.posicionPorcentaje >= 93) señales.push("⚠️ En el 93%+ del máximo diario");
+    if (c.caidaDesdeMaximo <= 0.5) señales.push("🎯 A solo " + c.caidaDesdeMaximo.toFixed(2) + "% del máximo 24h");
+    if (c.caidaDesdeMaximo48h !== undefined && c.caidaDesdeMaximo48h <= 0.5) señales.push("📌 A solo " + c.caidaDesdeMaximo48h.toFixed(2) + "% del máximo 48h");
     if (c.ciclosBajando >= 3) señales.push(`📉 ${c.ciclosBajando}/5 ciclos recientes son bajistas`);
     if (Math.abs(c.velPromedio || 0) < 0.003) señales.push("🛑 Velocidad casi detenida — impulso agotado");
     if (c.cambioReal2Min < -0.2) señales.push(`💨 Ya cae ${c.cambioReal2Min.toFixed(2)}% en 2 min`);
@@ -2223,12 +2248,12 @@ function renderizarRadar() {
         return h;
     };
 
+    html += renderTecho();
     html += renderMomentum();
     html += renderGrupo('EXPLOTANDO AHORA — Entrar LONG', '🚀', grupos.bomba,   'bomba',   '#0ecb81');
     html += renderGrupo('LISTAS PARA DESPEGAR — Rebote desde suelo', '⚡', grupos.lista,   'lista',   '#00b4d8');
     html += renderGrupo('CAYENDO FUERTE — Oportunidad SHORT', '💥', grupos.caida,   'caida',   '#ff2a3b');
     html += renderGrupo('AGOTÁNDOSE — Posible reversión bajista', '⚠️', grupos.agotado, 'agotado', '#f3ba2f');
-    html += renderTecho();
 
 
     // ── Render especial para TECHO → PRÓXIMA CAÍDA ──
@@ -2241,7 +2266,7 @@ function renderizarRadar() {
         </div>`;
 
         if (grupos.techo.length === 0) {
-            h += `<div class="radar-vacio" style="padding:16px;">Sin monedas en techo extremo ahora. El mercado no muestra techos de riesgo alto.</div>`;
+            h += `<div class="radar-vacio" style="padding:16px;">Ninguna moneda está en su máximo de 24h con señales de agotamiento ahora mismo.</div>`;
             return h;
         }
 
@@ -2275,8 +2300,12 @@ function renderizarRadar() {
 
                 <!-- Posición en rango -->
                 <div style="font-size:10px;color:#94a3b8;margin-top:5px;">
-                    Posición rango: <b style="color:#ff6b00;">${c.posicionPorcentaje.toFixed(1)}%</b>
-                    &nbsp;|&nbsp; Vel 2m: <b style="color:${c.cambioReal2Min < 0 ? '#ff2a3b' : '#0ecb81'};">${c.cambioReal2Min > 0 ? '+' : ''}${c.cambioReal2Min.toFixed(2)}%</b>
+                    Max 24h: <b style="color:#ff3c00;">-${c.caidaDesdeMaximo.toFixed(2)}%</b>
+                    &nbsp;|&nbsp; Max 48h: <b style="color:#ff6b00;">${c.caidaDesdeMaximo48h !== undefined ? '-' + c.caidaDesdeMaximo48h.toFixed(2) + '%' : '—'}</b>
+                </div>
+                <div style="font-size:10px;color:#94a3b8;margin-top:2px;">
+                    Vel 2m: <b style="color:${c.cambioReal2Min < 0 ? '#ff2a3b' : '#94a3b8'};">${c.cambioReal2Min > 0 ? '+' : ''}${c.cambioReal2Min.toFixed(2)}%</b>
+                    &nbsp;|&nbsp; Ciclos↓: <b style="color:#ff6b00;">${c.ciclosBajando || 0}/5</b>
                 </div>
                 <div style="font-size:10px;color:#94a3b8;margin-top:2px;">
                     RSI: <b style="color:${rsiColor};">${rsiVal}</b>
