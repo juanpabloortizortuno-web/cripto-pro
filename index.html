@@ -799,15 +799,7 @@
     <div class="main-workspace" id="mainWorkspace">
         
         <div class="column-center" id="columnCenter">
-            <!-- BOTÓN TECHO FIJO — parpadea solo cuando hay monedas en su máximo -->
-<div id="btnTechoWrapper" style="display:none; text-align:center; margin-bottom:10px;">
-    <button onclick="abrirRadarExplosivo(); setTimeout(()=>filtrarRadar('techo'),100);"
-        style="background:transparent; border:none; cursor:pointer; padding:0; animation:techo-parpadeo 0.7s infinite alternate;">
-        <span style="font-size:32px; filter:drop-shadow(0 0 8px rgba(255,42,59,0.9));">🔴</span>
-        <div style="font-size:9px; font-weight:900; color:#ff3c00; letter-spacing:1px; margin-top:2px;">EN MÁXIMO</div>
-    </button>
-</div>
-<div class="card" id="detailView" style="width:100%;">
+            <div class="card" id="detailView" style="width:100%;">
                 <!-- PANTALLA BIENVENIDA - se oculta al seleccionar una moneda -->
                 <div id="bienvenidaScreen" style="text-align:center; padding:60px 20px; color:var(--text-dim);">
                     <!-- LOGO DIAMANTE GRANDE EN PRESENTACIÓN -->
@@ -934,7 +926,7 @@
     <button id="simuladorBtn" class="float-btn float-sim" onclick="abrirSimulador()">🧪</button>
     <button id="emaRadarBtn" class="float-btn" onclick="abrirRadarDespegue()" style="background:#0ecb81; color:#fff; font-weight:900;">⚡</button>
     <a id="linkBinance" class="float-btn float-binance" target="_blank" style="display:none;"><i class="fas fa-chart-line"></i></a>
-    <a id="linkApp" class="float-btn float-app" target="_blank" style="display:none;"><i class="fas fa-mobile-alt"></i></a>
+    <button id="linkApp" class="float-btn float-app" onclick="abrirEnApp()" style="display:none;"><i class="fas fa-mobile-alt"></i></button>
 </div>
 
 <div id="simuladorPanel" class="overlay-panel">
@@ -1239,6 +1231,24 @@ function actualizarStatsAprendizajeUI() {
 }
 
     function initAudio() { if ('speechSynthesis' in window) { let u = new SpeechSynthesisUtterance(""); window.speechSynthesis.speak(u); } }
+
+function abrirEnApp() {
+    if (!selectedCoin) return;
+    const par = selectedCoin.replace('USDT','') + 'USDT';
+    const isAndroid = /Android/i.test(navigator.userAgent);
+    const isIOS = /iPhone|iPad|iPod/i.test(navigator.userAgent);
+    if (isAndroid) {
+        // Intent URL — abre la app si está instalada, si no va al Play Store
+        const intentUrl = `intent://futures/trading/${par}#Intent;scheme=bnc;package=com.binance.dev;S.browser_fallback_url=https%3A%2F%2Fwww.binance.com%2Fes%2Ffutures%2F${par};end`;
+        window.location.href = intentUrl;
+    } else if (isIOS) {
+        // En iOS intentar el scheme primero, con fallback a web
+        window.location.href = `bnc://futures/trading/${par}`;
+        setTimeout(() => { window.open(`https://www.binance.com/es/futures/${par}`, '_blank'); }, 1500);
+    } else {
+        window.open(`https://www.binance.com/es/futures/${par}`, '_blank');
+    }
+}
 
 // Cache de voces separadas por género
 let vozMasculina = null;
@@ -1679,7 +1689,7 @@ async function obtenerDatosBinance() {
                 document.getElementById("linkBinance").style.display = "flex";
                 document.getElementById("linkBinance").href = `https://www.binance.com/es/futures/${selectedCoin}`;
                 document.getElementById("linkApp").style.display = "flex";
-                document.getElementById("linkApp").href = `https://www.binance.com/es/futures/${selectedCoin}`;
+                // app link manejado por abrirEnApp()
             }
 if (radarFijado) {
 
@@ -1839,7 +1849,7 @@ function seleccionarMoneda(symbol) {
     document.getElementById("linkBinance").style.display = "flex";
     document.getElementById("linkBinance").href = `https://www.binance.com/es/futures/${symbol}`;
     document.getElementById("linkApp").style.display = "flex";
-    document.getElementById("linkApp").href = `https://www.binance.com/es/futures/${symbol}`;
+    // app link manejado por abrirEnApp()
 
     if(window.innerWidth <= 950){
         document.getElementById("sidebar").style.display = "none";
@@ -2383,11 +2393,7 @@ function actualizarContadorRadar() {
         if (totalTecho > 0) btnRad.classList.add('techo-activo');
         else btnRad.classList.remove('techo-activo');
     }
-    // Botón fijo de techo encima del precio
-    const btnWrapper = document.getElementById('btnTechoWrapper');
-    if (btnWrapper) {
-        btnWrapper.style.display = totalTecho > 0 ? 'block' : 'none';
-    }
+    // Botón de techo ahora vive en actualizarPanelCentral (dinámico por moneda)
     // Si el panel está abierto, re-renderizar
     if (radarAbierto) renderizarRadar();
 }
@@ -2493,6 +2499,21 @@ function actualizarPanelCentral() {
     const colorCambio = c.change >= 0 ? 'var(--accent-green)' : 'var(--accent-glow)';
     const simbolo = selectedCoin.replace("USDT","");
 
+    // ¿Esta moneda está en su máximo de 24h y perdiendo impulso?
+    const enTecho = detectarEnTechoProximaCaida(c);
+    const btnTechoHTML = enTecho ? `
+        <div style="text-align:center; margin-bottom:14px;">
+            <button onclick="abrirRadarExplosivo(); setTimeout(()=>filtrarRadar('techo'),100);"
+                style="background:rgba(255,42,59,0.12); border:2px solid #ff3c00; border-radius:12px;
+                       color:#ff3c00; font-size:13px; font-weight:900; padding:10px 20px; cursor:pointer;
+                       width:100%; letter-spacing:0.5px; animation:techo-parpadeo 0.8s infinite alternate;">
+                🔴 ${simbolo} EN MÁXIMO DEL DÍA — VER SEÑALES DE CAÍDA
+                <span style="display:block;font-size:10px;font-weight:600;margin-top:3px;color:#ff6b6b;">
+                    A ${c.caidaDesdeMaximo.toFixed(2)}% del máximo · ${c.ciclosBajando||0}/5 ciclos bajando
+                </span>
+            </button>
+        </div>` : '';
+
     let badgeAlarma = '';
     if (c.alertaBombaSubida) {
         badgeAlarma = `<span style="display:inline-flex;align-items:center;gap:5px;background:#0ecb81;color:#000;font-size:11px;font-weight:900;padding:3px 10px;border-radius:20px;margin-left:8px;animation:blinker-glow 0.6s linear infinite;">🚀 BOMBA ACTIVA</span>`;
@@ -2503,6 +2524,7 @@ function actualizarPanelCentral() {
     }
 
     document.getElementById("detailView").innerHTML = `
+        ${btnTechoHTML}
 
         <!-- CABECERA: NOMBRE + PRECIO + CAMBIO -->
         <div style="text-align:center; padding-bottom:14px; border-bottom:1px solid rgba(255,255,255,0.05); margin-bottom:14px;">
