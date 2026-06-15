@@ -14,6 +14,135 @@
             --border: rgba(255, 255, 255, 0.05);
         }
 
+
+        /* ── RADAR EXPLOSIVO ─────────────────────────── */
+        #radarExplosivo {
+            position: fixed;
+            top: 0; left: 0; right: 0; bottom: 0;
+            background: rgba(3,7,18,0.97);
+            z-index: 9000;
+            display: none;
+            flex-direction: column;
+            overflow-y: auto;
+        }
+        .radar-header {
+            position: sticky; top: 0;
+            background: #060b16;
+            border-bottom: 2px solid rgba(243,186,47,0.3);
+            padding: 14px 20px;
+            display: flex; align-items: center; justify-content: space-between;
+            z-index: 10;
+        }
+        .radar-tabs {
+            display: flex; gap: 6px; flex-wrap: wrap;
+            padding: 12px 16px 0;
+        }
+        .radar-tab {
+            padding: 7px 14px; border-radius: 20px; font-size: 11px;
+            font-weight: 900; border: 2px solid transparent; cursor: pointer;
+            transition: all 0.2s; letter-spacing: 0.5px;
+        }
+        .radar-tab.activo { opacity: 1; }
+        .radar-tab:not(.activo) { opacity: 0.45; }
+        .radar-seccion {
+            padding: 10px 16px 0;
+        }
+        .radar-titulo-seccion {
+            font-size: 11px; font-weight: 900; letter-spacing: 1.5px;
+            text-transform: uppercase; margin: 14px 0 8px;
+            display: flex; align-items: center; gap: 8px;
+        }
+        .radar-titulo-seccion::after {
+            content: ''; flex: 1; height: 1px;
+            background: rgba(255,255,255,0.07);
+        }
+        .radar-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
+            gap: 8px;
+            margin-bottom: 8px;
+        }
+        .radar-card {
+            background: #090f1c;
+            border-radius: 10px;
+            padding: 12px;
+            border: 1px solid rgba(255,255,255,0.05);
+            cursor: pointer;
+            transition: transform 0.15s, border-color 0.15s;
+            position: relative;
+            overflow: hidden;
+        }
+        .radar-card:hover { transform: translateY(-2px); }
+        .radar-card::before {
+            content: '';
+            position: absolute; top: 0; left: 0; right: 0; height: 3px;
+            border-radius: 10px 10px 0 0;
+        }
+        .radar-card.tipo-bomba { border-color: rgba(14,203,129,0.35); }
+        .radar-card.tipo-bomba::before { background: #0ecb81; }
+        .radar-card.tipo-lista { border-color: rgba(14,203,129,0.2); }
+        .radar-card.tipo-lista::before { background: #00b4d8; }
+        .radar-card.tipo-caida { border-color: rgba(255,42,59,0.35); }
+        .radar-card.tipo-caida::before { background: #ff2a3b; }
+        .radar-card.tipo-agotado { border-color: rgba(243,186,47,0.35); }
+        .radar-card.tipo-agotado::before { background: #f3ba2f; }
+        .radar-coin-nombre {
+            font-size: 14px; font-weight: 900; color: #fff; margin-bottom: 4px;
+        }
+        .radar-coin-badge {
+            font-size: 9px; font-weight: 900; padding: 2px 7px;
+            border-radius: 10px; display: inline-block; margin-bottom: 6px;
+            letter-spacing: 0.5px;
+        }
+        .radar-coin-stat {
+            font-size: 11px; color: #94a3b8; margin: 2px 0;
+        }
+        .radar-coin-stat b { color: #e2e8f0; }
+        .radar-coin-valor {
+            font-size: 20px; font-weight: 900; margin-top: 6px;
+        }
+        .radar-vacio {
+            text-align: center; padding: 30px; color: #475569;
+            font-size: 12px; font-weight: 600;
+        }
+        #btnRadarExplosivo {
+            position: fixed;
+            bottom: 20px; right: 20px;
+            z-index: 8000;
+            padding: 0;
+            width: 58px; height: 58px;
+            border-radius: 50%;
+            background: linear-gradient(135deg, #f3ba2f, #ff6b00);
+            border: none; cursor: pointer;
+            box-shadow: 0 4px 20px rgba(243,186,47,0.5);
+            font-size: 24px;
+            display: flex; align-items: center; justify-content: center;
+            animation: pulse-btn 2s infinite;
+        }
+        @keyframes pulse-btn {
+            0%,100% { box-shadow: 0 4px 20px rgba(243,186,47,0.5); }
+            50% { box-shadow: 0 4px 35px rgba(243,186,47,0.9); }
+        }
+        .radar-contador {
+            position: absolute; top: -4px; right: -4px;
+            background: #ff2a3b; color: #fff;
+            font-size: 10px; font-weight: 900;
+            width: 18px; height: 18px; border-radius: 50%;
+            display: flex; align-items: center; justify-content: center;
+        }
+        .radar-barra-mini {
+            height: 3px; border-radius: 3px; margin-top: 6px;
+            background: rgba(255,255,255,0.08);
+            overflow: hidden;
+        }
+        .radar-barra-mini-fill {
+            height: 100%; border-radius: 3px; transition: width 0.3s;
+        }
+        @keyframes radar-scan {
+            0% { opacity: 1; } 50% { opacity: 0.4; } 100% { opacity: 1; }
+        }
+        .radar-scanning { animation: radar-scan 1s infinite; }
+
         body { margin: 0; font-family: 'Inter', sans-serif; background: var(--bg-deep); color: var(--text-main); overflow: hidden; }
         header { display: flex; justify-content: space-between; align-items: center; padding: 0 20px; background: #060b16; border-bottom: 1px solid rgba(255, 255, 255, 0.03); height: 60px; }
         .brand b { font-size: 16px; font-weight: 900; color: var(--accent-gold); }
@@ -418,7 +547,47 @@
         .fijado-off { background: #ff2a3b; }
         .fijado-on { background: #0ecb81; box-shadow: 0 0 10px #0ecb81; }
 
-    </style>
+    
+        /* Tarjeta momentum especial */
+        .radar-card.tipo-momentum {
+            border-color: rgba(255,165,0,0.5);
+            background: linear-gradient(135deg, #090f1c 0%, #100a00 100%);
+        }
+        .radar-card.tipo-momentum::before { background: linear-gradient(90deg, #ffa500, #ff6b00); }
+        .momentum-barra-rango {
+            height: 6px; border-radius: 6px; margin: 8px 0 4px;
+            background: rgba(255,255,255,0.06); overflow: hidden; position: relative;
+        }
+        .momentum-barra-fill {
+            height: 100%; border-radius: 6px;
+            background: linear-gradient(90deg, #f3ba2f, #ffa500, #ff6b00);
+            transition: width 0.4s;
+        }
+        .momentum-numero-rango {
+            font-size: 28px; font-weight: 900;
+            background: linear-gradient(90deg, #ffa500, #ff6b00);
+            -webkit-background-clip: text; -webkit-text-fill-color: transparent;
+            background-clip: text; line-height: 1.1;
+        }
+        @keyframes momentum-pulse {
+            0%,100% { box-shadow: 0 0 0 0 rgba(255,165,0,0); }
+            50% { box-shadow: 0 0 20px 4px rgba(255,165,0,0.3); }
+        }
+        .radar-card.tipo-momentum { animation: momentum-pulse 2s infinite; }
+        .vel-indicator {
+            display: flex; align-items: center; gap: 4px;
+            font-size: 11px; margin-top: 4px;
+        }
+        .vel-bar {
+            flex: 1; height: 4px; border-radius: 4px;
+            background: rgba(255,255,255,0.06); overflow: hidden;
+        }
+        .vel-bar-fill {
+            height: 100%; border-radius: 4px; background: #0ecb81;
+            transition: width 0.3s;
+        }
+
+</style>
 </head>
 <body>
 
@@ -654,6 +823,62 @@
             </div>
         </div>
 
+    </div>
+</div>
+
+
+<!-- ══ BOTÓN FLOTANTE RADAR EXPLOSIVO ══ -->
+<button id="btnRadarExplosivo" onclick="abrirRadarExplosivo()" title="RADAR EXPLOSIVO">
+    <span style="position:relative;">
+        🔭
+        <span class="radar-contador" id="radarContador">0</span>
+    </span>
+</button>
+
+<!-- ══ PANEL RADAR EXPLOSIVO ══ -->
+<div id="radarExplosivo">
+    <div class="radar-header">
+        <div>
+            <div style="font-size:16px;font-weight:900;color:#f3ba2f;letter-spacing:1px;">🔭 RADAR EXPLOSIVO CDC</div>
+            <div style="font-size:10px;color:#64748b;margin-top:2px;" id="radarSubtitulo">Escaneando mercado en tiempo real...</div>
+        </div>
+        <div style="display:flex;gap:10px;align-items:center;">
+            <div style="font-size:11px;color:#0ecb81;font-weight:700;" id="radarUltimaActualizacion">–</div>
+            <button onclick="cerrarRadarExplosivo()" style="background:rgba(255,255,255,0.08);border:none;color:#fff;border-radius:8px;padding:8px 14px;font-size:12px;font-weight:700;cursor:pointer;">✕ CERRAR</button>
+        </div>
+    </div>
+
+    <!-- TABS -->
+    <div class="radar-tabs">
+        <button class="radar-tab activo" id="tabTodas" onclick="filtrarRadar('todas')"
+            style="background:rgba(243,186,47,0.15);color:#f3ba2f;border-color:rgba(243,186,47,0.4);">
+            🌐 TODAS
+        </button>
+        <button class="radar-tab" id="tabMomentum" onclick="filtrarRadar('momentum')"
+            style="background:rgba(255,165,0,0.15);color:#ffa500;border-color:transparent;position:relative;">
+            ⭐ MOMENTUM ALTO
+            <span style="position:absolute;top:-6px;right:-6px;background:#ffa500;color:#000;font-size:9px;font-weight:900;padding:1px 5px;border-radius:8px;" id="contMomentum">0</span>
+        </button>
+        <button class="radar-tab" id="tabBomba" onclick="filtrarRadar('bomba')"
+            style="background:rgba(14,203,129,0.1);color:#0ecb81;border-color:transparent;">
+            🚀 EXPLOTANDO
+        </button>
+        <button class="radar-tab" id="tabLista" onclick="filtrarRadar('lista')"
+            style="background:rgba(0,180,216,0.1);color:#00b4d8;border-color:transparent;">
+            ⚡ LISTAS PARA DESPEGAR
+        </button>
+        <button class="radar-tab" id="tabCaida" onclick="filtrarRadar('caida')"
+            style="background:rgba(255,42,59,0.1);color:#ff2a3b;border-color:transparent;">
+            💥 CAYENDO FUERTE
+        </button>
+        <button class="radar-tab" id="tabAgotado" onclick="filtrarRadar('agotado')"
+            style="background:rgba(243,186,47,0.1);color:#f3ba2f;border-color:transparent;">
+            ⚠️ AGOTÁNDOSE
+        </button>
+    </div>
+
+    <div class="radar-seccion" id="radarContenido">
+        <div class="radar-vacio radar-scanning">🔭 Escaneando el mercado...</div>
     </div>
 </div>
 
@@ -1563,6 +1788,308 @@ function seleccionarMoneda(symbol) {
         document.getElementById("sidebar").style.display = "none";
         window.scrollTo({ top:0, behavior:"smooth" });
     }
+}
+
+
+// ══════════════════════════════════════════════════════════════
+// RADAR EXPLOSIVO — Detector de oportunidades en todo el mercado
+// ══════════════════════════════════════════════════════════════
+let radarFiltroActual = 'todas';
+let radarAbierto = false;
+
+function abrirRadarExplosivo() {
+    document.getElementById('radarExplosivo').style.display = 'flex';
+    radarAbierto = true;
+    renderizarRadar();
+}
+
+function cerrarRadarExplosivo() {
+    document.getElementById('radarExplosivo').style.display = 'none';
+    radarAbierto = false;
+}
+
+function filtrarRadar(tipo) {
+    radarFiltroActual = tipo;
+    // Actualizar tabs
+    ['todas','bomba','lista','caida','agotado'].forEach(t => {
+        const tab = document.getElementById('tab' + t.charAt(0).toUpperCase() + t.slice(1));
+        if (!tab) return;
+        if (t === tipo) {
+            tab.classList.add('activo');
+            tab.style.borderColor = tab.style.color.replace(')',',0.5)').replace('rgb','rgba') || 'rgba(255,255,255,0.3)';
+        } else {
+            tab.classList.remove('activo');
+            tab.style.borderColor = 'transparent';
+        }
+    });
+    renderizarRadar();
+}
+
+function calcularScoreExplosivo(c) {
+    // Score compuesto para ordenar por "urgencia" de la oportunidad
+    let score = 0;
+    score += Math.abs(c.cambioReal2Min) * 20;       // cambio 2min es el factor principal
+    score += Math.abs(c.velocidad) * 10;             // velocidad instantánea
+    score += (c.ciclosSubiendo / 5) * 15;            // consistencia alcista
+    score += Math.min(c.volume / 1000000, 30);       // volumen (máx 30 pts)
+    if (c.alertaBombaSubida)        score += 50;
+    if (c.alertaDerrumbe)           score += 40;
+    if (c.alertaAgotamientoSubida)  score += 20;
+    return score;
+}
+
+// ── MOMENTUM ALTO: cerca del 100% del rango Y subiendo rápido ──
+// Tu criterio principal: posición alta en el rango diario + velocidad fuerte
+function detectarMomentumAlto(c) {
+    const enZonaAlta     = c.posicionPorcentaje >= 70;          // 70-100% del rango del día
+    const subiendoRapido = c.cambioReal2Min > 0.15;             // sube más de 0.15% en 2 min
+    const velocidadPos   = c.velPromedio > 0.002;               // velocidad promedio positiva
+    const ciclosFuertes  = c.ciclosSubiendo >= 3;               // al menos 3 de 5 ciclos subiendo
+    const volumenOK      = c.volume > 8000000;                  // algo de volumen mínimo
+    return enZonaAlta && subiendoRapido && velocidadPos && ciclosFuertes && volumenOK;
+}
+
+// Score especial para momentum: prioriza rango alto + velocidad
+function calcularScoreMomentum(c) {
+    let score = 0;
+    score += c.posicionPorcentaje * 0.5;          // 0-50 pts (rango es lo más importante)
+    score += c.cambioReal2Min * 15;               // velocidad 2min
+    score += c.velPromedio * 200;                 // velocidad promedio sostenida
+    score += (c.ciclosSubiendo / 5) * 20;         // consistencia
+    if (c.alertaBombaSubida) score += 30;         // bonus si tiene señal bomba también
+    return score;
+}
+
+function detectarListaParaDespegar(c) {
+    // Moneda que cayó bastante y está lista para rebotar
+    const caidaBuena     = c.caidaDesdeMaximo >= 8 && c.caidaDesdeMaximo <= 40;   // cayó entre 8-40% del máximo del día
+    const enZonaBaja     = c.posicionPorcentaje <= 25;                              // está en la parte baja del rango
+    const iniciaRebote   = c.cambioReal2Min > 0.1 && c.velPromedio > 0;            // empieza a subir
+    const volumenPresente = c.volume > 10000000;                                   // hay volumen
+    const ciclosCreciendo = c.ciclosSubiendo >= 2;                                 // al menos 2 de 5 ciclos subiendo
+    return caidaBuena && enZonaBaja && iniciaRebote && volumenPresente && ciclosCreciendo;
+}
+
+function renderizarRadar() {
+    const contenido = document.getElementById('radarContenido');
+    if (!contenido) return;
+
+    const todas = Object.values(cachedData);
+    if (todas.length === 0) {
+        contenido.innerHTML = '<div class="radar-vacio radar-scanning">🔭 Esperando datos del mercado...</div>';
+        return;
+    }
+
+    // ── Clasificar monedas en 5 grupos ──
+    const grupos = {
+        momentum: [],  // ⭐ NUEVO: cerca del 100% del rango Y subiendo rápido
+        bomba:    [],  // explosión activa en curso (LONG)
+        lista:    [],  // cayó y está lista para despegar (rebote)
+        caida:    [],  // cayendo fuerte (SHORT/salida)
+        agotado:  []   // subió mucho y se agota (cerca de reversión)
+    };
+
+    todas.forEach(c => {
+        if (detectarMomentumAlto(c))       grupos.momentum.push(c);
+        if (c.alertaBombaSubida)           grupos.bomba.push(c);
+        if (detectarListaParaDespegar(c))  grupos.lista.push(c);
+        if (c.alertaDerrumbe)             grupos.caida.push(c);
+        if (c.alertaAgotamientoSubida)    grupos.agotado.push(c);
+    });
+
+    // Ordenar: momentum por score especial, resto por score explosivo
+    grupos.momentum.sort((a,b) => calcularScoreMomentum(b) - calcularScoreMomentum(a));
+    grupos.momentum = grupos.momentum.slice(0, 15);
+    ['bomba','lista','caida','agotado'].forEach(k => {
+        grupos[k].sort((a,b) => calcularScoreExplosivo(b) - calcularScoreExplosivo(a));
+        grupos[k] = grupos[k].slice(0, 20);
+    });
+
+    // Actualizar badge del tab momentum
+    const contMom = document.getElementById('contMomentum');
+    if (contMom) {
+        contMom.textContent = grupos.momentum.length;
+        contMom.style.display = grupos.momentum.length > 0 ? 'inline' : 'none';
+    }
+
+    // Actualizar contador total en el botón flotante
+    const total = grupos.momentum.length + grupos.bomba.length + grupos.lista.length + grupos.caida.length + grupos.agotado.length;
+    const contEl = document.getElementById('radarContador');
+    if (contEl) contEl.textContent = total > 99 ? '99+' : total;
+
+    // Actualizar subtítulo
+    const sub = document.getElementById('radarSubtitulo');
+    if (sub) sub.textContent = `${total} oportunidades detectadas en ${todas.length} monedas escaneadas`;
+    const upd = document.getElementById('radarUltimaActualizacion');
+    if (upd) {
+        const now = new Date();
+        upd.textContent = '🟢 ' + now.toLocaleTimeString('es-BO');
+    }
+
+    // ── Renderizar según filtro ──
+    let html = '';
+
+    const renderGrupo = (titulo, icono, items, tipo, colorTitulo) => {
+        if (radarFiltroActual !== 'todas' && radarFiltroActual !== tipo) return '';
+        let h = `<div class="radar-titulo-seccion" style="color:${colorTitulo};">${icono} ${titulo} <span style="font-size:10px;background:rgba(255,255,255,0.07);padding:2px 8px;border-radius:10px;color:#94a3b8;">${items.length}</span></div>`;
+        if (items.length === 0) {
+            h += `<div class="radar-vacio" style="padding:16px;">Ninguna moneda en esta categoría ahora mismo</div>`;
+            return h;
+        }
+        h += `<div class="radar-grid">`;
+        items.forEach(c => {
+            const sym = c.symbol.replace('USDT','');
+            const score = calcularScoreExplosivo(c).toFixed(0);
+            const colorCambio2m = c.cambioReal2Min >= 0 ? '#0ecb81' : '#ff2a3b';
+            const colorVel = c.velocidad >= 0 ? '#0ecb81' : '#ff2a3b';
+            const barraW = Math.min(Math.abs(c.cambioReal2Min) * 20, 100).toFixed(0);
+            const barraColor = c.cambioReal2Min >= 0 ? '#0ecb81' : '#ff2a3b';
+
+            let badge = '', badgeBg = '', badgeColor = '';
+            if (tipo === 'bomba')   { badge = '🚀 EXPLOTANDO';      badgeBg = 'rgba(14,203,129,0.2)';  badgeColor = '#0ecb81'; }
+            if (tipo === 'lista')   { badge = '⚡ REBOTE PRÓXIMO';   badgeBg = 'rgba(0,180,216,0.2)';   badgeColor = '#00b4d8'; }
+            if (tipo === 'caida')   { badge = '💥 CAYENDO';          badgeBg = 'rgba(255,42,59,0.2)';   badgeColor = '#ff2a3b'; }
+            if (tipo === 'agotado') { badge = '⚠️ AGOTÁNDOSE';       badgeBg = 'rgba(243,186,47,0.2)';  badgeColor = '#f3ba2f'; }
+
+            const colorValor = tipo === 'caida' ? '#ff2a3b' : tipo === 'agotado' ? '#f3ba2f' : '#0ecb81';
+
+            h += `
+            <div class="radar-card tipo-${tipo}" onclick="cerrarRadarExplosivo(); seleccionarMoneda('${c.symbol}');">
+                <div class="radar-coin-nombre">${sym} <span style="font-size:10px;color:#475569;">USDT</span></div>
+                <span class="radar-coin-badge" style="background:${badgeBg};color:${badgeColor};">${badge}</span>
+                <div class="radar-coin-valor" style="color:${colorValor};">
+                    ${c.cambioReal2Min > 0 ? '+' : ''}${c.cambioReal2Min.toFixed(2)}%
+                    <span style="font-size:10px;color:#64748b;">2min</span>
+                </div>
+                <div class="radar-barra-mini">
+                    <div class="radar-barra-mini-fill" style="width:${barraW}%;background:${barraColor};"></div>
+                </div>
+                <div class="radar-coin-stat" style="margin-top:6px;">Vel: <b style="color:${colorVel};">${c.velocidad > 0 ? '+' : ''}${c.velocidad.toFixed(3)}%</b></div>
+                <div class="radar-coin-stat">Rango: <b>${c.posicionPorcentaje.toFixed(0)}%</b></div>
+                <div class="radar-coin-stat">Caída max: <b style="color:#f3ba2f;">-${c.caidaDesdeMaximo.toFixed(1)}%</b></div>
+                <div class="radar-coin-stat">Score: <b style="color:#64748b;">${score}</b></div>
+            </div>`;
+        });
+        h += `</div>`;
+        return h;
+    };
+
+    // ── Render especial para MOMENTUM ALTO ──
+    const renderMomentum = () => {
+        if (radarFiltroActual !== 'todas' && radarFiltroActual !== 'momentum') return '';
+        let h = `<div class="radar-titulo-seccion" style="color:#ffa500;">
+            ⭐ MOMENTUM ALTO — Cerca del 100% y subiendo
+            <span style="font-size:10px;background:rgba(255,165,0,0.12);padding:2px 8px;border-radius:10px;color:#ffa500;">${grupos.momentum.length}</span>
+            <span style="font-size:9px;color:#64748b;margin-left:4px;">ordenadas por rango + velocidad</span>
+        </div>`;
+        if (grupos.momentum.length === 0) {
+            h += `<div class="radar-vacio" style="padding:16px;">Ninguna moneda cumple el criterio ahora. El mercado puede estar en pausa.</div>`;
+            return h;
+        }
+        h += `<div class="radar-grid">`;
+        grupos.momentum.forEach((c, idx) => {
+            const sym = c.symbol.replace('USDT','');
+            const rango = c.posicionPorcentaje.toFixed(1);
+            const vel2m = c.cambioReal2Min.toFixed(3);
+            const velInst = c.velocidad.toFixed(4);
+            const colorVel = c.velocidad >= 0 ? '#0ecb81' : '#ff2a3b';
+            const velBarW = Math.min(Math.abs(c.velPromedio) * 5000, 100).toFixed(0);
+            const tieneBomba = c.alertaBombaSubida;
+            const posBar = Math.min(c.posicionPorcentaje, 100).toFixed(0);
+            const score = calcularScoreMomentum(c).toFixed(0);
+            const medalla = idx === 0 ? '🥇' : idx === 1 ? '🥈' : idx === 2 ? '🥉' : `#${idx+1}`;
+
+            // Color de urgencia según posición en rango
+            const urgenciaColor = c.posicionPorcentaje >= 90 ? '#ff6b00' :
+                                   c.posicionPorcentaje >= 80 ? '#ffa500' : '#f3ba2f';
+
+            h += `
+            <div class="radar-card tipo-momentum" onclick="cerrarRadarExplosivo(); seleccionarMoneda('${c.symbol}');">
+                <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px;">
+                    <div class="radar-coin-nombre">${sym} <span style="font-size:10px;color:#475569;">USDT</span></div>
+                    <span style="font-size:13px;">${medalla}</span>
+                </div>
+                ${tieneBomba ? '<span style="font-size:9px;background:rgba(14,203,129,0.2);color:#0ecb81;padding:2px 7px;border-radius:8px;font-weight:900;display:inline-block;margin-bottom:4px;">🚀 BOMBA ACTIVA</span>' : ''}
+
+                <!-- Posición en rango - lo más importante -->
+                <div style="margin:6px 0 2px;">
+                    <div style="display:flex;justify-content:space-between;font-size:10px;color:#94a3b8;margin-bottom:3px;">
+                        <span>Posición en rango</span>
+                        <span style="color:${urgenciaColor};font-weight:900;">${rango}%</span>
+                    </div>
+                    <div class="momentum-barra-rango">
+                        <div class="momentum-barra-fill" style="width:${posBar}%;"></div>
+                    </div>
+                    <div style="display:flex;justify-content:space-between;font-size:8px;color:#334155;margin-top:2px;">
+                        <span>0%</span><span style="color:${urgenciaColor};">▲ ${rango}%</span><span>100%</span>
+                    </div>
+                </div>
+
+                <!-- Velocidad 2min -->
+                <div class="vel-indicator">
+                    <span style="font-size:10px;color:#94a3b8;min-width:55px;">2min:</span>
+                    <div class="vel-bar">
+                        <div class="vel-bar-fill" style="width:${Math.min(Math.abs(parseFloat(vel2m))*30,100)}%;background:#0ecb81;"></div>
+                    </div>
+                    <span style="font-size:11px;font-weight:900;color:#0ecb81;min-width:50px;text-align:right;">+${vel2m}%</span>
+                </div>
+
+                <!-- Velocidad instantánea -->
+                <div class="vel-indicator">
+                    <span style="font-size:10px;color:#94a3b8;min-width:55px;">Vel inst:</span>
+                    <div class="vel-bar">
+                        <div class="vel-bar-fill" style="width:${velBarW}%;background:${colorVel};"></div>
+                    </div>
+                    <span style="font-size:10px;font-weight:700;color:${colorVel};min-width:50px;text-align:right;">${c.velocidad > 0 ? '+' : ''}${velInst}%</span>
+                </div>
+
+                <div style="display:flex;justify-content:space-between;margin-top:6px;font-size:10px;">
+                    <span style="color:#475569;">Ciclos ↑: <b style="color:#0ecb81;">${c.ciclosSubiendo}/5</b></span>
+                    <span style="color:#475569;">Score: <b style="color:#ffa500;">${score}</b></span>
+                </div>
+            </div>`;
+        });
+        h += `</div>`;
+        return h;
+    };
+
+    html += renderMomentum();
+    html += renderGrupo('EXPLOTANDO AHORA — Entrar LONG', '🚀', grupos.bomba,   'bomba',   '#0ecb81');
+    html += renderGrupo('LISTAS PARA DESPEGAR — Rebote desde suelo', '⚡', grupos.lista,   'lista',   '#00b4d8');
+    html += renderGrupo('CAYENDO FUERTE — Oportunidad SHORT', '💥', grupos.caida,   'caida',   '#ff2a3b');
+    html += renderGrupo('AGOTÁNDOSE — Posible reversión bajista', '⚠️', grupos.agotado, 'agotado', '#f3ba2f');
+
+    if (html === '') {
+        html = '<div class="radar-vacio">No hay señales activas en este momento. El mercado está en calma.</div>';
+    }
+
+    contenido.innerHTML = html;
+}
+
+// Actualizar contador del botón flotante cada ciclo (aunque el panel esté cerrado)
+function actualizarContadorRadar() {
+    const todas = Object.values(cachedData);
+    let total = 0;
+    let totalMom = 0;
+    todas.forEach(c => {
+        if (detectarMomentumAlto(c))     { total++; totalMom++; }
+        if (c.alertaBombaSubida)         total++;
+        if (detectarListaParaDespegar(c)) total++;
+        if (c.alertaDerrumbe)            total++;
+        if (c.alertaAgotamientoSubida)   total++;
+    });
+    const contMom = document.getElementById('contMomentum');
+    if (contMom) {
+        contMom.textContent = totalMom;
+        contMom.style.display = totalMom > 0 ? 'inline' : 'none';
+    }
+    const contEl = document.getElementById('radarContador');
+    if (contEl) {
+        contEl.textContent = total > 99 ? '99+' : total;
+        contEl.style.background = total > 5 ? '#ff2a3b' : total > 0 ? '#f3ba2f' : '#334155';
+    }
+    // Si el panel está abierto, re-renderizar
+    if (radarAbierto) renderizarRadar();
 }
 
 // Calcula un RSI simplificado a partir del historial de precios de 2 minutos (ciclos de ~2s)
