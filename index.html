@@ -86,6 +86,16 @@
         .radar-card.tipo-caida::before { background: #ff2a3b; }
         .radar-card.tipo-agotado { border-color: rgba(243,186,47,0.35); }
         .radar-card.tipo-agotado::before { background: #f3ba2f; }
+        .radar-card.tipo-techo { border-color: rgba(255,60,0,0.5); box-shadow: 0 0 12px rgba(255,60,0,0.2); }
+        .radar-card.tipo-techo::before { background: linear-gradient(90deg,#ff3c00,#ff2a3b); }
+        .techo-score-bar { height:4px; border-radius:4px; margin:5px 0; background:rgba(255,255,255,0.06); overflow:hidden; }
+        .techo-score-fill { height:100%; border-radius:4px; background:linear-gradient(90deg,#f3ba2f,#ff3c00); transition:width 0.4s; }
+        .techo-pronostico { background:rgba(255,42,59,0.08); border:1px solid rgba(255,42,59,0.2); border-radius:8px; padding:7px 9px; margin-top:7px; font-size:10px; color:#ff6b6b; font-weight:700; }
+        .btc-eth-bar { display:flex; align-items:center; gap:6px; padding:6px 0; border-bottom:1px solid rgba(255,255,255,0.04); font-size:11px; }
+        .btc-eth-bar:last-child { border-bottom:none; }
+        .corr-badge { font-size:9px; font-weight:900; padding:2px 6px; border-radius:8px; }
+        @keyframes techo-pulse { 0%,100%{box-shadow:0 0 8px rgba(255,60,0,0.3)} 50%{box-shadow:0 0 20px rgba(255,60,0,0.7)} }
+        .techo-pulsando { animation: techo-pulse 1.5s infinite; }
         .radar-coin-nombre {
             font-size: 14px; font-weight: 900; color: #fff; margin-bottom: 4px;
         }
@@ -738,6 +748,12 @@
 </header>
 
 <div id="nuclearAlert">🏆 MONITOR DE REVERSIÓN EXTREMA ACTIVO...</div>
+<div id="btcEthBar" style="background:#07101f;border-bottom:1px solid rgba(255,255,255,0.04);padding:5px 16px;display:flex;align-items:center;gap:12px;font-size:11px;overflow-x:auto;">
+    <span style="color:#475569;font-weight:700;white-space:nowrap;">CORRELACIÓN:</span>
+    <span id="btcCorrelDisplay" style="white-space:nowrap;">₿ BTC: <b style="color:#94a3b8;">—</b></span>
+    <span id="ethCorrelDisplay" style="white-space:nowrap;">Ξ ETH: <b style="color:#94a3b8;">—</b></span>
+    <span style="color:#334155;font-size:10px;white-space:nowrap;">| Si BTC/ETH caen, monedas en techo tienen mayor riesgo</span>
+</div>
 
 <div class="container">
 
@@ -875,6 +891,11 @@
             style="background:rgba(243,186,47,0.1);color:#f3ba2f;border-color:transparent;">
             ⚠️ AGOTÁNDOSE
         </button>
+        <button class="radar-tab" id="tabTecho" onclick="filtrarRadar('techo')"
+            style="background:rgba(255,60,0,0.15);color:#ff3c00;border-color:transparent;position:relative;">
+            🔴 EN TECHO → CAÍDA
+            <span style="position:absolute;top:-6px;right:-6px;background:#ff3c00;color:#fff;font-size:9px;font-weight:900;padding:1px 5px;border-radius:8px;" id="contTecho">0</span>
+        </button>
     </div>
 
     <div class="radar-seccion" id="radarContenido">
@@ -936,6 +957,11 @@ let historialPrecios2Min = {};
 // Historial de velocidad para detectar tendencia sostenida (últimos 5 ciclos = 10 seg)
 let historialVelocidad = {};
 let radarFijado = false;
+
+// ── CORRELACIÓN BTC/ETH ──────────────────────────────────────
+let btcEthHistorial = { BTCUSDT: [], ETHUSDT: [] };
+let btcEthInfluencia = {}; // symbol -> { btcCorr, ethCorr }
+let techoScoreHistorial = {}; // historial de score de techo
         let contadorAvisosMismoEstado = 0;
         let ultimaAlertaVoz = "";
 
@@ -1811,7 +1837,7 @@ function cerrarRadarExplosivo() {
 function filtrarRadar(tipo) {
     radarFiltroActual = tipo;
     // Actualizar tabs
-    ['todas','bomba','lista','caida','agotado'].forEach(t => {
+    ['todas','bomba','lista','caida','agotado','techo'].forEach(t => {
         const tab = document.getElementById('tab' + t.charAt(0).toUpperCase() + t.slice(1));
         if (!tab) return;
         if (t === tipo) {
@@ -1870,6 +1896,140 @@ function detectarListaParaDespegar(c) {
     return caidaBuena && enZonaBaja && iniciaRebote && volumenPresente && ciclosCreciendo;
 }
 
+// ══════════════════════════════════════════════════════════════════
+// DETECTOR DE TECHO + PRÓXIMA CAÍDA — Sistema avanzado CDC
+// ══════════════════════════════════════════════════════════════════
+
+// Calcula un score de 0-100 que indica la probabilidad de caída desde el techo
+function calcularScoreTecho(c) {
+    let score = 0;
+
+    // 1. POSICIÓN EN RANGO — entre más cerca del 100%, más crítico
+    if (c.posicionPorcentaje >= 97) score += 35;
+    else if (c.posicionPorcentaje >= 94) score += 28;
+    else if (c.posicionPorcentaje >= 90) score += 20;
+    else score += 10; // 88-89%
+
+    // 2. PÉRDIDA DE IMPULSO — lo más importante: momentum frenando o negativo
+    const velPromAbs = Math.abs(c.velPromedio || 0);
+    if ((c.velPromedio || 0) < 0) score += 25;           // ya bajando = máxima urgencia
+    else if (velPromAbs < 0.002) score += 18;            // detenido = agotamiento
+    else if (velPromAbs < 0.006) score += 10;            // frenando
+
+    // 3. CICLOS BAJANDO — confirma que el impulso se acabó
+    const ciclosBaj = c.ciclosBajando || 0;
+    if (ciclosBaj >= 4) score += 22;
+    else if (ciclosBaj >= 3) score += 15;
+    else if (ciclosBaj >= 2) score += 8;
+
+    // 4. CAMBIO 2MIN NEGATIVO — la caída ya comenzó
+    if (c.cambioReal2Min < -0.4) score += 20;
+    else if (c.cambioReal2Min < -0.2) score += 13;
+    else if (c.cambioReal2Min < 0) score += 6;
+
+    // 5. RSI SOBRECOMPRADO — calculado externamente y almacenado en prediccionCDC
+    const pred = prediccionCDC[c.symbol];
+    if (pred && pred.rsi !== null) {
+        if (pred.rsi > 78) score += 12;
+        else if (pred.rsi > 70) score += 7;
+    }
+
+    // 6. BONUS si ya tiene alerta de agotamiento o derrumbe
+    if (c.alertaAgotamientoSubida) score += 8;
+    if (c.alertaDerrumbe) score += 10;
+
+    // 7. CORRELACIÓN BTC/ETH — si BTC está cayendo, amplifica el riesgo
+    const infl = btcEthInfluencia[c.symbol];
+    if (infl) {
+        if (infl.btcCayendo && infl.corrAlta) score += 10;
+        if (infl.ethCayendo && infl.corrAlta) score += 6;
+    }
+
+    return Math.min(score, 100);
+}
+
+function detectarEnTechoProximaCaida(c) {
+    // Solo monedas que YA llegaron al máximo del día (>=88% del rango 24h)
+    if (c.posicionPorcentaje < 88) return false;
+    // Volumen mínimo para que la señal sea válida
+    if ((c.volume || 0) < 5000000) return false;
+    // No incluir monedas que siguen subiendo fuerte (esas van a BOMBA/MOMENTUM)
+    // Solo las que subieron y ahora frenan o caen
+    const sigueExplotando = c.cambioReal2Min > 0.5 && (c.velPromedio || 0) > 0.01 && c.ciclosSubiendo >= 4;
+    if (sigueExplotando) return false;
+    return true;
+}
+
+// Genera texto de pronóstico de caída con múltiples señales
+function generarPronosticosCaida(c) {
+    const señales = [];
+    const pred = prediccionCDC[c.symbol];
+    const infl = btcEthInfluencia[c.symbol];
+
+    if (c.posicionPorcentaje >= 93) señales.push("⚠️ En el 93%+ del máximo diario");
+    if (c.ciclosBajando >= 3) señales.push(`📉 ${c.ciclosBajando}/5 ciclos recientes son bajistas`);
+    if (Math.abs(c.velPromedio || 0) < 0.003) señales.push("🛑 Velocidad casi detenida — impulso agotado");
+    if (c.cambioReal2Min < -0.2) señales.push(`💨 Ya cae ${c.cambioReal2Min.toFixed(2)}% en 2 min`);
+    if (pred && pred.rsi !== null && pred.rsi > 70) señales.push(`📊 RSI=${pred.rsi} — Sobrecomprado`);
+    if (c.alertaAgotamientoSubida) señales.push("🔋 Alerta de agotamiento confirmada");
+    if (c.alertaDerrumbe) señales.push("💥 Derrumbe activo detectado");
+    if (infl && infl.btcCayendo) señales.push("₿ BTC cayendo — arrastra al mercado");
+    if (infl && infl.ethCayendo) señales.push("Ξ ETH cayendo — presión bajista adicional");
+    if (c.caidaDesdeMaximo > 0.5 && c.caidaDesdeMaximo < 3) señales.push(`📌 Inicio de caída: -${c.caidaDesdeMaximo.toFixed(2)}% desde el máximo`);
+
+    return señales.slice(0, 4); // máximo 4 pronósticos por tarjeta
+}
+
+// ── CORRELACIÓN CON BTC Y ETH ─────────────────────────────────
+function actualizarBarraCorrelacion(btcCayendo, ethCayendo, btcProm, ethProm) {
+    const btcEl = document.getElementById('btcCorrelDisplay');
+    const ethEl = document.getElementById('ethCorrelDisplay');
+    if (!btcEl || !ethEl) return;
+
+    const btcColor = btcCayendo ? '#ff2a3b' : '#0ecb81';
+    const ethColor = ethCayendo ? '#ff2a3b' : '#0ecb81';
+    const btcIcon = btcCayendo ? '📉' : '📈';
+    const ethIcon = ethCayendo ? '📉' : '📈';
+    const btcStatus = btcCayendo ? 'CAYENDO ⚠️' : 'SUBIENDO ✅';
+    const ethStatus = ethCayendo ? 'CAYENDO ⚠️' : 'SUBIENDO ✅';
+
+    btcEl.innerHTML = `₿ BTC: <b style="color:${btcColor};">${btcIcon} ${btcStatus}</b>`;
+    ethEl.innerHTML = `Ξ ETH: <b style="color:${ethColor};">${ethIcon} ${ethStatus}</b>`;
+}
+
+// ── CORRELACIÓN CON BTC Y ETH ─────────────────────────────────
+function actualizarCorrelacionBtcEth(allData) {
+    // Rastrear historial de BTC y ETH
+    ['BTCUSDT','ETHUSDT'].forEach(sym => {
+        const d = allData[sym];
+        if (!d) return;
+        if (!btcEthHistorial[sym]) btcEthHistorial[sym] = [];
+        btcEthHistorial[sym].push(d.velocidad || 0);
+        if (btcEthHistorial[sym].length > 10) btcEthHistorial[sym].shift();
+    });
+
+    const btcVels = btcEthHistorial['BTCUSDT'] || [];
+    const ethVels = btcEthHistorial['ETHUSDT'] || [];
+    const btcPromedio = btcVels.length > 0 ? btcVels.reduce((a,b)=>a+b,0)/btcVels.length : 0;
+    const ethPromedio = ethVels.length > 0 ? ethVels.reduce((a,b)=>a+b,0)/ethVels.length : 0;
+    const btcCayendo = btcPromedio < -0.001;
+    const ethCayendo = ethPromedio < -0.001;
+
+    // Para cada moneda, medir si su movimiento correlaciona con BTC
+    Object.keys(allData).forEach(sym => {
+        const c = allData[sym];
+        if (!c) return;
+        // Correlación alta si la moneda también está en zona alta y tiene impulso similar
+        const corrAlta = (c.posicionPorcentaje >= 88) && (c.volume > 8000000);
+        btcEthInfluencia[sym] = {
+            btcCayendo, ethCayendo, corrAlta,
+            btcPromedio, ethPromedio
+        };
+    });
+    actualizarBarraCorrelacion(btcCayendo, ethCayendo, btcPromedio, ethPromedio);
+}
+
+
 function renderizarRadar() {
     const contenido = document.getElementById('radarContenido');
     if (!contenido) return;
@@ -1886,7 +2046,8 @@ function renderizarRadar() {
         bomba:    [],  // explosión activa en curso (LONG)
         lista:    [],  // cayó y está lista para despegar (rebote)
         caida:    [],  // cayendo fuerte (SHORT/salida)
-        agotado:  []   // subió mucho y se agota (cerca de reversión)
+        agotado:  [],  // subió mucho y se agota (cerca de reversión)
+        techo:    []   // 🔴 EN TECHO Y A PUNTO DE CAER — PRIORIDAD MÁXIMA
     };
 
     todas.forEach(c => {
@@ -1895,11 +2056,14 @@ function renderizarRadar() {
         if (detectarListaParaDespegar(c))  grupos.lista.push(c);
         if (c.alertaDerrumbe)             grupos.caida.push(c);
         if (c.alertaAgotamientoSubida)    grupos.agotado.push(c);
+        if (detectarEnTechoProximaCaida(c))  grupos.techo.push(c);
     });
 
     // Ordenar: momentum por score especial, resto por score explosivo
     grupos.momentum.sort((a,b) => calcularScoreMomentum(b) - calcularScoreMomentum(a));
     grupos.momentum = grupos.momentum.slice(0, 15);
+    grupos.techo.sort((a,b) => calcularScoreTecho(b) - calcularScoreTecho(a));
+    grupos.techo = grupos.techo.slice(0, 20);
     ['bomba','lista','caida','agotado'].forEach(k => {
         grupos[k].sort((a,b) => calcularScoreExplosivo(b) - calcularScoreExplosivo(a));
         grupos[k] = grupos[k].slice(0, 20);
@@ -1912,8 +2076,15 @@ function renderizarRadar() {
         contMom.style.display = grupos.momentum.length > 0 ? 'inline' : 'none';
     }
 
+    // Actualizar badge de techo
+    const contTechoEl = document.getElementById('contTecho');
+    if (contTechoEl) {
+        contTechoEl.textContent = grupos.techo.length;
+        contTechoEl.style.display = grupos.techo.length > 0 ? 'inline' : 'none';
+    }
+
     // Actualizar contador total en el botón flotante
-    const total = grupos.momentum.length + grupos.bomba.length + grupos.lista.length + grupos.caida.length + grupos.agotado.length;
+    const total = grupos.momentum.length + grupos.bomba.length + grupos.lista.length + grupos.caida.length + grupos.agotado.length + grupos.techo.length;
     const contEl = document.getElementById('radarContador');
     if (contEl) contEl.textContent = total > 99 ? '99+' : total;
 
@@ -2000,8 +2171,7 @@ function renderizarRadar() {
             const medalla = idx === 0 ? '🥇' : idx === 1 ? '🥈' : idx === 2 ? '🥉' : `#${idx+1}`;
 
             // Color de urgencia según posición en rango
-            const urgenciaColor = c.posicionPorcentaje >= 90 ? '#ff6b00' :
-                                   c.posicionPorcentaje >= 80 ? '#ffa500' : '#f3ba2f';
+            const urgenciaColor = c.posicionPorcentaje >= 97 ? '#ff2a3b' : c.posicionPorcentaje >= 93 ? '#ff6b00' : '#f3ba2f';
 
             h += `
             <div class="radar-card tipo-momentum" onclick="cerrarRadarExplosivo(); seleccionarMoneda('${c.symbol}');">
@@ -2058,6 +2228,70 @@ function renderizarRadar() {
     html += renderGrupo('LISTAS PARA DESPEGAR — Rebote desde suelo', '⚡', grupos.lista,   'lista',   '#00b4d8');
     html += renderGrupo('CAYENDO FUERTE — Oportunidad SHORT', '💥', grupos.caida,   'caida',   '#ff2a3b');
     html += renderGrupo('AGOTÁNDOSE — Posible reversión bajista', '⚠️', grupos.agotado, 'agotado', '#f3ba2f');
+    html += renderTecho();
+
+
+    // ── Render especial para TECHO → PRÓXIMA CAÍDA ──
+    const renderTecho = () => {
+        if (radarFiltroActual !== 'todas' && radarFiltroActual !== 'techo') return '';
+        let h = `<div class="radar-titulo-seccion" style="color:#ff3c00;">
+            🔴 EN TECHO → PRÓXIMA CAÍDA
+            <span style="font-size:10px;background:rgba(255,60,0,0.15);padding:2px 8px;border-radius:10px;color:#ff6b00;">${grupos.techo.length}</span>
+            <span style="font-size:9px;color:#64748b;margin-left:4px;">por score de caída inminente</span>
+        </div>`;
+
+        if (grupos.techo.length === 0) {
+            h += `<div class="radar-vacio" style="padding:16px;">Sin monedas en techo extremo ahora. El mercado no muestra techos de riesgo alto.</div>`;
+            return h;
+        }
+
+        h += `<div class="radar-grid">`;
+        grupos.techo.forEach((c, idx) => {
+            const sym = c.symbol.replace('USDT','');
+            const scoreTecho = calcularScoreTecho(c);
+            const pronosticos = generarPronosticosCaida(c);
+            const urgenciaColor = scoreTecho >= 75 ? '#ff2a3b' : scoreTecho >= 55 ? '#ff6b00' : '#f3ba2f';
+            const medalla = idx === 0 ? '🥇' : idx === 1 ? '🥈' : idx === 2 ? '🥉' : `#${idx+1}`;
+            const infl = btcEthInfluencia[c.symbol] || {};
+            const pred = prediccionCDC[c.symbol];
+            const rsiVal = pred && pred.rsi !== null ? pred.rsi : '—';
+            const rsiColor = pred && pred.rsi > 70 ? '#ff2a3b' : '#94a3b8';
+
+            h += `
+            <div class="radar-card tipo-techo ${scoreTecho >= 65 ? 'techo-pulsando' : ''}" onclick="cerrarRadarExplosivo(); seleccionarMoneda('${c.symbol}');" style="min-height:180px;">
+                <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px;">
+                    <div class="radar-coin-nombre" style="color:#fff;">${sym} <span style="font-size:10px;color:#475569;">USDT</span></div>
+                    <span style="font-size:13px;">${medalla}</span>
+                </div>
+
+                <!-- Score de riesgo de caída -->
+                <div style="margin:5px 0 3px;display:flex;justify-content:space-between;align-items:center;">
+                    <span style="font-size:10px;color:#94a3b8;">Riesgo caída:</span>
+                    <span style="font-size:13px;font-weight:900;color:${urgenciaColor};">${scoreTecho}%</span>
+                </div>
+                <div class="techo-score-bar">
+                    <div class="techo-score-fill" style="width:${scoreTecho}%;"></div>
+                </div>
+
+                <!-- Posición en rango -->
+                <div style="font-size:10px;color:#94a3b8;margin-top:5px;">
+                    Posición rango: <b style="color:#ff6b00;">${c.posicionPorcentaje.toFixed(1)}%</b>
+                    &nbsp;|&nbsp; Vel 2m: <b style="color:${c.cambioReal2Min < 0 ? '#ff2a3b' : '#0ecb81'};">${c.cambioReal2Min > 0 ? '+' : ''}${c.cambioReal2Min.toFixed(2)}%</b>
+                </div>
+                <div style="font-size:10px;color:#94a3b8;margin-top:2px;">
+                    RSI: <b style="color:${rsiColor};">${rsiVal}</b>
+                    &nbsp;|&nbsp; Ciclos↓: <b style="color:#ff6b00;">${c.ciclosBajando || 0}/5</b>
+                    ${infl.btcCayendo ? '&nbsp;<span style="font-size:9px;background:rgba(255,42,59,0.2);color:#ff6b6b;padding:1px 5px;border-radius:6px;">₿↓</span>' : ''}
+                    ${infl.ethCayendo ? '&nbsp;<span style="font-size:9px;background:rgba(255,42,59,0.2);color:#ff6b6b;padding:1px 5px;border-radius:6px;">Ξ↓</span>' : ''}
+                </div>
+
+                <!-- Pronósticos de caída -->
+                ${pronosticos.length > 0 ? `<div class="techo-pronostico">${pronosticos.join('<br>')}</div>` : ''}
+            </div>`;
+        });
+        h += `</div>`;
+        return h;
+    };
 
     if (html === '') {
         html = '<div class="radar-vacio">No hay señales activas en este momento. El mercado está en calma.</div>';
@@ -2077,11 +2311,20 @@ function actualizarContadorRadar() {
         if (detectarListaParaDespegar(c)) total++;
         if (c.alertaDerrumbe)            total++;
         if (c.alertaAgotamientoSubida)   total++;
+        if (detectarEnTechoProximaCaida(c)) total++;
     });
     const contMom = document.getElementById('contMomentum');
     if (contMom) {
         contMom.textContent = totalMom;
         contMom.style.display = totalMom > 0 ? 'inline' : 'none';
+    }
+    // Techo counter en tab
+    let totalTecho = 0;
+    todas.forEach(c => { if (detectarEnTechoProximaCaida(c)) totalTecho++; });
+    const contTechoTab = document.getElementById('contTecho');
+    if (contTechoTab) {
+        contTechoTab.textContent = totalTecho;
+        contTechoTab.style.display = totalTecho > 0 ? 'inline' : 'none';
     }
     const contEl = document.getElementById('radarContador');
     if (contEl) {
