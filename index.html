@@ -779,39 +779,50 @@
     <span style="color:#334155;font-size:10px;white-space:nowrap;">| Si BTC/ETH caen, monedas en techo tienen mayor riesgo</span>
 </div>
 
-<div id="newsTickerBar" style="background:#0a1628;border-bottom:1px solid rgba(255,255,255,0.06);display:flex;align-items:center;height:34px;overflow:hidden;position:relative;">
-    <div style="background:#0ecb81;color:#03110a;font-weight:900;font-size:10px;padding:0 12px;height:100%;display:flex;align-items:center;white-space:nowrap;z-index:2;box-shadow:4px 0 8px rgba(0,0,0,0.3);">📰 NOTICIAS</div>
+<div id="newsTickerBar" style="background:#0a0a0a;border-bottom:2px solid #cc0000;display:flex;align-items:center;height:42px;overflow:hidden;position:relative;">
+    <div style="background:#cc0000;color:#fff;font-weight:900;font-size:11px;padding:0 14px;height:100%;display:flex;align-items:center;white-space:nowrap;z-index:2;letter-spacing:1px;box-shadow:4px 0 12px rgba(204,0,0,0.5);">📺 BREAKING</div>
     <div id="newsTickerViewport" style="flex:1;overflow:hidden;height:100%;position:relative;">
         <div id="newsTickerTrack" style="display:flex;align-items:center;height:100%;white-space:nowrap;position:absolute;will-change:transform;">
-            <span style="color:#475569;font-size:11px;padding:0 24px;">Cargando noticias del mercado...</span>
+            <span style="color:#999;font-size:12px;font-weight:600;padding:0 24px;font-family:Arial,sans-serif;">Cargando noticias del mercado...</span>
         </div>
     </div>
-    <button onclick="abrirPanelNoticias()" title="Ver todas las alertas de riesgo" style="background:rgba(255,255,255,0.06);border:none;color:#94a3b8;font-size:11px;padding:0 12px;height:100%;cursor:pointer;white-space:nowrap;z-index:2;">👁 Ver todas</button>
-    <button onclick="abrirPanelNoticiasGenerales()" title="Noticias generales del mercado, traducidas" style="background:rgba(243,186,47,0.12);border:none;color:#f3ba2f;font-size:11px;padding:0 12px;height:100%;cursor:pointer;white-space:nowrap;z-index:2;border-left:1px solid rgba(255,255,255,0.06);">🌐 Noticias generales</button>
+    <button onclick="abrirPanelNoticias()" title="Ver todas las alertas de riesgo" style="background:#1a0000;border:none;border-left:1px solid #cc0000;color:#ff4444;font-size:11px;font-weight:700;padding:0 14px;height:100%;cursor:pointer;white-space:nowrap;z-index:2;letter-spacing:0.5px;">▶ ALERTAS</button>
+    <button onclick="abrirPanelNoticiasGenerales()" title="Noticias generales del mercado, traducidas" style="background:#111;border:none;border-left:1px solid #333;color:#ccc;font-size:11px;font-weight:700;padding:0 14px;height:100%;cursor:pointer;white-space:nowrap;z-index:2;letter-spacing:0.5px;">🌐 MERCADO</button>
 </div>
 
-<div id="panelNoticias" class="overlay-panel" style="display:none;">
-    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px;">
-        <h2 style="color:#00d4ff;font-size:18px;margin:0;">📰 Noticias del mercado</h2>
-        <button onclick="cerrarPanelNoticias()" style="background:rgba(255,255,255,0.08);border:none;color:#fff;border-radius:8px;padding:8px 14px;font-size:12px;font-weight:700;cursor:pointer;">✕ CERRAR</button>
+<div id="panelNoticias" class="overlay-panel" style="display:none;background:rgba(0,0,0,0.97);">
+    <!-- Cabecera estilo CNN -->
+    <div style="border-bottom:3px solid #cc0000;padding-bottom:14px;margin-bottom:18px;display:flex;justify-content:space-between;align-items:center;">
+        <div>
+            <div style="font-size:11px;font-weight:900;color:#cc0000;letter-spacing:2px;margin-bottom:4px;">📺 CNN CRYPTO — BREAKING NEWS</div>
+            <div style="font-size:22px;font-weight:900;color:#ffffff;font-family:Arial,sans-serif;line-height:1.1;">ALERTAS DE RIESGO EN TIEMPO REAL</div>
+        </div>
+        <button onclick="cerrarPanelNoticias()" style="background:#cc0000;border:none;color:#fff;border-radius:4px;padding:10px 18px;font-size:12px;font-weight:900;cursor:pointer;letter-spacing:1px;">✕ CERRAR</button>
     </div>
-    <p style="color:#64748b;font-size:11px;margin:0 0 14px;">El ticker muestra SOLO alertas de riesgo real, combinando tres fuentes: (1) movimientos de precio anormales detectados al instante (caídas o subidas extremas en 2 minutos, el tipo de comportamiento típico de un hackeo, delisting sorpresa o colapso de liquidez), (2) un intento automático de traer los avisos oficiales de Binance (hackeos, suspensiones de depósitos/retiros, delistings, LPP) cada 8 minutos, y (3) titulares reales de Cointelegraph cada 6 minutos, filtrados por las mismas palabras clave de riesgo. Las fuentes (2) y (3) usan endpoints/proxies de terceros que <b>no son oficiales ni soportados</b> — pueden funcionar hoy y dejar de responder cualquier día sin aviso. Si eso pasa, el ticker sigue funcionando igual con las alertas de movimiento de precio, y tú puedes pegar manualmente los avisos importantes aquí.</p>
-    <div id="estadoAvisosOficiales" style="font-size:10px;color:#475569;margin:0 0 6px;">Avisos oficiales: esperando primera verificación...</div>
-    <div id="estadoCointelegraph" style="font-size:10px;color:#475569;margin:0 0 12px;">Cointelegraph: esperando primera verificación...</div>
 
-    <div id="listaNoticiasCompleta" style="display:flex;flex-direction:column;gap:8px;max-height:50vh;overflow-y:auto;"></div>
+    <!-- Estado de fuentes, compacto -->
+    <div style="display:flex;gap:16px;margin-bottom:16px;flex-wrap:wrap;">
+        <div id="estadoAvisosOficiales" style="font-size:11px;font-weight:700;color:#666;font-family:Arial,sans-serif;">⏳ Binance: verificando...</div>
+        <div id="estadoCointelegraph" style="font-size:11px;font-weight:700;color:#666;font-family:Arial,sans-serif;">⏳ Cointelegraph: verificando...</div>
+    </div>
+
+    <div id="listaNoticiasCompleta" style="display:flex;flex-direction:column;gap:0;max-height:55vh;overflow-y:auto;"></div>
 </div>
 
-<div id="panelNoticiasGenerales" class="overlay-panel" style="display:none;">
-    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px;">
-        <h2 style="color:#f3ba2f;font-size:18px;margin:0;">🌐 Noticias generales del mercado</h2>
-        <button onclick="cerrarPanelNoticiasGenerales()" style="background:rgba(255,255,255,0.08);border:none;color:#fff;border-radius:8px;padding:8px 14px;font-size:12px;font-weight:700;cursor:pointer;">✕ CERRAR</button>
+<div id="panelNoticiasGenerales" class="overlay-panel" style="display:none;background:rgba(0,0,0,0.97);">
+    <!-- Cabecera estilo CNN -->
+    <div style="border-bottom:3px solid #cc0000;padding-bottom:14px;margin-bottom:18px;display:flex;justify-content:space-between;align-items:center;">
+        <div>
+            <div style="font-size:11px;font-weight:900;color:#cc0000;letter-spacing:2px;margin-bottom:4px;">📺 CNN CRYPTO — MARKET NEWS</div>
+            <div style="font-size:22px;font-weight:900;color:#ffffff;font-family:Arial,sans-serif;line-height:1.1;">NOTICIAS GENERALES DEL MERCADO</div>
+        </div>
+        <button onclick="cerrarPanelNoticiasGenerales()" style="background:#cc0000;border:none;color:#fff;border-radius:4px;padding:10px 18px;font-size:12px;font-weight:900;cursor:pointer;letter-spacing:1px;">✕ CERRAR</button>
     </div>
-    <p style="color:#64748b;font-size:11px;margin:0 0 14px;">Titulares recientes de varios medios cripto (CoinDesk, Cointelegraph, Decrypt, Bitcoin.com), traducidos automáticamente al español. Esta sección es independiente del ticker de alertas de riesgo: aquí entran todas las noticias, no solo las de riesgo.</p>
-    <div id="estadoNoticiasGenerales" style="font-size:10px;color:#475569;margin:0 0 12px;">Conectando con las fuentes…</div>
 
-    <div id="listaNoticiasGenerales" style="display:flex;flex-direction:column;gap:8px;max-height:55vh;overflow-y:auto;">
-        <div class="radar-vacio" style="padding:16px;">Cargando noticias…</div>
+    <div id="estadoNoticiasGenerales" style="font-size:11px;font-weight:700;color:#666;font-family:Arial,sans-serif;margin-bottom:16px;">Conectando con las fuentes…</div>
+
+    <div id="listaNoticiasGenerales" style="display:flex;flex-direction:column;gap:0;max-height:58vh;overflow-y:auto;">
+        <div style="padding:20px;color:#666;font-family:Arial,sans-serif;">Cargando noticias…</div>
     </div>
 </div>
 
@@ -2113,11 +2124,17 @@ function renderizarPanelNoticiasGenerales() {
         return;
     }
 
-    cont.innerHTML = noticiasGeneralesFeed.map(n => `
-        <a href="${n.link}" target="_blank" rel="noopener noreferrer" style="display:block;background:rgba(255,255,255,0.03);border-left:3px solid #f3ba2f;border-radius:6px;padding:8px 10px;text-decoration:none;color:#e2e8f0;">
-            <div style="font-size:10px;color:#f3ba2f;font-weight:700;margin-bottom:3px;">${n.fuente}${n.fecha ? ' · ' + formatearFechaNoticiaGeneral(n.fecha) : ''}</div>
-            <div style="font-size:12px;line-height:1.4;">${n.titulo}</div>
-        </a>
+    cont.innerHTML = noticiasGeneralesFeed.map((n, i) => `
+        <div style="padding:16px 4px;border-bottom:1px solid #1a1a1a;font-family:Arial,sans-serif;">
+            <div style="display:flex;align-items:center;gap:10px;margin-bottom:8px;">
+                <span style="font-size:10px;font-weight:900;color:#cc0000;letter-spacing:1.5px;">${n.fuente.toUpperCase()}</span>
+                ${n.fecha ? `<span style="font-size:10px;color:#555;">${formatearFechaNoticiaGeneral(n.fecha)}</span>` : ''}
+            </div>
+            <a href="${n.link}" target="_blank" rel="noopener noreferrer" style="text-decoration:none;">
+                <div style="font-size:17px;font-weight:700;color:#ffffff;line-height:1.35;letter-spacing:-0.2px;">${n.titulo}</div>
+                <div style="font-size:11px;color:#cc0000;margin-top:6px;font-weight:700;">Leer más ▶</div>
+            </a>
+        </div>
     `).join('');
 }
 
@@ -2194,32 +2211,34 @@ function renderizarListaNoticiasCompleta() {
         cont.innerHTML = '<div class="radar-vacio" style="padding:16px;">Todavía no hay noticias generadas en este ciclo.</div>';
         return;
     }
-    cont.innerHTML = noticiasFeed.map(n => {
+    cont.innerHTML = noticiasFeed.map((n, i) => {
         const hora = new Date(n.ts).toLocaleTimeString('es-BO');
         const color = colorPorTipoNoticia(n.tipo);
-        const badge = {
-            riesgo:   { bg: 'rgba(255,42,59,0.15)',  label: '🚨 RIESGO' },
-            oficial:  { bg: 'rgba(243,186,47,0.10)', label: '📌 OFICIAL' },
-            bomba:    { bg: 'rgba(14,203,129,0.10)', label: '📈 SUBIDA' },
-            derrumbe: { bg: 'rgba(255,42,59,0.10)',  label: '📉 CAÍDA' },
-            rebote:   { bg: 'rgba(0,212,255,0.10)',  label: '↩️ REBOTE' },
-            volumen:  { bg: 'rgba(243,186,47,0.10)', label: '📊 VOLUMEN' },
-            manual:   { bg: 'rgba(167,139,250,0.10)',label: '✍️ MANUAL' },
-            general:  { bg: 'rgba(100,116,139,0.10)',label: '📰 NOTICIA' },
-        }[n.tipo] || { bg: 'rgba(255,255,255,0.03)', label: '📰' };
 
-        // Limpiar prefijos largos del texto para que solo quede lo relevante
+        const etiqueta = {
+            riesgo:   { txt: '🔴 ALERTA',   col: '#cc0000' },
+            oficial:  { txt: '🟡 BINANCE',  col: '#f3ba2f' },
+            bomba:    { txt: '🟢 SUBIDA',   col: '#0ecb81' },
+            derrumbe: { txt: '🔴 CAÍDA',    col: '#ff2a3b' },
+            rebote:   { txt: '🔵 REBOTE',   col: '#00d4ff' },
+            volumen:  { txt: '🟠 VOLUMEN',  col: '#f3ba2f' },
+            manual:   { txt: '🟣 MANUAL',   col: '#a78bfa' },
+            general:  { txt: '⚪ NOTICIA',  col: '#999'    },
+        }[n.tipo] || { txt: '⚪ INFO', col: '#999' };
+
+        // Limpiar prefijos del texto
         const textoLimpio = n.texto
             .replace(/^🚨\s*(CT|Binance Futuros|Binance):\s*/i, '')
             .replace(/^📌\s*Binance:\s*/i, '')
+            .replace(/^🚀\s*DESPEGUE:\s*/i, '')
             .replace(/^📰\s*\[[^\]]+\]\s*/i, '');
 
-        return `<div style="background:${badge.bg};border-left:3px solid ${color};border-radius:8px;padding:10px 12px;display:flex;flex-direction:column;gap:4px;">
-            <div style="display:flex;align-items:center;gap:6px;">
-                <span style="font-size:9px;font-weight:700;color:${color};letter-spacing:0.5px;">${badge.label}</span>
-                <span style="font-size:9px;color:#475569;margin-left:auto;">${hora}</span>
+        return `<div style="padding:16px 4px;border-bottom:1px solid #1a1a1a;font-family:Arial,sans-serif;">
+            <div style="display:flex;align-items:center;gap:10px;margin-bottom:8px;">
+                <span style="font-size:10px;font-weight:900;color:${etiqueta.col};letter-spacing:1.5px;">${etiqueta.txt}</span>
+                <span style="font-size:10px;color:#555;margin-left:auto;">${hora}</span>
             </div>
-            <div style="font-size:12px;color:#e2e8f0;line-height:1.45;font-weight:500;">${textoLimpio}</div>
+            <div style="font-size:17px;font-weight:700;color:#ffffff;line-height:1.35;letter-spacing:-0.2px;">${textoLimpio}</div>
         </div>`;
     }).join('');
 }
@@ -2245,9 +2264,14 @@ function renderizarTickerNoticias() {
     }
 
     const itemsHtml = fuente.slice(0, 15).map(n => {
-        const color = colorPorTipoNoticia(n.tipo);
-        return `<span style="color:${color};font-size:11px;padding:0 28px;font-weight:600;">${n.texto}</span>`;
-    }).join('<span style="color:#334155;">•</span>');
+        const color = usandoRelleno ? '#aaa' : colorPorTipoNoticia(n.tipo);
+        const textoLimpio = n.texto
+            .replace(/^🚨\s*(CT|Binance Futuros|Binance):\s*/i, '')
+            .replace(/^📌\s*Binance:\s*/i, '')
+            .replace(/^🚀\s*DESPEGUE:\s*/i, '')
+            .replace(/^📰\s*\[[^\]]+\]\s*/i, '');
+        return `<span style="color:${color};font-size:13px;padding:0 32px;font-weight:700;font-family:Arial,sans-serif;letter-spacing:0.2px;">${textoLimpio}</span>`;
+    }).join('<span style="color:#cc0000;font-size:14px;font-weight:900;">  ●  </span>');
 
     // Firma del contenido actual: si no cambió respecto al render anterior, NO tocamos el DOM
     // ni la animación. Antes esta función se llamaba cada 2s y SIEMPRE reiniciaba la animación
