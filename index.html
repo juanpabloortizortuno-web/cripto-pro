@@ -1744,15 +1744,40 @@ async function revisarAvisosOficialesBinance() {
             const htmlTexto = await resp.text();
 
             // Cada anuncio aparece como un enlace a /support/announcement/detail/<id>
-            // con el título como texto del enlace. Extraemos pares (id, título) únicos.
-            const regexAnuncio = /\/support\/announcement\/detail\/([a-f0-9]+)(?:\?[^"'>]*)?["'][^>]*>([^<]+)<\/a>/gi;
+            // con el título como texto del enlace. El formato exacto puede variar según
+            // cómo lo devuelva el proxy (HTML crudo vs. una versión ya "limpiada" tipo
+            // markdown), así que probamos varios patrones en cascada y usamos el primero
+            // que encuentre resultados, en vez de depender de uno solo.
+            const patronesAnuncio = [
+                // Formato HTML clásico: <a href="/.../detail/ID...">Título</a>
+                /\/support\/announcement\/detail\/([a-f0-9]+)(?:\?[^"'>]*)?["'][^>]*>([^<]{4,200})<\/a>/gi,
+                // Formato tipo markdown: [Título](/.../detail/ID...)
+                /\[([^\[\]]{4,200})\]\(\/[a-zA-Z-]*\/support\/announcement\/detail\/([a-f0-9]+)[^)]*\)/gi,
+            ];
+
             const vistos = new Set();
-            let match;
-            while ((match = regexAnuncio.exec(htmlTexto)) !== null) {
-                const id = match[1];
-                const titulo = match[2].trim();
-                if (!titulo || vistos.has(id)) continue;
-                vistos.add(id);
+            let anunciosEncontrados = [];
+
+            for (const patron of patronesAnuncio) {
+                let match;
+                while ((match = patron.exec(htmlTexto)) !== null) {
+                    // El orden de los grupos de captura difiere entre patrones: el primero
+                    // captura (id, titulo) y el segundo (titulo, id). Detectamos cuál es cuál
+                    // viendo cuál de los dos grupos parece un id hexadecimal.
+                    const esHex = (s) => /^[a-f0-9]+$/i.test(s);
+                    let id, titulo;
+                    if (esHex(match[1]) && !esHex(match[2])) { id = match[1]; titulo = match[2]; }
+                    else { titulo = match[1]; id = match[2]; }
+
+                    titulo = titulo.trim();
+                    if (!titulo || vistos.has(id)) continue;
+                    vistos.add(id);
+                    anunciosEncontrados.push({ id, titulo });
+                }
+                if (anunciosEncontrados.length > 0) break; // un patrón ya funcionó, no probar los demás
+            }
+
+            for (const { id, titulo } of anunciosEncontrados) {
 
                 const tituloLower = titulo.toLowerCase();
                 const esRiesgo = PALABRAS_PELIGRO.some(palabra => tituloLower.includes(palabra));
