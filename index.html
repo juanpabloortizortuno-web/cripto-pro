@@ -4,6 +4,19 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>CDC FUTURO — Terminal</title>
+
+<!-- PWA: manifest y metadatos de instalación -->
+<link rel="manifest" href="./manifest.json">
+<meta name="theme-color" content="#f59e0b">
+
+<!-- iOS no lee el manifest.json para estos comportamientos; necesita sus propios meta tags -->
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Cripto PRO">
+<link rel="apple-touch-icon" href="./icon-192.png">
+
+<link rel="icon" type="image/png" sizes="192x192" href="./icon-192.png">
+<link rel="icon" type="image/png" sizes="512x512" href="./icon-512.png">
 <style>
   :root{
     --bg: #050a14;
@@ -271,6 +284,60 @@ function formatearFecha(pubDate){
   return d.toLocaleDateString('es-BO', { day:'2-digit', month:'short', hour:'2-digit', minute:'2-digit' });
 }
 
+// ---------------------------------------------------------------
+// Traducción automática de titulares (las fuentes son en inglés).
+// Usa el endpoint público de Google Translate. Si falla, se deja
+// el título original en inglés en vez de romper la noticia.
+// Cachea traducciones en localStorage para no repetir trabajo.
+// ---------------------------------------------------------------
+const CACHE_TRAD_KEY = 'cdc_traducciones_v1';
+
+function leerCacheTraducciones(){
+  try{
+    return JSON.parse(localStorage.getItem(CACHE_TRAD_KEY)) || {};
+  }catch{
+    return {};
+  }
+}
+
+function guardarCacheTraducciones(cache){
+  try{
+    // Limitar tamaño del cache para no crecer indefinidamente
+    const entradas = Object.entries(cache);
+    const recortado = entradas.slice(-300);
+    localStorage.setItem(CACHE_TRAD_KEY, JSON.stringify(Object.fromEntries(recortado)));
+  }catch{
+    // Si localStorage no está disponible (modo privado, etc.) seguimos sin cache
+  }
+}
+
+async function traducirTexto(texto){
+  const cache = leerCacheTraducciones();
+  if(cache[texto]) return cache[texto];
+
+  try{
+    const url = `https://translate.googleapis.com/translate_a/single?client=gtx&sl=en&tl=es&dt=t&q=${encodeURIComponent(texto)}`;
+    const res = await fetchConTimeout(url, 6000);
+    const data = JSON.parse(res);
+    const traducido = data[0].map(parte => parte[0]).join('');
+    cache[texto] = traducido;
+    guardarCacheTraducciones(cache);
+    return traducido;
+  }catch(err){
+    console.warn('No se pudo traducir, se muestra original:', err.message);
+    return texto; // fallback: título original en inglés
+  }
+}
+
+async function traducirNoticias(noticias){
+  return Promise.all(
+    noticias.map(async n => ({
+      ...n,
+      titulo: await traducirTexto(n.titulo),
+    }))
+  );
+}
+
 async function fetchConTimeout(url, ms = 8000){
   const controller = new AbortController();
   const id = setTimeout(() => controller.abort(), ms);
@@ -356,7 +423,10 @@ async function cargarNoticias(){
   todas.sort((a, b) => new Date(b.fecha) - new Date(a.fecha));
 
   if(todas.length > 0){
-    renderNoticias(todas.slice(0, 14));
+    const recortadas = todas.slice(0, 14);
+    setStatus('Traduciendo titulares…');
+    const traducidas = await traducirNoticias(recortadas);
+    renderNoticias(traducidas);
     setStatus(
       algunaFalló
         ? 'Conectado parcialmente (alguna fuente no respondió).'
@@ -377,6 +447,18 @@ btnRefresh.addEventListener('click', cargarNoticias);
 // Carga inicial + auto-refresh cada 5 minutos
 cargarNoticias();
 setInterval(cargarNoticias, 5 * 60 * 1000);
+
+// ---------------------------------------------------------------
+// Registro del Service Worker (requerido para que la app sea instalable)
+// ---------------------------------------------------------------
+if('serviceWorker' in navigator){
+  window.addEventListener('load', () => {
+    navigator.serviceWorker.register('./sw.js')
+      .then(() => console.log('Service Worker registrado'))
+      .catch(err => console.warn('No se pudo registrar el Service Worker:', err));
+  });
+}
+
 </script>
 </body>
 </html>
