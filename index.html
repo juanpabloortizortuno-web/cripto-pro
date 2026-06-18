@@ -1800,7 +1800,7 @@ async function revisarAvisosOficialesBinance() {
 
                 if (esRiesgo) {
                     agregarNoticia(
-                        `🚨 ALERTA DE RIESGO BINANCE: ${titulo}`,
+                        `🚨 Binance Futuros: ${titulo}`,
                         'riesgo',
                         'riesgo_' + id,
                         esPrioritario
@@ -1808,7 +1808,7 @@ async function revisarAvisosOficialesBinance() {
                     try { hablar(`Atención. Riesgo elevado detectado. ${titulo}`, true); } catch(e) {}
                 } else {
                     agregarNoticia(
-                        `📋 [Aviso oficial Binance] ${titulo}`,
+                        `📌 Binance: ${titulo}`,
                         'oficial',
                         'oficial_' + id,
                         esPrioritario
@@ -1826,10 +1826,10 @@ async function revisarAvisosOficialesBinance() {
     if (estadoEl) {
         const hora = new Date().toLocaleTimeString('es-BO');
         if (huboExito) {
-            estadoEl.innerHTML = `🟢 Avisos oficiales: conectado correctamente — última actualización ${hora}`;
+            estadoEl.innerHTML = `🟢 Binance: conectado · ${hora}`;
             estadoEl.style.color = '#0ecb81';
         } else if (huboIntento) {
-            estadoEl.innerHTML = `🟡 Avisos oficiales: no disponibles ahora (Binance bloqueó o cambió el formato) — usando solo noticias de mercado + manuales. Último intento ${hora}`;
+            estadoEl.innerHTML = `🟡 Binance: bloqueado · ${hora}`;
             estadoEl.style.color = '#f3ba2f';
         }
     }
@@ -1864,27 +1864,40 @@ async function revisarNoticiasCointelegraph() {
         const items = Array.from(xml.querySelectorAll('item')).slice(0, 20); // últimos 20 titulares
 
         let huboNuevaAlerta = false;
-        items.forEach(item => {
-            const titulo = item.querySelector('title') ? item.querySelector('title').textContent : '';
+        for (const item of items) {
+            const tituloRaw = item.querySelector('title') ? item.querySelector('title').textContent.trim() : '';
             const link = item.querySelector('link') ? item.querySelector('link').textContent : '';
-            if (!titulo) return;
+            if (!tituloRaw) continue;
 
-            const tituloLower = titulo.toLowerCase();
+            const tituloLower = tituloRaw.toLowerCase();
             const esRiesgo = PALABRAS_PELIGRO.some(palabra => tituloLower.includes(palabra));
-            if (!esRiesgo) return; // solo noticias de riesgo real entran al ticker, como pediste
+            if (!esRiesgo) continue; // solo noticias de riesgo real entran al ticker, como pediste
+
+            // Traducir al español si el título parece estar en inglés
+            let titulo = tituloRaw;
+            try {
+                const urlTrad = `https://translate.googleapis.com/translate_a/single?client=gtx&sl=auto&tl=es&dt=t&q=${encodeURIComponent(tituloRaw)}`;
+                const resTrad = await fetch(urlTrad);
+                if (resTrad.ok) {
+                    const dataTrad = await resTrad.json();
+                    titulo = dataTrad[0].map(p => p[0]).join('').trim() || tituloRaw;
+                }
+            } catch(e) { /* usar título original si falla la traducción */ }
 
             agregarNoticia(
-                `🚨 ALERTA (Cointelegraph): ${titulo}`,
+                `🚨 CT: ${titulo}`,
                 'riesgo',
-                'cointelegraph_' + (link || titulo)
+                'cointelegraph_' + (link || tituloRaw)
             );
-            try { hablar(`Atención. Noticia de riesgo en Cointelegraph. ${titulo}`, true); } catch(e) {}
+            try { hablar(`Atención. Riesgo detectado. ${titulo}`, true); } catch(e) {}
             huboNuevaAlerta = true;
-        });
+        }
 
         if (estadoEl) {
             const hora = new Date().toLocaleTimeString('es-BO');
-            estadoEl.innerHTML = `🟢 Cointelegraph: conectado correctamente — última revisión ${hora}${huboNuevaAlerta ? ' (alerta encontrada)' : ' (sin alertas de riesgo nuevas)'}`;
+            estadoEl.innerHTML = huboNuevaAlerta
+                ? `🟢 Cointelegraph · ${hora} · ⚠️ alerta encontrada`
+                : `🟢 Cointelegraph · ${hora} · sin alertas`;
             estadoEl.style.color = '#0ecb81';
         }
     } catch (e) {
@@ -1892,7 +1905,8 @@ async function revisarNoticiasCointelegraph() {
         // o el feed puede cambiar de formato en cualquier momento sin aviso.
         console.log('Noticias de Cointelegraph no disponibles ahora — usando solo el motor de precio anormal + avisos Binance.');
         if (estadoEl) {
-            estadoEl.innerHTML = `🟡 Cointelegraph: no disponible ahora — usando solo alertas de precio + Binance`;
+            const hora = new Date().toLocaleTimeString('es-BO');
+            estadoEl.innerHTML = `🟡 Cointelegraph: no disponible · ${hora}`;
             estadoEl.style.color = '#f3ba2f';
         }
     }
@@ -2183,8 +2197,29 @@ function renderizarListaNoticiasCompleta() {
     cont.innerHTML = noticiasFeed.map(n => {
         const hora = new Date(n.ts).toLocaleTimeString('es-BO');
         const color = colorPorTipoNoticia(n.tipo);
-        return `<div style="display:flex;justify-content:space-between;align-items:flex-start;gap:10px;background:rgba(255,255,255,0.03);border-left:3px solid ${color};border-radius:6px;padding:8px 10px;">
-            <div style="font-size:12px;color:#e2e8f0;flex:1;">${n.texto}<div style="font-size:10px;color:#475569;margin-top:3px;">${hora}</div></div>
+        const badge = {
+            riesgo:   { bg: 'rgba(255,42,59,0.15)',  label: '🚨 RIESGO' },
+            oficial:  { bg: 'rgba(243,186,47,0.10)', label: '📌 OFICIAL' },
+            bomba:    { bg: 'rgba(14,203,129,0.10)', label: '📈 SUBIDA' },
+            derrumbe: { bg: 'rgba(255,42,59,0.10)',  label: '📉 CAÍDA' },
+            rebote:   { bg: 'rgba(0,212,255,0.10)',  label: '↩️ REBOTE' },
+            volumen:  { bg: 'rgba(243,186,47,0.10)', label: '📊 VOLUMEN' },
+            manual:   { bg: 'rgba(167,139,250,0.10)',label: '✍️ MANUAL' },
+            general:  { bg: 'rgba(100,116,139,0.10)',label: '📰 NOTICIA' },
+        }[n.tipo] || { bg: 'rgba(255,255,255,0.03)', label: '📰' };
+
+        // Limpiar prefijos largos del texto para que solo quede lo relevante
+        const textoLimpio = n.texto
+            .replace(/^🚨\s*(CT|Binance Futuros|Binance):\s*/i, '')
+            .replace(/^📌\s*Binance:\s*/i, '')
+            .replace(/^📰\s*\[[^\]]+\]\s*/i, '');
+
+        return `<div style="background:${badge.bg};border-left:3px solid ${color};border-radius:8px;padding:10px 12px;display:flex;flex-direction:column;gap:4px;">
+            <div style="display:flex;align-items:center;gap:6px;">
+                <span style="font-size:9px;font-weight:700;color:${color};letter-spacing:0.5px;">${badge.label}</span>
+                <span style="font-size:9px;color:#475569;margin-left:auto;">${hora}</span>
+            </div>
+            <div style="font-size:12px;color:#e2e8f0;line-height:1.45;font-weight:500;">${textoLimpio}</div>
         </div>`;
     }).join('');
 }
@@ -2475,6 +2510,41 @@ if(document.getElementById("emaRadarPanel").style.display === "block"){
     }
 }
 
+// ── PUNTUACIÓN DE DESPEGUE INMINENTE ──────────────────────────────────────
+// Combina 5 señales para detectar monedas que cayeron fuerte en 24h y están
+// a punto de revertir al alza. Máximo ~100 puntos.
+function calcularScoreDespegue(c) {
+    let score = 0;
+    const señales = [];
+
+    // 1. Caída fuerte en 24h (base del patrón: comprar en el piso)
+    //    Necesitamos que haya caído, pero no que siga cayendo.
+    if (c.change <= -8)       { score += 25; señales.push('📉-8%'); }
+    else if (c.change <= -5)  { score += 18; señales.push('📉-5%'); }
+    else if (c.change <= -3)  { score += 10; señales.push('📉-3%'); }
+
+    // 2. Empieza a subir ahora (velocidad positiva y ciclos alcistas recientes)
+    if (c.velPromedio > 0 && c.ciclosSubiendo >= 3) { score += 25; señales.push('⬆️ girando'); }
+    else if (c.velPromedio > 0 && c.ciclosSubiendo >= 2) { score += 12; señales.push('⬆️ leve'); }
+
+    // 3. Volumen fuerte (confirma interés comprador)
+    if (c.volume > 50000000)       { score += 20; señales.push('💧vol.alto'); }
+    else if (c.volume > 20000000)  { score += 10; señales.push('💧vol.medio'); }
+
+    // 4. Precio tocó zona baja del rango 24h y rebotó (tocó soporte)
+    if (c.posicionPorcentaje <= 15 && c.cambioReal2Min > 0) { score += 20; señales.push('🎯soporte'); }
+    else if (c.posicionPorcentaje <= 25 && c.cambioReal2Min > 0) { score += 10; señales.push('🎯zona baja'); }
+
+    // 5. Vela verde en 2 minutos (confirmación de impulso comprador)
+    if (c.cambioReal2Min > 0.4)       { score += 10; señales.push('🕯️+verde'); }
+    else if (c.cambioReal2Min > 0.15) { score += 5;  señales.push('🕯️verde'); }
+
+    // Penalización: si aún está cayendo fuerte ahora, no es el momento
+    if (c.velPromedio < -0.05 && c.ciclosBajando >= 4) { score -= 20; }
+
+    return { score: Math.max(0, score), señales };
+}
+
 function actualizarTablaIzquierda() {
     const tbody = document.getElementById("cryptoList");
     if (!tbody) return;
@@ -2488,19 +2558,41 @@ function actualizarTablaIzquierda() {
         return tiempos.length > 0 ? Math.max(...tiempos) : 0;
     }
 
-    const ordenadas = Object.values(cachedData).sort((a, b) => {
-        const tA = tiempoAlerta(a);
-        const tB = tiempoAlerta(b);
-        // Monedas con alerta primero, ordenadas por llegada (más reciente arriba)
-        if (tA > 0 && tB > 0) return tB - tA;   // ambas con alerta: más reciente arriba
-        if (tA > 0) return -1;                    // solo A tiene alerta: A primero
-        if (tB > 0) return 1;                     // solo B tiene alerta: B primero
-        // Sin alerta: orden por cambio 2min
+    // Calcular score de despegue para cada moneda
+    const conScore = Object.values(cachedData).map(c => ({
+        ...c,
+        _despegue: calcularScoreDespegue(c)
+    }));
+
+    const ordenadas = conScore.sort((a, b) => {
+        // 1er criterio: alertas explosivas activas (bomba/derrumbe) siempre primero
+        const tA = tiempoAlerta(a), tB = tiempoAlerta(b);
+        if (tA > 0 && tB > 0) return tB - tA;
+        if (tA > 0) return -1;
+        if (tB > 0) return 1;
+        // 2do criterio: score de despegue alto (≥40) sube al tope
+        const sA = a._despegue.score, sB = b._despegue.score;
+        if (sA >= 40 && sB >= 40) return sB - sA;
+        if (sA >= 40) return -1;
+        if (sB >= 40) return 1;
+        // 3er criterio: resto por cambio 2min
         return Math.abs(b.cambioReal2Min) - Math.abs(a.cambioReal2Min);
+    });
+
+    // Emitir alerta en el ticker para las top 3 con score >= 60
+    const topDespegue = ordenadas.filter(c => c._despegue.score >= 60).slice(0, 3);
+    topDespegue.forEach(c => {
+        const nombre = c.symbol.replace('USDT', '');
+        agregarNoticia(
+            `🚀 DESPEGUE: ${nombre} · caída 24h ${c.change.toFixed(1)}% · girando al alza · ${c._despegue.señales.join(' ')}`,
+            'bomba',
+            'despegue_' + c.symbol
+        );
     });
 
     ordenadas.forEach(c => {
         const symbol = c.symbol;
+        const { score, señales } = c._despegue;
         const tr = document.createElement("tr");
         tr.setAttribute('data-symbol', symbol);
         tr.onclick = () => seleccionarMoneda(symbol);
@@ -2512,6 +2604,20 @@ function actualizarTablaIzquierda() {
 
         let subEtiqueta = '';
         let iconoAlarma = '';
+
+        // Badge de despegue inminente (prioridad visual máxima si score ≥ 60)
+        if (score >= 60 && !c.alertaBombaSubida && !c.alertaDerrumbe) {
+            tr.style.background = "rgba(0,212,255,0.12)";
+            tr.style.borderLeft = "4px solid #00d4ff";
+            subEtiqueta = `<span style="color:#00d4ff;font-size:10px;font-weight:900;display:block;text-shadow:0 0 6px rgba(0,212,255,0.6);">🚀 DESPEGUE INMINENTE · ${score}pts</span>
+                           <span style="color:#64748b;font-size:9px;">${señales.join(' ')}</span>`;
+            iconoAlarma = '<span style="font-size:12px;animation:blinker-glow 0.6s linear infinite;">⚡</span> ';
+        } else if (score >= 40 && !c.alertaBombaSubida && !c.alertaDerrumbe) {
+            tr.style.background = "rgba(0,212,255,0.05)";
+            tr.style.borderLeft = "3px solid rgba(0,212,255,0.4)";
+            subEtiqueta = `<span style="color:#38bdf8;font-size:10px;font-weight:700;display:block;">📡 EN RADAR · ${score}pts · ${señales.join(' ')}</span>`;
+        }
+
         if (c.alertaBombaSubida) {
             tr.style.background = "rgba(14, 203, 129, 0.25)";
             tr.style.borderLeft = "4px solid #0ecb81";
@@ -2528,8 +2634,10 @@ function actualizarTablaIzquierda() {
             subEtiqueta = '<span style="color:#f3ba2f; font-size:10px; font-weight:900; display:block;">⚠️ SUBIDA AGOTÁNDOSE</span>';
             iconoAlarma = '<span style="font-size:12px; animation:blinker-glow 0.7s linear infinite;">🔔</span> ';
         } else if (c.caidaDesdeMaximo >= 2.0 && c.caidaDesdeMaximo <= 5.0 && c.velocidad < 0) {
-            tr.style.background = "rgba(255, 42, 59, 0.1)";
-            subEtiqueta = '<span style="color:var(--accent-gold); font-size:10px; font-weight:900; display:block;">⚡ CAPTURA GIRO CDC</span>';
+            if (!subEtiqueta) { // no sobreescribir si ya tiene badge de despegue
+                tr.style.background = "rgba(255, 42, 59, 0.1)";
+                subEtiqueta = '<span style="color:var(--accent-gold); font-size:10px; font-weight:900; display:block;">⚡ CAPTURA GIRO CDC</span>';
+            }
         }
 
         let colorCambio = c.change > 0 ? "var(--accent-green)" : "var(--accent-glow)";
