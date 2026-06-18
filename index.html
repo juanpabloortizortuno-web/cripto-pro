@@ -1693,6 +1693,9 @@ async function fetchConProxiesEnCascada(urlDestino, timeoutMs = 8000) {
 // estructura sin aviso, así que TODO este bloque corre en try/catch silencioso: si
 // funciona, perfecto; si falla, el dashboard sigue funcionando igual con las alertas
 // de movimiento de precio.
+// Catálogo 49 (Futuros) se trata como PRIORITARIO: se consulta primero y sus avisos
+// se insertan al frente del feed de noticias, antes que cualquier otra fuente.
+const CATALOGO_PRIORITARIO_ID = 49;
 const BINANCE_CATALOGOS_OFICIALES = {
     49: 'Futuros — avisos de contratos (tick size, márgenes, conversiones)',
     48: 'Nuevas criptomonedas y listados',
@@ -1739,7 +1742,14 @@ async function revisarAvisosOficialesBinance() {
     let huboExito = false;
     let huboIntento = false;
 
-    for (const catalogId of Object.keys(BINANCE_CATALOGOS_OFICIALES)) {
+    // El catálogo 49 (Futuros) va primero siempre, sin importar el orden del objeto.
+    const idsCatalogos = Object.keys(BINANCE_CATALOGOS_OFICIALES).sort((a, b) => {
+        if (Number(a) === CATALOGO_PRIORITARIO_ID) return -1;
+        if (Number(b) === CATALOGO_PRIORITARIO_ID) return 1;
+        return 0;
+    });
+
+    for (const catalogId of idsCatalogos) {
         huboIntento = true;
         try {
             // Página pública de anuncios de Binance para este catálogo (es-LA, en español)
@@ -1786,19 +1796,22 @@ async function revisarAvisosOficialesBinance() {
 
                 const tituloLower = titulo.toLowerCase();
                 const esRiesgo = PALABRAS_PELIGRO.some(palabra => tituloLower.includes(palabra));
+                const esPrioritario = Number(catalogId) === CATALOGO_PRIORITARIO_ID;
 
                 if (esRiesgo) {
                     agregarNoticia(
                         `🚨 ALERTA DE RIESGO BINANCE: ${titulo}`,
                         'riesgo',
-                        'riesgo_' + id
+                        'riesgo_' + id,
+                        esPrioritario
                     );
                     try { hablar(`Atención. Riesgo elevado detectado. ${titulo}`, true); } catch(e) {}
                 } else {
                     agregarNoticia(
                         `📋 [Aviso oficial Binance] ${titulo}`,
                         'oficial',
-                        'oficial_' + id
+                        'oficial_' + id,
+                        esPrioritario
                     );
                 }
                 huboExito = true;
@@ -1885,7 +1898,7 @@ async function revisarNoticiasCointelegraph() {
     }
 }
 
-function agregarNoticia(texto, tipo, claveCooldown) {
+function agregarNoticia(texto, tipo, claveCooldown, prioritario = false) {
     const ahora = Date.now();
     if (claveCooldown) {
         const ultima = ultimaNoticiaPorClave[claveCooldown];
@@ -1895,8 +1908,16 @@ function agregarNoticia(texto, tipo, claveCooldown) {
     noticiasFeed.unshift({
         texto: texto,
         tipo: tipo,            // 'riesgo' | 'oficial' (el ticker ahora es exclusivamente de alertas de riesgo)
-        ts: ahora
+        ts: ahora,
+        prioritario: prioritario  // catálogo 49 de Binance: siempre va primero en el ticker
     });
+    if (prioritario) {
+        // Mover todas las noticias prioritarias al frente, manteniendo entre ellas
+        // el orden de más reciente a más antigua, y dejando el resto detrás sin tocar su orden.
+        const prioritarias = noticiasFeed.filter(n => n.prioritario);
+        const resto = noticiasFeed.filter(n => !n.prioritario);
+        noticiasFeed = [...prioritarias, ...resto];
+    }
     if (noticiasFeed.length > NOTICIAS_MAX) noticiasFeed.length = NOTICIAS_MAX;
     renderizarTickerNoticias();
 }
@@ -2115,6 +2136,7 @@ async function revisarNoticiasGenerales(forzar) {
         if (estadoEl) estadoEl.innerHTML = 'Traduciendo titulares…';
         noticiasGeneralesFeed = await traducirNoticiasGenerales(todas);
         renderizarPanelNoticiasGenerales();
+        renderizarTickerNoticias(); // refresca el ticker: si no hay riesgo activo, usa estas como relleno
         if (estadoEl) {
             const hora = new Date().toLocaleTimeString('es-BO');
             estadoEl.innerHTML = algunaFalló
@@ -2147,6 +2169,7 @@ function colorPorTipoNoticia(tipo) {
     if (tipo === 'manual') return '#a78bfa';
     if (tipo === 'oficial') return '#ffd700';
     if (tipo === 'riesgo') return '#ff0000';
+    if (tipo === 'general') return '#64748b';
     return '#94a3b8';
 }
 
@@ -2172,14 +2195,21 @@ function renderizarTickerNoticias() {
     const track = document.getElementById('newsTickerTrack');
     if (!track) return;
 
-    if (noticiasFeed.length === 0) {
+    // Si no hay alertas de riesgo, usamos noticias generales como relleno para que
+    // el ticker nunca se vea vacío mientras el mercado está tranquilo.
+    const usandoRelleno = noticiasFeed.length === 0;
+    const fuente = usandoRelleno
+        ? noticiasGeneralesFeed.map(n => ({ texto: `📰 [${n.fuente}] ${n.titulo}`, tipo: 'general', ts: new Date(n.fecha).getTime() || Date.now() }))
+        : noticiasFeed;
+
+    if (fuente.length === 0) {
         track.style.animation = 'none';
         track.innerHTML = '<span style="color:#475569;font-size:11px;padding:0 24px;">🔭 Monitoreando el mercado para generar noticias...</span>';
         track.dataset.tickerFirma = '';
         return;
     }
 
-    const itemsHtml = noticiasFeed.slice(0, 15).map(n => {
+    const itemsHtml = fuente.slice(0, 15).map(n => {
         const color = colorPorTipoNoticia(n.tipo);
         return `<span style="color:${color};font-size:11px;padding:0 28px;font-weight:600;">${n.texto}</span>`;
     }).join('<span style="color:#334155;">•</span>');
@@ -2189,7 +2219,7 @@ function renderizarTickerNoticias() {
     // (animation:none + reflow + animation de nuevo), lo que cortaba visualmente el scroll
     // aunque las noticias fueran exactamente las mismas. Ahora solo se reinicia cuando el
     // contenido realmente cambia (llega una alerta nueva o se elimina una).
-    const firmaActual = noticiasFeed.slice(0, 15).map(n => n.ts).join(',');
+    const firmaActual = (usandoRelleno ? 'gen_' : 'riesgo_') + fuente.slice(0, 15).map(n => n.ts).join(',');
     if (track.dataset.tickerFirma === firmaActual) {
         return; // mismo contenido: dejamos la animación en curso intacta, sin cortes
     }
@@ -2201,7 +2231,7 @@ function renderizarTickerNoticias() {
     // Reiniciar animación CSS (solo ocurre ahora cuando el contenido realmente cambió)
     track.style.animation = 'none';
     track.offsetHeight; // forzar reflow
-    const duracion = Math.max(20, noticiasFeed.slice(0,15).length * 6);
+    const duracion = Math.max(20, fuente.slice(0,15).length * 6);
     track.style.animation = `tickerScroll ${duracion}s linear infinite`;
 }
 
