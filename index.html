@@ -1732,6 +1732,10 @@ async function revisarAvisosOficialesBinance() {
     ultimaRevisionAvisosOficiales = ahora;
 
     const estadoEl = document.getElementById('estadoAvisosOficiales');
+    if (estadoEl) {
+        estadoEl.innerHTML = '🔄 Avisos oficiales: verificando ahora...';
+        estadoEl.style.color = '#475569';
+    }
     let huboExito = false;
     let huboIntento = false;
 
@@ -1834,6 +1838,10 @@ async function revisarNoticiasCointelegraph() {
     ultimaRevisionCointelegraph = ahora;
 
     const estadoEl = document.getElementById('estadoCointelegraph');
+    if (estadoEl) {
+        estadoEl.innerHTML = '🔄 Cointelegraph: verificando ahora...';
+        estadoEl.style.color = '#475569';
+    }
 
     try {
         const resp = await fetchConProxiesEnCascada(COINTELEGRAPH_RSS_URL);
