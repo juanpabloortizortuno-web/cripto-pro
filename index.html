@@ -1650,10 +1650,37 @@ const NOTICIAS_COOLDOWN_MS = 4 * 60 * 1000; // no repetir la misma noticia de la
 let ultimaNoticiaPorClave = {};      // clave -> timestamp de última vez emitida
 
 // ── Proxy CORS público gratuito, usado para leer fuentes externas que no permiten
-// fetch directo desde el navegador (Binance, Cointelegraph). Es un servicio de
-// terceros sin garantía de uptime; si falla, las funciones que lo usan fallan en
-// silencio y el dashboard sigue funcionando con las alertas de precio anormal.
-const PROXY_CORS_URL = 'https://api.allorigins.win/raw?url=';
+// fetch directo desde el navegador (Binance, Cointelegraph). Son servicios de
+// terceros sin garantía de uptime: por eso ahora se prueban varios en cascada —
+// si el primero falla o está caído, se intenta automáticamente con el siguiente
+// antes de darse por vencido.
+const PROXIES_CORS_RIESGO = [
+    url => `https://api.allorigins.win/raw?url=${encodeURIComponent(url)}`,
+    url => `https://corsproxy.io/?url=${encodeURIComponent(url)}`,
+    url => `https://api.codetabs.com/v1/proxy?quest=${encodeURIComponent(url)}`,
+    url => `https://thingproxy.freeboard.io/fetch/${url}`,
+];
+
+// Intenta los proxies uno por uno hasta que alguno devuelva una respuesta OK.
+// Lanza el último error si todos fallan (igual que antes hacía un solo fetch).
+async function fetchConProxiesEnCascada(urlDestino, timeoutMs = 8000) {
+    let ultimoError = null;
+    for (const proxyFn of PROXIES_CORS_RIESGO) {
+        const controller = new AbortController();
+        const id = setTimeout(() => controller.abort(), timeoutMs);
+        try {
+            const resp = await fetch(proxyFn(urlDestino), { signal: controller.signal });
+            clearTimeout(id);
+            if (!resp.ok) { ultimoError = new Error('HTTP ' + resp.status); continue; }
+            return resp; // primer proxy que responde OK
+        } catch (e) {
+            clearTimeout(id);
+            ultimoError = e;
+            continue; // probar el siguiente proxy
+        }
+    }
+    throw ultimoError || new Error('Todos los proxies fallaron');
+}
 
 // ── Avisos OFICIALES de Binance (catálogos de anuncios) ──
 // IMPORTANTE: Binance NO publica una API oficial/soportada para leer estos avisos
@@ -1712,9 +1739,7 @@ async function revisarAvisosOficialesBinance() {
         try {
             // Página pública de anuncios de Binance para este catálogo (es-LA, en español)
             const urlBinance = `https://www.binance.com/es-LA/support/announcement/list/${catalogId}`;
-            const urlProxy = PROXY_CORS_URL + encodeURIComponent(urlBinance);
-            const resp = await fetch(urlProxy);
-            if (!resp.ok) continue; // falla silenciosa: el proxy o Binance puede bloquear
+            const resp = await fetchConProxiesEnCascada(urlBinance);
 
             const htmlTexto = await resp.text();
 
@@ -1785,14 +1810,7 @@ async function revisarNoticiasCointelegraph() {
     const estadoEl = document.getElementById('estadoCointelegraph');
 
     try {
-        const resp = await fetch(PROXY_CORS_URL + encodeURIComponent(COINTELEGRAPH_RSS_URL));
-        if (!resp.ok) {
-            if (estadoEl) {
-                estadoEl.innerHTML = `🟡 Cointelegraph: no disponible ahora (proxy o feed bloqueó la petición)`;
-                estadoEl.style.color = '#f3ba2f';
-            }
-            return;
-        }
+        const resp = await fetchConProxiesEnCascada(COINTELEGRAPH_RSS_URL);
         const xmlTexto = await resp.text();
         const parser = new DOMParser();
         const xml = parser.parseFromString(xmlTexto, 'text/xml');
