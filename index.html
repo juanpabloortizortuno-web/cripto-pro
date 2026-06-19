@@ -953,6 +953,11 @@
             style="background:rgba(243,186,47,0.15);color:#f3ba2f;border-color:rgba(243,186,47,0.4);">
             🌐 TODAS
         </button>
+        <button class="radar-tab" id="tabMotorAlcista" onclick="filtrarRadar('motorAlcista')"
+            style="background:rgba(14,203,129,0.22);color:#0ecb81;border-color:rgba(14,203,129,0.6);position:relative;font-weight:900;">
+            🚀 MOTOR ALCISTA (EMA)
+            <span style="position:absolute;top:-6px;right:-6px;background:#0ecb81;color:#000;font-size:9px;font-weight:900;padding:1px 5px;border-radius:8px;" id="contMotorAlcista">0</span>
+        </button>
         <button class="radar-tab" id="tabRebote" onclick="filtrarRadar('rebote')"
             style="background:rgba(0,180,216,0.25);color:#00d4ff;border-color:rgba(0,212,255,0.6);position:relative;font-weight:900;">
             🟢⚡ REBOTE DESDE MÍNIMO
@@ -2972,6 +2977,7 @@ function actualizarTablaIzquierda() {
 
     tbody.innerHTML = "";
     tbody.appendChild(fragmento);
+    actualizarContadorRadar(); // mantiene el botón 🔭 y sus contadores siempre al día, esté abierto o no el panel
 }
 
 function seleccionarMoneda(symbol) {
@@ -3021,7 +3027,7 @@ function cerrarRadarExplosivo() {
 function filtrarRadar(tipo) {
     radarFiltroActual = tipo;
     // Actualizar tabs
-    ['todas','rebote','bomba','lista','caida','agotado','techo'].forEach(t => {
+    ['todas','motorAlcista','rebote','bomba','lista','caida','agotado','techo'].forEach(t => {
         const tab = document.getElementById('tab' + t.charAt(0).toUpperCase() + t.slice(1));
         if (!tab) return;
         if (t === tipo) {
@@ -3250,6 +3256,7 @@ function renderizarRadar() {
 
     // ── Clasificar monedas en 5 grupos ──
     const grupos = {
+        motorAlcista: [], // 🚀 NUEVO: motor EMA — despegue confirmado + rebote tras caída de 24h
         rebote:   [],  // 🟢⚡ DESTACADO: cayó bastante, ya rebotando desde mínimo, volátil
         momentum: [],  // ⭐ NUEVO: cerca del 100% del rango Y subiendo rápido
         bomba:    [],  // explosión activa en curso (LONG)
@@ -3260,6 +3267,8 @@ function renderizarRadar() {
     };
 
     todas.forEach(c => {
+        if (esDespegueReal(c.symbol))      grupos.motorAlcista.push({ c, tipo: 'despegue' });
+        else if (esReboteTrasCaida(c.symbol)) grupos.motorAlcista.push({ c, tipo: 'rebote_ema' });
         if (detectarListaParaDespegar(c))  grupos.rebote.push(c);
         if (detectarMomentumAlto(c))       grupos.momentum.push(c);
         if (c.alertaBombaSubida)           grupos.bomba.push(c);
@@ -3268,6 +3277,21 @@ function renderizarRadar() {
         if (c.alertaAgotamientoSubida)    grupos.agotado.push(c);
         if (detectarEnTechoProximaCaida(c))  grupos.techo.push(c);
     });
+
+    grupos.motorAlcista.sort((a, b) => {
+        const ea = datosEMA[a.c.symbol], eb = datosEMA[b.c.symbol];
+        if (a.tipo !== b.tipo) return a.tipo === 'despegue' ? -1 : 1; // despegues confirmados primero
+        return (eb?.subidaDesdeMinimo || 0) - (ea?.subidaDesdeMinimo || 0);
+    });
+    grupos.motorAlcista = grupos.motorAlcista.slice(0, 20);
+
+    // Actualizar badge del tab motor alcista
+    const contMotorAlcista = document.getElementById('contMotorAlcista');
+    if (contMotorAlcista) {
+        contMotorAlcista.textContent = grupos.motorAlcista.length;
+        contMotorAlcista.style.display = grupos.motorAlcista.length > 0 ? 'inline' : 'none';
+    }
+
 
     grupos.rebote.sort((a,b) => calcularScoreRebote(b) - calcularScoreRebote(a));
     grupos.rebote = grupos.rebote.slice(0, 20);
@@ -3304,7 +3328,7 @@ function renderizarRadar() {
     }
 
     // Actualizar contador total en el botón flotante
-    const total = grupos.rebote.length + grupos.momentum.length + grupos.bomba.length + grupos.lista.length + grupos.caida.length + grupos.agotado.length + grupos.techo.length;
+    const total = grupos.motorAlcista.length + grupos.rebote.length + grupos.momentum.length + grupos.bomba.length + grupos.lista.length + grupos.caida.length + grupos.agotado.length + grupos.techo.length;
     const contEl = document.getElementById('radarContador');
     if (contEl) contEl.textContent = total > 99 ? '99+' : total;
 
@@ -3548,6 +3572,46 @@ function renderizarRadar() {
         return h;
     };
 
+    // ── Render especial y destacado para MOTOR ALCISTA EMA (despegue + rebote tras caída) ──
+    const renderMotorAlcista = () => {
+        if (radarFiltroActual !== 'todas' && radarFiltroActual !== 'motorAlcista') return '';
+        let h = `<div class="radar-titulo-seccion" style="color:#0ecb81;">
+            🚀 MOTOR ALCISTA EMA — Despegue confirmado y rebote tras caída de 24h
+            <span style="font-size:10px;background:rgba(14,203,129,0.15);padding:2px 8px;border-radius:10px;color:#0ecb81;">${grupos.motorAlcista.length}</span>
+            <span style="font-size:9px;color:#64748b;margin-left:4px;">EMA7&gt;25&gt;99 alcista o EMA7 girando al alza tras caída</span>
+        </div>`;
+        if (grupos.motorAlcista.length === 0) {
+            h += `<div class="radar-vacio" style="padding:16px;">Ninguna moneda cumple el criterio ahora mismo. El motor sigue escaneando cada 8 segundos.</div>`;
+            return h;
+        }
+        h += `<div class="radar-grid">`;
+        grupos.motorAlcista.forEach(({ c, tipo }, idx) => {
+            const sym = c.symbol.replace('USDT','');
+            const e = datosEMA[c.symbol];
+            const medalla = idx === 0 ? '🥇' : idx === 1 ? '🥈' : idx === 2 ? '🥉' : `#${idx+1}`;
+            const esDespegue = tipo === 'despegue';
+            const colorTipo = esDespegue ? '#0ecb81' : '#00d4ff';
+            const badgeTexto = esDespegue ? '🚀 DESPEGUE CONFIRMADO' : '🔄 REBOTE TRAS CAÍDA';
+            const pct = e ? e.subidaDesdeMinimo.toFixed(1) : '0.0';
+
+            h += `
+            <div class="radar-card" style="border-color:${esDespegue ? 'rgba(14,203,129,0.4)' : 'rgba(0,212,255,0.35)'};" onclick="cerrarRadarExplosivo(); seleccionarMoneda('${c.symbol}');">
+                <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px;">
+                    <div class="radar-coin-nombre">${sym} <span style="font-size:10px;color:#475569;">USDT</span></div>
+                    <span style="font-size:13px;">${medalla}</span>
+                </div>
+                <span class="radar-coin-badge" style="background:${esDespegue ? 'rgba(14,203,129,0.18)' : 'rgba(0,212,255,0.18)'};color:${colorTipo};">${badgeTexto}</span>
+                <div class="radar-coin-stat" style="margin-top:6px;">Cambio 24h: <b style="color:${c.change >= 0 ? '#0ecb81' : '#ff2a3b'};">${c.change > 0 ? '+' : ''}${c.change.toFixed(2)}%</b></div>
+                <div class="radar-coin-stat">Desde mínimo 48h: <b style="color:${colorTipo};">+${pct}%</b></div>
+                <div class="radar-coin-stat">Posición en rango: <b>${c.posicionPorcentaje.toFixed(0)}%</b></div>
+                ${e ? `<div class="radar-coin-stat" style="font-size:9px;">EMA7: ${e.ema7.toFixed(5)} · EMA25: ${e.ema25.toFixed(5)} · EMA99: ${e.ema99.toFixed(5)}</div>` : ''}
+            </div>`;
+        });
+        h += `</div>`;
+        return h;
+    };
+
+    html += renderMotorAlcista();
     html += renderRebote();
     html += renderTecho();
     html += renderMomentum();
@@ -3569,7 +3633,9 @@ function actualizarContadorRadar() {
     const todas = Object.values(cachedData);
     let total = 0;
     let totalMom = 0;
+    let totalMotorAlcista = 0;
     todas.forEach(c => {
+        if (esDespegueReal(c.symbol) || esReboteTrasCaida(c.symbol)) { total++; totalMotorAlcista++; }
         if (detectarMomentumAlto(c))     { total++; totalMom++; }
         if (c.alertaBombaSubida)         total++;
         if (detectarListaParaDespegar(c)) total++;
@@ -3577,6 +3643,11 @@ function actualizarContadorRadar() {
         if (c.alertaAgotamientoSubida)   total++;
         if (detectarEnTechoProximaCaida(c)) total++;
     });
+    const contMotorAlcistaTab = document.getElementById('contMotorAlcista');
+    if (contMotorAlcistaTab) {
+        contMotorAlcistaTab.textContent = totalMotorAlcista;
+        contMotorAlcistaTab.style.display = totalMotorAlcista > 0 ? 'inline' : 'none';
+    }
     const contMom = document.getElementById('contMomentum');
     if (contMom) {
         contMom.textContent = totalMom;
@@ -3595,10 +3666,10 @@ function actualizarContadorRadar() {
         contEl.textContent = total > 99 ? '99+' : total;
         contEl.style.background = total > 5 ? '#ff2a3b' : total > 0 ? '#f3ba2f' : '#334155';
     }
-    // Botón flotante amarillo — visible solo cuando hay monedas en techo
+    // Botón flotante — visible cuando hay monedas en techo O señales del motor alcista (despegue/rebote)
     const btnRad = document.getElementById('btnRadarExplosivo');
     if (btnRad) {
-        if (totalTecho > 0) btnRad.classList.add('techo-activo');
+        if (totalTecho > 0 || totalMotorAlcista > 0) btnRad.classList.add('techo-activo');
         else btnRad.classList.remove('techo-activo');
     }
     // Botón de techo ahora vive en actualizarPanelCentral (dinámico por moneda)
