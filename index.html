@@ -1491,7 +1491,8 @@ let vozFemenina = null;
 
 // Control de tiempo para no cambiar de moneda muy rápido (5 segundos)
 let tiempoUltimoCambioAuto = 0;
-const BLOQUEO_CAMBIO_MS = 5000; // 5 segundos
+const BLOQUEO_CAMBIO_MS = 8000; // 8 segundos entre cambios automaticos
+let indiceRotacionLong = 0;      // rota entre las candidatas en modo LONG
 
 // Control de audio: no interrumpir hasta terminar + 5 seg extra
 let audioBloqueadoHasta = 0;
@@ -2744,49 +2745,71 @@ async function obtenerDatosBinance() {
                 if (!timestampLlegada[item.symbol + "_AGOTADO"]) timestampLlegada[item.symbol + "_AGOTADO"] = Date.now();
             } else { delete timestampLlegada[item.symbol + "_AGOTADO"]; }
 
-            // ── MODO LONG (alcista): agregar despegues y rebotes a la lista de prioridades
-            // para que el auto-select funcione igual que en modo SHORT.
+            // ── MODO LONG (alcista): candidatas para auto-select
+            // Filtro estricto: cerca del minimo 24h + caida terminando (velocidad girando al alza)
             if (!enModoBajista) {
-                if (enDespegue) {
-                    const e = datosEMA[item.symbol];
-                    const scoreAlcista = e ? e.subidaDesdeMinimo : 0;
-                    listaPrioridades.push({ symbol: item.symbol, tipo: "DESPEGUE", score: scoreAlcista });
-                    if (!timestampLlegada[item.symbol + "_DESPEGUE"]) timestampLlegada[item.symbol + "_DESPEGUE"] = Date.now();
-                } else { delete timestampLlegada[item.symbol + "_DESPEGUE"]; }
+                // Cerca del piso 24h: en el 30% inferior del rango del dia
+                const cercaPiso = posicionPorcentaje <= 30;
+                // Caida terminando: velocidad ya positiva o cambio 2min positivo
+                const caidaTerminando = velocidadPrecio > 0 || cambioReal2Min > 0;
+                // Que haya caido en las 24h o siga muy cerca de su minimo
+                const cayoEnDia = change < -1 || posicionPorcentaje <= 20;
 
-                if (enRebote) {
-                    const e = datosEMA[item.symbol];
-                    const scoreRebote = e ? (e.subidaDesdeMinimo * 0.7) : 0; // peso ligeramente menor que despegue
-                    listaPrioridades.push({ symbol: item.symbol, tipo: "REBOTE", score: scoreRebote });
+                if (cercaPiso && caidaTerminando && cayoEnDia) {
+                    // Score: mas cerca del piso = mejor; bonus si EMA7 ya giro y si hay impulso
+                    const scorePiso    = 30 - posicionPorcentaje;              // 0-30
+                    const scoreImpulso = Math.max(0, cambioReal2Min * 10);     // impulso positivo
+                    const scoreEMA     = (ed && ed.ema7 > ed.ema7Prev) ? 5 : 0; // EMA7 ya giro alcista
+                    const scoreTotal   = scorePiso + scoreImpulso + scoreEMA;
+                    listaPrioridades.push({ symbol: item.symbol, tipo: "REBOTE", score: scoreTotal });
                     if (!timestampLlegada[item.symbol + "_REBOTE"]) timestampLlegada[item.symbol + "_REBOTE"] = Date.now();
                 } else { delete timestampLlegada[item.symbol + "_REBOTE"]; }
+
+                if (enDespegue) {
+                    if (!timestampLlegada[item.symbol + "_DESPEGUE"]) timestampLlegada[item.symbol + "_DESPEGUE"] = Date.now();
+                } else { delete timestampLlegada[item.symbol + "_DESPEGUE"]; }
             }
         });
         
         // Manejo automático de prioridades de alerta
         if (listaPrioridades.length > 0) {
             listaPrioridades.sort((a, b) => b.score - a.score);
-            let foco = listaPrioridades[0];
+
+            // En modo LONG rotamos entre las candidatas para que el sistema las muestre todas
+            // En modo SHORT siempre enfocamos la de mayor score (comportamiento original)
+            let foco;
+            if (modoMercado === 'alcista' && listaPrioridades.length > 1) {
+                // Rotar: el indice avanza cada vez que se hace un cambio exitoso
+                indiceRotacionLong = indiceRotacionLong % listaPrioridades.length;
+                foco = listaPrioridades[indiceRotacionLong];
+            } else {
+                foco = listaPrioridades[0];
+            }
             alertaActivaGlobal = foco;
             
             const ahora = Date.now();
             const audioHablando = ahora < audioBloqueadoHasta;
-            // El cambio visual de moneda ya NO depende del audio — solo del cooldown de 5s
+            // El cambio visual NO depende del audio — solo del cooldown
             const puedeoCambiar = (ahora - tiempoUltimoCambioAuto) >= BLOQUEO_CAMBIO_MS;
 
-            // Cambia de moneda si pasaron 5 segundos (independiente del audio)
-            if (!radarFijado && selectedCoin !== foco.symbol && puedeoCambiar) {
-                tiempoUltimoCambioAuto = ahora;
-                selectedCoin = foco.symbol;
-                document.getElementById("linkBinance").style.display = "flex";
-                document.getElementById("linkBinance").href = `https://www.binance.com/es/futures/${selectedCoin}`;
-                document.getElementById("linkApp").style.display = "flex";
-                // Mostrar la moneda en el panel central (ocultar bienvenida si aún está visible)
-                const bienvenida = document.getElementById("bienvenidaScreen");
-                if (bienvenida) bienvenida.style.display = "none";
-                calcularPrediccionCDC(selectedCoin);
-                actualizarPanelCentral();
-                actualizarTacometroDerecho();
+            // Cambia de moneda si pasaron los segundos de cooldown
+            if (!radarFijado && puedeoCambiar) {
+                // En LONG: cambia aunque sea la misma (para rotar), en SHORT: solo si es diferente
+                const debeRotar = modoMercado === 'alcista' || selectedCoin !== foco.symbol;
+                if (debeRotar) {
+                    tiempoUltimoCambioAuto = ahora;
+                    if (modoMercado === 'alcista') indiceRotacionLong = (indiceRotacionLong + 1) % listaPrioridades.length;
+                    selectedCoin = foco.symbol;
+                    document.getElementById("linkBinance").style.display = "flex";
+                    document.getElementById("linkBinance").href = `https://www.binance.com/es/futures/${selectedCoin}`;
+                    document.getElementById("linkApp").style.display = "flex";
+                    // Mostrar la moneda en el panel central (ocultar bienvenida si aún está visible)
+                    const bienvenida = document.getElementById("bienvenidaScreen");
+                    if (bienvenida) bienvenida.style.display = "none";
+                    calcularPrediccionCDC(selectedCoin);
+                    actualizarPanelCentral();
+                    actualizarTacometroDerecho();
+                }
             }
 if (radarFijado) {
 
