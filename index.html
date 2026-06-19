@@ -741,6 +741,12 @@
         </div>
     </div>
 
+    <!-- CENTRO: Switch de modo Alcista/Bajista -->
+    <div id="modoSwitchWrap" style="display:flex;align-items:center;gap:0;background:#0a0a0a;border-radius:20px;padding:3px;border:1px solid rgba(255,255,255,0.08);">
+        <button id="btnModoAlcista" onclick="cambiarModoMercado('alcista')" style="display:flex;align-items:center;gap:6px;padding:6px 14px;border-radius:17px;border:none;cursor:pointer;font-size:12px;font-weight:800;transition:all 0.2s;white-space:nowrap;">📈 ALCISTA</button>
+        <button id="btnModoBajista" onclick="cambiarModoMercado('bajista')" style="display:flex;align-items:center;gap:6px;padding:6px 14px;border-radius:17px;border:none;cursor:pointer;font-size:12px;font-weight:800;transition:all 0.2s;white-space:nowrap;">📉 BAJISTA</button>
+    </div>
+
     <!-- DERECHA: Test Audio + TikTok + WhatsApp -->
     <div style="display:flex; align-items:center; gap:10px; flex-shrink:0;">
 
@@ -1009,9 +1015,84 @@
 
 <script>
 let cachedData = {};
+
+// ══════════════════════════════════════════════════════════════════
+// 🎯 FILTRO DE FUTUROS USDT-M — solo trabajamos con monedas que tengan
+// contrato REAL en Binance Futures USDT-M (perpetuo), aunque el precio
+// se obtenga de la API de spot. Así el botón "OPERAR YA" / link siempre
+// abre un par que sí existe en https://www.binance.com/es/futures/...
+// ══════════════════════════════════════════════════════════════════
+let simbolosFuturosUSDTM = null; // null = aún no cargado; Set una vez cargado
+let cargandoSimbolosFuturos = false;
+
+async function cargarSimbolosFuturosUSDTM() {
+    if (cargandoSimbolosFuturos) return;
+    cargandoSimbolosFuturos = true;
+    try {
+        const res = await fetch('https://fapi.binance.com/fapi/v1/exchangeInfo');
+        if (!res.ok) throw new Error('exchangeInfo respondió ' + res.status);
+        const info = await res.json();
+        const validos = new Set(
+            info.symbols
+                .filter(s => s.contractType === 'PERPETUAL' && s.quoteAsset === 'USDT' && s.status === 'TRADING')
+                .map(s => s.symbol)
+        );
+        simbolosFuturosUSDTM = validos;
+        // Limpiar cualquier símbolo que ya estuviera en caché pero no tenga contrato real de futuros
+        Object.keys(cachedData).forEach(sym => {
+            if (!validos.has(sym)) delete cachedData[sym];
+        });
+        console.log(`✅ Futuros USDT-M cargados: ${validos.size} pares disponibles`);
+        actualizarTablaIzquierda(); // re-filtrar la tabla ahora que ya sabemos qué es válido
+    } catch (e) {
+        console.error('No se pudo cargar la lista de contratos de Futuros USDT-M:', e);
+        // Si falla, simbolosFuturosUSDTM se queda en null y NO filtramos (modo seguro:
+        // mejor mostrar todo que ocultar todo por un fallo temporal de red).
+    } finally {
+        cargandoSimbolosFuturos = false;
+    }
+}
+
+// true si el símbolo tiene contrato real en Binance Futures USDT-M.
+// Si aún no cargamos la lista (simbolosFuturosUSDTM === null), dejamos pasar todo
+// para no bloquear la tabla mientras se obtiene la info la primera vez.
+function esFuturoUSDTMValido(symbol) {
+    if (simbolosFuturosUSDTM === null) return true;
+    return simbolosFuturosUSDTM.has(symbol);
+}
+
 let emaDataCDC = {};
 let radarReversionCDC = {};
 let selectedCoin = null;
+let modoMercado = localStorage.getItem('cdc_modo_mercado') || 'alcista'; // 'alcista' (despegue EMA) | 'bajista' (bomba/derrumbe/agotamiento en techo)
+
+function cambiarModoMercado(modo) {
+    modoMercado = modo;
+    localStorage.setItem('cdc_modo_mercado', modo);
+    actualizarBotonesModoMercado();
+    actualizarTablaIzquierda();
+}
+
+function actualizarBotonesModoMercado() {
+    const btnAlcista = document.getElementById('btnModoAlcista');
+    const btnBajista = document.getElementById('btnModoBajista');
+    if (!btnAlcista || !btnBajista) return;
+    if (modoMercado === 'alcista') {
+        btnAlcista.style.background = 'linear-gradient(135deg,#0ecb81,#0a9d63)';
+        btnAlcista.style.color = '#03110a';
+        btnAlcista.style.boxShadow = '0 0 12px rgba(14,203,129,0.4)';
+        btnBajista.style.background = 'transparent';
+        btnBajista.style.color = '#64748b';
+        btnBajista.style.boxShadow = 'none';
+    } else {
+        btnBajista.style.background = 'linear-gradient(135deg,#ff2a3b,#cc0000)';
+        btnBajista.style.color = '#fff';
+        btnBajista.style.boxShadow = '0 0 12px rgba(255,42,59,0.4)';
+        btnAlcista.style.background = 'transparent';
+        btnAlcista.style.color = '#64748b';
+        btnAlcista.style.boxShadow = 'none';
+    }
+}
 let cambioAnterior = {};
 let fuerzaCompradora = {};
 let fuerzaVendedora = {};
@@ -2384,6 +2465,7 @@ async function obtenerDatosBinance() {
         data.forEach(item => {
             const precio = parseFloat(item.lastPrice);
             if(!item.symbol.endsWith("USDT") || precio >= 20.00){ return; }
+            if(!esFuturoUSDTMValido(item.symbol)){ return; } // solo monedas con contrato real en Binance Futures USDT-M
             
             let change = parseFloat(item.priceChangePercent);
             let anterior = cambioAnterior[item.symbol];
@@ -2427,35 +2509,30 @@ async function obtenerDatosBinance() {
             const ciclosSubiendo = historialVelocidad[item.symbol].filter(v => v > 0).length;
             const ciclosBajando  = historialVelocidad[item.symbol].filter(v => v < 0).length;
 
-            // ⏸️ PAUSADO temporalmente por petición del usuario: el sistema viejo de
-            // BOMBA/DERRUMBE/AGOTAMIENTO (monedas en techo o cayendo) queda desactivado.
-            // Solo se usa el nuevo filtro de despegue real (EMA7>25>99 + 15% desde mínimo 48h).
-            // El cálculo original se deja comentado abajo por si se quiere reactivar después.
-            let alertaBombaSubida = false;
-            let alertaDerrumbe = false;
-            let alertaAgotamientoSubida = false;
-            /* CÓDIGO ORIGINAL (pausado):
-            let alertaBombaSubida_ORIG = 
+            // Estas 3 alertas (sistema "techo/derrumbe") solo se activan en Modo Bajista.
+            // En Modo Alcista quedan en false: solo interesa el despegue EMA desde abajo.
+            const enModoBajista = (modoMercado === 'bajista');
+
+            let alertaBombaSubida = enModoBajista &&
                 esMonedaRapida &&
                 cambioReal2Min > CDC_CONFIG.umbralBombaCambio2m &&
                 velPromedio > 0 &&
                 ciclosSubiendo >= 3 &&
                 posicionPorcentaje < 92;
 
-            let alertaDerrumbe_ORIG = 
+            let alertaDerrumbe = enModoBajista &&
                 enZonaAlta &&
                 esMonedaRapida &&
                 cambioReal2Min < CDC_CONFIG.umbralDerrumbeCambio2m &&
                 velPromedio < 0 &&
                 ciclosBajando >= 3;
 
-            let alertaAgotamientoSubida_ORIG = 
+            let alertaAgotamientoSubida = enModoBajista &&
                 posicionPorcentaje >= CDC_CONFIG.umbralAgotamientoPos &&
                 esMonedaRapida &&
                 Math.abs(velocidadPrecio) < 0.008 &&
                 cambioReal2Min > 0.3 &&
                 ciclosSubiendo <= 2;
-            */
 
             cachedData[item.symbol] = {
                 symbol: item.symbol,
@@ -2492,12 +2569,12 @@ async function obtenerDatosBinance() {
             
             // Asignación de estado cerebral del bot
             let cerebro = "ESTABLE";
-            // ⏸️ También pausado: "GIRO CONFIRMADO" (caída desde máximo, techo bajando) — el usuario
-            // no quiere ver monedas que están al máximo y empiezan a caer, solo despegues desde abajo.
+            // "GIRO CONFIRMADO" (caída desde máximo, techo bajando) también es exclusivo del modo bajista
             if (alertaDerrumbe) cerebro = "💥 DERRUMBE EN TOPE";
             else if (alertaBombaSubida) cerebro = "🚀 TODA POTENCIA LONG";
             else if (alertaAgotamientoSubida) cerebro = "⚠️ SUBIDA AGOTADA";
-            else cerebro = "⏸️ Pausado (solo despegue activo)";
+            else if (enModoBajista && caidaDesdeMaximo >= 2.0 && caidaDesdeMaximo <= 5.0 && velocidadPrecio < 0) cerebro = "🚨 GIRO CONFIRMADO";
+            else cerebro = enModoBajista ? "👀 Observando" : "⏸️ Modo bajista pausado";
             cerebroCDC[item.symbol] = cerebro;
             
             let riesgo = "BAJO";
@@ -2622,29 +2699,44 @@ function actualizarTablaIzquierda() {
     const todas = Object.values(cachedData);
 
     // Clasificar: las que cumplen el filtro real de despegue (EMA + 15% desde mínimo) van primero
-    const despegando = todas.filter(c => esDespegueReal(c.symbol));
-    const resto = todas.filter(c => !esDespegueReal(c.symbol));
+    let ordenadas;
+    if (modoMercado === 'alcista') {
+        const despegando = todas.filter(c => esDespegueReal(c.symbol));
+        const resto = todas.filter(c => !esDespegueReal(c.symbol));
+        despegando.sort((a, b) => (datosEMA[b.symbol]?.subidaDesdeMinimo || 0) - (datosEMA[a.symbol]?.subidaDesdeMinimo || 0));
+        resto.sort((a, b) => Math.abs(b.cambioReal2Min) - Math.abs(a.cambioReal2Min));
 
-    despegando.sort((a, b) => (datosEMA[b.symbol]?.subidaDesdeMinimo || 0) - (datosEMA[a.symbol]?.subidaDesdeMinimo || 0));
-    resto.sort((a, b) => Math.abs(b.cambioReal2Min) - Math.abs(a.cambioReal2Min));
-
-    // Avisar en el ticker cuando una moneda nueva entra al filtro de despegue real
-    despegando.forEach(c => {
-        const e = datosEMA[c.symbol];
-        const nombre = c.symbol.replace('USDT', '');
-        agregarNoticia(
-            `🚀 DESPEGUE CONFIRMADO: ${nombre} · EMA7>25>99 alcista · +${e.subidaDesdeMinimo.toFixed(1)}% desde mínimo 48h`,
-            'bomba',
-            'despegue_ema_' + c.symbol
-        );
-    });
-
-    const ordenadas = [...despegando, ...resto];
+        // Avisar en el ticker cuando una moneda nueva entra al filtro de despegue real
+        despegando.forEach(c => {
+            const e = datosEMA[c.symbol];
+            const nombre = c.symbol.replace('USDT', '');
+            agregarNoticia(
+                `🚀 DESPEGUE CONFIRMADO: ${nombre} · EMA7>25>99 alcista · +${e.subidaDesdeMinimo.toFixed(1)}% desde mínimo 48h`,
+                'bomba',
+                'despegue_ema_' + c.symbol
+            );
+        });
+        ordenadas = [...despegando, ...resto];
+    } else {
+        // Modo bajista: priorizar BOMBA/DERRUMBE/AGOTAMIENTO/GIRO CONFIRMADO (sistema viejo de techo)
+        function tiempoAlerta(c) {
+            const claves = [c.symbol + "_BOMBA", c.symbol + "_DERRUMBE", c.symbol + "_AGOTADO"];
+            const tiempos = claves.map(k => timestampLlegada[k] || 0).filter(t => t > 0);
+            return tiempos.length > 0 ? Math.max(...tiempos) : 0;
+        }
+        ordenadas = [...todas].sort((a, b) => {
+            const tA = tiempoAlerta(a), tB = tiempoAlerta(b);
+            if (tA > 0 && tB > 0) return tB - tA;
+            if (tA > 0) return -1;
+            if (tB > 0) return 1;
+            return Math.abs(b.cambioReal2Min) - Math.abs(a.cambioReal2Min);
+        });
+    }
 
     ordenadas.forEach(c => {
         const symbol = c.symbol;
         const e = datosEMA[symbol];
-        const cumpleDespegue = esDespegueReal(symbol);
+        const cumpleDespegue = modoMercado === 'alcista' && esDespegueReal(symbol);
         const tr = document.createElement("tr");
         tr.setAttribute('data-symbol', symbol);
         tr.onclick = () => seleccionarMoneda(symbol);
@@ -2657,7 +2749,28 @@ function actualizarTablaIzquierda() {
         let subEtiqueta = '';
         let iconoAlarma = '';
 
-        if (cumpleDespegue) {
+        if (modoMercado === 'bajista') {
+            // Badges del sistema viejo: techo, derrumbe, agotamiento
+            if (c.alertaBombaSubida) {
+                tr.style.background = "rgba(14, 203, 129, 0.25)";
+                tr.style.borderLeft = "4px solid #0ecb81";
+                subEtiqueta = '<span style="color:#0ecb81; font-size:10px; font-weight:900; display:block; text-shadow: 0 0 5px rgba(14,203,129,0.5);">🚀 ¡TODA POTENCIA! LONG</span>';
+                iconoAlarma = '<span style="font-size:12px; animation:blinker-glow 0.5s linear infinite;">🔔</span> ';
+            } else if (c.alertaDerrumbe) {
+                tr.style.background = "rgba(255, 42, 59, 0.25)";
+                tr.style.borderLeft = "4px solid #ff2a3b";
+                subEtiqueta = '<span style="color:#ff2a3b; font-size:10px; font-weight:900; display:block; text-shadow: 0 0 5px rgba(255,42,59,0.5);">⚠️ ¡FUERZA EXTREMA! SHORT</span>';
+                iconoAlarma = '<span style="font-size:12px; animation:blinker-glow 0.5s linear infinite;">🔔</span> ';
+            } else if (c.alertaAgotamientoSubida) {
+                tr.style.background = "rgba(243, 186, 47, 0.2)";
+                tr.style.borderLeft = "4px solid #f3ba2f";
+                subEtiqueta = '<span style="color:#f3ba2f; font-size:10px; font-weight:900; display:block;">⚠️ SUBIDA AGOTÁNDOSE</span>';
+                iconoAlarma = '<span style="font-size:12px; animation:blinker-glow 0.7s linear infinite;">🔔</span> ';
+            } else if (c.caidaDesdeMaximo >= 2.0 && c.caidaDesdeMaximo <= 5.0 && c.velocidad < 0) {
+                tr.style.background = "rgba(255, 42, 59, 0.1)";
+                subEtiqueta = '<span style="color:var(--accent-gold); font-size:10px; font-weight:900; display:block;">⚡ CAPTURA GIRO CDC</span>';
+            }
+        } else if (cumpleDespegue) {
             tr.style.background = "rgba(0,212,255,0.14)";
             tr.style.borderLeft = "4px solid #00d4ff";
             subEtiqueta = `<span style="color:#00d4ff;font-size:10px;font-weight:900;display:block;text-shadow:0 0 6px rgba(0,212,255,0.6);">🚀 DESPEGUE · EMA7>25>99 · +${e.subidaDesdeMinimo.toFixed(1)}% desde mínimo</span>`;
@@ -2670,8 +2783,7 @@ function actualizarTablaIzquierda() {
         } else if (!e) {
             subEtiqueta = `<span style="color:#475569;font-size:9px;display:block;">⏳ calculando EMAs…</span>`;
         }
-        // ⏸️ El resto de badges (BOMBA/DERRUMBE/AGOTAMIENTO/CAPTURA GIRO CDC en techo) están
-        // PAUSADOS por petición del usuario: solo interesa el filtro de despegue de abajo hacia arriba.
+        // El sistema de badges activo depende de modoMercado (alcista = despegue EMA, bajista = techo/derrumbe)
 
         let colorCambio = c.change > 0 ? "var(--accent-green)" : "var(--accent-glow)";
         tr.innerHTML = `
@@ -3923,6 +4035,7 @@ document.addEventListener("DOMContentLoaded", () => {
     cargarConfigCDC();
     cargarStatsAprendizajeCDC();
     verificarLicencia();
+    actualizarBotonesModoMercado(); // pinta el switch alcista/bajista según el modo guardado
 
     // Ocultar pantalla de inicio (splash) después de la animación
     setTimeout(() => {
@@ -3937,6 +4050,7 @@ document.addEventListener("DOMContentLoaded", () => {
     const guardadas = localStorage.getItem("cdc_simulaciones");
     if (guardadas) { try { simulaciones = JSON.parse(guardadas); } catch (e) {} }
     actualizarPaperTradingUI();
+    cargarSimbolosFuturosUSDTM(); // saber qué monedas tienen contrato real en Futuros USDT-M
     obtenerDatosBinance();
     revisarAvisosOficialesBinance(); // primer intento al cargar la página
     revisarNoticiasCointelegraph(); // primer intento al cargar la página
@@ -3952,6 +4066,7 @@ document.addEventListener("DOMContentLoaded", () => {
     // ciclo de precios (necesita cachedData lleno) y luego rota un lote de monedas cada 20s.
     setTimeout(() => { cicloActualizacionEMA(); }, 4000);
     setInterval(() => cicloActualizacionEMA(), EMA_INTERVALO_MS);
+    setInterval(() => cargarSimbolosFuturosUSDTM(), 30 * 60 * 1000); // refrescar lista de contratos cada 30 min
 });
 </script>
 
