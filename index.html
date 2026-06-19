@@ -741,10 +741,16 @@
         </div>
     </div>
 
-    <!-- CENTRO: Switch de modo Alcista/Bajista -->
-    <div id="modoSwitchWrap" style="display:flex;align-items:center;gap:0;background:#0a0a0a;border-radius:20px;padding:3px;border:1px solid rgba(255,255,255,0.08);">
-        <button id="btnModoAlcista" onclick="cambiarModoMercado('alcista')" style="display:flex;align-items:center;gap:6px;padding:6px 14px;border-radius:17px;border:none;cursor:pointer;font-size:12px;font-weight:800;transition:all 0.2s;white-space:nowrap;">📈 ALCISTA</button>
-        <button id="btnModoBajista" onclick="cambiarModoMercado('bajista')" style="display:flex;align-items:center;gap:6px;padding:6px 14px;border-radius:17px;border:none;cursor:pointer;font-size:12px;font-weight:800;transition:all 0.2s;white-space:nowrap;">📉 BAJISTA</button>
+    <!-- CENTRO: Switch LONG / SHORT -->
+    <div id="modoSwitchWrap" style="display:flex;align-items:center;gap:4px;background:#0a0a0a;border-radius:22px;padding:4px;border:1px solid rgba(255,255,255,0.08);">
+        <button id="btnModoAlcista" onclick="cambiarModoMercado('alcista')"
+            style="display:flex;align-items:center;gap:5px;padding:7px 16px;border-radius:18px;border:none;cursor:pointer;font-size:12px;font-weight:900;transition:all 0.25s;white-space:nowrap;letter-spacing:0.5px;">
+            🟢 LONG · COMPRA
+        </button>
+        <button id="btnModoBajista" onclick="cambiarModoMercado('bajista')"
+            style="display:flex;align-items:center;gap:5px;padding:7px 16px;border-radius:18px;border:none;cursor:pointer;font-size:12px;font-weight:900;transition:all 0.25s;white-space:nowrap;letter-spacing:0.5px;">
+            🔴 SHORT · VENTA
+        </button>
     </div>
 
     <!-- DERECHA: Test Audio + TikTok + WhatsApp -->
@@ -777,6 +783,7 @@
     </div>
 </header>
 
+<div id="modoBanner" style="text-align:center;padding:5px;font-size:11px;font-weight:900;letter-spacing:1.5px;transition:all 0.3s;"></div>
 <div id="nuclearAlert">🏆 MONITOR DE REVERSIÓN EXTREMA ACTIVO...</div>
 <div id="btcEthBar" style="background:#07101f;border-bottom:1px solid rgba(255,255,255,0.04);padding:5px 16px;display:flex;align-items:center;gap:12px;font-size:11px;overflow-x:auto;">
     <span style="color:#475569;font-weight:700;white-space:nowrap;">CORRELACIÓN:</span>
@@ -837,6 +844,17 @@
     <div class="sidebar" id="sidebar">
         <div class="sidebar-header">
             <button onclick="document.getElementById('activationPanel').style.display='flex'" class="btn vip" style="width:100%; font-size:11px; padding:8px;"><i class="fas fa-crown"></i> ACTIVAR LICENCIA</button>
+            <!-- LONG / SHORT en el sidebar -->
+            <div style="display:flex;gap:6px;">
+                <button id="btnModoAlcistaSide" onclick="cambiarModoMercado('alcista')"
+                    style="flex:1;padding:10px 6px;border-radius:10px;border:none;cursor:pointer;font-size:12px;font-weight:900;transition:all 0.25s;letter-spacing:0.3px;">
+                    🟢 LONG<br><span style="font-size:9px;font-weight:700;opacity:0.85;">COMPRA · PISO</span>
+                </button>
+                <button id="btnModoBajistaSide" onclick="cambiarModoMercado('bajista')"
+                    style="flex:1;padding:10px 6px;border-radius:10px;border:none;cursor:pointer;font-size:12px;font-weight:900;transition:all 0.25s;letter-spacing:0.3px;">
+                    🔴 SHORT<br><span style="font-size:9px;font-weight:700;opacity:0.85;">VENTA · TECHO</span>
+                </button>
+            </div>
             <div class="search-box">
                 <div id="botSaludo" class="bot-saludo" style="margin-bottom:8px;">🤖 Buscando giros o despegues (< 20 USDT)</div>
                 <input type="text" id="searchCoin" placeholder="Buscar low-caps o filtros (BOMBA, POTENCIA, AGOTADO)..." onkeyup="buscarMoneda()">
@@ -1070,27 +1088,75 @@ function cambiarModoMercado(modo) {
     modoMercado = modo;
     localStorage.setItem('cdc_modo_mercado', modo);
     actualizarBotonesModoMercado();
+    actualizarBannerModo();
     actualizarTablaIzquierda();
+}
+
+function actualizarBannerModo() {
+    const banner = document.getElementById('modoBanner');
+    if (!banner) return;
+    if (modoMercado === 'alcista') {
+        banner.style.background = 'linear-gradient(90deg,rgba(14,203,129,0.15),rgba(14,203,129,0.3),rgba(14,203,129,0.15))';
+        banner.style.color = '#0ecb81';
+        banner.style.borderBottom = '2px solid rgba(14,203,129,0.4)';
+        banner.innerHTML = '✅ MODO LONG · BUSCANDO MONEDAS EN EL PISO QUE ESTÁN DESPEGANDO · COMPRA';
+    } else {
+        banner.style.background = 'linear-gradient(90deg,rgba(255,42,59,0.15),rgba(255,42,59,0.3),rgba(255,42,59,0.15))';
+        banner.style.color = '#ff2a3b';
+        banner.style.borderBottom = '2px solid rgba(255,42,59,0.4)';
+        banner.innerHTML = '🔴 MODO SHORT · BUSCANDO MONEDAS EN EL MÁXIMO PARA VENDER · VENTA';
+    }
 }
 
 function actualizarBotonesModoMercado() {
     const btnAlcista = document.getElementById('btnModoAlcista');
     const btnBajista = document.getElementById('btnModoBajista');
-    if (!btnAlcista || !btnBajista) return;
+    const btnAlcistaSide = document.getElementById('btnModoAlcistaSide');
+    const btnBajistaSide = document.getElementById('btnModoBajistaSide');
+
+    function aplicarActivo(btn, esVerde) {
+        if (!btn) return;
+        if (esVerde) {
+            btn.style.background = 'linear-gradient(135deg,#0ecb81,#05a660)';
+            btn.style.color = '#001a0d';
+            btn.style.boxShadow = '0 0 18px rgba(14,203,129,0.65), 0 2px 8px rgba(0,0,0,0.5)';
+            btn.style.transform = 'scale(1.04)';
+            btn.style.border = '2px solid rgba(14,203,129,0.5)';
+        } else {
+            btn.style.background = 'linear-gradient(135deg,#ff2a3b,#cc0000)';
+            btn.style.color = '#fff';
+            btn.style.boxShadow = '0 0 18px rgba(255,42,59,0.65), 0 2px 8px rgba(0,0,0,0.5)';
+            btn.style.transform = 'scale(1.04)';
+            btn.style.border = '2px solid rgba(255,42,59,0.5)';
+        }
+    }
+    function aplicarInactivo(btn, esVerde) {
+        if (!btn) return;
+        if (esVerde) {
+            btn.style.background = 'rgba(14,203,129,0.08)';
+            btn.style.color = '#64748b';
+            btn.style.boxShadow = 'none';
+            btn.style.transform = 'scale(1)';
+            btn.style.border = '2px solid rgba(14,203,129,0.12)';
+        } else {
+            btn.style.background = 'rgba(255,42,59,0.08)';
+            btn.style.color = '#64748b';
+            btn.style.boxShadow = 'none';
+            btn.style.transform = 'scale(1)';
+            btn.style.border = '2px solid rgba(255,42,59,0.12)';
+        }
+    }
+
     if (modoMercado === 'alcista') {
-        btnAlcista.style.background = 'linear-gradient(135deg,#0ecb81,#0a9d63)';
-        btnAlcista.style.color = '#03110a';
-        btnAlcista.style.boxShadow = '0 0 12px rgba(14,203,129,0.4)';
-        btnBajista.style.background = 'transparent';
-        btnBajista.style.color = '#64748b';
-        btnBajista.style.boxShadow = 'none';
+        aplicarActivo(btnAlcista, true);
+        aplicarActivo(btnAlcistaSide, true);
+        aplicarInactivo(btnBajista, false);
+        aplicarInactivo(btnBajistaSide, false);
     } else {
-        btnBajista.style.background = 'linear-gradient(135deg,#ff2a3b,#cc0000)';
-        btnBajista.style.color = '#fff';
-        btnBajista.style.boxShadow = '0 0 12px rgba(255,42,59,0.4)';
-        btnAlcista.style.background = 'transparent';
-        btnAlcista.style.color = '#64748b';
-        btnAlcista.style.boxShadow = 'none';
+        aplicarActivo(btnBajista, false);
+        aplicarActivo(btnBajistaSide, false);
+        aplicarInactivo(btnAlcista, true);
+        aplicarInactivo(btnAlcistaSide, true);
     }
 }
 let cambioAnterior = {};
@@ -2383,8 +2449,8 @@ function renderizarTickerNoticias() {
 let datosEMA = {};          // { symbol: { ema7, ema25, ema99, ema7Prev, ema25Prev, ema99Prev, minimo48h, alineadasAlcista, subidaDesdeMinimo } }
 let colaSimbolosEMA = [];   // cola de símbolos pendientes de actualizar EMA (rotamos para no saturar la API)
 let indiceEMAActual = 0;
-const EMA_LOTE_POR_CICLO = 6;       // cuántos símbolos actualizamos cada ciclo de refresco EMA
-const EMA_INTERVALO_MS = 20 * 1000; // cada 20s actualizamos un lote (rotación completa ~ unos minutos)
+const EMA_LOTE_POR_CICLO = 15;      // cuántos símbolos actualizamos cada ciclo de refresco EMA
+const EMA_INTERVALO_MS = 8 * 1000; // cada 8s actualizamos un lote (rotación completa mucho más rápida)
 
 function calcularEMASerie(valores, periodo) {
     if (valores.length < periodo) return null;
@@ -2752,34 +2818,34 @@ function actualizarTablaIzquierda() {
         if (modoMercado === 'bajista') {
             // Badges del sistema viejo: techo, derrumbe, agotamiento
             if (c.alertaBombaSubida) {
-                tr.style.background = "rgba(14, 203, 129, 0.25)";
+                tr.style.background = "rgba(14, 203, 129, 0.22)";
                 tr.style.borderLeft = "4px solid #0ecb81";
-                subEtiqueta = '<span style="color:#0ecb81; font-size:10px; font-weight:900; display:block; text-shadow: 0 0 5px rgba(14,203,129,0.5);">🚀 ¡TODA POTENCIA! LONG</span>';
+                subEtiqueta = '<span style="color:#fff; background:linear-gradient(90deg,#0ecb81,#05a660); font-size:10px; font-weight:900; display:inline-block; padding:2px 8px; border-radius:6px; margin-top:3px; letter-spacing:0.5px;">✅ LONG · COMPRAR AHORA</span>';
                 iconoAlarma = '<span style="font-size:12px; animation:blinker-glow 0.5s linear infinite;">🔔</span> ';
             } else if (c.alertaDerrumbe) {
-                tr.style.background = "rgba(255, 42, 59, 0.25)";
+                tr.style.background = "rgba(255, 42, 59, 0.22)";
                 tr.style.borderLeft = "4px solid #ff2a3b";
-                subEtiqueta = '<span style="color:#ff2a3b; font-size:10px; font-weight:900; display:block; text-shadow: 0 0 5px rgba(255,42,59,0.5);">⚠️ ¡FUERZA EXTREMA! SHORT</span>';
+                subEtiqueta = '<span style="color:#fff; background:linear-gradient(90deg,#ff2a3b,#cc0000); font-size:10px; font-weight:900; display:inline-block; padding:2px 8px; border-radius:6px; margin-top:3px; letter-spacing:0.5px;">🔴 SHORT · VENDER AHORA</span>';
                 iconoAlarma = '<span style="font-size:12px; animation:blinker-glow 0.5s linear infinite;">🔔</span> ';
             } else if (c.alertaAgotamientoSubida) {
                 tr.style.background = "rgba(243, 186, 47, 0.2)";
                 tr.style.borderLeft = "4px solid #f3ba2f";
-                subEtiqueta = '<span style="color:#f3ba2f; font-size:10px; font-weight:900; display:block;">⚠️ SUBIDA AGOTÁNDOSE</span>';
+                subEtiqueta = '<span style="color:#000; background:#f3ba2f; font-size:10px; font-weight:900; display:inline-block; padding:2px 8px; border-radius:6px; margin-top:3px;">⚠️ SHORT · AGOTÁNDOSE</span>';
                 iconoAlarma = '<span style="font-size:12px; animation:blinker-glow 0.7s linear infinite;">🔔</span> ';
             } else if (c.caidaDesdeMaximo >= 2.0 && c.caidaDesdeMaximo <= 5.0 && c.velocidad < 0) {
                 tr.style.background = "rgba(255, 42, 59, 0.1)";
-                subEtiqueta = '<span style="color:var(--accent-gold); font-size:10px; font-weight:900; display:block;">⚡ CAPTURA GIRO CDC</span>';
+                subEtiqueta = '<span style="color:#f3ba2f; font-size:10px; font-weight:900; display:block;">⚡ CAPTURA GIRO CDC</span>';
             }
         } else if (cumpleDespegue) {
-            tr.style.background = "rgba(0,212,255,0.14)";
-            tr.style.borderLeft = "4px solid #00d4ff";
-            subEtiqueta = `<span style="color:#00d4ff;font-size:10px;font-weight:900;display:block;text-shadow:0 0 6px rgba(0,212,255,0.6);">🚀 DESPEGUE · EMA7>25>99 · +${e.subidaDesdeMinimo.toFixed(1)}% desde mínimo</span>`;
+            tr.style.background = "rgba(14,203,129,0.18)";
+            tr.style.borderLeft = "4px solid #0ecb81";
+            subEtiqueta = `<span style="color:#fff; background:linear-gradient(90deg,#0ecb81,#05a660); font-size:10px; font-weight:900; display:inline-block; padding:2px 8px; border-radius:6px; margin-top:3px; text-shadow:none; letter-spacing:0.5px;">✅ LONG · DESPEGANDO +${e.subidaDesdeMinimo.toFixed(1)}% desde mínimo</span>`;
             iconoAlarma = '<span style="font-size:12px;animation:blinker-glow 0.6s linear infinite;">⚡</span> ';
         } else if (e && e.alineadasAlcista) {
             // EMAs alcistas pero todavía no llegó al 15% desde el mínimo: queda "en camino"
             tr.style.background = "rgba(0,212,255,0.05)";
             tr.style.borderLeft = "3px solid rgba(0,212,255,0.35)";
-            subEtiqueta = `<span style="color:#38bdf8;font-size:10px;font-weight:700;display:block;">📡 EMAs alcistas · +${e.subidaDesdeMinimo.toFixed(1)}% (falta llegar a 15%)</span>`;
+            subEtiqueta = `<span style="color:#38bdf8;font-size:10px;font-weight:700;display:block;">📡 LONG EN FORMACIÓN · +${e.subidaDesdeMinimo.toFixed(1)}% (esperando 15%)</span>`;
         } else if (!e) {
             subEtiqueta = `<span style="color:#475569;font-size:9px;display:block;">⏳ calculando EMAs…</span>`;
         }
@@ -4036,6 +4102,7 @@ document.addEventListener("DOMContentLoaded", () => {
     cargarStatsAprendizajeCDC();
     verificarLicencia();
     actualizarBotonesModoMercado(); // pinta el switch alcista/bajista según el modo guardado
+    actualizarBannerModo(); // pinta el banner de modo activo
 
     // Ocultar pantalla de inicio (splash) después de la animación
     setTimeout(() => {
