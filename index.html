@@ -2671,6 +2671,14 @@ async function obtenerDatosBinance() {
                 ? ((maximo48h[item.symbol] - precio) / maximo48h[item.symbol]) * 100
                 : 999;
             
+            // Estado del motor alcista (despegue EMA / rebote tras caída) para esta moneda,
+            // usado cuando estamos en Modo Alcista, para que el panel de detalle muestre
+            // lo que el motor realmente está viendo en vez del texto fijo de "pausado".
+            const ed = datosEMA[item.symbol];
+            const enDespegue = !enModoBajista && esDespegueReal(item.symbol);
+            const enRebote = !enModoBajista && !enDespegue && esReboteTrasCaida(item.symbol);
+            const enFormacion = !enModoBajista && !enDespegue && !enRebote && ed && ed.alineadasAlcista;
+
             // Asignación de estado cerebral del bot
             let cerebro = "ESTABLE";
             // "GIRO CONFIRMADO" (caída desde máximo, techo bajando) también es exclusivo del modo bajista
@@ -2678,16 +2686,22 @@ async function obtenerDatosBinance() {
             else if (alertaBombaSubida) cerebro = "🚀 TODA POTENCIA LONG";
             else if (alertaAgotamientoSubida) cerebro = "⚠️ SUBIDA AGOTADA";
             else if (enModoBajista && caidaDesdeMaximo >= 2.0 && caidaDesdeMaximo <= 5.0 && velocidadPrecio < 0) cerebro = "🚨 GIRO CONFIRMADO";
-            else cerebro = enModoBajista ? "👀 Observando" : "⏸️ Modo bajista pausado";
+            else if (enDespegue) cerebro = "🚀 DESPEGUE EMA CONFIRMADO";
+            else if (enRebote) cerebro = "🔄 REBOTE TRAS CAÍDA · GIRANDO ALCISTA";
+            else if (enFormacion) cerebro = "📡 LONG EN FORMACIÓN";
+            else cerebro = enModoBajista ? "👀 Observando" : (ed ? "👀 Motor alcista observando (sin señal aún)" : "⏳ Calculando EMAs…");
             cerebroCDC[item.symbol] = cerebro;
             
             let riesgo = "BAJO";
             if (alertaDerrumbe) riesgo = "CRÍTICO DESPLOME";
             else if (alertaBombaSubida) riesgo = "MÁXIMA FUERZA DE COMPRA";
             else if (alertaAgotamientoSubida) riesgo = "ALTO RIESGO REVERSIÓN";
+            else if (enDespegue) riesgo = "OPORTUNIDAD LONG CONFIRMADA";
+            else if (enRebote) riesgo = "OPORTUNIDAD LONG TEMPRANA";
             riesgoCDC[item.symbol] = riesgo;
             
-            senalCDC[item.symbol] = alertaDerrumbe ? "SHORT INMINENTE" : (alertaBombaSubida ? "LONG EXPLOSIVO" : (alertaAgotamientoSubida ? "SHORT DE AGOTAMIENTO" : "ESPERAR SEÑAL"));
+            senalCDC[item.symbol] = alertaDerrumbe ? "SHORT INMINENTE" : (alertaBombaSubida ? "LONG EXPLOSIVO" : (alertaAgotamientoSubida ? "SHORT DE AGOTAMIENTO" : (enDespegue ? "LONG CONFIRMADO" : (enRebote ? "LONG TEMPRANO" : "ESPERAR SEÑAL"))));
+
 
             // Agrupar las alertas detectadas para priorizar redirección y voz
             if (alertaDerrumbe) {
@@ -3824,7 +3838,7 @@ function actualizarPanelCentral() {
             </div>
             <div class="intel-row">
                 <span class="intel-label">📡 Señal Activa</span>
-                <span class="intel-value" style="color:#fff; background:${c.alertaBombaSubida ? '#0ecb81' : (c.alertaDerrumbe ? '#ff2a3b' : '#334155')}; color:${c.alertaBombaSubida ? '#000' : '#fff'}; padding:3px 10px; border-radius:6px; font-size:12px;">${senalCDC[selectedCoin]}</span>
+                <span class="intel-value" style="color:#fff; background:${c.alertaBombaSubida || esDespegueReal(selectedCoin) ? '#0ecb81' : (c.alertaDerrumbe ? '#ff2a3b' : (esReboteTrasCaida(selectedCoin) ? '#00d4ff' : '#334155'))}; color:${(c.alertaBombaSubida || esDespegueReal(selectedCoin)) ? '#000' : '#fff'}; padding:3px 10px; border-radius:6px; font-size:12px;">${senalCDC[selectedCoin]}</span>
             </div>
         </div>
     `;
