@@ -1163,6 +1163,7 @@ let ultimaMonedaHablada = "";
 let ultimoTipoAlertaHablada = "";
 let timestampLlegada = {}; // Registra cuándo apareció cada alerta por primera vez
 let ultimosDespeguesAlertados = {}; // symbol -> timestamp de última vez que se anunció por voz
+let ultimosReboteAlertados = {}; // symbol -> timestamp de última vez que se anunció rebote tras caída por voz
 
 // Historial para rastrear los últimos 2 minutos exactos (60 lecturas de 2 segundos)
 let historialPrecios2Min = {};
@@ -2517,6 +2518,42 @@ function esDespegueReal(symbol) {
     return e.alineadasAlcista && e.subidaDesdeMinimo >= 8;
 }
 
+// ══════════════════════════════════════════════════════════════════
+// 🔄 REBOTE TRAS CAÍDA — detecta monedas que estuvieron cayendo en
+// las últimas 24h (siguen en negativo en el día o cerca de su mínimo)
+// y AHORA están girando hacia arriba: la EMA7 ya cambió de dirección
+// (empezó a subir) aunque todavía no esté 100% alineada con EMA25/EMA99,
+// y el precio ya despegó un poco desde su piso de 48h.
+// Esto es justo lo que pedías: "monedas que estén despegando después
+// de haber caído sus 24 horas" — antes solo se mostraban las que YA
+// tenían las 3 EMAs perfectamente alineadas, lo cual es mucho más raro
+// y tardaba en aparecer. Este filtro las atrapa apenas empieza el giro.
+// ══════════════════════════════════════════════════════════════════
+function esReboteTrasCaida(symbol) {
+    const c = cachedData[symbol];
+    const e = datosEMA[symbol];
+    if (!c || !e) return false;
+
+    // 1) Tiene que haber caído: sigue en negativo en las 24h, o el precio
+    //    está en la mitad inferior del rango de 24h (todavía cerca de su piso).
+    const cayoEnElDia = c.change < 0 || c.posicionPorcentaje <= 40;
+    if (!cayoEnElDia) return false;
+
+    // 2) Tiene que estar girando: la EMA7 ya dejó de bajar y apunta hacia arriba.
+    const emaGirando = e.ema7 > e.ema7Prev;
+    if (!emaGirando) return false;
+
+    // 3) Ya hay un repunte real desde el mínimo de 48h (más sensible que el 8% del
+    //    despegue confirmado, para agarrar el movimiento apenas arranca).
+    const yaRepunto = e.subidaDesdeMinimo >= 3;
+    if (!yaRepunto) return false;
+
+    // 4) Velocidad de los últimos 2 minutos también positiva: confirma que no es ruido.
+    const conImpulso = c.velocidad > 0 || c.cambioReal2Min > 0;
+
+    return conImpulso;
+}
+
 async function obtenerDatosBinance() {
     try {
         const response = await fetch('https://api.binance.com/api/v3/ticker/24hr');
@@ -2769,8 +2806,10 @@ function actualizarTablaIzquierda() {
     let ordenadas;
     if (modoMercado === 'alcista') {
         const despegando = todas.filter(c => esDespegueReal(c.symbol));
-        const resto = todas.filter(c => !esDespegueReal(c.symbol));
+        const rebotando = todas.filter(c => !esDespegueReal(c.symbol) && esReboteTrasCaida(c.symbol));
+        const resto = todas.filter(c => !esDespegueReal(c.symbol) && !esReboteTrasCaida(c.symbol));
         despegando.sort((a, b) => (datosEMA[b.symbol]?.subidaDesdeMinimo || 0) - (datosEMA[a.symbol]?.subidaDesdeMinimo || 0));
+        rebotando.sort((a, b) => (datosEMA[b.symbol]?.subidaDesdeMinimo || 0) - (datosEMA[a.symbol]?.subidaDesdeMinimo || 0));
         resto.sort((a, b) => Math.abs(b.cambioReal2Min) - Math.abs(a.cambioReal2Min));
 
         // Avisar en el ticker Y por voz cuando una moneda nueva entra al filtro de despegue real
@@ -2799,7 +2838,32 @@ function actualizarTablaIzquierda() {
                 }, esperaMs);
             }
         });
-        ordenadas = [...despegando, ...resto];
+
+        // Avisar en el ticker Y por voz cuando una moneda entra al filtro de REBOTE TRAS CAÍDA
+        const COOLDOWN_REBOTE_VOZ = 5 * 60 * 1000;
+        const ahoraRebote = Date.now();
+        rebotando.forEach(c => {
+            const e = datosEMA[c.symbol];
+            const nombre = c.symbol.replace('USDT', '');
+            agregarNoticia(
+                `🔄 REBOTE TRAS CAÍDA: ${nombre} · cayó en las últimas 24h y ahora gira al alza · +${e.subidaDesdeMinimo.toFixed(1)}% desde mínimo 48h`,
+                'rebote',
+                'rebote_caida_' + c.symbol
+            );
+            const ultimoAviso = ultimosReboteAlertados[c.symbol] || 0;
+            if (ahoraRebote - ultimoAviso > COOLDOWN_REBOTE_VOZ) {
+                ultimosReboteAlertados[c.symbol] = ahoraRebote;
+                const pct = e.subidaDesdeMinimo.toFixed(1);
+                const textoVoz = `Atención. ${nombre} venía cayendo en las últimas 24 horas y ahora está mostrando un rebote. Subió ${pct} por ciento desde su mínimo reciente y la EMA 7 ya está girando hacia arriba. Vigilá una posible entrada en largo.`;
+                const esperaMs = (Date.now() < audioBloqueadoHasta) ? (audioBloqueadoHasta - Date.now() + 500) : 0;
+                setTimeout(() => {
+                    if (Date.now() - ultimosReboteAlertados[c.symbol] < COOLDOWN_REBOTE_VOZ + 5000) {
+                        hablar(textoVoz, true);
+                    }
+                }, esperaMs);
+            }
+        });
+        ordenadas = [...despegando, ...rebotando, ...resto];
     } else {
         // Modo bajista: priorizar BOMBA/DERRUMBE/AGOTAMIENTO/GIRO CONFIRMADO (sistema viejo de techo)
         function tiempoAlerta(c) {
@@ -2820,6 +2884,7 @@ function actualizarTablaIzquierda() {
         const symbol = c.symbol;
         const e = datosEMA[symbol];
         const cumpleDespegue = modoMercado === 'alcista' && esDespegueReal(symbol);
+        const cumpleRebote = modoMercado === 'alcista' && !cumpleDespegue && esReboteTrasCaida(symbol);
         const tr = document.createElement("tr");
         tr.setAttribute('data-symbol', symbol);
         tr.onclick = () => seleccionarMoneda(symbol);
@@ -2858,6 +2923,11 @@ function actualizarTablaIzquierda() {
             tr.style.borderLeft = "4px solid #0ecb81";
             subEtiqueta = `<span style="color:#fff; background:linear-gradient(90deg,#0ecb81,#05a660); font-size:10px; font-weight:900; display:inline-block; padding:2px 8px; border-radius:6px; margin-top:3px; text-shadow:none; letter-spacing:0.5px;">🚀 DESPEGUE EMA · +${e.subidaDesdeMinimo.toFixed(1)}% desde mín.48h</span>`;
             iconoAlarma = '<span style="font-size:12px;animation:blinker-glow 0.6s linear infinite;">⚡</span> ';
+        } else if (cumpleRebote) {
+            tr.style.background = "rgba(0,212,255,0.16)";
+            tr.style.borderLeft = "4px solid #00d4ff";
+            subEtiqueta = `<span style="color:#fff; background:linear-gradient(90deg,#00d4ff,#0088aa); font-size:10px; font-weight:900; display:inline-block; padding:2px 8px; border-radius:6px; margin-top:3px; text-shadow:none; letter-spacing:0.5px;">🔄 REBOTE TRAS CAÍDA · +${e.subidaDesdeMinimo.toFixed(1)}% desde mín.48h</span>`;
+            iconoAlarma = '<span style="font-size:12px;animation:blinker-glow 0.7s linear infinite;">🔁</span> ';
         } else if (e && e.alineadasAlcista) {
             // EMAs alcistas pero todavía no llegó al 15% desde el mínimo: queda "en camino"
             tr.style.background = "rgba(0,212,255,0.05)";
@@ -4085,7 +4155,7 @@ async function abrirRadarDespegue() {
     initAudio();
     let html = "";
     let candidatos = [];
-    let candidatosReversion = [];
+    let rebotes = [];
 
  const symbols = Object.keys(cachedData);
     for (const symbol of symbols) {
@@ -4095,16 +4165,17 @@ async function abrirRadarDespegue() {
         // Usar el mismo filtro que la tabla: EMA alineadas + ≥8% desde mínimo 48h
         if (esDespegueReal(symbol) && e) {
             candidatos.push({ c, e });
-        }
-
-        if (await analizarReversionCDC(symbol)) {
-            candidatosReversion.push(c);
+        } else if (e && esReboteTrasCaida(symbol)) {
+            // Cayó en las últimas 24h y ahora está girando al alza (EMA7 ya sube)
+            rebotes.push({ c, e });
         }
     }
 
     // Ordenar: más subida desde mínimo primero
     candidatos.sort((a, b) => b.e.subidaDesdeMinimo - a.e.subidaDesdeMinimo);
+    rebotes.sort((a, b) => b.e.subidaDesdeMinimo - a.e.subidaDesdeMinimo);
     let topSuelos = candidatos.slice(0, 8);
+    let topRebotes = rebotes.slice(0, 8);
 
     topSuelos.forEach(({ c, e }) => {
         html += `
@@ -4118,11 +4189,26 @@ async function abrirRadarDespegue() {
         </div>`;
     });
 
+    if (topRebotes.length > 0) {
+        html += `<div style="font-size:11px; font-weight:900; letter-spacing:0.5px; color:#00d4ff; margin:14px 0 8px; text-transform:uppercase;">🔄 Rebotando tras caída de 24h</div>`;
+        topRebotes.forEach(({ c, e }) => {
+            html += `
+            <div onclick="seleccionarMoneda('${c.symbol}'); cerrarRadarDespegue();" style="background:#050914; border:2px solid #00d4ff; padding:12px; margin-bottom:10px; border-radius:8px; cursor:pointer; position:relative;">
+                🔄 <b>${c.symbol.replace("USDT","")}</b> <span style="font-size:10px; color:var(--text-dim);">USDT</span>
+                <span style="position:absolute; right:10px; top:12px; background:rgba(0,212,255,0.15); color:#00d4ff; font-size:10px; font-weight:900; padding:2px 6px; border-radius:4px;">🔄 REBOTE</span>
+                <br>
+                <span style="font-size:11px; display:block; margin-top:4px;">Precio Actual: <b style="color:#fff;">$${c.price}</b></span>
+                <span style="display:block; font-size:11px; color:#00d4ff; font-weight:bold;">${c.change > 0 ? '+' : ''}${c.change.toFixed(2)}% en 24h · +${e.subidaDesdeMinimo.toFixed(1)}% desde mínimo 48h</span>
+                <span style="display:block; font-size:10px; color:var(--text-dim);">EMA7 girando al alza · EMA7: ${e.ema7.toFixed(5)}</span>
+            </div>`;
+        });
+    }
+
     if(html === ""){ 
         html = `
         <div style="text-align:center; padding:25px; color:#475569; font-size:12px;">
             <i class="fas fa-spinner fa-spin" style="color:var(--accent-green); margin-bottom:10px; font-size:18px;"></i><br>
-            No hay despegues EMA activos ahora mismo.<br>
+            No hay despegues ni rebotes activos ahora mismo.<br>
             <span style="font-size:10px; margin-top:6px; display:block;">El sistema actualiza las EMAs de a 15 monedas cada 8 segundos.<br>Esperá unos minutos para que se completen los cálculos.</span>
         </div>`; 
     }
@@ -4187,7 +4273,7 @@ document.addEventListener("DOMContentLoaded", () => {
 
 <div id="emaRadarPanel" style="display:none; position:fixed; bottom:110px; right:20px; width:320px; background:#111; border:2px solid var(--accent-green); border-radius:12px; z-index:999999; padding:15px; box-shadow:0 0 20px rgba(14,203,129,.3);">
     <div id="cdcThinking" style="background:#0b1628; border:1px solid var(--accent-green); border-radius:12px; padding:10px; margin-bottom:15px; color:#fff; font-size:12px; text-align:center; font-weight:bold;">
-        💭 RADAR DE DESPEGUE INMINENTE:<br>EMAs 7&gt;25&gt;99 alineadas alcistas + &gt;8% desde mínimo 48h.
+        💭 RADAR DE DESPEGUE INMINENTE:<br>EMAs 7&gt;25&gt;99 alineadas alcistas + &gt;8% desde mínimo 48h.<br>🔄 También se muestran monedas que cayeron en las últimas 24h y ya están girando al alza (EMA7 girando + repunte desde el piso).
     </div>
     <div id="emaRadarLista"></div>
     <div style="text-align:center; margin-top:15px;"><button onclick="cerrarRadarDespegue()" class="btn vip" style="width:100%;">Cerrar</button></div>
