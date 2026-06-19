@@ -1162,6 +1162,7 @@ let originalPageTitle = document.title;
 let ultimaMonedaHablada = "";
 let ultimoTipoAlertaHablada = "";
 let timestampLlegada = {}; // Registra cuándo apareció cada alerta por primera vez
+let ultimosDespeguesAlertados = {}; // symbol -> timestamp de última vez que se anunció por voz
 
 // Historial para rastrear los últimos 2 minutos exactos (60 lecturas de 2 segundos)
 let historialPrecios2Min = {};
@@ -1595,6 +1596,17 @@ function generarTextoAlarma(coinName, tipoAlerta) {
     const probSubida = (prediccionCDC[coinName] || {}).subida || 50;
     const probCaida  = (prediccionCDC[coinName] || {}).caida  || 50;
     const cambioAbs  = Math.abs(parseFloat(c.cambioReal2Min)).toFixed(2);
+
+    if (tipoAlerta === "DESPEGUE") {
+        const e = datosEMA[coinName];
+        const pct = e ? e.subidaDesdeMinimo.toFixed(1) : '?';
+        const frases = [
+            `Alerta de despegue en ${nombre}. Las medias exponenciales 7, 25 y 99 están perfectamente alineadas al alza y el precio subió ${pct} por ciento desde el mínimo de 48 horas. El setup es ideal para evaluar una posición larga con stop bajo el mínimo reciente.`,
+            `${nombre} acaba de completar el patrón de despegue. EMA 7 mayor que 25, mayor que 99, y subió ${pct} por ciento desde el suelo. Alta probabilidad de continuación alcista. Evalúa la entrada con volumen de confirmación.`,
+            `Despegue real confirmado en ${nombre}. Las tres EMAs alineadas y apuntando para arriba. La moneda subió ${pct} por ciento desde su mínimo reciente de 48 horas. Este es el patrón que buscamos: piso claro, EMAs alineadas, impulso activo.`
+        ];
+        return { texto: frases[Math.floor(Math.random() * frases.length)], esMasculino: true };
+    }
 
     if (tipoAlerta === "BOMBA") {
         const frases = [
@@ -2497,11 +2509,12 @@ async function cicloActualizacionEMA() {
 }
 
 // Devuelve true solo si la moneda cumple TODOS los criterios de despegue real pedidos:
-// EMA7 > EMA25 > EMA99 (alineadas alcistas, ambas subiendo) + ≥15% desde el mínimo de 48h
+// EMA7 > EMA25 > EMA99 (alineadas alcistas, ambas subiendo) + ≥8% desde el mínimo de 48h
+// (bajamos de 15% a 8% para capturar el inicio del despegue, no solo cuando ya subió mucho)
 function esDespegueReal(symbol) {
     const e = datosEMA[symbol];
     if (!e) return false;
-    return e.alineadasAlcista && e.subidaDesdeMinimo >= 15;
+    return e.alineadasAlcista && e.subidaDesdeMinimo >= 8;
 }
 
 async function obtenerDatosBinance() {
@@ -2760,7 +2773,9 @@ function actualizarTablaIzquierda() {
         despegando.sort((a, b) => (datosEMA[b.symbol]?.subidaDesdeMinimo || 0) - (datosEMA[a.symbol]?.subidaDesdeMinimo || 0));
         resto.sort((a, b) => Math.abs(b.cambioReal2Min) - Math.abs(a.cambioReal2Min));
 
-        // Avisar en el ticker cuando una moneda nueva entra al filtro de despegue real
+        // Avisar en el ticker Y por voz cuando una moneda nueva entra al filtro de despegue real
+        const COOLDOWN_DESPEGUE_VOZ = 5 * 60 * 1000; // 5 minutos entre avisos de la misma moneda
+        const ahoraDespegue = Date.now();
         despegando.forEach(c => {
             const e = datosEMA[c.symbol];
             const nombre = c.symbol.replace('USDT', '');
@@ -2769,6 +2784,20 @@ function actualizarTablaIzquierda() {
                 'bomba',
                 'despegue_ema_' + c.symbol
             );
+            // Alerta de voz para despegue: solo si pasaron más de 5 minutos desde el último aviso de esta moneda
+            const ultimoAviso = ultimosDespeguesAlertados[c.symbol] || 0;
+            if (ahoraDespegue - ultimoAviso > COOLDOWN_DESPEGUE_VOZ) {
+                ultimosDespeguesAlertados[c.symbol] = ahoraDespegue;
+                const pct = e.subidaDesdeMinimo.toFixed(1);
+                const textoVoz = `¡Alerta de despegue! ${nombre} está despegando desde su mínimo de 48 horas. Las EMAs 7, 25 y 99 están alineadas alcistas y el precio subió ${pct} por ciento desde el piso. Es momento de evaluar una entrada larga con stop bajo el mínimo reciente.`;
+                // Dar prioridad a despegue: esperar a que termine audio actual si hay uno
+                const esperaMs = (Date.now() < audioBloqueadoHasta) ? (audioBloqueadoHasta - Date.now() + 500) : 0;
+                setTimeout(() => {
+                    if (Date.now() - ultimosDespeguesAlertados[c.symbol] < COOLDOWN_DESPEGUE_VOZ + 5000) {
+                        hablar(textoVoz, true);
+                    }
+                }, esperaMs);
+            }
         });
         ordenadas = [...despegando, ...resto];
     } else {
@@ -2827,7 +2856,7 @@ function actualizarTablaIzquierda() {
         } else if (cumpleDespegue) {
             tr.style.background = "rgba(14,203,129,0.18)";
             tr.style.borderLeft = "4px solid #0ecb81";
-            subEtiqueta = `<span style="color:#fff; background:linear-gradient(90deg,#0ecb81,#05a660); font-size:10px; font-weight:900; display:inline-block; padding:2px 8px; border-radius:6px; margin-top:3px; text-shadow:none; letter-spacing:0.5px;">✅ LONG · DESPEGANDO +${e.subidaDesdeMinimo.toFixed(1)}% desde mínimo</span>`;
+            subEtiqueta = `<span style="color:#fff; background:linear-gradient(90deg,#0ecb81,#05a660); font-size:10px; font-weight:900; display:inline-block; padding:2px 8px; border-radius:6px; margin-top:3px; text-shadow:none; letter-spacing:0.5px;">🚀 DESPEGUE EMA · +${e.subidaDesdeMinimo.toFixed(1)}% desde mín.48h</span>`;
             iconoAlarma = '<span style="font-size:12px;animation:blinker-glow 0.6s linear infinite;">⚡</span> ';
         } else if (e && e.alineadasAlcista) {
             // EMAs alcistas pero todavía no llegó al 15% desde el mínimo: queda "en camino"
@@ -4034,9 +4063,11 @@ async function abrirRadarDespegue() {
  const symbols = Object.keys(cachedData);
     for (const symbol of symbols) {
         const c = cachedData[symbol];
+        const e = datosEMA[symbol];
 
-        if (c.posicionPorcentaje <= 15 && c.velocidad > 0) {
-            candidatos.push(c);
+        // Usar el mismo filtro que la tabla: EMA alineadas + ≥8% desde mínimo 48h
+        if (esDespegueReal(symbol) && e) {
+            candidatos.push({ c, e });
         }
 
         if (await analizarReversionCDC(symbol)) {
@@ -4044,18 +4075,19 @@ async function abrirRadarDespegue() {
         }
     }
 
-    candidatos.sort((a, b) => a.posicionPorcentaje - b.posicionPorcentaje);
-    let topSuelos = candidatos.slice(0, 5);
+    // Ordenar: más subida desde mínimo primero
+    candidatos.sort((a, b) => b.e.subidaDesdeMinimo - a.e.subidaDesdeMinimo);
+    let topSuelos = candidatos.slice(0, 8);
 
-    topSuelos.forEach(item => {
+    topSuelos.forEach(({ c, e }) => {
         html += `
-        <div onclick="seleccionarMoneda('${item.symbol}'); cerrarRadarDespegue();" style="background:#050914; border:2px solid var(--accent-green); padding:12px; margin-bottom:10px; border-radius:8px; cursor:pointer; position:relative;">
-            📈 <b>${item.symbol.replace("USDT","")}</b> <span style="font-size:10px; color:var(--text-dim);">USDT</span>
-            <span style="position:absolute; right:10px; top:12px; background:rgba(14,203,129,0.15); color:var(--accent-green); font-size:10px; font-weight:900; padding:2px 6px; border-radius:4px;">SUELO 24H</span>
+        <div onclick="seleccionarMoneda('${c.symbol}'); cerrarRadarDespegue();" style="background:#050914; border:2px solid var(--accent-green); padding:12px; margin-bottom:10px; border-radius:8px; cursor:pointer; position:relative;">
+            🚀 <b>${c.symbol.replace("USDT","")}</b> <span style="font-size:10px; color:var(--text-dim);">USDT</span>
+            <span style="position:absolute; right:10px; top:12px; background:rgba(14,203,129,0.15); color:var(--accent-green); font-size:10px; font-weight:900; padding:2px 6px; border-radius:4px;">🚀 DESPEGUE EMA</span>
             <br>
-            <span style="font-size:11px; display:block; margin-top:4px;">Precio Actual: <b style="color:#fff;">$${item.price}</b></span>
-            <span style="display:block; font-size:11px; color:var(--accent-green); font-weight:bold;">Velocidad Rebote: +${item.velocidad.toFixed(3)}%</span>
-            <span style="display:block; font-size:10px; color:var(--text-dim);">Ubicación Rango: ${item.posicionPorcentaje.toFixed(1)}% (Cerca del Suelo)</span>
+            <span style="font-size:11px; display:block; margin-top:4px;">Precio Actual: <b style="color:#fff;">$${c.price}</b></span>
+            <span style="display:block; font-size:11px; color:var(--accent-green); font-weight:bold;">+${e.subidaDesdeMinimo.toFixed(1)}% desde mínimo 48h</span>
+            <span style="display:block; font-size:10px; color:var(--text-dim);">EMA7: ${e.ema7.toFixed(5)} · EMA25: ${e.ema25.toFixed(5)} · EMA99: ${e.ema99.toFixed(5)}</span>
         </div>`;
     });
 
@@ -4063,7 +4095,8 @@ async function abrirRadarDespegue() {
         html = `
         <div style="text-align:center; padding:25px; color:#475569; font-size:12px;">
             <i class="fas fa-spinner fa-spin" style="color:var(--accent-green); margin-bottom:10px; font-size:18px;"></i><br>
-            Buscando activos...
+            No hay despegues EMA activos ahora mismo.<br>
+            <span style="font-size:10px; margin-top:6px; display:block;">El sistema actualiza las EMAs de a 15 monedas cada 8 segundos.<br>Esperá unos minutos para que se completen los cálculos.</span>
         </div>`; 
     }
 
@@ -4127,7 +4160,7 @@ document.addEventListener("DOMContentLoaded", () => {
 
 <div id="emaRadarPanel" style="display:none; position:fixed; bottom:110px; right:20px; width:320px; background:#111; border:2px solid var(--accent-green); border-radius:12px; z-index:999999; padding:15px; box-shadow:0 0 20px rgba(14,203,129,.3);">
     <div id="cdcThinking" style="background:#0b1628; border:1px solid var(--accent-green); border-radius:12px; padding:10px; margin-bottom:15px; color:#fff; font-size:12px; text-align:center; font-weight:bold;">
-        💭 RADAR DE DESPEGUE INMINENTE:<br>Filtrando monedas de bajo valor (&lt; 20 USDT) en mínimos de 24h.
+        💭 RADAR DE DESPEGUE INMINENTE:<br>EMAs 7&gt;25&gt;99 alineadas alcistas + &gt;8% desde mínimo 48h.
     </div>
     <div id="emaRadarLista"></div>
     <div style="text-align:center; margin-top:15px;"><button onclick="cerrarRadarDespegue()" class="btn vip" style="width:100%;">Cerrar</button></div>
