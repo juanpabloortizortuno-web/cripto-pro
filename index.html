@@ -3638,6 +3638,33 @@ function actualizarPanelCentral() {
             </button>
         </div>` : '';
 
+    // ¿Esta moneda está tocando su mínimo de 24h o 48h y empezando a rebotar?
+    const e48 = datosEMA[selectedCoin];
+    const distanciaAlMin24h = c.posicionPorcentaje; // 0% = en el suelo exacto de 24h
+    const precioMin24h = c.low;
+    const precioMin48h = e48 ? e48.minimo48h : null;
+    const distanciaAlMin48h = precioMin48h ? ((c.price - precioMin48h) / precioMin48h) * 100 : null;
+    const cercaMin24h = distanciaAlMin24h <= 12; // dentro del 12% inferior del rango 24h
+    const cercaMin48h = distanciaAlMin48h !== null && distanciaAlMin48h <= 5; // a menos de 5% del mínimo real 48h
+    const enSuelo = cercaMin24h || cercaMin48h;
+    const subiendoDesdeMin = c.velocidad > 0 || c.cambioReal2Min > 0;
+
+    const btnSueloHTML = enSuelo ? `
+        <div style="text-align:center; margin-bottom:14px;">
+            <button onclick="abrirRadarDespegue();"
+                style="background:rgba(14,203,129,0.12); border:2px solid #0ecb81; border-radius:12px;
+                       color:#0ecb81; font-size:13px; font-weight:900; padding:10px 20px; cursor:pointer;
+                       width:100%; letter-spacing:0.5px; animation:techo-parpadeo 0.8s infinite alternate;">
+                🟢 ${simbolo} CERCA DEL MÍNIMO${cercaMin24h && cercaMin48h ? ' 24H Y 48H' : cercaMin48h ? ' DE 48H' : ' DE 24H'} — ZONA DE DESPEGUE
+                <span style="display:block;font-size:10px;font-weight:600;margin-top:3px;color:#6ee7b7;">
+                    ${cercaMin24h ? `Mín 24h: $${precioMin24h.toFixed(4)} · Solo ${distanciaAlMin24h.toFixed(1)}% sobre el suelo` : ''}
+                    ${cercaMin24h && cercaMin48h ? ' &nbsp;|&nbsp; ' : ''}
+                    ${cercaMin48h ? `Mín 48h: $${precioMin48h.toFixed(4)} · +${distanciaAlMin48h.toFixed(2)}% desde el piso real` : ''}
+                    ${subiendoDesdeMin ? ' &nbsp;⚡ YA REBOTANDO' : ' &nbsp;⏳ esperando rebote'}
+                </span>
+            </button>
+        </div>` : '';
+
     let badgeAlarma = '';
     if (c.alertaBombaSubida) {
         badgeAlarma = `<span style="display:inline-flex;align-items:center;gap:5px;background:#0ecb81;color:#000;font-size:11px;font-weight:900;padding:3px 10px;border-radius:20px;margin-left:8px;animation:blinker-glow 0.6s linear infinite;">🚀 BOMBA ACTIVA</span>`;
