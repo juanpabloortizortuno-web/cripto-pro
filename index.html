@@ -1604,48 +1604,25 @@ function generarTextoAlarma(coinName, tipoAlerta) {
     if (tipoAlerta === "DESPEGUE") {
         const e = datosEMA[coinName];
         const pct = e ? e.subidaDesdeMinimo.toFixed(1) : '?';
-        const frases = [
-            `Alerta de despegue en ${nombre}. Las medias exponenciales 7, 25 y 99 están perfectamente alineadas al alza y el precio subió ${pct} por ciento desde el mínimo de 48 horas. El setup es ideal para evaluar una posición larga con stop bajo el mínimo reciente.`,
-            `${nombre} acaba de completar el patrón de despegue. EMA 7 mayor que 25, mayor que 99, y subió ${pct} por ciento desde el suelo. Alta probabilidad de continuación alcista. Evalúa la entrada con volumen de confirmación.`,
-            `Despegue real confirmado en ${nombre}. Las tres EMAs alineadas y apuntando para arriba. La moneda subió ${pct} por ciento desde su mínimo reciente de 48 horas. Este es el patrón que buscamos: piso claro, EMAs alineadas, impulso activo.`
-        ];
-        return { texto: frases[Math.floor(Math.random() * frases.length)], esMasculino: true };
+        return { texto: `¡Despegue! ${nombre}, más ${pct} por ciento desde el piso. EMAs alineadas al alza. Revisar long.`, esMasculino: true };
     }
 
     if (tipoAlerta === "BOMBA") {
-        const frases = [
-            `¡Atención! ${nombre} está despegando con fuerza. Subió ${cambio2m} por ciento en solo dos minutos y la aceleración se mantiene. Se ubica en el ${posRango} por ciento de su rango del día, en zona de impulso activo. El algoritmo estima ${probSubida} por ciento de probabilidad de que continúe subiendo. Mi recomendación es evaluar una entrada larga, con el stop bien ajustado bajo el mínimo reciente y no arriesgar más del dos por ciento del capital.`,
-            `¡Alerta de subida explosiva en ${nombre}! La presión compradora es muy fuerte, con un impulso de ${cambio2m} por ciento en los últimos dos minutos. La probabilidad alcista está en ${probSubida} por ciento. Si vas a entrar, hazlo con volumen de confirmación y protege tu posición con un stop bajo el soporte inmediato.`,
-            `${nombre} acaba de dispararse. Llevamos ${cambio2m} por ciento de impulso en dos minutos con compradores dominando completamente. Rango del día al ${posRango} por ciento, zona de momentum. El sistema recomienda considerar long, con gestión de riesgo disciplinada y stop ajustado.`
-        ];
-        return { texto: frases[Math.floor(Math.random() * frases.length)], esMasculino: true };
+        return { texto: `¡Bomba! ${nombre}, más ${cambio2m} por ciento en dos minutos. Rango al ${posRango} por ciento. Subida ${probSubida} por ciento probable.`, esMasculino: true };
 
     } else if (tipoAlerta === "DERRUMBE") {
-        const frases = [
-            `¡Cuidado! ${nombre} está cayendo desde zona de techo. Bajó ${cambioAbs} por ciento en dos minutos con presión vendedora sostenida. Está en el ${posRango} por ciento del rango diario, zona de resistencia crítica. La probabilidad de caída adicional es del ${probCaida} por ciento. Si operas, considera una posición corta con el stop bien colocado sobre el máximo del día.`,
-            `¡Alerta de derrumbe en ${nombre}! Los vendedores tomaron el control desde máximos. Caída de ${cambioAbs} por ciento en los últimos dos minutos. El algoritmo detecta ${probCaida} por ciento de probabilidad bajista. Evalúa un short con objetivo en el soporte inferior y riesgo controlado.`,
-            `${nombre} está revirtiéndose con fuerza desde el techo. Bajó ${cambioAbs} por ciento en dos minutos y la presión vendedora no para. Zona de rango al ${posRango} por ciento, señal de agotamiento en máximos. Recomendación: considera short, gestiona el riesgo y no te apures en la entrada.`
-        ];
-        return { texto: frases[Math.floor(Math.random() * frases.length)], esMasculino: false };
+        return { texto: `¡Derrumbe! ${nombre}, menos ${cambioAbs} por ciento en dos minutos. Rango al ${posRango} por ciento. Caída ${probCaida} por ciento probable.`, esMasculino: false };
 
     } else if (tipoAlerta === "AGOTADO") {
-        const frases = [
-            `Advertencia en ${nombre}. La subida se está agotando cerca del techo máximo del día. Está en el ${posRango} por ciento del rango y el impulso casi se detuvo. La probabilidad de reversión bajista es del ${probCaida} por ciento. No es buen momento para entrar largo. Si tienes posición abierta con ganancias, considera asegurarlas antes de que gire.`,
-            `${nombre} llegó lejos pero el combustible se acabó. Está en zona extrema del rango con velocidad casi cero. El algoritmo calcula ${probCaida} por ciento de probabilidad de corrección. Precaución con las posiciones largas, el giro puede llegar en cualquier momento.`
-        ];
-        return { texto: frases[Math.floor(Math.random() * frases.length)], esMasculino: false };
+        return { texto: `Agotado. ${nombre} en el ${posRango} por ciento del rango. Reversión bajista ${probCaida} por ciento probable.`, esMasculino: false };
 
     } else if (tipoAlerta === "REBOTE") {
         const e = datosEMA[coinName];
         const pct = e ? e.subidaDesdeMinimo.toFixed(1) : '?';
-        const frases = [
-            `Rebote detectado en ${nombre}. La moneda venía cayendo en las últimas 24 horas y ahora está girando al alza. Subió ${pct} por ciento desde su mínimo reciente y la EMA 7 ya apunta hacia arriba. Vigilá una posible entrada en largo con confirmación de volumen.`,
-            `Atención. ${nombre} está rebotando tras una caída reciente. La EMA 7 giró alcista y el precio recuperó ${pct} por ciento desde el piso. Puede ser una oportunidad temprana de largo, pero esperá confirmación antes de entrar.`
-        ];
-        return { texto: frases[Math.floor(Math.random() * frases.length)], esMasculino: true };
+        return { texto: `¡Rebote! ${nombre}, más ${pct} por ciento desde el mínimo. EMA siete girando al alza.`, esMasculino: true };
     }
 
-    return { texto: `Moneda ${nombre} en seguimiento activo`, esMasculino: true };
+    return { texto: `Alerta ${nombre}`, esMasculino: true };
 }
 
 function playAlarmVoice(coinName, tipoAlerta) {
@@ -2803,7 +2780,12 @@ async function obtenerDatosBinance() {
                 document.getElementById("linkBinance").style.display = "flex";
                 document.getElementById("linkBinance").href = `https://www.binance.com/es/futures/${selectedCoin}`;
                 document.getElementById("linkApp").style.display = "flex";
-                // app link manejado por abrirEnApp()
+                // Mostrar la moneda en el panel central (ocultar bienvenida si aún está visible)
+                const bienvenida = document.getElementById("bienvenidaScreen");
+                if (bienvenida) bienvenida.style.display = "none";
+                calcularPrediccionCDC(selectedCoin);
+                actualizarPanelCentral();
+                actualizarTacometroDerecho();
             }
 if (radarFijado) {
 
