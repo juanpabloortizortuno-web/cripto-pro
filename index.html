@@ -1566,12 +1566,12 @@ function hablar(texto, esMasculino) {
     u.rate  = 0.90;
     if (vozFemenina) u.voice = vozFemenina;
 
-    // Calcular duración estimada y bloquear durante ese tiempo + 5 seg
+    // Calcular duración estimada y bloquear durante ese tiempo + 1 seg
     const duracionEstimada = Math.ceil((texto.length / (u.rate * 14)) * 1000);
-    audioBloqueadoHasta = Date.now() + duracionEstimada + 5000;
+    audioBloqueadoHasta = Date.now() + duracionEstimada + 1000;
 
     u.onend = () => {
-        audioBloqueadoHasta = Date.now() + 5000;
+        audioBloqueadoHasta = Date.now() + 1000;
     };
     u.onerror = (e) => {
         console.log("Error de voz, liberando bloqueo:", e);
@@ -1587,7 +1587,7 @@ function hablar(texto, esMasculino) {
             try { window.speechSynthesis.cancel(); } catch(e) {}
             audioBloqueadoHasta = 0;
         }
-    }, duracionEstimada + 6000);
+    }, duracionEstimada + 2000);
 }
 
 function generarTextoAlarma(coinName, tipoAlerta) {
@@ -2771,9 +2771,10 @@ async function obtenerDatosBinance() {
             
             const ahora = Date.now();
             const audioHablando = ahora < audioBloqueadoHasta;
-            const puedeoCambiar = !audioHablando && (ahora - tiempoUltimoCambioAuto) >= BLOQUEO_CAMBIO_MS;
+            // El cambio visual de moneda ya NO depende del audio — solo del cooldown de 5s
+            const puedeoCambiar = (ahora - tiempoUltimoCambioAuto) >= BLOQUEO_CAMBIO_MS;
 
-            // Solo cambia de moneda si el audio terminó Y pasaron 5 segundos
+            // Cambia de moneda si pasaron 5 segundos (independiente del audio)
             if (!radarFijado && selectedCoin !== foco.symbol && puedeoCambiar) {
                 tiempoUltimoCambioAuto = ahora;
                 selectedCoin = foco.symbol;
