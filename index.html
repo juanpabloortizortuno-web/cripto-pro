@@ -1634,6 +1634,15 @@ function generarTextoAlarma(coinName, tipoAlerta) {
             `${nombre} llegó lejos pero el combustible se acabó. Está en zona extrema del rango con velocidad casi cero. El algoritmo calcula ${probCaida} por ciento de probabilidad de corrección. Precaución con las posiciones largas, el giro puede llegar en cualquier momento.`
         ];
         return { texto: frases[Math.floor(Math.random() * frases.length)], esMasculino: false };
+
+    } else if (tipoAlerta === "REBOTE") {
+        const e = datosEMA[coinName];
+        const pct = e ? e.subidaDesdeMinimo.toFixed(1) : '?';
+        const frases = [
+            `Rebote detectado en ${nombre}. La moneda venía cayendo en las últimas 24 horas y ahora está girando al alza. Subió ${pct} por ciento desde su mínimo reciente y la EMA 7 ya apunta hacia arriba. Vigilá una posible entrada en largo con confirmación de volumen.`,
+            `Atención. ${nombre} está rebotando tras una caída reciente. La EMA 7 giró alcista y el precio recuperó ${pct} por ciento desde el piso. Puede ser una oportunidad temprana de largo, pero esperá confirmación antes de entrar.`
+        ];
+        return { texto: frases[Math.floor(Math.random() * frases.length)], esMasculino: true };
     }
 
     return { texto: `Moneda ${nombre} en seguimiento activo`, esMasculino: true };
@@ -2757,6 +2766,24 @@ async function obtenerDatosBinance() {
                 listaPrioridades.push({ symbol: item.symbol, tipo: "AGOTADO", score: posicionPorcentaje });
                 if (!timestampLlegada[item.symbol + "_AGOTADO"]) timestampLlegada[item.symbol + "_AGOTADO"] = Date.now();
             } else { delete timestampLlegada[item.symbol + "_AGOTADO"]; }
+
+            // ── MODO LONG (alcista): agregar despegues y rebotes a la lista de prioridades
+            // para que el auto-select funcione igual que en modo SHORT.
+            if (!enModoBajista) {
+                if (enDespegue) {
+                    const e = datosEMA[item.symbol];
+                    const scoreAlcista = e ? e.subidaDesdeMinimo : 0;
+                    listaPrioridades.push({ symbol: item.symbol, tipo: "DESPEGUE", score: scoreAlcista });
+                    if (!timestampLlegada[item.symbol + "_DESPEGUE"]) timestampLlegada[item.symbol + "_DESPEGUE"] = Date.now();
+                } else { delete timestampLlegada[item.symbol + "_DESPEGUE"]; }
+
+                if (enRebote) {
+                    const e = datosEMA[item.symbol];
+                    const scoreRebote = e ? (e.subidaDesdeMinimo * 0.7) : 0; // peso ligeramente menor que despegue
+                    listaPrioridades.push({ symbol: item.symbol, tipo: "REBOTE", score: scoreRebote });
+                    if (!timestampLlegada[item.symbol + "_REBOTE"]) timestampLlegada[item.symbol + "_REBOTE"] = Date.now();
+                } else { delete timestampLlegada[item.symbol + "_REBOTE"]; }
+            }
         });
         
         // Manejo automático de prioridades de alerta
@@ -4245,6 +4272,12 @@ function actualizarAlertaGanadora(alertaActiva) {
         } else if (alertaActiva.tipo === "AGOTADO") {
             alerta.className = "fuerza-agotamiento-alert";
             alerta.innerHTML = `⚠️ ¡ALERTA MOMENTUM REVENTADO! SUBIDA AGOTADA EN EL EXTREMO: <b style="color:#000">${sim}</b> | RANGO: <b style="color:#000">${alertaActiva.score.toFixed(1)}%</b> | POSIBLE INVERSIÓN`;
+        } else if (alertaActiva.tipo === "DESPEGUE") {
+            alerta.className = "fuerza-subida-alert";
+            alerta.innerHTML = `🚀 ¡DESPEGUE CONFIRMADO! EMA7>25>99 ALCISTA EN: <b style="color:var(--accent-gold)">${sim}</b> | +<b style="color:#fff">${alertaActiva.score.toFixed(1)}%</b> DESDE MÍNIMO 48H | MOTOR LONG ACTIVO`;
+        } else if (alertaActiva.tipo === "REBOTE") {
+            alerta.className = "fuerza-subida-alert";
+            alerta.innerHTML = `🔄 ¡REBOTE TRAS CAÍDA DETECTADO EN: <b style="color:var(--accent-gold)">${sim}</b> | +<b style="color:#fff">${alertaActiva.score.toFixed(1)}%</b> DESDE MÍNIMO · EMA7 GIRANDO AL ALZA`;
         }
         alerta.onclick = () => { seleccionarMoneda(alertaActiva.symbol); };
         return;
