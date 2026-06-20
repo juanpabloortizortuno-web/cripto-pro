@@ -1699,6 +1699,11 @@ function generarTextoAlarma(coinName, tipoAlerta) {
         const volPct = c.caidaVolumenPct || 0;
         const fraseVolumen = volPct >= 30 ? ` El volumen de venta también cayó ${volPct.toFixed(0)} por ciento.` : '';
         return { texto: `Atención, posible reversión. ${nombre} se desplomó ${caida} por ciento desde su máximo y sigue pegada al mínimo, pero está entrando capital de forma sostenida.${fraseVolumen} Vigilando más datos antes de confirmar.`, esMasculino: true };
+
+    } else if (tipoAlerta === "PATRON_60_8") {
+        const caidaMax = Math.max(c.caidaDesdeMaximo || 0, c.caidaDesdeMaximo48h || 0).toFixed(0);
+        const cambioActual = c.change !== undefined ? c.change.toFixed(1) : '?';
+        return { texto: `Patrón long detectado. ${nombre} se desplomó ${caidaMax} por ciento desde su máximo y ya viene recuperándose, alejándose del mínimo, con un cambio actual de ${cambioActual} por ciento.`, esMasculino: true };
     }
 
     return { texto: `Alerta ${nombre}`, esMasculino: true };
@@ -2871,6 +2876,26 @@ async function obtenerDatosBinance() {
                     listaPrioridades.push({ symbol: item.symbol, tipo: "REVERSION", score: scoreTotal });
                     if (!timestampLlegada[item.symbol + "_REVERSION"]) timestampLlegada[item.symbol + "_REVERSION"] = Date.now();
                 } else { delete timestampLlegada[item.symbol + "_REVERSION"]; }
+
+                // Patrón -60%/-8%-6%: moneda que se desplomó ≥60% desde su máximo de
+                // 24-48h y que YA viene subiendo desde ese piso hasta quedar con un
+                // cambio de 24h entre -8% y -6% (alejándose del mínimo, no parada en él).
+                // Es el patrón que pediste para el modo LONG: una caída brutal que ya
+                // empezó a revertir y dejó el mínimo atrás varios puntos.
+                const peorCaidaMaximo = Math.max(caidaDesdeMaximo, cachedData[item.symbol].caidaDesdeMaximo48h !== undefined ? cachedData[item.symbol].caidaDesdeMaximo48h : 0);
+                const sigueCaidaFuerte = peorCaidaMaximo >= 60;
+                const enRangoRecuperacion = change >= -8 && change <= -6;
+                const alejandoseDelMinimo = velocidadPrecio > 0 && ciclosSubiendo >= 1;
+
+                if (sigueCaidaFuerte && enRangoRecuperacion && alejandoseDelMinimo) {
+                    const scoreCaidaP   = Math.min(peorCaidaMaximo, 90);                       // cuánto se desplomó, tope 90
+                    const scoreCiclosP  = (ciclosSubiendo || 0) * 8;
+                    const volPctP       = caidaVolumenPct(item.symbol);
+                    const scoreVolumenP = volPctP >= 50 ? 15 : (volPctP / 50) * 15;
+                    const scoreTotal    = 45 + scoreCaidaP * 0.3 + scoreCiclosP + scoreVolumenP;
+                    listaPrioridades.push({ symbol: item.symbol, tipo: "PATRON_60_8", score: scoreTotal });
+                    if (!timestampLlegada[item.symbol + "_PATRON_60_8"]) timestampLlegada[item.symbol + "_PATRON_60_8"] = Date.now();
+                } else { delete timestampLlegada[item.symbol + "_PATRON_60_8"]; }
             }
         });
         
