@@ -1497,6 +1497,52 @@ let indiceRotacionLong = 0;      // rota entre las candidatas en modo LONG
 // Control de audio: no interrumpir hasta terminar + 5 seg extra
 let audioBloqueadoHasta = 0;
 
+// ── HISTORIAL DE VOLUMEN ─────────────────────────────────────────
+// OJO: el "volume" que da Binance es el acumulado de las últimas 24h, así que
+// SIEMPRE sube (o se mantiene) — nunca "cae" en términos crudos. Lo que sí
+// podemos medir es el RITMO de actividad: cuánto volumen nuevo entra entre
+// un ciclo y el siguiente. Si ese ritmo se desinfla fuerte respecto a su pico
+// reciente, significa que la presión de venta (o compra) se está agotando.
+// Eso es lo que pediste: "si cayó -50% de volumen, mejor" — se mide como
+// caída del ritmo, no del acumulado.
+// Nota: se reconstruye desde que se abre la página (Binance no da histórico
+// de ritmo de trades por API pública); igual detecta perfecto el momento en
+// que la venta se frena EN VIVO, que es lo que importa para el timing.
+let historialVolumen = {};
+const VENTANA_VOLUMEN_MS = 20 * 60 * 1000; // ventana de 20 minutos
+
+function registrarVolumen(symbol, volumenAcumulado) {
+    if (!historialVolumen[symbol]) historialVolumen[symbol] = { arr: [], anterior: null };
+    const h = historialVolumen[symbol];
+    if (h.anterior !== null) {
+        const delta = Math.max(0, volumenAcumulado - h.anterior); // actividad de este ciclo (~2s)
+        h.arr.push({ t: Date.now(), d: delta });
+        const limite = Date.now() - VENTANA_VOLUMEN_MS;
+        while (h.arr.length > 0 && h.arr[0].t < limite) h.arr.shift();
+    }
+    h.anterior = volumenAcumulado;
+}
+
+// % de caída del ritmo de actividad reciente respecto a su pico en la ventana.
+// Devuelve 0 si todavía no hay suficientes datos (recién cargó la página).
+function caidaVolumenPct(symbol) {
+    const h = historialVolumen[symbol];
+    if (!h || h.arr.length < 10) return 0; // necesitamos al menos ~20s de muestras
+
+    // Pico = promedio del 25% de ciclos con más actividad (evita que un trade
+    // gigante aislado distorsione la comparación)
+    const ordenado = h.arr.map(p => p.d).sort((a, b) => b - a);
+    const topN = Math.max(1, Math.ceil(ordenado.length * 0.25));
+    const pico = ordenado.slice(0, topN).reduce((s, v) => s + v, 0) / topN;
+
+    // Actividad reciente = promedio de los últimos 5 ciclos (~10s)
+    const recientes = h.arr.slice(-5).map(p => p.d);
+    const actual = recientes.reduce((s, v) => s + v, 0) / recientes.length;
+
+    if (pico <= 0) return 0;
+    return Math.max(0, ((pico - actual) / pico) * 100);
+}
+
 function cargarVoces() {
     const todas = window.speechSynthesis.getVoices();
     if (todas.length === 0) return;
@@ -1543,11 +1589,27 @@ if (window.speechSynthesis) {
     }, 500);
 }
 
+// Cola de voz: en vez de cancelar lo que se está hablando cada vez que llega un
+// aviso nuevo (lo que cortaba las palabras a la mitad), cada aviso se encola y se
+// habla en orden, uno termina antes de que empiece el siguiente.
+let colaVoz = [];
+let vozHablandoAhora = false;
+const MAX_COLA_VOZ = 4; // si el usuario se ausenta, no dejamos que se acumulen avisos viejos
+
 function hablar(texto, esMasculino) {
     if (!('speechSynthesis' in window)) return;
+    // Si la cola ya está llena, descartamos el aviso más antiguo (ya perdió vigencia)
+    if (colaVoz.length >= MAX_COLA_VOZ) colaVoz.shift();
+    colaVoz.push({ texto, esMasculino });
+    procesarColaVoz();
+}
 
-    // Si todavía está en bloqueo, no interrumpir
-    if (Date.now() < audioBloqueadoHasta) return;
+function procesarColaVoz() {
+    if (vozHablandoAhora) return; // ya hay una frase en curso; cuando termine, ella misma llama a esta función de nuevo
+    if (colaVoz.length === 0) return;
+
+    const siguiente = colaVoz.shift();
+    const texto = siguiente.texto;
 
     // Workaround conocido de Chrome/Android: el motor de TTS a veces queda "pausado"
     // internamente y resume() lo despierta antes de hablar.
@@ -1555,10 +1617,6 @@ function hablar(texto, esMasculino) {
 
     // Si todavía no hay ninguna voz cargada, reintentamos cargar justo antes de hablar
     if (!vozFemenina && !vozMasculina) cargarVoces();
-
-    // Siempre usar voz femenina — diferenciamos por pitch y rate
-    // Cancelar cualquier cosa pendiente y hablar
-    window.speechSynthesis.cancel();
 
     const u = new SpeechSynthesisUtterance(texto);
     u.lang = 'es-ES';
@@ -1570,25 +1628,37 @@ function hablar(texto, esMasculino) {
     // Calcular duración estimada y bloquear durante ese tiempo + 1 seg
     const duracionEstimada = Math.ceil((texto.length / (u.rate * 14)) * 1000);
     audioBloqueadoHasta = Date.now() + duracionEstimada + 1000;
+    vozHablandoAhora = true;
 
-    u.onend = () => {
+    const liberarYContinuar = () => {
+        vozHablandoAhora = false;
         audioBloqueadoHasta = Date.now() + 1000;
+        procesarColaVoz(); // si quedó algo en cola, lo habla a continuación
     };
+
+    u.onend = liberarYContinuar;
     u.onerror = (e) => {
         console.log("Error de voz, liberando bloqueo:", e);
         audioBloqueadoHasta = 0;
+        liberarYContinuar();
     };
 
     window.speechSynthesis.speak(u);
 
     // Watchdog: en Android Chrome a veces speak() se traba en silencio sin disparar
-    // onend/onerror. Si tras el tiempo estimado + margen sigue "hablando", forzamos reset.
+    // onend/onerror. Si tras el tiempo estimado + margen sigue "hablando" (o quedó
+    // colgado), forzamos el reset para no bloquear la cola para siempre.
     setTimeout(() => {
-        if (window.speechSynthesis.speaking && Date.now() >= audioBloqueadoHasta - 1000) {
-            try { window.speechSynthesis.cancel(); } catch(e) {}
-            audioBloqueadoHasta = 0;
-        }
-    }, duracionEstimada + 2000);
+        if (!vozHablandoAhora) return; // ya se liberó normalmente
+        try {
+            if (!window.speechSynthesis.speaking || Date.now() >= audioBloqueadoHasta + 3000) {
+                window.speechSynthesis.cancel();
+            } else {
+                return; // todavía hablando dentro de lo esperado, no tocar
+            }
+        } catch(e) {}
+        liberarYContinuar();
+    }, duracionEstimada + 2500);
 }
 
 function generarTextoAlarma(coinName, tipoAlerta) {
@@ -1620,11 +1690,15 @@ function generarTextoAlarma(coinName, tipoAlerta) {
     } else if (tipoAlerta === "REBOTE") {
         const e = datosEMA[coinName];
         const pct = e ? e.subidaDesdeMinimo.toFixed(1) : '?';
-        return { texto: `¡Rebote! ${nombre}, más ${pct} por ciento desde el mínimo. EMA siete girando al alza.`, esMasculino: true };
+        const volPct = c.caidaVolumenPct || 0;
+        const fraseVolumen = volPct >= 30 ? ` El volumen de venta cayó ${volPct.toFixed(0)} por ciento desde su pico reciente.` : '';
+        return { texto: `¡Rebote! ${nombre}, más ${pct} por ciento desde el mínimo. EMA siete girando al alza.${fraseVolumen}`, esMasculino: true };
 
     } else if (tipoAlerta === "REVERSION") {
         const caida = c.caidaDesdeMaximo ? c.caidaDesdeMaximo.toFixed(0) : '?';
-        return { texto: `Atención, posible reversión. ${nombre} se desplomó ${caida} por ciento desde su máximo y sigue pegada al mínimo, pero está entrando capital de forma sostenida. Vigilando más datos antes de confirmar.`, esMasculino: true };
+        const volPct = c.caidaVolumenPct || 0;
+        const fraseVolumen = volPct >= 30 ? ` El volumen de venta también cayó ${volPct.toFixed(0)} por ciento.` : '';
+        return { texto: `Atención, posible reversión. ${nombre} se desplomó ${caida} por ciento desde su máximo y sigue pegada al mínimo, pero está entrando capital de forma sostenida.${fraseVolumen} Vigilando más datos antes de confirmar.`, esMasculino: true };
     }
 
     return { texto: `Alerta ${nombre}`, esMasculino: true };
@@ -2668,6 +2742,8 @@ async function obtenerDatosBinance() {
                 cambioReal2Min > 0.3 &&
                 ciclosSubiendo <= 2;
 
+            registrarVolumen(item.symbol, parseFloat(item.quoteVolume));
+
             cachedData[item.symbol] = {
                 symbol: item.symbol,
                 price: precio,
@@ -2676,6 +2752,7 @@ async function obtenerDatosBinance() {
                 high: high,
                 low: low,
                 volume: parseFloat(item.quoteVolume),
+                caidaVolumenPct: caidaVolumenPct(item.symbol),
                 posicionPorcentaje: posicionPorcentaje, 
                 caidaDesdeMaximo: caidaDesdeMaximo,
                 cambioReal2Min: cambioReal2Min,
@@ -2761,10 +2838,16 @@ async function obtenerDatosBinance() {
 
                 if (cercaPiso && caidaTerminando && cayoEnDia) {
                     // Score: mas cerca del piso = mejor; bonus si EMA7 ya giro y si hay impulso
-                    const scorePiso    = 30 - posicionPorcentaje;              // 0-30
-                    const scoreImpulso = Math.max(0, cambioReal2Min * 10);     // impulso positivo
-                    const scoreEMA     = (ed && ed.ema7 > ed.ema7Prev) ? 5 : 0; // EMA7 ya giro alcista
-                    const scoreTotal   = scorePiso + scoreImpulso + scoreEMA;
+                    const scorePiso     = 30 - posicionPorcentaje;              // 0-30
+                    const scoreImpulso  = Math.max(0, cambioReal2Min * 10);     // impulso positivo
+                    const scoreEMA      = (ed && ed.ema7 > ed.ema7Prev) ? 5 : 0; // EMA7 ya giro alcista
+                    // Bonus de precisión: si el ritmo de volumen cayó fuerte respecto a su
+                    // pico reciente, la presión de venta se está agotando de verdad (lo que
+                    // pediste: "si cayó -50% de volumen, mejor"). Tope en 15 pts para no opacar
+                    // el resto de las señales.
+                    const volPct        = caidaVolumenPct(item.symbol);
+                    const scoreVolumen  = volPct >= 50 ? 15 : (volPct / 50) * 15;
+                    const scoreTotal    = scorePiso + scoreImpulso + scoreEMA + scoreVolumen;
                     listaPrioridades.push({ symbol: item.symbol, tipo: "REBOTE", score: scoreTotal });
                     if (!timestampLlegada[item.symbol + "_REBOTE"]) timestampLlegada[item.symbol + "_REBOTE"] = Date.now();
                 } else { delete timestampLlegada[item.symbol + "_REBOTE"]; }
@@ -2780,9 +2863,11 @@ async function obtenerDatosBinance() {
                 // y está entrando dinero" antes de que se confirme del todo, para juntar
                 // más datos del informe de seguridad mientras la alarma sigue en esa moneda.
                 if (esRevirtiendoCrashExtremo(item.symbol)) {
-                    const scoreCaida   = Math.min(caidaDesdeMaximo, 70);                     // cuánto se desplomó, tope 70
-                    const scoreCiclos  = (ciclosSubiendo || 0) * 8;                           // confirma que no es ruido de 1 vela
-                    const scoreTotal   = 50 + scoreCaida * 0.3 + scoreCiclos; // prioridad alta: empieza en 50
+                    const scoreCaida    = Math.min(caidaDesdeMaximo, 70);                     // cuánto se desplomó, tope 70
+                    const scoreCiclos   = (ciclosSubiendo || 0) * 8;                           // confirma que no es ruido de 1 vela
+                    const volPct        = caidaVolumenPct(item.symbol);
+                    const scoreVolumen  = volPct >= 50 ? 15 : (volPct / 50) * 15;              // venta agotándose
+                    const scoreTotal    = 50 + scoreCaida * 0.3 + scoreCiclos + scoreVolumen;  // prioridad alta: empieza en 50
                     listaPrioridades.push({ symbol: item.symbol, tipo: "REVERSION", score: scoreTotal });
                     if (!timestampLlegada[item.symbol + "_REVERSION"]) timestampLlegada[item.symbol + "_REVERSION"] = Date.now();
                 } else { delete timestampLlegada[item.symbol + "_REVERSION"]; }
@@ -2807,12 +2892,10 @@ async function obtenerDatosBinance() {
             
             const ahora = Date.now();
             const audioHablando = ahora < audioBloqueadoHasta;
-            // El cambio de moneda SÍ debe esperar a que termine de hablar la alarma actual:
-            // si cambiamos de moneda a mitad de la frase, la voz se corta y además el sistema
-            // pierde el seguimiento de la moneda que estaba analizando (no junta suficientes
-            // datos como para confirmar la reversión). Por eso ahora exigimos cooldown cumplido
-            // Y que no haya audio en curso.
-            const puedeoCambiar = (ahora - tiempoUltimoCambioAuto) >= BLOQUEO_CAMBIO_MS && !audioHablando;
+            // El PANEL nunca debe congelarse esperando al audio — solo respeta el cooldown
+            // de cambio. El corte de palabras se soluciona aparte, con una cola de voz real
+            // (ver función hablar()), así que aquí no hace falta frenar el cambio visual.
+            const puedeoCambiar = (ahora - tiempoUltimoCambioAuto) >= BLOQUEO_CAMBIO_MS;
 
             // Cambia de moneda si pasaron los segundos de cooldown
             if (!radarFijado && puedeoCambiar) {
