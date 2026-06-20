@@ -1621,6 +1621,10 @@ function generarTextoAlarma(coinName, tipoAlerta) {
         const e = datosEMA[coinName];
         const pct = e ? e.subidaDesdeMinimo.toFixed(1) : '?';
         return { texto: `¡Rebote! ${nombre}, más ${pct} por ciento desde el mínimo. EMA siete girando al alza.`, esMasculino: true };
+
+    } else if (tipoAlerta === "REVERSION") {
+        const caida = c.caidaDesdeMaximo ? c.caidaDesdeMaximo.toFixed(0) : '?';
+        return { texto: `Atención, posible reversión. ${nombre} se desplomó ${caida} por ciento desde su máximo y sigue pegada al mínimo, pero está entrando capital de forma sostenida. Vigilando más datos antes de confirmar.`, esMasculino: true };
     }
 
     return { texto: `Alerta ${nombre}`, esMasculino: true };
@@ -2768,6 +2772,20 @@ async function obtenerDatosBinance() {
                 if (enDespegue) {
                     if (!timestampLlegada[item.symbol + "_DESPEGUE"]) timestampLlegada[item.symbol + "_DESPEGUE"] = Date.now();
                 } else { delete timestampLlegada[item.symbol + "_DESPEGUE"]; }
+
+                // Reversión extrema: moneda que se desplomó muy fuerte (≥50% en 24h o ≥70%
+                // desde su máximo), sigue pegada al piso (≤15% del rango) y YA muestra
+                // entrada de capital sostenida (varios ciclos seguidos subiendo, no un
+                // parpadeo). Esto es justo lo que pediste: detectar el "ya no sigue cayendo
+                // y está entrando dinero" antes de que se confirme del todo, para juntar
+                // más datos del informe de seguridad mientras la alarma sigue en esa moneda.
+                if (esRevirtiendoCrashExtremo(item.symbol)) {
+                    const scoreCaida   = Math.min(caidaDesdeMaximo, 70);                     // cuánto se desplomó, tope 70
+                    const scoreCiclos  = (ciclosSubiendo || 0) * 8;                           // confirma que no es ruido de 1 vela
+                    const scoreTotal   = 50 + scoreCaida * 0.3 + scoreCiclos; // prioridad alta: empieza en 50
+                    listaPrioridades.push({ symbol: item.symbol, tipo: "REVERSION", score: scoreTotal });
+                    if (!timestampLlegada[item.symbol + "_REVERSION"]) timestampLlegada[item.symbol + "_REVERSION"] = Date.now();
+                } else { delete timestampLlegada[item.symbol + "_REVERSION"]; }
             }
         });
         
@@ -2789,8 +2807,12 @@ async function obtenerDatosBinance() {
             
             const ahora = Date.now();
             const audioHablando = ahora < audioBloqueadoHasta;
-            // El cambio visual NO depende del audio — solo del cooldown
-            const puedeoCambiar = (ahora - tiempoUltimoCambioAuto) >= BLOQUEO_CAMBIO_MS;
+            // El cambio de moneda SÍ debe esperar a que termine de hablar la alarma actual:
+            // si cambiamos de moneda a mitad de la frase, la voz se corta y además el sistema
+            // pierde el seguimiento de la moneda que estaba analizando (no junta suficientes
+            // datos como para confirmar la reversión). Por eso ahora exigimos cooldown cumplido
+            // Y que no haya audio en curso.
+            const puedeoCambiar = (ahora - tiempoUltimoCambioAuto) >= BLOQUEO_CAMBIO_MS && !audioHablando;
 
             // Cambia de moneda si pasaron los segundos de cooldown
             if (!radarFijado && puedeoCambiar) {
