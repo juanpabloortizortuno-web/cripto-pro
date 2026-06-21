@@ -1041,22 +1041,36 @@ async function cargarSimbolosFuturosUSDTM() {
         const res = await fetch('https://fapi.binance.com/fapi/v1/exchangeInfo');
         if (!res.ok) throw new Error('exchangeInfo respondió ' + res.status);
         const info = await res.json();
-        const validos = new Set(
-            info.symbols
-                .filter(s => s.contractType === 'PERPETUAL' && s.quoteAsset === 'USDT' && s.status === 'TRADING')
-                .map(s => s.symbol)
+
+        const perpetuos = info.symbols.filter(
+            s => s.contractType === 'PERPETUAL' && s.quoteAsset === 'USDT' && s.status === 'TRADING'
         );
+
+        const validos = new Set(perpetuos.map(s => s.symbol));
         simbolosFuturosUSDTM = validos;
-        // Limpiar cualquier símbolo que ya estuviera en caché pero no tenga contrato real de futuros
+
+        // ✅ Calcular apalancamiento máximo real desde maintMarginPercent
+        // maxLeverage ≈ 1 / maintMarginPercent
+        // Ej: 0.20 (20%) → 5x | 0.10 (10%) → 10x | 0.025 (2.5%) → 40x
+        let contadorBajoApal = 0;
+        perpetuos.forEach(s => {
+            const mmp = parseFloat(s.maintMarginPercent);
+            if (!isNaN(mmp) && mmp > 0) {
+                const maxLev = Math.round(1 / mmp);
+                MONEDAS_BAJO_APALANCAMIENTO[s.symbol] = maxLev;
+                if (maxLev <= 10) contadorBajoApal++;
+            }
+        });
+
+        // Limpiar cualquier símbolo en caché sin contrato real de futuros
         Object.keys(cachedData).forEach(sym => {
             if (!validos.has(sym)) delete cachedData[sym];
         });
-        console.log(`✅ Futuros USDT-M cargados: ${validos.size} pares disponibles`);
-        actualizarTablaIzquierda(); // re-filtrar la tabla ahora que ya sabemos qué es válido
+
+        console.log(`✅ Futuros USDT-M cargados: ${validos.size} pares. Con apalancamiento ≤10x: ${contadorBajoApal}`);
+        actualizarTablaIzquierda();
     } catch (e) {
         console.error('No se pudo cargar la lista de contratos de Futuros USDT-M:', e);
-        // Si falla, simbolosFuturosUSDTM se queda en null y NO filtramos (modo seguro:
-        // mejor mostrar todo que ocultar todo por un fallo temporal de red).
     } finally {
         cargandoSimbolosFuturos = false;
     }
@@ -2593,7 +2607,9 @@ async function cicloActualizacionEMA() {
 //          maintMarginPercent = 0.025 (2.5%) → maxLev = 40x
 // Este mapa se actualiza cada 30 min junto con la lista de futuros.
 // ══════════════════════════════════════════════════════════════════
-const MONEDAS_BAJO_APALANCAMIENTO = {}; // llenado dinámico en cargarSimbolosFuturosUSDTM()
+// Declarado aquí para que esté disponible globalmente.
+// Se llena en cargarSimbolosFuturosUSDTM() con datos reales de Binance.
+const MONEDAS_BAJO_APALANCAMIENTO = {};
 
 function tieneApalancamientoBajo(symbol) {
     const max = MONEDAS_BAJO_APALANCAMIENTO[symbol];
