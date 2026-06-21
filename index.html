@@ -4849,32 +4849,50 @@ async function abrirRadarDespegue() {
     let topRebotes = rebotes.slice(0, 8);
 
     topSuelos.forEach(({ c, e }) => {
+        const maxLev = MONEDAS_BAJO_APALANCAMIENTO[c.symbol];
+        const esUltra = maxLev !== undefined && maxLev <= 5;
+        const esMuyVol = maxLev !== undefined && maxLev <= 10;
+        const volLabel = esUltra
+            ? `<div style="text-align:center; margin:8px 0 4px; font-size:22px; font-weight:900; letter-spacing:3px; color:#ff3333; text-shadow:0 0 14px #ff3333, 0 0 28px #ff000088; animation:techo-pulse 1.2s infinite;">🔥 ULTRA VOLÁTIL 🔥</div>`
+            : esMuyVol
+            ? `<div style="text-align:center; margin:8px 0 4px; font-size:20px; font-weight:900; letter-spacing:2px; color:#f3ba2f; text-shadow:0 0 12px #f3ba2f88;">⚡ VOLÁTIL ⚡</div>`
+            : '';
         html += `
-        <div onclick="seleccionarMoneda('${c.symbol}'); cerrarRadarDespegue();" style="background:#050914; border:2px solid var(--accent-green); padding:12px; margin-bottom:10px; border-radius:8px; cursor:pointer; position:relative;">
+        <div onclick="seleccionarMoneda('${c.symbol}'); cerrarRadarDespegue();" style="background:#050914; border:2px solid ${esUltra ? '#ff3333' : esMuyVol ? '#f3ba2f' : 'var(--accent-green)'}; padding:12px; margin-bottom:10px; border-radius:8px; cursor:pointer; position:relative; ${esUltra ? 'box-shadow:0 0 16px #ff333355;' : esMuyVol ? 'box-shadow:0 0 12px #f3ba2f33;' : ''}">
             🚀 <b>${c.symbol.replace("USDT","")}</b> <span style="font-size:10px; color:var(--text-dim);">USDT</span>
             <span style="position:absolute; right:10px; top:12px; background:rgba(14,203,129,0.15); color:var(--accent-green); font-size:10px; font-weight:900; padding:2px 6px; border-radius:4px;">🚀 DESPEGUE EMA</span>
             <br>
+            ${volLabel}
             <span style="font-size:11px; display:block; margin-top:4px;">Precio Actual: <b style="color:#fff;">$${c.price}</b></span>
             <span style="display:block; font-size:11px; color:var(--accent-green); font-weight:bold;">+${e.subidaDesdeMinimo.toFixed(1)}% desde mínimo 48h</span>
             <span style="display:block; font-size:10px; color:var(--text-dim);">EMA7: ${e.ema7.toFixed(5)} · EMA25: ${e.ema25.toFixed(5)} · EMA99: ${e.ema99.toFixed(5)}</span>
             <span style="display:block; font-size:10px; color:#f3ba2f; font-weight:700;">⚡ Momentum: ${momentumScore(c.symbol).toFixed(1)}</span>
-            ${tieneApalancamientoBajo(c.symbol) ? `<span style="display:block; font-size:10px; color:${MONEDAS_BAJO_APALANCAMIENTO[c.symbol] <= 5 ? '#ff4444' : '#f3ba2f'}; font-weight:700;">${MONEDAS_BAJO_APALANCAMIENTO[c.symbol] <= 5 ? '🔥' : '⚡'} Apalanc. máx: ${MONEDAS_BAJO_APALANCAMIENTO[c.symbol]}x${MONEDAS_BAJO_APALANCAMIENTO[c.symbol] <= 5 ? ' · ULTRA VOLÁTIL' : ' · MUY VOLÁTIL'}</span>` : ''}
+            ${esMuyVol ? `<span style="display:block; font-size:10px; color:${esUltra ? '#ff4444' : '#f3ba2f'}; font-weight:700;">${esUltra ? '🔥' : '⚡'} Apalanc. máx: ${maxLev}x</span>` : ''}
         </div>`;
     });
 
     if (topRebotes.length > 0) {
         html += `<div style="font-size:11px; font-weight:900; letter-spacing:0.5px; color:#00d4ff; margin:14px 0 8px; text-transform:uppercase;">🔄 Rebotando tras caída de 24h</div>`;
         topRebotes.forEach(({ c, e }) => {
+            const maxLev = MONEDAS_BAJO_APALANCAMIENTO[c.symbol];
+            const esUltra = maxLev !== undefined && maxLev <= 5;
+            const esMuyVol = maxLev !== undefined && maxLev <= 10;
+            const volLabel = esUltra
+                ? `<div style="text-align:center; margin:8px 0 4px; font-size:22px; font-weight:900; letter-spacing:3px; color:#ff3333; text-shadow:0 0 14px #ff3333, 0 0 28px #ff000088; animation:techo-pulse 1.2s infinite;">🔥 ULTRA VOLÁTIL 🔥</div>`
+                : esMuyVol
+                ? `<div style="text-align:center; margin:8px 0 4px; font-size:20px; font-weight:900; letter-spacing:2px; color:#f3ba2f; text-shadow:0 0 12px #f3ba2f88;">⚡ VOLÁTIL ⚡</div>`
+                : '';
             html += `
-            <div onclick="seleccionarMoneda('${c.symbol}'); cerrarRadarDespegue();" style="background:#050914; border:2px solid #00d4ff; padding:12px; margin-bottom:10px; border-radius:8px; cursor:pointer; position:relative;">
+            <div onclick="seleccionarMoneda('${c.symbol}'); cerrarRadarDespegue();" style="background:#050914; border:2px solid ${esUltra ? '#ff3333' : esMuyVol ? '#f3ba2f' : '#00d4ff'}; padding:12px; margin-bottom:10px; border-radius:8px; cursor:pointer; position:relative; ${esUltra ? 'box-shadow:0 0 16px #ff333355;' : esMuyVol ? 'box-shadow:0 0 12px #f3ba2f33;' : ''}">
                 🔄 <b>${c.symbol.replace("USDT","")}</b> <span style="font-size:10px; color:var(--text-dim);">USDT</span>
                 <span style="position:absolute; right:10px; top:12px; background:rgba(0,212,255,0.15); color:#00d4ff; font-size:10px; font-weight:900; padding:2px 6px; border-radius:4px;">🔄 REBOTE</span>
                 <br>
+                ${volLabel}
                 <span style="font-size:11px; display:block; margin-top:4px;">Precio Actual: <b style="color:#fff;">$${c.price}</b></span>
                 <span style="display:block; font-size:11px; color:#00d4ff; font-weight:bold;">${c.change > 0 ? '+' : ''}${c.change.toFixed(2)}% en 24h · +${e.subidaDesdeMinimo.toFixed(1)}% desde mínimo 48h</span>
                 <span style="display:block; font-size:10px; color:var(--text-dim);">EMA7 girando al alza · EMA7: ${e.ema7.toFixed(5)}</span>
                 <span style="display:block; font-size:10px; color:#f3ba2f; font-weight:700;">⚡ Momentum: ${momentumScore(c.symbol).toFixed(1)}</span>
-                ${tieneApalancamientoBajo(c.symbol) ? `<span style="display:block; font-size:10px; color:${MONEDAS_BAJO_APALANCAMIENTO[c.symbol] <= 5 ? '#ff4444' : '#f3ba2f'}; font-weight:700;">${MONEDAS_BAJO_APALANCAMIENTO[c.symbol] <= 5 ? '🔥' : '⚡'} Apalanc. máx: ${MONEDAS_BAJO_APALANCAMIENTO[c.symbol]}x${MONEDAS_BAJO_APALANCAMIENTO[c.symbol] <= 5 ? ' · ULTRA VOLÁTIL' : ' · MUY VOLÁTIL'}</span>` : ''}
+                ${esMuyVol ? `<span style="display:block; font-size:10px; color:${esUltra ? '#ff4444' : '#f3ba2f'}; font-weight:700;">${esUltra ? '🔥' : '⚡'} Apalanc. máx: ${maxLev}x</span>` : ''}
             </div>`;
         });
     }
