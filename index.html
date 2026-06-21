@@ -4478,9 +4478,41 @@ function actualizarTacometroDerecho() {
     const c = cachedData[selectedCoin];
     if (!c) return;
 
-    // Convertir posicionPorcentaje (0-100) a ángulo del tacómetro (-100 a +100 del estilo imagen)
-    // Mapeamos 0%→ -100 (rojo), 50%→ 0 (centro), 100%→ +100 (verde)
-    const cdcVal = (c.posicionPorcentaje - 50) * 2; // rango -100 a +100
+    // ══════════════════════════════════════════════════════
+    // FÓRMULA FUSIONADA CDC MEJORADA — velocímetro de auto
+    // Combina: posición rango + presión compra/venta + 
+    // velocidad instantánea + momentum EMA + volatilidad
+    // Rango final: -100 (SHORT máx) → +100 (LONG máx)
+    // ══════════════════════════════════════════════════════
+    const maxLev = MONEDAS_BAJO_APALANCAMIENTO[selectedCoin];
+    const esUltra = maxLev !== undefined && maxLev <= 5;
+    const esMuyVol = maxLev !== undefined && maxLev <= 10;
+
+    // 1) Posición en rango 24h: -50 a +50
+    const baseRango = (c.posicionPorcentaje - 50);
+
+    // 2) Presión compradora/vendedora (inyección de capital)
+    const vel = c.velocidad || 0;
+    const cambio2m = c.cambioReal2Min || 0;
+    const ciclosS = c.ciclosSubiendo || 0;
+    const ciclosB = c.ciclosBajando || 0;
+    const presionCompra = Math.max(0, vel * 35 + cambio2m * 28 + ciclosS * 5);
+    const presionVenta  = Math.max(0, Math.abs(Math.min(0, vel)) * 35 + Math.abs(Math.min(0, cambio2m)) * 28 + ciclosB * 5);
+    const presionNeta = presionCompra - presionVenta; // positivo=compradores, negativo=vendedores
+
+    // 3) Bonus EMA: si las EMAs están alineadas alcistas sube más fuerte
+    const emaBonus = esDespegueReal(selectedCoin) ? 18
+                   : esReboteTrasCaida(selectedCoin) ? 10
+                   : 0;
+    const emaSign = (modoMercado === 'bajista') ? -1 : 1;
+
+    // 4) Multiplicador de volatilidad: monedas más volátiles reaccionan más rápido (como un motor más potente)
+    const multVol = esUltra ? 1.7 : esMuyVol ? 1.35 : 1.0;
+
+    // 5) Fusión final con pesos calibrados
+    let cdcVal = (baseRango * 0.35 + presionNeta * 0.50 + emaBonus * emaSign * 0.15) * multVol;
+    cdcVal = Math.max(-100, Math.min(100, cdcVal));
+
     const p = prediccionCDC[selectedCoin] || { subida: 50, caida: 50 };
     
     // Ángulo de la aguja: -100 → -135°, 0 → 0°, +100 → +135°
@@ -4547,7 +4579,7 @@ function actualizarTacometroDerecho() {
         <div style="text-align:center; padding:0 0 6px 0;">
             <div style="display:flex; align-items:center; justify-content:center; gap:8px; margin-bottom:4px;">
                 <span style="font-size:14px;">🌡️</span>
-                <span style="font-size:13px; font-weight:900; color:#fff; letter-spacing:1px;">TERMÓMETRO CDC</span>
+                <span style="font-size:13px; font-weight:900; color:#fff; letter-spacing:1px;">VELOCÍMETRO CDC</span>
                 <span style="font-size:10px; font-weight:700; padding:2px 8px; border-radius:4px; background:rgba(14,203,129,0.15); color:#0ecb81; border:1px solid rgba(14,203,129,0.3);">EN TIEMPO REAL</span>
                 <button id="btnRadarExplosivo" onclick="abrirRadarExplosivo()" title="RADAR EXPLOSIVO">
                     <span style="position:relative;">
@@ -4557,74 +4589,116 @@ function actualizarTacometroDerecho() {
                 </button>
             </div>
 
-            <!-- SVG TACÓMETRO PRINCIPAL -->
+            <!-- SVG VELOCÍMETRO FUSIONADO -->
             <div style="position:relative; display:inline-block; margin:0 auto;">
-            <svg viewBox="0 0 400 220" width="100%" style="max-width:380px; display:block; margin:0 auto;">
+            <svg viewBox="0 0 400 240" width="100%" style="max-width:390px; display:block; margin:0 auto;">
                 <defs>
-                    <!-- Gradiente del arco: rojo → amarillo → verde -->
-                    <linearGradient id="arcGrad" x1="0%" y1="0%" x2="100%" y2="0%">
-                        <stop offset="0%" stop-color="#ff2a3b"/>
-                        <stop offset="25%" stop-color="#ff6b00"/>
+                    <!-- Arco SHORT (izq) rojo profundo → naranja -->
+                    <linearGradient id="arcShort" x1="0%" y1="0%" x2="100%" y2="0%">
+                        <stop offset="0%" stop-color="#7b0014"/>
+                        <stop offset="100%" stop-color="#ff6b00"/>
+                    </linearGradient>
+                    <!-- Arco neutro central amarillo -->
+                    <linearGradient id="arcNeutro" x1="0%" y1="0%" x2="100%" y2="0%">
+                        <stop offset="0%" stop-color="#ff6b00"/>
                         <stop offset="50%" stop-color="#f3ba2f"/>
-                        <stop offset="75%" stop-color="#90ee44"/>
+                        <stop offset="100%" stop-color="#90ee44"/>
+                    </linearGradient>
+                    <!-- Arco LONG (der) verde -->
+                    <linearGradient id="arcLong" x1="0%" y1="0%" x2="100%" y2="0%">
+                        <stop offset="0%" stop-color="#90ee44"/>
                         <stop offset="100%" stop-color="#0ecb81"/>
                     </linearGradient>
-                    <!-- Gradiente del arco interior oscuro -->
-                    <radialGradient id="bgGrad" cx="50%" cy="100%" r="80%">
-                        <stop offset="0%" stop-color="#0a1428"/>
-                        <stop offset="100%" stop-color="#030712"/>
-                    </radialGradient>
-                    <!-- Brillo en el extremo activo -->
+                    <!-- Glow filtros -->
                     <filter id="glowFilter" x="-50%" y="-50%" width="200%" height="200%">
                         <feGaussianBlur stdDeviation="4" result="blur"/>
                         <feMerge><feMergeNode in="blur"/><feMergeNode in="SourceGraphic"/></feMerge>
                     </filter>
                     <filter id="needleGlow">
-                        <feGaussianBlur stdDeviation="3" result="blur"/>
+                        <feGaussianBlur stdDeviation="${esUltra ? 5 : esMuyVol ? 4 : 3}" result="blur"/>
+                        <feMerge><feMergeNode in="blur"/><feMergeNode in="SourceGraphic"/></feMerge>
+                    </filter>
+                    <filter id="volLabelGlow" x="-30%" y="-30%" width="160%" height="160%">
+                        <feGaussianBlur stdDeviation="6" result="blur"/>
                         <feMerge><feMergeNode in="blur"/><feMergeNode in="SourceGraphic"/></feMerge>
                     </filter>
                 </defs>
 
-                <!-- Fondo oscuro -->
-                <rect width="400" height="220" fill="transparent"/>
+                <!-- Fondo base oscuro semicircular -->
+                <rect width="400" height="240" fill="transparent"/>
 
-                <!-- Arco exterior decorativo (sombra) -->
-                <path d="M 30 190 A 170 170 0 0 1 370 190" fill="none" stroke="#111827" stroke-width="28" stroke-linecap="round"/>
-                <!-- Arco de color rojo→verde -->
-                <path d="M 30 190 A 170 170 0 0 1 370 190" fill="none" stroke="url(#arcGrad)" stroke-width="22" stroke-linecap="round"/>
-                <!-- Arco interior oscuro para efecto profundidad -->
-                <path d="M 42 190 A 158 158 0 0 1 358 190" fill="none" stroke="#030712" stroke-width="8"/>
+                <!-- ── ZONAS DE VELOCIDAD (3 arcos en capas) ── -->
+                <!-- Sombra exterior -->
+                <path d="M 25 200 A 175 175 0 0 1 375 200" fill="none" stroke="#0b1220" stroke-width="34" stroke-linecap="round"/>
+                <!-- Zona SHORT: izquierda, rojo/naranja -->
+                <path d="M 25 200 A 175 175 0 0 1 200 25" fill="none" stroke="url(#arcShort)" stroke-width="26" stroke-linecap="butt" opacity="0.85"/>
+                <!-- Zona NEUTRO: centro, amarillo -->
+                <path d="M 200 25 A 175 175 0 0 1 375 200" fill="none" stroke="url(#arcLong)" stroke-width="26" stroke-linecap="butt" opacity="0.85"/>
+                <!-- Overlay degradado neutro encima para fundir -->
+                <path d="M 80 145 A 175 175 0 0 1 320 145" fill="none" stroke="url(#arcNeutro)" stroke-width="14" stroke-linecap="round" opacity="0.6"/>
+                <!-- Arco interior oscuro (profundidad) -->
+                <path d="M 38 200 A 162 162 0 0 1 362 200" fill="none" stroke="#030a14" stroke-width="10"/>
 
-                <!-- Marcas de tick -->
+                <!-- ── ZONA ROJA extremo SHORT (rayas) ── -->
+                ${cdcVal < -70 ? `<path d="M 25 200 A 175 175 0 0 1 70 88" fill="none" stroke="#ff0022" stroke-width="26" stroke-linecap="butt" opacity="${0.3 + Math.abs(cdcVal)/400}" style="filter:drop-shadow(0 0 8px #ff002288);"/>` : ''}
+                <!-- ── ZONA VERDE extremo LONG (rayas) ── -->
+                ${cdcVal > 70 ? `<path d="M 330 88 A 175 175 0 0 1 375 200" fill="none" stroke="#0ecb81" stroke-width="26" stroke-linecap="butt" opacity="${0.3 + cdcVal/400}" style="filter:drop-shadow(0 0 8px #0ecb8188);"/>` : ''}
+
+                <!-- ── MARCAS DE VELOCIDAD tipo auto ── -->
                 ${[-100,-80,-60,-40,-20,0,20,40,60,80,100].map(v => {
-                    const a = (v/100)*135 * Math.PI/180 - Math.PI/2 - (Math.PI*0.25);
-                    const r1=148, r2=138, r3=125;
-                    const cx=200, cy=190;
+                    const ang = (v/100)*135;
+                    const a = ang * Math.PI/180 - Math.PI/2 - (Math.PI*0.25);
+                    const cx=200, cy=200;
                     const isMajor = v % 20 === 0;
-                    const r = isMajor ? r2 : r1;
-                    return `<line x1="${cx+r1*Math.cos(a)}" y1="${cy+r1*Math.sin(a)}" x2="${cx+r*Math.cos(a)}" y2="${cy+r*Math.sin(a)}" stroke="rgba(255,255,255,0.4)" stroke-width="${isMajor?2:1}"/>
-                    ${isMajor ? `<text x="${cx+r3*Math.cos(a)}" y="${cy+r3*Math.sin(a)}" fill="rgba(255,255,255,0.7)" font-size="11" font-weight="700" text-anchor="middle" dominant-baseline="middle">${v}</text>` : ''}`;
+                    const r1=158, r2=isMajor?143:150, r3=128;
+                    const labelMap = {'-100':'S','−80':'','−60':'','−40':'','−20':'','0':'0','20':'','40':'','60':'','80':'','100':'L'};
+                    const isExtremo = Math.abs(v) === 100;
+                    const tickColor = v < -40 ? '#ff4444' : v > 40 ? '#0ecb81' : 'rgba(255,255,255,0.5)';
+                    return `<line x1="${cx+r1*Math.cos(a)}" y1="${cy+r1*Math.sin(a)}" x2="${cx+r2*Math.cos(a)}" y2="${cy+r2*Math.sin(a)}" stroke="${tickColor}" stroke-width="${isMajor?2.5:1}"/>
+                    ${isMajor ? `<text x="${cx+r3*Math.cos(a)}" y="${cy+r3*Math.sin(a)}" fill="${tickColor}" font-size="${isExtremo?13:10}" font-weight="900" text-anchor="middle" dominant-baseline="middle">${v}</text>` : ''}`;
                 }).join('')}
 
-                <!-- Destellos eléctricos si fuerza extrema -->
+                <!-- ── ETIQUETA SHORT / LONG en los extremos ── -->
+                <text x="14" y="215" fill="#ff2a3b" font-size="11" font-weight="900" text-anchor="middle">SHORT</text>
+                <text x="386" y="215" fill="#0ecb81" font-size="11" font-weight="900" text-anchor="middle">LONG</text>
+
+                <!-- ── DESTELLOS ELÉCTRICOS si fuerza extrema ── -->
                 ${lightning}
 
-                <!-- Aguja con glow -->
-                <g transform="translate(200,190) rotate(${needleAngle})" filter="url(#needleGlow)">
-                    <line x1="0" y1="0" x2="0" y2="-130" stroke="${colorEstado}" stroke-width="3" stroke-linecap="round"/>
-                    <polygon points="0,-130 -4,-110 4,-110" fill="${colorEstado}"/>
+                <!-- ── LABEL DE VOLATILIDAD dentro del tacómetro ── -->
+                ${esUltra ? `
+                    <text x="200" y="90" fill="#ff3333" font-size="14" font-weight="900" text-anchor="middle" filter="url(#volLabelGlow)" style="letter-spacing:2px;">🔥 ULTRA VOLÁTIL 🔥</text>
+                    <text x="200" y="106" fill="#ff555588" font-size="9" font-weight="700" text-anchor="middle">APAL. MÁX ${maxLev}x · MOVIMIENTO AMPLIFICADO</text>
+                ` : esMuyVol ? `
+                    <text x="200" y="90" fill="#f3ba2f" font-size="13" font-weight="900" text-anchor="middle" filter="url(#volLabelGlow)" style="letter-spacing:1px;">⚡ VOLÁTIL ⚡</text>
+                    <text x="200" y="105" fill="#f3ba2f88" font-size="9" font-weight="700" text-anchor="middle">APAL. MÁX ${maxLev}x · MUY ACTIVA</text>
+                ` : `
+                    <text x="200" y="92" fill="#475569" font-size="11" font-weight="700" text-anchor="middle">📊 APALANCAMIENTO NORMAL</text>
+                `}
+
+                <!-- ── AGUJA — se mueve como velocímetro de auto ── -->
+                <g transform="translate(200,200) rotate(${needleAngle})" filter="url(#needleGlow)">
+                    <!-- Cola de la aguja (abajo) -->
+                    <line x1="0" y1="0" x2="0" y2="18" stroke="${colorEstado}66" stroke-width="4" stroke-linecap="round"/>
+                    <!-- Cuerpo principal -->
+                    <line x1="0" y1="0" x2="0" y2="-138" stroke="${colorEstado}" stroke-width="${esUltra ? 4 : 3}" stroke-linecap="round"/>
+                    <!-- Punta de flecha -->
+                    <polygon points="0,-138 -5,-115 5,-115" fill="${colorEstado}"/>
+                    <!-- Línea central blanca de la aguja (detalle de auto) -->
+                    <line x1="0" y1="5" x2="0" y2="-110" stroke="rgba(255,255,255,0.25)" stroke-width="1" stroke-linecap="round"/>
                 </g>
-                <!-- Centro de la aguja -->
-                <circle cx="200" cy="190" r="10" fill="#fff" filter="url(#needleGlow)"/>
-                <circle cx="200" cy="190" r="5" fill="${colorEstado}"/>
+                <!-- Centro/pivote de la aguja -->
+                <circle cx="200" cy="200" r="13" fill="#1a2640" stroke="${colorEstado}" stroke-width="2"/>
+                <circle cx="200" cy="200" r="6" fill="${colorEstado}" filter="url(#needleGlow)"/>
 
-                <!-- Valor central grande -->
-                <text x="200" y="148" fill="${colorEstado}" font-size="42" font-weight="900" text-anchor="middle" filter="url(#glowFilter)">${cdcVal >= 0 ? '+' : ''}${cdcVal.toFixed(1)}</text>
-                <text x="200" y="168" fill="rgba(255,255,255,0.5)" font-size="11" font-weight="700" text-anchor="middle">FUERZA CDC</text>
+                <!-- ── VALOR NUMÉRICO grande en el centro ── -->
+                <text x="200" y="155" fill="${colorEstado}" font-size="46" font-weight="900" text-anchor="middle" filter="url(#glowFilter)">${cdcVal >= 0 ? '+' : ''}${cdcVal.toFixed(0)}</text>
+                <text x="200" y="174" fill="rgba(255,255,255,0.4)" font-size="10" font-weight="700" text-anchor="middle">VELOCIDAD CDC</text>
 
-                <!-- Labels laterales -->
-                <text x="18" y="200" fill="#ff2a3b" font-size="11" font-weight="900" text-anchor="middle">-100</text>
-                <text x="382" y="200" fill="#0ecb81" font-size="11" font-weight="900" text-anchor="middle">100</text>
+                <!-- ── INDICADORES MINI abajo del número ── -->
+                <text x="130" y="220" fill="${vel >= 0 ? '#0ecb81' : '#ff2a3b'}" font-size="9" font-weight="700" text-anchor="middle">VEL ${vel > 0 ? '+' : ''}${vel.toFixed(3)}%</text>
+                <text x="200" y="220" fill="${cambio2m >= 0 ? '#0ecb81' : '#ff2a3b'}" font-size="9" font-weight="700" text-anchor="middle">2M ${cambio2m > 0 ? '+' : ''}${cambio2m.toFixed(2)}%</text>
+                <text x="270" y="220" fill="#94a3b8" font-size="9" font-weight="700" text-anchor="middle">↑${ciclosS} ↓${ciclosB}</text>
             </svg>
             </div>
 
@@ -4634,132 +4708,13 @@ function actualizarTacometroDerecho() {
                 ${etiquetaAlerta}
             </div>
 
-            <!-- Flechas de momentum -->
+            <!-- Flechas de momentum + dirección de capital -->
             <div style="text-align:center; font-size:22px; color:${arrowColor}; letter-spacing:2px; margin:4px 0; font-weight:900; opacity:0.8;">${arrows}</div>
             <div style="text-align:center; font-size:10px; color:#64748b; margin-bottom:8px;">
-                Entrada de capital &bull; ${cdcVal > 0 ? 'Compradores dominando' : 'Vendedores dominando'} &bull; ${Math.abs(cdcVal) > 60 ? 'Momento explosivo' : 'Momento moderado'}
+                ${cdcVal > 15 ? '🟢 Compradores acelerando' : cdcVal < -15 ? '🔴 Vendedores acelerando' : '⚖️ Presión equilibrada'}
+                &bull; ${Math.abs(cdcVal) > 70 ? '🔥 Zona roja · máxima fuerza' : Math.abs(cdcVal) > 40 ? '⚡ Acelerando con fuerza' : Math.abs(cdcVal) > 15 ? '▶ Movimiento activo' : '⏸ Motor en ralentí'}
+                ${esUltra ? ' &bull; 🔥 Motor turbo ×1.7' : esMuyVol ? ' &bull; ⚡ Motor sport ×1.35' : ''}
             </div>
-
-            <!-- ══ TACÓMETRO DE VOLATILIDAD / APALANCAMIENTO ══ -->
-            ${(() => {
-                const maxLev = MONEDAS_BAJO_APALANCAMIENTO[selectedCoin];
-                const esUltra = maxLev !== undefined && maxLev <= 5;
-                const esMuyVol = maxLev !== undefined && maxLev <= 10;
-
-                // Inyección de dinero: compras vs ventas usando volumen + velocidad + ciclos
-                // Rango -100 (venta pura SHORT) a +100 (compra pura LONG)
-                const volTotal = c.volume || 1;
-                const cambio2m = c.cambioReal2Min || 0;
-                const vel = c.velocidad || 0;
-                const ciclosS = c.ciclosSubiendo || 0;
-                const ciclosB = c.ciclosBajando || 0;
-
-                // Presión compradora: velocidad positiva, ciclos subiendo, cambio positivo en 2m
-                const presionCompra = Math.max(0, vel * 30 + cambio2m * 25 + ciclosS * 4);
-                // Presión vendedora: velocidad negativa, ciclos bajando, cambio negativo en 2m
-                const presionVenta  = Math.max(0, Math.abs(Math.min(0, vel)) * 30 + Math.abs(Math.min(0, cambio2m)) * 25 + ciclosB * 4);
-
-                // Score neto -100 a +100
-                let inyScore = presionCompra - presionVenta;
-                // Amplificar para monedas volátiles (se mueve más rápido)
-                if (esUltra) inyScore *= 1.6;
-                else if (esMuyVol) inyScore *= 1.3;
-                inyScore = Math.max(-100, Math.min(100, inyScore));
-
-                const inyAngle = (inyScore / 100) * 135;
-                const inyColor = inyScore > 15 ? '#0ecb81' : inyScore < -15 ? '#ff2a3b' : '#f3ba2f';
-
-                // Etiqueta central del tacómetro según tipo de moneda
-                let volTag, volTagColor, volTagShadow, volTagAnim;
-                if (esUltra) {
-                    volTag = '🔥 ULTRA VOLÁTIL';
-                    volTagColor = '#ff3333';
-                    volTagShadow = '0 0 16px #ff333399';
-                    volTagAnim = 'animation:techo-pulse 1.1s infinite;';
-                } else if (esMuyVol) {
-                    volTag = '⚡ VOLÁTIL';
-                    volTagColor = '#f3ba2f';
-                    volTagShadow = '0 0 12px #f3ba2f88';
-                    volTagAnim = '';
-                } else {
-                    volTag = '📊 APALANCAMIENTO NORMAL';
-                    volTagColor = '#64748b';
-                    volTagShadow = 'none';
-                    volTagAnim = '';
-                }
-
-                // Etiqueta de dirección bajo el tacómetro
-                const dirLong  = inyScore > 15;
-                const dirShort = inyScore < -15;
-                const dirLabel = dirLong
-                    ? `<span style="color:#0ecb81;font-weight:900;">🟢 INYECCIÓN LONG · COMPRADORES</span>`
-                    : dirShort
-                    ? `<span style="color:#ff2a3b;font-weight:900;">🔴 INYECCIÓN SHORT · VENDEDORES</span>`
-                    : `<span style="color:#f3ba2f;font-weight:900;">⚖️ PRESIÓN EQUILIBRADA</span>`;
-
-                return `
-                <div style="margin:10px 0 4px; border-top:1px solid rgba(255,255,255,0.05); padding-top:10px;">
-                    <div style="text-align:center; font-size:11px; font-weight:900; letter-spacing:1.5px; color:#94a3b8; margin-bottom:2px; text-transform:uppercase;">
-                        💰 TACÓMETRO · INYECCIÓN DE CAPITAL
-                    </div>
-                    <div style="text-align:center; font-size:${esUltra ? '18px' : esMuyVol ? '17px' : '13px'}; font-weight:900; letter-spacing:${esUltra ? '3px' : '1px'}; color:${volTagColor}; text-shadow:${volTagShadow}; margin-bottom:2px; ${volTagAnim}">${volTag}</div>
-                    ${maxLev !== undefined ? `<div style="text-align:center; font-size:10px; color:#475569; margin-bottom:4px;">Apalanc. máx. en Binance: <b style="color:${esUltra ? '#ff4444' : esMuyVol ? '#f3ba2f' : '#64748b'};">${maxLev}x</b></div>` : ''}
-
-                    <svg viewBox="0 0 400 180" width="100%" style="max-width:360px; display:block; margin:0 auto;">
-                        <defs>
-                            <linearGradient id="volArcGrad" x1="0%" y1="0%" x2="100%" y2="0%">
-                                <stop offset="0%" stop-color="#ff2a3b"/>
-                                <stop offset="30%" stop-color="#ff6b00"/>
-                                <stop offset="50%" stop-color="#f3ba2f"/>
-                                <stop offset="70%" stop-color="#90ee44"/>
-                                <stop offset="100%" stop-color="#0ecb81"/>
-                            </linearGradient>
-                            <filter id="volNeedleGlow">
-                                <feGaussianBlur stdDeviation="3" result="blur"/>
-                                <feMerge><feMergeNode in="blur"/><feMergeNode in="SourceGraphic"/></feMerge>
-                            </filter>
-                            <filter id="volGlowText" x="-50%" y="-50%" width="200%" height="200%">
-                                <feGaussianBlur stdDeviation="3" result="blur"/>
-                                <feMerge><feMergeNode in="blur"/><feMergeNode in="SourceGraphic"/></feMerge>
-                            </filter>
-                        </defs>
-
-                        <!-- Arco base sombra -->
-                        <path d="M 30 160 A 140 140 0 0 1 370 160" fill="none" stroke="#111827" stroke-width="22" stroke-linecap="round"/>
-                        <!-- Arco coloreado SHORT→LONG -->
-                        <path d="M 30 160 A 140 140 0 0 1 370 160" fill="none" stroke="url(#volArcGrad)" stroke-width="17" stroke-linecap="round"/>
-                        <!-- Arco interior oscuro -->
-                        <path d="M 40 160 A 130 130 0 0 1 360 160" fill="none" stroke="#030712" stroke-width="7"/>
-
-                        <!-- Ticks -->
-                        ${[-100,-50,0,50,100].map(v => {
-                            const a = (v/100)*135 * Math.PI/180 - Math.PI/2 - (Math.PI*0.25);
-                            const cx=200, cy=160, r1=122, r2=110, r3=96;
-                            const labels = {'-100':'SHORT','-50':'',0:'CENTRO','50':'','100':'LONG'};
-                            return `<line x1="${cx+r1*Math.cos(a)}" y1="${cy+r1*Math.sin(a)}" x2="${cx+r2*Math.cos(a)}" y2="${cy+r2*Math.sin(a)}" stroke="rgba(255,255,255,0.5)" stroke-width="2"/>
-                            ${labels[v] ? `<text x="${cx+r3*Math.cos(a)}" y="${cy+r3*Math.sin(a)}" fill="rgba(255,255,255,0.6)" font-size="10" font-weight="700" text-anchor="middle" dominant-baseline="middle">${labels[v]}</text>` : ''}`;
-                        }).join('')}
-
-                        <!-- Aguja -->
-                        <g transform="translate(200,160) rotate(${inyAngle})" filter="url(#volNeedleGlow)">
-                            <line x1="0" y1="0" x2="0" y2="-105" stroke="${inyColor}" stroke-width="3" stroke-linecap="round"/>
-                            <polygon points="0,-105 -4,-88 4,-88" fill="${inyColor}"/>
-                        </g>
-                        <circle cx="200" cy="160" r="9" fill="#fff" filter="url(#volNeedleGlow)"/>
-                        <circle cx="200" cy="160" r="5" fill="${inyColor}"/>
-
-                        <!-- Valor numérico central -->
-                        <text x="200" y="122" fill="${inyColor}" font-size="34" font-weight="900" text-anchor="middle" filter="url(#volGlowText)">${inyScore >= 0 ? '+' : ''}${inyScore.toFixed(0)}</text>
-                        <text x="200" y="140" fill="rgba(255,255,255,0.4)" font-size="9" font-weight="700" text-anchor="middle">PRESIÓN NETA</text>
-
-                        <!-- Labels SHORT / LONG extremos -->
-                        <text x="20" y="168" fill="#ff2a3b" font-size="10" font-weight="900" text-anchor="middle">SHORT</text>
-                        <text x="380" y="168" fill="#0ecb81" font-size="10" font-weight="900" text-anchor="middle">LONG</text>
-                    </svg>
-
-                    <div style="text-align:center; font-size:11px; margin-top:2px; margin-bottom:6px;">${dirLabel}</div>
-                </div>`;
-            })()}
         </div>
 
         <!-- Proyección dinámica -->
