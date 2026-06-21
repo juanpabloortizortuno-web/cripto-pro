@@ -2582,12 +2582,43 @@ async function cicloActualizacionEMA() {
     actualizarTablaIzquierda(); // refrescar tabla con los nuevos datos EMA disponibles
 }
 
+// ══════════════════════════════════════════════════════════════════
+// ⚡ MOMENTUM / VELOCIDAD — score que mide qué tan RÁPIDO se está
+// moviendo una moneda ahora mismo (no solo cuánto subió acumulado).
+// Combina: velocidad promedio reciente (10s), cambio neto en 2 min,
+// ciclos consecutivos a favor y ritmo de volumen (actividad nueva,
+// no el acumulado de 24h que siempre sube). Útil para priorizar
+// monedas "rápidas" en vez de las que cumplen el mínimo pero se
+// mueven lento (despegue viejo / ya agotado).
+// ══════════════════════════════════════════════════════════════════
+function momentumScore(symbol) {
+    const c = cachedData[symbol];
+    if (!c) return 0;
+    const velAbs = Math.abs(c.velocidad || 0);           // velocidad instantánea (%/ciclo ~2s)
+    const cambio2m = Math.abs(c.cambioReal2Min || 0);     // movimiento neto últimos 2 min
+    const ciclos = Math.max(c.ciclosSubiendo || 0, c.ciclosBajando || 0); // consistencia direccional
+    const ritmoVol = Math.min((c.volume || 0) / 1000000, 30); // actividad/liquidez, tope 30
+
+    // Pesos: velocidad y cambio en 2min son lo que mejor capta "rapidez real"
+    return (velAbs * 40) + (cambio2m * 15) + (ciclos * 3) + ritmoVol;
+}
+
+// Umbral mínimo de momentum para considerar una moneda "rápida".
+// Por debajo de esto, aunque cumpla EMA/subida, se descarta como "lenta".
+const MOMENTUM_MIN_RAPIDA = 12;
+
+function esMonedaLenta(symbol) {
+    return momentumScore(symbol) < MOMENTUM_MIN_RAPIDA;
+}
+
 // Devuelve true solo si la moneda cumple TODOS los criterios de despegue real pedidos:
 // EMA7 > EMA25 > EMA99 (alineadas alcistas, ambas subiendo) + ≥8% desde el mínimo de 48h
 // (bajamos de 15% a 8% para capturar el inicio del despegue, no solo cuando ya subió mucho)
+// + AHORA también exige que el movimiento sea rápido (momentum), no solo acumulado lento.
 function esDespegueReal(symbol) {
     const e = datosEMA[symbol];
     if (!e) return false;
+    if (esMonedaLenta(symbol)) return false; // descarta despegues "viejos" o lentos
     return e.alineadasAlcista && e.subidaDesdeMinimo >= 8;
 }
 
@@ -2623,8 +2654,10 @@ function esReboteTrasCaida(symbol) {
 
     // 4) Velocidad de los últimos 2 minutos también positiva: confirma que no es ruido.
     const conImpulso = c.velocidad > 0 || c.cambioReal2Min > 0;
+    if (!conImpulso) return false;
 
-    return conImpulso;
+    // 5) Y que el giro sea RÁPIDO, no un rebote tibio/lento (momentum real).
+    return !esMonedaLenta(symbol);
 }
 
 // ══════════════════════════════════════════════════════════════════
@@ -4553,9 +4586,9 @@ async function abrirRadarDespegue() {
         }
     }
 
-    // Ordenar: más subida desde mínimo primero
-    candidatos.sort((a, b) => b.e.subidaDesdeMinimo - a.e.subidaDesdeMinimo);
-    rebotes.sort((a, b) => b.e.subidaDesdeMinimo - a.e.subidaDesdeMinimo);
+    // Ordenar: prioriza velocidad/momentum real (rápidas primero), no solo % acumulado.
+    candidatos.sort((a, b) => momentumScore(b.c.symbol) - momentumScore(a.c.symbol));
+    rebotes.sort((a, b) => momentumScore(b.c.symbol) - momentumScore(a.c.symbol));
     let topSuelos = candidatos.slice(0, 8);
     let topRebotes = rebotes.slice(0, 8);
 
@@ -4568,6 +4601,7 @@ async function abrirRadarDespegue() {
             <span style="font-size:11px; display:block; margin-top:4px;">Precio Actual: <b style="color:#fff;">$${c.price}</b></span>
             <span style="display:block; font-size:11px; color:var(--accent-green); font-weight:bold;">+${e.subidaDesdeMinimo.toFixed(1)}% desde mínimo 48h</span>
             <span style="display:block; font-size:10px; color:var(--text-dim);">EMA7: ${e.ema7.toFixed(5)} · EMA25: ${e.ema25.toFixed(5)} · EMA99: ${e.ema99.toFixed(5)}</span>
+            <span style="display:block; font-size:10px; color:#f3ba2f; font-weight:700;">⚡ Momentum: ${momentumScore(c.symbol).toFixed(1)}</span>
         </div>`;
     });
 
@@ -4582,6 +4616,7 @@ async function abrirRadarDespegue() {
                 <span style="font-size:11px; display:block; margin-top:4px;">Precio Actual: <b style="color:#fff;">$${c.price}</b></span>
                 <span style="display:block; font-size:11px; color:#00d4ff; font-weight:bold;">${c.change > 0 ? '+' : ''}${c.change.toFixed(2)}% en 24h · +${e.subidaDesdeMinimo.toFixed(1)}% desde mínimo 48h</span>
                 <span style="display:block; font-size:10px; color:var(--text-dim);">EMA7 girando al alza · EMA7: ${e.ema7.toFixed(5)}</span>
+                <span style="display:block; font-size:10px; color:#f3ba2f; font-weight:700;">⚡ Momentum: ${momentumScore(c.symbol).toFixed(1)}</span>
             </div>`;
         });
     }
