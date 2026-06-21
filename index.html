@@ -4639,6 +4639,127 @@ function actualizarTacometroDerecho() {
             <div style="text-align:center; font-size:10px; color:#64748b; margin-bottom:8px;">
                 Entrada de capital &bull; ${cdcVal > 0 ? 'Compradores dominando' : 'Vendedores dominando'} &bull; ${Math.abs(cdcVal) > 60 ? 'Momento explosivo' : 'Momento moderado'}
             </div>
+
+            <!-- ══ TACÓMETRO DE VOLATILIDAD / APALANCAMIENTO ══ -->
+            ${(() => {
+                const maxLev = MONEDAS_BAJO_APALANCAMIENTO[selectedCoin];
+                const esUltra = maxLev !== undefined && maxLev <= 5;
+                const esMuyVol = maxLev !== undefined && maxLev <= 10;
+
+                // Inyección de dinero: compras vs ventas usando volumen + velocidad + ciclos
+                // Rango -100 (venta pura SHORT) a +100 (compra pura LONG)
+                const volTotal = c.volume || 1;
+                const cambio2m = c.cambioReal2Min || 0;
+                const vel = c.velocidad || 0;
+                const ciclosS = c.ciclosSubiendo || 0;
+                const ciclosB = c.ciclosBajando || 0;
+
+                // Presión compradora: velocidad positiva, ciclos subiendo, cambio positivo en 2m
+                const presionCompra = Math.max(0, vel * 30 + cambio2m * 25 + ciclosS * 4);
+                // Presión vendedora: velocidad negativa, ciclos bajando, cambio negativo en 2m
+                const presionVenta  = Math.max(0, Math.abs(Math.min(0, vel)) * 30 + Math.abs(Math.min(0, cambio2m)) * 25 + ciclosB * 4);
+
+                // Score neto -100 a +100
+                let inyScore = presionCompra - presionVenta;
+                // Amplificar para monedas volátiles (se mueve más rápido)
+                if (esUltra) inyScore *= 1.6;
+                else if (esMuyVol) inyScore *= 1.3;
+                inyScore = Math.max(-100, Math.min(100, inyScore));
+
+                const inyAngle = (inyScore / 100) * 135;
+                const inyColor = inyScore > 15 ? '#0ecb81' : inyScore < -15 ? '#ff2a3b' : '#f3ba2f';
+
+                // Etiqueta central del tacómetro según tipo de moneda
+                let volTag, volTagColor, volTagShadow, volTagAnim;
+                if (esUltra) {
+                    volTag = '🔥 ULTRA VOLÁTIL';
+                    volTagColor = '#ff3333';
+                    volTagShadow = '0 0 16px #ff333399';
+                    volTagAnim = 'animation:techo-pulse 1.1s infinite;';
+                } else if (esMuyVol) {
+                    volTag = '⚡ VOLÁTIL';
+                    volTagColor = '#f3ba2f';
+                    volTagShadow = '0 0 12px #f3ba2f88';
+                    volTagAnim = '';
+                } else {
+                    volTag = '📊 APALANCAMIENTO NORMAL';
+                    volTagColor = '#64748b';
+                    volTagShadow = 'none';
+                    volTagAnim = '';
+                }
+
+                // Etiqueta de dirección bajo el tacómetro
+                const dirLong  = inyScore > 15;
+                const dirShort = inyScore < -15;
+                const dirLabel = dirLong
+                    ? `<span style="color:#0ecb81;font-weight:900;">🟢 INYECCIÓN LONG · COMPRADORES</span>`
+                    : dirShort
+                    ? `<span style="color:#ff2a3b;font-weight:900;">🔴 INYECCIÓN SHORT · VENDEDORES</span>`
+                    : `<span style="color:#f3ba2f;font-weight:900;">⚖️ PRESIÓN EQUILIBRADA</span>`;
+
+                return `
+                <div style="margin:10px 0 4px; border-top:1px solid rgba(255,255,255,0.05); padding-top:10px;">
+                    <div style="text-align:center; font-size:11px; font-weight:900; letter-spacing:1.5px; color:#94a3b8; margin-bottom:2px; text-transform:uppercase;">
+                        💰 TACÓMETRO · INYECCIÓN DE CAPITAL
+                    </div>
+                    <div style="text-align:center; font-size:${esUltra ? '18px' : esMuyVol ? '17px' : '13px'}; font-weight:900; letter-spacing:${esUltra ? '3px' : '1px'}; color:${volTagColor}; text-shadow:${volTagShadow}; margin-bottom:2px; ${volTagAnim}">${volTag}</div>
+                    ${maxLev !== undefined ? `<div style="text-align:center; font-size:10px; color:#475569; margin-bottom:4px;">Apalanc. máx. en Binance: <b style="color:${esUltra ? '#ff4444' : esMuyVol ? '#f3ba2f' : '#64748b'};">${maxLev}x</b></div>` : ''}
+
+                    <svg viewBox="0 0 400 180" width="100%" style="max-width:360px; display:block; margin:0 auto;">
+                        <defs>
+                            <linearGradient id="volArcGrad" x1="0%" y1="0%" x2="100%" y2="0%">
+                                <stop offset="0%" stop-color="#ff2a3b"/>
+                                <stop offset="30%" stop-color="#ff6b00"/>
+                                <stop offset="50%" stop-color="#f3ba2f"/>
+                                <stop offset="70%" stop-color="#90ee44"/>
+                                <stop offset="100%" stop-color="#0ecb81"/>
+                            </linearGradient>
+                            <filter id="volNeedleGlow">
+                                <feGaussianBlur stdDeviation="3" result="blur"/>
+                                <feMerge><feMergeNode in="blur"/><feMergeNode in="SourceGraphic"/></feMerge>
+                            </filter>
+                            <filter id="volGlowText" x="-50%" y="-50%" width="200%" height="200%">
+                                <feGaussianBlur stdDeviation="3" result="blur"/>
+                                <feMerge><feMergeNode in="blur"/><feMergeNode in="SourceGraphic"/></feMerge>
+                            </filter>
+                        </defs>
+
+                        <!-- Arco base sombra -->
+                        <path d="M 30 160 A 140 140 0 0 1 370 160" fill="none" stroke="#111827" stroke-width="22" stroke-linecap="round"/>
+                        <!-- Arco coloreado SHORT→LONG -->
+                        <path d="M 30 160 A 140 140 0 0 1 370 160" fill="none" stroke="url(#volArcGrad)" stroke-width="17" stroke-linecap="round"/>
+                        <!-- Arco interior oscuro -->
+                        <path d="M 40 160 A 130 130 0 0 1 360 160" fill="none" stroke="#030712" stroke-width="7"/>
+
+                        <!-- Ticks -->
+                        ${[-100,-50,0,50,100].map(v => {
+                            const a = (v/100)*135 * Math.PI/180 - Math.PI/2 - (Math.PI*0.25);
+                            const cx=200, cy=160, r1=122, r2=110, r3=96;
+                            const labels = {'-100':'SHORT','-50':'',0:'CENTRO','50':'','100':'LONG'};
+                            return `<line x1="${cx+r1*Math.cos(a)}" y1="${cy+r1*Math.sin(a)}" x2="${cx+r2*Math.cos(a)}" y2="${cy+r2*Math.sin(a)}" stroke="rgba(255,255,255,0.5)" stroke-width="2"/>
+                            ${labels[v] ? `<text x="${cx+r3*Math.cos(a)}" y="${cy+r3*Math.sin(a)}" fill="rgba(255,255,255,0.6)" font-size="10" font-weight="700" text-anchor="middle" dominant-baseline="middle">${labels[v]}</text>` : ''}`;
+                        }).join('')}
+
+                        <!-- Aguja -->
+                        <g transform="translate(200,160) rotate(${inyAngle})" filter="url(#volNeedleGlow)">
+                            <line x1="0" y1="0" x2="0" y2="-105" stroke="${inyColor}" stroke-width="3" stroke-linecap="round"/>
+                            <polygon points="0,-105 -4,-88 4,-88" fill="${inyColor}"/>
+                        </g>
+                        <circle cx="200" cy="160" r="9" fill="#fff" filter="url(#volNeedleGlow)"/>
+                        <circle cx="200" cy="160" r="5" fill="${inyColor}"/>
+
+                        <!-- Valor numérico central -->
+                        <text x="200" y="122" fill="${inyColor}" font-size="34" font-weight="900" text-anchor="middle" filter="url(#volGlowText)">${inyScore >= 0 ? '+' : ''}${inyScore.toFixed(0)}</text>
+                        <text x="200" y="140" fill="rgba(255,255,255,0.4)" font-size="9" font-weight="700" text-anchor="middle">PRESIÓN NETA</text>
+
+                        <!-- Labels SHORT / LONG extremos -->
+                        <text x="20" y="168" fill="#ff2a3b" font-size="10" font-weight="900" text-anchor="middle">SHORT</text>
+                        <text x="380" y="168" fill="#0ecb81" font-size="10" font-weight="900" text-anchor="middle">LONG</text>
+                    </svg>
+
+                    <div style="text-align:center; font-size:11px; margin-top:2px; margin-bottom:6px;">${dirLabel}</div>
+                </div>`;
+            })()}
         </div>
 
         <!-- Proyección dinámica -->
