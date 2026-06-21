@@ -2648,14 +2648,15 @@ function esMonedaLenta(symbol) {
 }
 
 // Devuelve true solo si la moneda cumple TODOS los criterios de despegue real pedidos:
-// EMA7 > EMA25 > EMA99 (alineadas alcistas, ambas subiendo) + ≥8% desde el mínimo de 48h
-// (bajamos de 15% a 8% para capturar el inicio del despegue, no solo cuando ya subió mucho)
+// EMA7 > EMA25 > EMA99 (alineadas alcistas, ambas subiendo) + ≥10% desde el mínimo de 48h
+// (exigimos 10% para confirmar que la moneda ya tomó impulso real camino a su máximo,
+//  no que apenas despuntó unos pocos puntos desde el piso)
 // + AHORA también exige que el movimiento sea rápido (momentum), no solo acumulado lento.
 function esDespegueReal(symbol) {
     const e = datosEMA[symbol];
     if (!e) return false;
     if (esMonedaLenta(symbol)) return false; // descarta despegues "viejos" o lentos
-    return e.alineadasAlcista && e.subidaDesdeMinimo >= 8;
+    return e.alineadasAlcista && e.subidaDesdeMinimo >= 10;
 }
 
 // ══════════════════════════════════════════════════════════════════
@@ -3217,7 +3218,7 @@ function actualizarTablaIzquierda() {
             // EMAs alcistas pero todavía no llegó al 15% desde el mínimo: queda "en camino"
             tr.style.background = "rgba(0,212,255,0.05)";
             tr.style.borderLeft = "3px solid rgba(0,212,255,0.35)";
-            subEtiqueta = `<span style="color:#38bdf8;font-size:10px;font-weight:700;display:block;">📡 LONG EN FORMACIÓN · +${e.subidaDesdeMinimo.toFixed(1)}% (esperando 15%)</span>`;
+            subEtiqueta = `<span style="color:#38bdf8;font-size:10px;font-weight:700;display:block;">📡 LONG EN FORMACIÓN · +${e.subidaDesdeMinimo.toFixed(1)}% (esperando 10%)</span>`;
         } else if (!e) {
             subEtiqueta = `<span style="color:#475569;font-size:9px;display:block;">⏳ calculando EMAs…</span>`;
         }
@@ -4709,7 +4710,7 @@ async function abrirRadarDespegue() {
         const c = cachedData[symbol];
         const e = datosEMA[symbol];
 
-        // Usar el mismo filtro que la tabla: EMA alineadas + ≥8% desde mínimo 48h
+        // Usar el mismo filtro que la tabla: EMA alineadas + ≥10% desde mínimo 48h
         if (esDespegueReal(symbol) && e) {
             candidatos.push({ c, e });
         } else if (e && esReboteTrasCaida(symbol)) {
