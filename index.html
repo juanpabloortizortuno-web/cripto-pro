@@ -2583,7 +2583,24 @@ async function cicloActualizacionEMA() {
 }
 
 // ══════════════════════════════════════════════════════════════════
-// ⚡ MOMENTUM / VELOCIDAD — score que mide qué tan RÁPIDO se está
+// 🎯 MONEDAS DE BAJO APALANCAMIENTO MÁXIMO (≤5x) — Binance no tiene un
+// endpoint público para consultar esto sin API Key/Secret de tu cuenta,
+// así que esta lista es MANUAL: agregá o quitá símbolos a mano cuando
+// verifiques el apalancamiento máximo de una moneda en la pantalla de
+// trading de Binance Futures (junto al selector de apalancamiento).
+// Suelen ser monedas con menor liquidez/volumen, por eso el exchange
+// las limita — coincide con el perfil "rápidas y volátiles" que pediste.
+// Formato: "SYMBOL": maxLeverage (ej: "PEPEUSDT": 5)
+// ══════════════════════════════════════════════════════════════════
+const MONEDAS_BAJO_APALANCAMIENTO = {
+    // "EJEMPLOUSDT": 4,
+    // "OTRAMONEDAUSDT": 5,
+};
+
+function tieneApalancamientoBajo(symbol) {
+    const max = MONEDAS_BAJO_APALANCAMIENTO[symbol];
+    return max !== undefined && max <= 5;
+}
 // moviendo una moneda ahora mismo (no solo cuánto subió acumulado).
 // Combina: velocidad promedio reciente (10s), cambio neto en 2 min,
 // ciclos consecutivos a favor y ritmo de volumen (actividad nueva,
@@ -2600,7 +2617,9 @@ function momentumScore(symbol) {
     const ritmoVol = Math.min((c.volume || 0) / 1000000, 30); // actividad/liquidez, tope 30
 
     // Pesos: velocidad y cambio en 2min son lo que mejor capta "rapidez real"
-    return (velAbs * 40) + (cambio2m * 15) + (ciclos * 3) + ritmoVol;
+    let score = (velAbs * 40) + (cambio2m * 15) + (ciclos * 3) + ritmoVol;
+    if (tieneApalancamientoBajo(symbol)) score += 25; // bonus: el exchange ya la marca como volátil/riesgosa
+    return score;
 }
 
 // Umbral mínimo de momentum para considerar una moneda "rápida".
@@ -3498,6 +3517,11 @@ function renderizarRadar() {
     };
 
     todas.forEach(c => {
+        // 🔺 FILTRO EXCLUSIVO: solo monedas de la lista MONEDAS_BAJO_APALANCAMIENTO
+        // entran al radar, tanto para señales LONG como SHORT. Si la lista está
+        // vacía, no entra ninguna moneda — hay que llenarla primero.
+        if (!tieneApalancamientoBajo(c.symbol)) return;
+
         if (esDespegueReal(c.symbol))      grupos.motorAlcista.push({ c, tipo: 'despegue' });
         else if (esReboteTrasCaida(c.symbol)) grupos.motorAlcista.push({ c, tipo: 'rebote_ema' });
         if (esRevirtiendoCrashExtremo(c.symbol)) grupos.crashReversion.push(c);
@@ -4574,6 +4598,7 @@ async function abrirRadarDespegue() {
 
  const symbols = Object.keys(cachedData);
     for (const symbol of symbols) {
+        if (!tieneApalancamientoBajo(symbol)) continue; // 🔺 exclusivo: solo lista de bajo apalancamiento
         const c = cachedData[symbol];
         const e = datosEMA[symbol];
 
@@ -4602,6 +4627,7 @@ async function abrirRadarDespegue() {
             <span style="display:block; font-size:11px; color:var(--accent-green); font-weight:bold;">+${e.subidaDesdeMinimo.toFixed(1)}% desde mínimo 48h</span>
             <span style="display:block; font-size:10px; color:var(--text-dim);">EMA7: ${e.ema7.toFixed(5)} · EMA25: ${e.ema25.toFixed(5)} · EMA99: ${e.ema99.toFixed(5)}</span>
             <span style="display:block; font-size:10px; color:#f3ba2f; font-weight:700;">⚡ Momentum: ${momentumScore(c.symbol).toFixed(1)}</span>
+            ${tieneApalancamientoBajo(c.symbol) ? `<span style="display:block; font-size:10px; color:#ff6b6b; font-weight:700;">🔺 Apalanc. máx: ${MONEDAS_BAJO_APALANCAMIENTO[c.symbol]}x</span>` : ''}
         </div>`;
     });
 
@@ -4617,6 +4643,7 @@ async function abrirRadarDespegue() {
                 <span style="display:block; font-size:11px; color:#00d4ff; font-weight:bold;">${c.change > 0 ? '+' : ''}${c.change.toFixed(2)}% en 24h · +${e.subidaDesdeMinimo.toFixed(1)}% desde mínimo 48h</span>
                 <span style="display:block; font-size:10px; color:var(--text-dim);">EMA7 girando al alza · EMA7: ${e.ema7.toFixed(5)}</span>
                 <span style="display:block; font-size:10px; color:#f3ba2f; font-weight:700;">⚡ Momentum: ${momentumScore(c.symbol).toFixed(1)}</span>
+                ${tieneApalancamientoBajo(c.symbol) ? `<span style="display:block; font-size:10px; color:#ff6b6b; font-weight:700;">🔺 Apalanc. máx: ${MONEDAS_BAJO_APALANCAMIENTO[c.symbol]}x</span>` : ''}
             </div>`;
         });
     }
