@@ -868,19 +868,55 @@
                     🔴 SHORT<br><span style="font-size:9px;font-weight:700;opacity:0.85;">VENTA · TECHO</span>
                 </button>
             </div>
-            <!-- 🚨 BOTÓN DE ALARMA: compra/venta directa a Binance de la moneda seleccionada -->
-            <button id="btnAlarmaLateral" onclick="abrirBinanceAlarma()" style="display:none;width:100%;margin-top:8px;padding:12px 10px;border-radius:10px;border:none;cursor:pointer;font-size:12px;font-weight:900;letter-spacing:0.4px;text-align:center;line-height:1.5;min-height:62px;">
-                <span id="alarmaLateralTexto">—</span>
-            </button>
-            <!-- 🔔 PANEL DE ALERTA BAJO LONG/SHORT -->
-            <div id="alarmaSidePanel" style="display:none; width:100%; margin-top:6px; padding:10px 12px; border-radius:10px; border:2px solid rgba(14,203,129,0.3); background:#050914; font-size:11px; line-height:1.7; text-align:center; transition:all 0.3s; cursor:pointer;" onclick="if(window._alarmaSideMoneda) seleccionarMoneda(window._alarmaSideMoneda);">
-                <div id="alarmaSideTexto" style="font-weight:900; letter-spacing:0.4px;"></div>
+            <!-- 🚨 BOTÓN UNIFICADO DE SEÑAL + ALARMA -->
+            <div id="btnAlarmaUnificado" style="display:none; width:100%; margin-top:8px; border-radius:12px; overflow:hidden; cursor:pointer; box-shadow:0 4px 18px rgba(0,0,0,0.5); transition:all 0.3s;" onclick="manejarClickAlarmaUnificada()">
+                <!-- Cabecera de estado IA -->
+                <div id="alarmaUnifHeader" style="padding:9px 12px 5px; display:flex; align-items:center; gap:8px; background:rgba(0,0,0,0.3);">
+                    <span id="alarmaUnifIcono" style="font-size:18px;">⏳</span>
+                    <div style="flex:1; min-width:0;">
+                        <div id="alarmaUnifTitulo" style="font-size:12px; font-weight:900; letter-spacing:0.5px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">— ANALIZANDO —</div>
+                        <div id="alarmaUnifSub" style="font-size:9px; font-weight:700; opacity:0.75; margin-top:1px;">IA calculando señal...</div>
+                    </div>
+                    <div id="alarmaUnifProb" style="font-size:16px; font-weight:900; white-space:nowrap;">—%</div>
+                </div>
+                <!-- Barra de progreso IA -->
+                <div id="alarmaUnifBarraWrap" style="height:3px; background:rgba(255,255,255,0.08);">
+                    <div id="alarmaUnifBarra" style="height:100%; width:0%; transition:width 0.4s; background:#f3ba2f;"></div>
+                </div>
+                <!-- Cuerpo: texto de la señal o alerta del mercado -->
+                <div id="alarmaUnifCuerpo" style="padding:8px 12px 10px; font-size:10px; font-weight:700; line-height:1.5; color:rgba(255,255,255,0.75);">
+                    Escaneando mercado...
+                </div>
             </div>
+            <!-- Botones ocultos para mantener compatibilidad con código existente -->
+            <button id="btnAlarmaLateral" style="display:none;"></button>
+            <span id="alarmaLateralTexto" style="display:none;"></span>
+            <div id="alarmaSidePanel" style="display:none;"><div id="alarmaSideTexto"></div></div>
             <div class="search-box">
                 <div id="botSaludo" class="bot-saludo" style="margin-bottom:8px;">🤖 Buscando giros o despegues (< 20 USDT)</div>
                 <input type="text" id="searchCoin" placeholder="Buscar low-caps o filtros (BOMBA, POTENCIA, AGOTADO)..." onkeyup="buscarMoneda()">
             </div>
         </div>
+        <!-- ══ DESLIZADOR MAX/MIN 24H ══ -->
+        <div id="deslizadorMaxMin" style="display:none; background:#060b16; border-top:1px solid rgba(255,255,255,0.05); flex-shrink:0; max-height:210px; overflow-y:auto;">
+            <!-- Tabs -->
+            <div style="display:flex; border-bottom:1px solid rgba(255,255,255,0.06);">
+                <button id="tabMaxBtn" onclick="mostrarTabMaxMin('max')" style="flex:1; padding:7px 4px; font-size:10px; font-weight:900; border:none; cursor:pointer; letter-spacing:0.5px; background:rgba(255,60,0,0.18); color:#ff3c00; border-bottom:2px solid #ff3c00;">
+                    🔴 EN MÁXIMO
+                </button>
+                <button id="tabMinBtn" onclick="mostrarTabMaxMin('min')" style="flex:1; padding:7px 4px; font-size:10px; font-weight:900; border:none; cursor:pointer; letter-spacing:0.5px; background:transparent; color:#475569; border-bottom:2px solid transparent;">
+                    🟢 EN MÍNIMO
+                </button>
+            </div>
+            <div id="deslizadorLista" style="padding:6px 8px; display:flex; flex-direction:column; gap:5px;"></div>
+        </div>
+        <!-- Toggle para abrir/cerrar el deslizador -->
+        <button id="btnToggleDeslizador" onclick="toggleDeslizador()" style="width:100%; padding:6px 12px; background:#07101f; border:none; border-top:1px solid rgba(255,255,255,0.06); border-bottom:1px solid rgba(255,255,255,0.06); color:#475569; font-size:10px; font-weight:900; cursor:pointer; letter-spacing:1px; display:flex; align-items:center; justify-content:center; gap:6px; flex-shrink:0;">
+            <span id="deslizadorToggleIcono">▼</span>
+            <span id="deslizadorToggleTxt">VER MONEDAS EN MÁX/MÍN 24H</span>
+            <span id="deslizadorBadge" style="background:#ff3c00; color:#fff; font-size:9px; font-weight:900; padding:1px 6px; border-radius:8px; display:none;">0</span>
+        </button>
+
         <div class="table-wrapper">
             <table>
                 <thead>
@@ -1518,6 +1554,74 @@ function abrirBinanceAlarma() {
 const _iaCache = {};  // symbol -> { ts, html, esCompra, esVenta }
 const _IA_COOLDOWN_MS = 20000; // 20 segundos entre llamadas IA por moneda
 
+// ══════════════════════════════════════════════════════════════════
+// 🎚️ DESLIZADOR DE MONEDAS EN MÁXIMO / MÍNIMO DE 24H
+// ══════════════════════════════════════════════════════════════════
+let _deslizadorAbierto = false;
+let _deslizadorTab = 'max';
+
+function mostrarTabMaxMin(tab) {
+    _deslizadorTab = tab;
+    const tabMax = document.getElementById('tabMaxBtn');
+    const tabMin = document.getElementById('tabMinBtn');
+    if (tabMax) {
+        tabMax.style.background = tab === 'max' ? 'rgba(255,60,0,0.18)' : 'transparent';
+        tabMax.style.color      = tab === 'max' ? '#ff3c00' : '#475569';
+        tabMax.style.borderBottom = tab === 'max' ? '2px solid #ff3c00' : '2px solid transparent';
+    }
+    if (tabMin) {
+        tabMin.style.background = tab === 'min' ? 'rgba(14,203,129,0.15)' : 'transparent';
+        tabMin.style.color      = tab === 'min' ? '#0ecb81' : '#475569';
+        tabMin.style.borderBottom = tab === 'min' ? '2px solid #0ecb81' : '2px solid transparent';
+    }
+    renderizarDeslizador();
+}
+
+function renderizarDeslizador() {
+    const lista = document.getElementById('deslizadorLista');
+    const badge = document.getElementById('deslizadorBadge');
+    if (!lista) return;
+    const todas = Object.values(cachedData);
+    const UMBRAL_MAX = 90;
+    const UMBRAL_MIN = 10;
+    let candidatos;
+    if (_deslizadorTab === 'max') {
+        candidatos = todas.filter(c => c.posicionPorcentaje >= UMBRAL_MAX).sort((a, b) => b.posicionPorcentaje - a.posicionPorcentaje).slice(0, 30);
+    } else {
+        candidatos = todas.filter(c => c.posicionPorcentaje <= UMBRAL_MIN).sort((a, b) => a.posicionPorcentaje - b.posicionPorcentaje).slice(0, 30);
+    }
+    const totalBadge = todas.filter(c => c.posicionPorcentaje >= UMBRAL_MAX || c.posicionPorcentaje <= UMBRAL_MIN).length;
+    if (badge) { badge.textContent = totalBadge; badge.style.display = totalBadge > 0 ? 'inline' : 'none'; }
+    if (candidatos.length === 0) {
+        lista.innerHTML = `<div style="text-align:center; padding:14px; color:#475569; font-size:11px;">${_deslizadorTab === 'max' ? '🔴' : '🟢'} Sin monedas en ${_deslizadorTab === 'max' ? 'máximo' : 'mínimo'} ahora mismo</div>`;
+        return;
+    }
+    lista.innerHTML = candidatos.map(c => {
+        const nombre = c.symbol.replace('USDT','');
+        const esMax = _deslizadorTab === 'max';
+        const color = esMax ? '#ff3c00' : '#0ecb81';
+        const posBar = Math.min(Math.max(c.posicionPorcentaje, 0), 100).toFixed(0);
+        const colorBar = esMax ? `linear-gradient(90deg,#ff2a3b,#ff6b00)` : `linear-gradient(90deg,#0ecb81,#00d4ff)`;
+        const vel = c.cambioReal2Min; const colorVel = vel >= 0 ? '#0ecb81' : '#ff2a3b'; const iconoVel = vel >= 0 ? '▲' : '▼';
+        const scoreTecho = esMax ? calcularScoreTecho(c) : null;
+        return `<div onclick="seleccionarMoneda('${c.symbol}')" style="background:#080f1e; border:1px solid ${esMax ? 'rgba(255,60,0,0.3)' : 'rgba(14,203,129,0.25)'}; border-radius:8px; padding:8px 10px; cursor:pointer; margin-bottom:2px;">
+            <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:4px;">
+                <span style="font-size:12px; font-weight:900; color:#fff;">${nombre}</span>
+                <span style="font-size:11px; font-weight:900; color:${color};">${posBar}%</span>
+            </div>
+            <div style="height:3px; background:rgba(255,255,255,0.07); border-radius:3px; overflow:hidden; margin-bottom:5px;">
+                <div style="height:100%; width:${posBar}%; background:${colorBar}; border-radius:3px;"></div>
+            </div>
+            <div style="display:flex; justify-content:space-between; font-size:9px; color:#475569;">
+                <span>$${c.price.toFixed(4)}</span>
+                <span style="color:${colorVel};">${iconoVel} ${Math.abs(vel).toFixed(2)}% 2m</span>
+                ${esMax && scoreTecho ? `<span style="color:${scoreTecho >= 65 ? '#ff2a3b' : '#f3ba2f'};">⚠️ ${scoreTecho}%</span>` : `<span>${c.change > 0 ? '+' : ''}${c.change.toFixed(1)}% 24h</span>`}
+            </div>
+        </div>`;
+    }).join('');
+}
+
+
 async function analizarConIA(symbol) {
     const c = cachedData[symbol];
     if (!c) return null;
@@ -1580,14 +1684,90 @@ TEXTO: [una frase corta y directa de máximo 12 palabras que diga qué hacer y p
     }
 }
 
+// ══════════════════════════════════════════════════
+// BOTÓN UNIFICADO DE SEÑAL + ALARMA (nuevo diseño)
+// ══════════════════════════════════════════════════
+function manejarClickAlarmaUnificada() {
+    if (window._alarmaSideMoneda && window._alarmaSideMoneda !== selectedCoin) {
+        seleccionarMoneda(window._alarmaSideMoneda);
+    } else if (selectedCoin) {
+        abrirBinanceAlarma();
+    }
+}
+
+function _setUnifEstado(config) {
+    // config: { tipo:'long'|'short'|'espera'|'alerta', icono, titulo, sub, prob, cuerpo, gradiente }
+    const wrap = document.getElementById('btnAlarmaUnificado');
+    const header = document.getElementById('alarmaUnifHeader');
+    const barra = document.getElementById('alarmaUnifBarra');
+    if (!wrap) return;
+
+    const gradientes = {
+        long:   'linear-gradient(135deg,#064d2b,#0a3d21)',
+        short:  'linear-gradient(135deg,#4d0612,#3b000d)',
+        espera: 'linear-gradient(135deg,#0d1627,#111d36)',
+        alerta: 'linear-gradient(135deg,#3b2e00,#241c00)',
+    };
+    const barraColores = {
+        long: '#0ecb81', short: '#ff2a3b', espera: '#475569', alerta: '#f3ba2f'
+    };
+    const bordes = {
+        long: 'rgba(14,203,129,0.55)', short: 'rgba(255,42,59,0.55)',
+        espera: 'rgba(71,85,105,0.4)', alerta: 'rgba(243,186,47,0.55)'
+    };
+    const tipo = config.tipo || 'espera';
+    wrap.style.background   = gradientes[tipo];
+    wrap.style.border        = `2px solid ${bordes[tipo]}`;
+    if (tipo === 'long' || tipo === 'short') {
+        wrap.style.animation = tipo === 'long'
+            ? 'alarma-parpadeo-verde 0.9s infinite alternate'
+            : 'alarma-parpadeo-roja 0.9s infinite alternate';
+    } else {
+        wrap.style.animation = 'none';
+    }
+
+    document.getElementById('alarmaUnifIcono').textContent  = config.icono  || '⏳';
+    document.getElementById('alarmaUnifTitulo').textContent  = config.titulo || '—';
+    document.getElementById('alarmaUnifSub').textContent    = config.sub    || '';
+    document.getElementById('alarmaUnifProb').textContent   = config.prob   || '—%';
+    document.getElementById('alarmaUnifProb').style.color   = barraColores[tipo];
+    document.getElementById('alarmaUnifCuerpo').innerHTML   = config.cuerpo || '';
+    barra.style.background = barraColores[tipo];
+    barra.style.width = config.barra || '0%';
+}
+
+// Pasos de análisis animado: avanza la barra cada 600ms simulando que la IA trabaja
+let _unif_pasos_timer = null;
+function _iniciarAnimacionAnalisis(nombre) {
+    if (_unif_pasos_timer) clearInterval(_unif_pasos_timer);
+    const pasos = [
+        { p:'8%',  txt:'📡 Capturando datos de mercado...'},
+        { p:'22%', txt:'📊 Calculando posición en rango 24h...'},
+        { p:'38%', txt:'⚡ Midiendo velocidad y momentum...'},
+        { p:'55%', txt:'🧮 Evaluando ciclos y tendencia...'},
+        { p:'68%', txt:'🔮 Consultando modelo de predicción...'},
+        { p:'80%', txt:'🤖 IA analizando señal óptima...'},
+        { p:'92%', txt:'✅ Procesando resultado final...'},
+    ];
+    let i = 0;
+    _setUnifEstado({ tipo:'espera', icono:'🤖', titulo:`${nombre} · ANALIZANDO`, sub: pasos[0].txt, prob:'—%', cuerpo: pasos[0].txt, barra:'5%' });
+    _unif_pasos_timer = setInterval(() => {
+        i++;
+        if (i >= pasos.length) { clearInterval(_unif_pasos_timer); _unif_pasos_timer = null; return; }
+        const s = pasos[i];
+        document.getElementById('alarmaUnifSub').textContent   = s.txt;
+        document.getElementById('alarmaUnifCuerpo').innerHTML  = `<span style="color:#94a3b8;">${s.txt}</span>`;
+        document.getElementById('alarmaUnifBarra').style.width = s.p;
+    }, 650);
+}
+
 function actualizarBotonAlarmaLateral(symbol) {
-    const btn = document.getElementById('btnAlarmaLateral');
-    const txt = document.getElementById('alarmaLateralTexto');
-    if (!btn || !txt) return;
+    const wrap = document.getElementById('btnAlarmaUnificado');
+    if (!wrap) return;
 
     const c = symbol ? cachedData[symbol] : null;
     if (!symbol || !c) {
-        btn.style.display = 'none';
+        wrap.style.display = 'none';
         binanceAlarmaSymbol = null;
         return;
     }
@@ -1596,64 +1776,73 @@ function actualizarBotonAlarmaLateral(symbol) {
     const nombre = symbol.replace('USDT', '');
     const señal = (senalCDC && senalCDC[symbol]) ? senalCDC[symbol] : 'ESPERAR SEÑAL';
     const pred = prediccionCDC[symbol] || {};
-
     const esCompra = c.alertaBombaSubida || señal.includes('LONG');
     const esVenta  = c.alertaDerrumbe || c.alertaAgotamientoSubida || señal.includes('SHORT INMINENTE') || señal.includes('AGOTAMIENTO');
 
-    // Siempre visible cuando hay moneda seleccionada
-    btn.style.display = 'block';
-    btn.classList.remove('alarma-compra', 'alarma-venta', 'alarma-espera');
+    wrap.style.display = 'block';
 
-    // ── Mostrar señal base inmediatamente (sin esperar IA) ──
-    if (esVenta) {
-        btn.classList.add('alarma-venta');
-        txt.innerHTML = `🔴 SHORT ${nombre} · ${pred.caida||50}% prob bajada<br>
-            <span style="font-size:9px;font-weight:700;opacity:0.85;">⏳ Consultando IA...</span>`;
-    } else if (esCompra) {
-        btn.classList.add('alarma-compra');
-        txt.innerHTML = `🟢 LONG ${nombre} · ${pred.subida||50}% prob subida<br>
-            <span style="font-size:9px;font-weight:700;opacity:0.85;">⏳ Consultando IA...</span>`;
-    } else {
-        btn.classList.add('alarma-espera');
-        txt.innerHTML = `⏳ ${nombre} · Analizando mercado...<br>
-            <span style="font-size:9px;font-weight:700;opacity:0.75;">IA calculando señal</span>`;
-    }
-
-    // ── Consultar IA (con cooldown para no saturar) ──
+    // Consultar IA con cooldown
     const ahora = Date.now();
     const cache = _iaCache[symbol];
     if (cache && (ahora - cache.ts) < _IA_COOLDOWN_MS) {
-        // Usar resultado cacheado
-        _aplicarResultadoIA(btn, txt, nombre, cache, esCompra, esVenta, pred);
+        _aplicarResultadoIA(null, null, nombre, cache, esCompra, esVenta, pred);
         return;
     }
 
+    // Mostrar animación de análisis mientras la IA trabaja
+    _iniciarAnimacionAnalisis(nombre);
+
     analizarConIA(symbol).then(resultado => {
-        if (!resultado) return; // silenciar errores
+        if (_unif_pasos_timer) { clearInterval(_unif_pasos_timer); _unif_pasos_timer = null; }
+        if (!resultado) {
+            // Si falla la IA, mostrar señal base
+            _mostrarSeñalBase(nombre, esCompra, esVenta, pred);
+            return;
+        }
         _iaCache[symbol] = { ts: Date.now(), ...resultado, esCompra, esVenta };
-        // Solo aplicar si la moneda sigue siendo la seleccionada
         if (binanceAlarmaSymbol === symbol) {
-            _aplicarResultadoIA(btn, txt, nombre, _iaCache[symbol], esCompra, esVenta, pred);
+            _aplicarResultadoIA(null, null, nombre, _iaCache[symbol], esCompra, esVenta, pred);
         }
     });
 }
 
+function _mostrarSeñalBase(nombre, esCompra, esVenta, pred) {
+    if (esVenta) {
+        _setUnifEstado({ tipo:'short', icono:'🔴', titulo:`SHORT ${nombre}`, sub:`${pred.caida||50}% probabilidad de bajada`, prob:`${pred.caida||50}%`, cuerpo:'Señal SHORT detectada · Condiciones de venta activas', barra:`${pred.caida||50}%` });
+    } else if (esCompra) {
+        _setUnifEstado({ tipo:'long', icono:'🟢', titulo:`LONG ${nombre}`, sub:`${pred.subida||50}% probabilidad de subida`, prob:`${pred.subida||50}%`, cuerpo:'Señal LONG detectada · Condiciones de compra activas', barra:`${pred.subida||50}%` });
+    } else {
+        _setUnifEstado({ tipo:'espera', icono:'⏸', titulo:`${nombre} · SIN SEÑAL`, sub:'Mercado lateral · Espera entrada', prob:'50%', cuerpo:'Sin señal clara en este momento. Esperando confirmación.', barra:'50%' });
+    }
+}
+
 function _aplicarResultadoIA(btn, txt, nombre, cache, esCompra, esVenta, pred) {
     const { dir, frase } = cache;
-    btn.classList.remove('alarma-compra', 'alarma-venta', 'alarma-espera');
 
     if (dir === 'LONG' || (dir !== 'SHORT' && esCompra)) {
-        btn.classList.add('alarma-compra');
-        txt.innerHTML = `🟢 LONG ${nombre} · ${pred.subida||50}% prob. subida<br>
-            <span style="font-size:10px;font-weight:700;color:#d1fae5;line-height:1.4;">${frase || 'Señal LONG · Condiciones favorables de compra'}</span>`;
+        _setUnifEstado({
+            tipo:'long', icono:'🟢', titulo:`LONG ${nombre}`,
+            sub:`${pred.subida||50}% prob. subida · IA confirmó`,
+            prob:`${pred.subida||50}%`,
+            cuerpo: `<span style="color:#6ee7b7;">${frase || 'Señal LONG · Condiciones favorables de compra'}</span>`,
+            barra:`${pred.subida||50}%`
+        });
     } else if (dir === 'SHORT' || (dir !== 'LONG' && esVenta)) {
-        btn.classList.add('alarma-venta');
-        txt.innerHTML = `🔴 SHORT ${nombre} · ${pred.caida||50}% prob. bajada<br>
-            <span style="font-size:10px;font-weight:700;color:#fee2e2;line-height:1.4;">${frase || 'Señal SHORT · Condiciones favorables de venta'}</span>`;
+        _setUnifEstado({
+            tipo:'short', icono:'🔴', titulo:`SHORT ${nombre}`,
+            sub:`${pred.caida||50}% prob. bajada · IA confirmó`,
+            prob:`${pred.caida||50}%`,
+            cuerpo: `<span style="color:#fca5a5;">${frase || 'Señal SHORT · Condiciones favorables de venta'}</span>`,
+            barra:`${pred.caida||50}%`
+        });
     } else {
-        btn.classList.add('alarma-espera');
-        txt.innerHTML = `⏳ ${nombre} · SIN SEÑAL CLARA<br>
-            <span style="font-size:10px;font-weight:700;color:#94a3b8;line-height:1.4;">${frase || 'Mercado lateral · Espera una mejor entrada'}</span>`;
+        _setUnifEstado({
+            tipo:'espera', icono:'⏸', titulo:`${nombre} · SIN SEÑAL`,
+            sub:'Mercado lateral · Espera entrada',
+            prob:'50%',
+            cuerpo: `<span style="color:#94a3b8;">${frase || 'Sin señal clara · Espera una mejor entrada'}</span>`,
+            barra:'50%'
+        });
     }
 }
 
@@ -4978,80 +5167,55 @@ function actualizarAlertaGanadora(alertaActiva) {
         alerta.onclick = null;
     }
 
-    // Toda la info de alarma va al panel lateral debajo de LONG/SHORT
-    const panel = document.getElementById("alarmaSidePanel");
-    const texto = document.getElementById("alarmaSideTexto");
-    if (!panel || !texto) return;
+    // Si hay una moneda seleccionada y tiene señal propia, dejar que el botón unificado la maneje
+    if (selectedCoin) return;
 
-    if(alertaActiva) {
+    // Sin moneda seleccionada: mostrar alerta del mercado en el botón unificado
+    const wrap = document.getElementById("btnAlarmaUnificado");
+    if (!wrap) return;
+
+    if (alertaActiva) {
         let sim = alertaActiva.symbol.replace("USDT","");
         window._alarmaSideMoneda = alertaActiva.symbol;
-        let html = "";
-        let borderColor = "";
-        let bgColor = "";
-
-        if (alertaActiva.tipo === "BOMBA") {
-            borderColor = "rgba(14,203,129,0.7)";
-            bgColor = "rgba(14,203,129,0.08)";
-            html = `<span style="font-size:13px;">🚀 BOMBA — LONG</span><br>
-                    <span style="color:#0ecb81; font-size:16px; font-weight:900;">${sim}</span><br>
-                    <span style="color:#94a3b8; font-size:10px;">+${alertaActiva.score.toFixed(3)}% en 2min · SUBIDA VERTICAL</span>`;
-        } else if (alertaActiva.tipo === "DERRUMBE") {
-            borderColor = "rgba(255,42,59,0.7)";
-            bgColor = "rgba(255,42,59,0.08)";
-            html = `<span style="font-size:13px;">🚨 DERRUMBE — SHORT</span><br>
-                    <span style="color:#ff2a3b; font-size:16px; font-weight:900;">${sim}</span><br>
-                    <span style="color:#94a3b8; font-size:10px;">-${alertaActiva.score.toFixed(3)}% en 2min · CAÍDA EXTREMA</span>`;
-        } else if (alertaActiva.tipo === "AGOTADO") {
-            borderColor = "rgba(243,186,47,0.7)";
-            bgColor = "rgba(243,186,47,0.07)";
-            html = `<span style="font-size:13px;">⚠️ AGOTAMIENTO — SHORT</span><br>
-                    <span style="color:#f3ba2f; font-size:16px; font-weight:900;">${sim}</span><br>
-                    <span style="color:#94a3b8; font-size:10px;">Rango: ${alertaActiva.score.toFixed(1)}% · POSIBLE INVERSIÓN</span>`;
-        } else if (alertaActiva.tipo === "DESPEGUE") {
-            borderColor = "rgba(14,203,129,0.7)";
-            bgColor = "rgba(14,203,129,0.08)";
-            html = `<span style="font-size:13px;">🚀 DESPEGUE EMA — LONG</span><br>
-                    <span style="color:#0ecb81; font-size:16px; font-weight:900;">${sim}</span><br>
-                    <span style="color:#94a3b8; font-size:10px;">+${alertaActiva.score.toFixed(1)}% desde mínimo 48h</span>`;
-        } else if (alertaActiva.tipo === "REBOTE") {
-            borderColor = "rgba(14,203,129,0.7)";
-            bgColor = "rgba(14,203,129,0.08)";
-            html = `<span style="font-size:13px;">🔄 REBOTE — LONG</span><br>
-                    <span style="color:#0ecb81; font-size:16px; font-weight:900;">${sim}</span><br>
-                    <span style="color:#94a3b8; font-size:10px;">+${alertaActiva.score.toFixed(1)}% desde mínimo · EMA girando</span>`;
-        }
-
-        texto.innerHTML = html;
-        panel.style.display = "block";
-        panel.style.borderColor = borderColor;
-        panel.style.background = bgColor;
-        // Animación de parpadeo según tipo
         const esLong = ["BOMBA","DESPEGUE","REBOTE"].includes(alertaActiva.tipo);
-        panel.style.animation = esLong
-            ? "alarma-parpadeo-verde 0.9s infinite alternate"
-            : "alarma-parpadeo-roja 0.9s infinite alternate";
+        const iconos = { BOMBA:'🚀', DERRUMBE:'🚨', AGOTADO:'⚠️', DESPEGUE:'🚀', REBOTE:'🔄' };
+        const titulos = { BOMBA:`BOMBA LONG — ${sim}`, DERRUMBE:`DERRUMBE SHORT — ${sim}`, AGOTADO:`AGOTAMIENTO — ${sim}`, DESPEGUE:`DESPEGUE EMA — ${sim}`, REBOTE:`REBOTE — ${sim}` };
+        const subs = {
+            BOMBA: `+${alertaActiva.score.toFixed(3)}% en 2min · SUBIDA VERTICAL`,
+            DERRUMBE: `-${alertaActiva.score.toFixed(3)}% en 2min · CAÍDA EXTREMA`,
+            AGOTADO: `Rango: ${alertaActiva.score.toFixed(1)}% · POSIBLE INVERSIÓN`,
+            DESPEGUE: `+${alertaActiva.score.toFixed(1)}% desde mínimo 48h`,
+            REBOTE: `+${alertaActiva.score.toFixed(1)}% desde mínimo · EMA girando`,
+        };
+        _setUnifEstado({
+            tipo: esLong ? 'long' : (alertaActiva.tipo === 'AGOTADO' ? 'alerta' : 'short'),
+            icono: iconos[alertaActiva.tipo] || '📡',
+            titulo: titulos[alertaActiva.tipo] || sim,
+            sub: subs[alertaActiva.tipo] || '',
+            prob: esLong ? '▲ LONG' : '▼ SHORT',
+            cuerpo: `<span style="font-size:9px; opacity:0.7;">Toca para ver esta moneda</span>`,
+            barra: '85%'
+        });
+        wrap.style.display = 'block';
         return;
     }
 
-    // Sin alerta activa: buscar moneda en giro
+    // Sin alerta: buscar giro detectado
     const monedas = Object.values(cachedData);
     let objetivos = monedas.filter(m => m.caidaDesdeMaximo >= 2.0 && m.caidaDesdeMaximo <= 5.0 && m.velocidad < 0);
-
-    if(objetivos.length > 0) {
+    if (objetivos.length > 0) {
         objetivos.sort((a,b) => a.velocidad - b.velocidad);
         let ganadora = objetivos[0];
         window._alarmaSideMoneda = ganadora.symbol;
         let sim = ganadora.symbol.replace("USDT","");
-        texto.innerHTML = `<span style="font-size:11px; color:#f3ba2f;">🏆 GIRO DETECTADO</span><br>
-                           <span style="color:#fff; font-size:15px; font-weight:900;">${sim}</span><br>
-                           <span style="color:#94a3b8; font-size:10px;">$${ganadora.price} · Vel: ${ganadora.velocidad.toFixed(3)}%</span>`;
-        panel.style.display = "block";
-        panel.style.borderColor = "rgba(243,186,47,0.4)";
-        panel.style.background = "rgba(243,186,47,0.05)";
-        panel.style.animation = "none";
+        _setUnifEstado({
+            tipo:'alerta', icono:'🏆', titulo:`GIRO DETECTADO — ${sim}`,
+            sub:`$${ganadora.price} · Vel: ${ganadora.velocidad.toFixed(3)}%`,
+            prob:'⚡ GIRO', cuerpo:'<span style="font-size:9px;opacity:0.7;">Toca para analizar esta moneda</span>', barra:'60%'
+        });
+        wrap.style.display = 'block';
     } else {
-        panel.style.display = "none";
+        wrap.style.display = 'none';
         window._alarmaSideMoneda = null;
     }
 }
@@ -5288,7 +5452,34 @@ document.addEventListener("DOMContentLoaded", () => {
     document.body.addEventListener('touchstart', initAudio, { once: false });
 
     setInterval(() => { obtenerDatosBinance(); actualizarPaperTradingUI(); evaluarAprendizajeCDC(); revisarAvisosOficialesBinance(); revisarNoticiasCointelegraph(); }, 2000);
-    setInterval(() => revisarNoticiasGenerales(false), 5 * 60 * 1000); // refresco de noticias generales, independiente del ciclo de 2s
+
+function toggleDeslizador() {
+    _deslizadorAbierto = !_deslizadorAbierto;
+    const panel = document.getElementById('deslizadorMaxMin');
+    const icono = document.getElementById('deslizadorToggleIcono');
+    const txt   = document.getElementById('deslizadorToggleTxt');
+    if (panel) panel.style.display = _deslizadorAbierto ? 'block' : 'none';
+    if (icono) icono.textContent = _deslizadorAbierto ? '▲' : '▼';
+    if (txt)   txt.textContent   = _deslizadorAbierto ? 'OCULTAR LISTA MÁX/MÍN 24H' : 'VER MONEDAS EN MÁX/MÍN 24H';
+    if (_deslizadorAbierto) renderizarDeslizador();
+}
+
+// Hook para actualizar badge en cada ciclo
+const _origActualizarTablaIzq2 = window._hookActualizarTablaHecho;
+if (!_origActualizarTablaIzq2) {
+    window._hookActualizarTablaHecho = true;
+    const _orig_ati = actualizarTablaIzquierda;
+    actualizarTablaIzquierda = function() {
+        _orig_ati.apply(this, arguments);
+        if (_deslizadorAbierto) renderizarDeslizador();
+        const badge = document.getElementById('deslizadorBadge');
+        if (badge) {
+            const todas = Object.values(cachedData);
+            const n = todas.filter(c => c.posicionPorcentaje >= 90 || c.posicionPorcentaje <= 10).length;
+            badge.textContent = n; badge.style.display = n > 0 ? 'inline' : 'none';
+        }
+    };
+}
 
     // Sistema de despegue real (EMA7/25/99 + 15% desde mínimo 48h): arranca tras el primer
     // ciclo de precios (necesita cachedData lleno) y luego rota un lote de monedas cada 20s.
