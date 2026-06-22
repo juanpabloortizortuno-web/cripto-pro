@@ -4,7 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>CDC FUTURO-PRO | PROYECTO TECNOMAN</title>
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght=300;400;500;600;700;900&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;900&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
     <style>
         :root {
@@ -869,7 +869,7 @@
                 </button>
             </div>
             <!-- 🚨 BOTÓN DE ALARMA: compra/venta directa a Binance de la moneda seleccionada -->
-            <button id="btnAlarmaLateral" onclick="abrirBinanceAlarma()" style="display:none;width:100%;margin-top:8px;padding:11px 8px;border-radius:10px;border:none;cursor:pointer;font-size:12px;font-weight:900;letter-spacing:0.4px;text-align:center;line-height:1.3;">
+            <button id="btnAlarmaLateral" onclick="abrirBinanceAlarma()" style="display:none;width:100%;margin-top:8px;padding:12px 10px;border-radius:10px;border:none;cursor:pointer;font-size:12px;font-weight:900;letter-spacing:0.4px;text-align:center;line-height:1.5;min-height:62px;">
                 <span id="alarmaLateralTexto">—</span>
             </button>
             <div class="search-box">
@@ -1511,6 +1511,72 @@ function abrirBinanceAlarma() {
     window.open(`https://www.binance.com/es/futures/${binanceAlarmaSymbol}`, '_blank');
 }
 
+// ── Cache de análisis IA para no llamar en cada tick ──
+const _iaCache = {};  // symbol -> { ts, html, esCompra, esVenta }
+const _IA_COOLDOWN_MS = 20000; // 20 segundos entre llamadas IA por moneda
+
+async function analizarConIA(symbol) {
+    const c = cachedData[symbol];
+    if (!c) return null;
+    const pred = prediccionCDC[symbol] || {};
+    const señal = (senalCDC && senalCDC[symbol]) ? senalCDC[symbol] : 'ESPERAR SEÑAL';
+    const nombre = symbol.replace('USDT','');
+
+    // Calcular si el movimiento esperado alcanza 1 USDT con capital mínimo y 1x
+    // Con 1x: necesitas que el precio suba/baje al menos (1/capital)*100 %
+    // Usamos capital de referencia de 50 USDT (posición pequeña)
+    const capitalRef = 50;
+    const pctNecesario = (1 / capitalRef) * 100; // = 2%
+    const mov2m = Math.abs(c.cambioReal2Min || 0);
+    const velPromedio = Math.abs(c.velPromedio || 0);
+    const pctEstimado1min = velPromedio * 60; // vel por segundo * 60 = estimado 1 min
+    const puedeLlegar1USDT = (mov2m >= pctNecesario) || (pctEstimado1min >= pctNecesario);
+
+    const prompt = `Eres un bot de trading de futuros en Binance. Analiza estos datos en tiempo real de ${nombre}USDT y responde en MÁXIMO 2 líneas cortas en español, sin explicaciones largas.
+
+DATOS:
+- Precio: $${c.price}
+- Cambio 2 min: ${(c.cambioReal2Min||0).toFixed(3)}%
+- Velocidad promedio: ${(c.velPromedio||0).toFixed(4)}%/seg
+- Ciclos subiendo: ${c.ciclosSubiendo||0}/5  |  Bajando: ${c.ciclosBajando||0}/5
+- Posición en rango 24h: ${(c.posicionPorcentaje||50).toFixed(0)}% (0=piso, 100=techo)
+- RSI: ${pred.rsi !== undefined ? pred.rsi : 'N/A'}
+- Prob. subida IA: ${pred.subida||50}%  |  Prob. bajada: ${pred.caida||50}%
+- Señal sistema: ${señal}
+- Alerta bomba subida: ${c.alertaBombaSubida ? 'SÍ' : 'NO'}
+- Alerta derrumbe: ${c.alertaDerrumbe ? 'SÍ' : 'NO'}
+- Agotamiento subida: ${c.alertaAgotamientoSubida ? 'SÍ' : 'NO'}
+- Movimiento 2min ya cubre 1 USDT con $50 a 1x: ${puedeLlegar1USDT ? 'SÍ' : 'NO'}
+
+Responde SOLO con:
+DIRECCIÓN: LONG o SHORT o ESPERAR
+TEXTO: [una frase corta y directa de máximo 12 palabras que diga qué hacer y por qué, mencionando si se puede ganar 1 USDT]`;
+
+    try {
+        const resp = await fetch("https://api.anthropic.com/v1/messages", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+                model: "claude-sonnet-4-6",
+                max_tokens: 80,
+                messages: [{ role: "user", content: prompt }]
+            })
+        });
+        const data = await resp.json();
+        const texto = (data.content || []).map(b => b.text||'').join('').trim();
+
+        let dir = 'ESPERAR', frase = '';
+        const lineas = texto.split('\n').map(l => l.trim()).filter(Boolean);
+        for (const l of lineas) {
+            if (l.startsWith('DIRECCIÓN:')) dir = l.replace('DIRECCIÓN:','').trim();
+            if (l.startsWith('TEXTO:')) frase = l.replace('TEXTO:','').trim();
+        }
+        return { dir, frase };
+    } catch(e) {
+        return null;
+    }
+}
+
 function actualizarBotonAlarmaLateral(symbol) {
     const btn = document.getElementById('btnAlarmaLateral');
     const txt = document.getElementById('alarmaLateralTexto');
@@ -1526,22 +1592,65 @@ function actualizarBotonAlarmaLateral(symbol) {
     binanceAlarmaSymbol = symbol;
     const nombre = symbol.replace('USDT', '');
     const señal = (senalCDC && senalCDC[symbol]) ? senalCDC[symbol] : 'ESPERAR SEÑAL';
+    const pred = prediccionCDC[symbol] || {};
 
     const esCompra = c.alertaBombaSubida || señal.includes('LONG');
     const esVenta  = c.alertaDerrumbe || c.alertaAgotamientoSubida || señal.includes('SHORT INMINENTE') || señal.includes('AGOTAMIENTO');
 
+    // Siempre visible cuando hay moneda seleccionada
     btn.style.display = 'block';
     btn.classList.remove('alarma-compra', 'alarma-venta', 'alarma-espera');
 
+    // ── Mostrar señal base inmediatamente (sin esperar IA) ──
     if (esVenta) {
         btn.classList.add('alarma-venta');
-        txt.innerHTML = `🔴 VENDER ${nombre} AHORA<br><span style="font-size:9px;font-weight:700;opacity:0.9;">Toca para abrir en Binance</span>`;
+        txt.innerHTML = `🔴 SHORT ${nombre} · ${pred.caida||50}% prob bajada<br>
+            <span style="font-size:9px;font-weight:700;opacity:0.85;">⏳ Consultando IA...</span>`;
     } else if (esCompra) {
         btn.classList.add('alarma-compra');
-        txt.innerHTML = `🟢 COMPRAR ${nombre} AHORA<br><span style="font-size:9px;font-weight:700;opacity:0.9;">Toca para abrir en Binance</span>`;
+        txt.innerHTML = `🟢 LONG ${nombre} · ${pred.subida||50}% prob subida<br>
+            <span style="font-size:9px;font-weight:700;opacity:0.85;">⏳ Consultando IA...</span>`;
     } else {
         btn.classList.add('alarma-espera');
-        txt.innerHTML = `⏳ ${nombre} · ESPERANDO SEÑAL<br><span style="font-size:9px;font-weight:700;opacity:0.85;">Toca para ver en Binance</span>`;
+        txt.innerHTML = `⏳ ${nombre} · Analizando mercado...<br>
+            <span style="font-size:9px;font-weight:700;opacity:0.75;">IA calculando señal</span>`;
+    }
+
+    // ── Consultar IA (con cooldown para no saturar) ──
+    const ahora = Date.now();
+    const cache = _iaCache[symbol];
+    if (cache && (ahora - cache.ts) < _IA_COOLDOWN_MS) {
+        // Usar resultado cacheado
+        _aplicarResultadoIA(btn, txt, nombre, cache, esCompra, esVenta, pred);
+        return;
+    }
+
+    analizarConIA(symbol).then(resultado => {
+        if (!resultado) return; // silenciar errores
+        _iaCache[symbol] = { ts: Date.now(), ...resultado, esCompra, esVenta };
+        // Solo aplicar si la moneda sigue siendo la seleccionada
+        if (binanceAlarmaSymbol === symbol) {
+            _aplicarResultadoIA(btn, txt, nombre, _iaCache[symbol], esCompra, esVenta, pred);
+        }
+    });
+}
+
+function _aplicarResultadoIA(btn, txt, nombre, cache, esCompra, esVenta, pred) {
+    const { dir, frase } = cache;
+    btn.classList.remove('alarma-compra', 'alarma-venta', 'alarma-espera');
+
+    if (dir === 'LONG' || (dir !== 'SHORT' && esCompra)) {
+        btn.classList.add('alarma-compra');
+        txt.innerHTML = `🟢 LONG ${nombre} · ${pred.subida||50}% prob. subida<br>
+            <span style="font-size:10px;font-weight:700;color:#d1fae5;line-height:1.4;">${frase || 'Señal LONG · Condiciones favorables de compra'}</span>`;
+    } else if (dir === 'SHORT' || (dir !== 'LONG' && esVenta)) {
+        btn.classList.add('alarma-venta');
+        txt.innerHTML = `🔴 SHORT ${nombre} · ${pred.caida||50}% prob. bajada<br>
+            <span style="font-size:10px;font-weight:700;color:#fee2e2;line-height:1.4;">${frase || 'Señal SHORT · Condiciones favorables de venta'}</span>`;
+    } else {
+        btn.classList.add('alarma-espera');
+        txt.innerHTML = `⏳ ${nombre} · SIN SEÑAL CLARA<br>
+            <span style="font-size:10px;font-weight:700;color:#94a3b8;line-height:1.4;">${frase || 'Mercado lateral · Espera una mejor entrada'}</span>`;
     }
 }
 
@@ -1764,58 +1873,11 @@ function calcularApalancamientoRecomendado(coinName) {
     return { apal: 3, razon: "rango moderado, buena oportunidad" };
 }
 
-// ── HELPER: muestra el panel de señal escrita en pantalla ──
+// ── HELPER: panel de señal central eliminado — la señal se muestra
+//    únicamente en el botón de alarma lateral debajo de LONG/SHORT ──
 function mostrarPanelSenalEscrita(coinName, tipoAlerta, direccion, apal, textoDetalle) {
-    let panel = document.getElementById('cdcSenalEscritaPanel');
-    if (!panel) {
-        panel = document.createElement('div');
-        panel.id = 'cdcSenalEscritaPanel';
-        document.body.appendChild(panel);
-    }
-    const esLong = direccion === 'LONG';
-    const colorBorde = esLong ? '#0ecb81' : '#ff2a3b';
-    const colorFondo = esLong ? 'rgba(14,203,129,0.12)' : 'rgba(255,42,59,0.12)';
-    const emoji = esLong ? '🟢' : '🔴';
-    const nombre = coinName.replace('USDT','');
-
-    panel.style.cssText = `
-        position: fixed;
-        bottom: 120px; left: 50%; transform: translateX(-50%);
-        z-index: 9999998;
-        background: #07101f;
-        border: 2px solid ${colorBorde};
-        border-radius: 14px;
-        padding: 14px 18px;
-        min-width: 300px; max-width: 94vw;
-        box-shadow: 0 0 30px ${colorBorde}66;
-        font-family: 'Inter', sans-serif;
-        text-align: center;
-        animation: cdcSenalEntrada 0.35s ease;
-    `;
-
-    panel.innerHTML = `
-        <style>
-            @keyframes cdcSenalEntrada { from { opacity:0; transform:translateX(-50%) translateY(20px); } to { opacity:1; transform:translateX(-50%) translateY(0); } }
-            @keyframes cdcSenalPulse { 0%,100%{ box-shadow:0 0 18px ${colorBorde}55; } 50%{ box-shadow:0 0 38px ${colorBorde}cc; } }
-            #cdcSenalEscritaPanel { animation: cdcSenalEntrada 0.35s ease, cdcSenalPulse 1.6s infinite; }
-        </style>
-        <div style="font-size:11px; font-weight:900; color:#64748b; letter-spacing:1.5px; margin-bottom:4px;">✅ ESTA MONEDA CUMPLE LAS CONDICIONES</div>
-        <div style="font-size:22px; font-weight:900; color:#fff; margin-bottom:2px;">${emoji} ${nombre}</div>
-        <div style="font-size:18px; font-weight:900; color:${colorBorde}; margin-bottom:6px;">
-            ENTRA EN ${direccion} A ${apal}x PARA GANAR
-        </div>
-        <div style="font-size:11px; color:#94a3b8; margin-bottom:10px; line-height:1.5;">${textoDetalle}</div>
-        <button onclick="document.getElementById('cdcSenalEscritaPanel').style.display='none'"
-            style="background:rgba(255,255,255,0.07); border:1px solid rgba(255,255,255,0.1); color:#94a3b8;
-                   font-size:11px; font-weight:700; padding:5px 16px; border-radius:8px; cursor:pointer;">
-            ✕ Cerrar
-        </button>
-    `;
-    panel.style.display = 'block';
-
-    // Auto-cierre a los 30 segundos
-    if (panel._autoClose) clearTimeout(panel._autoClose);
-    panel._autoClose = setTimeout(() => { if (panel) panel.style.display = 'none'; }, 30000);
+    // Redirigir la señal al botón de alarma lateral
+    actualizarBotonAlarmaLateral(coinName);
 }
 
 function generarTextoAlarma(coinName, tipoAlerta) {
