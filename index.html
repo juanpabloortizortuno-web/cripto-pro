@@ -152,6 +152,31 @@
             from { opacity: 0.3; transform: scale(0.9); }
             to   { opacity: 1;   transform: scale(1.1); }
         }
+        /* ── BOTÓN DE ALARMA LATERAL (compra/venta directo a Binance) ── */
+        @keyframes alarma-parpadeo-verde {
+            from { box-shadow: 0 0 8px rgba(14,203,129,0.45); transform: scale(0.99); }
+            to   { box-shadow: 0 0 22px rgba(14,203,129,0.95); transform: scale(1.015); }
+        }
+        @keyframes alarma-parpadeo-roja {
+            from { box-shadow: 0 0 8px rgba(255,42,59,0.45); transform: scale(0.99); }
+            to   { box-shadow: 0 0 22px rgba(255,42,59,0.95); transform: scale(1.015); }
+        }
+        #btnAlarmaLateral.alarma-compra {
+            background: linear-gradient(135deg,#0ecb81,#05a660);
+            color: #001a0d;
+            animation: alarma-parpadeo-verde 0.7s infinite alternate;
+        }
+        #btnAlarmaLateral.alarma-venta {
+            background: linear-gradient(135deg,#ff2a3b,#b80012);
+            color: #fff;
+            animation: alarma-parpadeo-roja 0.7s infinite alternate;
+        }
+        #btnAlarmaLateral.alarma-espera {
+            background: #1e293b;
+            color: #94a3b8;
+            animation: none;
+            box-shadow: none;
+        }
         .radar-contador {
             position: absolute; top: -4px; right: -4px;
             background: #ff2a3b; color: #fff;
@@ -843,6 +868,10 @@
                     🔴 SHORT<br><span style="font-size:9px;font-weight:700;opacity:0.85;">VENTA · TECHO</span>
                 </button>
             </div>
+            <!-- 🚨 BOTÓN DE ALARMA: compra/venta directa a Binance de la moneda seleccionada -->
+            <button id="btnAlarmaLateral" onclick="abrirBinanceAlarma()" style="display:none;width:100%;margin-top:8px;padding:11px 8px;border-radius:10px;border:none;cursor:pointer;font-size:12px;font-weight:900;letter-spacing:0.4px;text-align:center;line-height:1.3;">
+                <span id="alarmaLateralTexto">—</span>
+            </button>
             <div class="search-box">
                 <div id="botSaludo" class="bot-saludo" style="margin-bottom:8px;">🤖 Buscando giros o despegues (< 20 USDT)</div>
                 <input type="text" id="searchCoin" placeholder="Buscar low-caps o filtros (BOMBA, POTENCIA, AGOTADO)..." onkeyup="buscarMoneda()">
@@ -1467,6 +1496,54 @@ function actualizarStatsAprendizajeUI() {
             }, 400);
         }
     }
+
+// ══════════════════════════════════════════════════════════════════
+// 🚨 BOTÓN DE ALARMA LATERAL — debajo de LONG/SHORT.
+// Se pinta verde y parpadea cuando hay señal de COMPRA, rojo cuando hay
+// señal de VENTA, y al hacer clic abre directo Binance Futures con la
+// moneda seleccionada (ahorra tiempo: no hay que buscarla a mano).
+// ══════════════════════════════════════════════════════════════════
+let binanceAlarmaSymbol = null;
+
+function abrirBinanceAlarma() {
+    if (!binanceAlarmaSymbol) return;
+    initAudio();
+    window.open(`https://www.binance.com/es/futures/${binanceAlarmaSymbol}`, '_blank');
+}
+
+function actualizarBotonAlarmaLateral(symbol) {
+    const btn = document.getElementById('btnAlarmaLateral');
+    const txt = document.getElementById('alarmaLateralTexto');
+    if (!btn || !txt) return;
+
+    const c = symbol ? cachedData[symbol] : null;
+    if (!symbol || !c) {
+        btn.style.display = 'none';
+        binanceAlarmaSymbol = null;
+        return;
+    }
+
+    binanceAlarmaSymbol = symbol;
+    const nombre = symbol.replace('USDT', '');
+    const señal = (senalCDC && senalCDC[symbol]) ? senalCDC[symbol] : 'ESPERAR SEÑAL';
+
+    const esCompra = c.alertaBombaSubida || señal.includes('LONG');
+    const esVenta  = c.alertaDerrumbe || c.alertaAgotamientoSubida || señal.includes('SHORT INMINENTE') || señal.includes('AGOTAMIENTO');
+
+    btn.style.display = 'block';
+    btn.classList.remove('alarma-compra', 'alarma-venta', 'alarma-espera');
+
+    if (esVenta) {
+        btn.classList.add('alarma-venta');
+        txt.innerHTML = `🔴 VENDER ${nombre} AHORA<br><span style="font-size:9px;font-weight:700;opacity:0.9;">Toca para abrir en Binance</span>`;
+    } else if (esCompra) {
+        btn.classList.add('alarma-compra');
+        txt.innerHTML = `🟢 COMPRAR ${nombre} AHORA<br><span style="font-size:9px;font-weight:700;opacity:0.9;">Toca para abrir en Binance</span>`;
+    } else {
+        btn.classList.add('alarma-espera');
+        txt.innerHTML = `⏳ ${nombre} · ESPERANDO SEÑAL<br><span style="font-size:9px;font-weight:700;opacity:0.85;">Toca para ver en Binance</span>`;
+    }
+}
 
 function abrirEnApp() {
     if (!selectedCoin) return;
@@ -3528,6 +3605,7 @@ function seleccionarMoneda(symbol) {
     actualizarTablaIzquierda();
     actualizarPanelCentral();
     actualizarTacometroDerecho();
+    actualizarBotonAlarmaLateral(symbol);
 
     document.getElementById("linkBinance").style.display = "flex";
     document.getElementById("linkBinance").href = `https://www.binance.com/es/futures/${symbol}`;
@@ -4823,6 +4901,7 @@ function actualizarTacometroDerecho() {
         </div>
     `;
     actualizarContadorRadar(); // el botón de radar se reconstruyó adentro del tacómetro: refrescar su contador al toque
+    actualizarBotonAlarmaLateral(selectedCoin);
 }
 
 function actualizarAlertaGanadora(alertaActiva) {
