@@ -1182,6 +1182,7 @@ let ultimoTipoAlertaHablada = "";
 let timestampLlegada = {}; // Registra cuándo apareció cada alerta por primera vez
 let ultimosDespeguesAlertados = {}; // symbol -> timestamp de última vez que se anunció por voz
 let ultimosReboteAlertados = {}; // symbol -> timestamp de última vez que se anunció rebote tras caída por voz
+let ultimosScalpAlertados = {}; // symbol -> timestamp de última alerta de scalping (silencio de 90s entre alertas del mismo par)
 
 // Historial para rastrear los últimos 2 minutos exactos (60 lecturas de 2 segundos)
 let historialPrecios2Min = {};
@@ -1729,6 +1730,160 @@ function playAlarmVoice(coinName, tipoAlerta) {
         const { texto, esMasculino } = generarTextoAlarma(coinName, tipoAlerta);
         hablar(texto, esMasculino);
     } catch(e) { console.log("Error voz:", e); }
+}
+
+// ══════════════════════════════════════════════════════════════════
+// 💰 SISTEMA DE ALERTAS DE SCALPING
+// Detecta monedas que cumplen TODAS las condiciones para scalping
+// y lanza voz + banner visual con la recomendación exacta.
+// ══════════════════════════════════════════════════════════════════
+const SCALP_SILENCIO_MS = 90000; // 90s entre alertas del mismo par
+let bannerScalpTimeout = null;
+
+function verificarAlertasScalping() {
+    const ahora = Date.now();
+    const symbols = Object.keys(cachedData);
+    let mejorCandidato = null;
+    let mejorScore = 0;
+
+    for (const symbol of symbols) {
+        if (!tieneApalancamientoBajo(symbol)) continue;
+        const c = cachedData[symbol];
+        const e = datosEMA[symbol];
+        if (!c || !e) continue;
+
+        // Silencio: no repetir la misma moneda antes de 90s
+        const ultimaAlerta = ultimosScalpAlertados[symbol] || 0;
+        if (ahora - ultimaAlerta < SCALP_SILENCIO_MS) continue;
+
+        const cambio2m = Math.abs(c.cambioReal2Min || 0);
+        const velAbs = Math.abs(c.velPromedio || 0);
+        const ciclos = Math.max(c.ciclosSubiendo || 0, c.ciclosBajando || 0);
+
+        // Condición base: ≥0.25% en 2 min + velocidad sostenida + dirección consistente
+        if (cambio2m < SCALP_MOV_NECESARIO) continue;
+        if (velAbs < 0.008) continue;
+        if (ciclos < 2) continue;
+
+        // Condición extra fuerte: que además tenga EMA alineada O rango explosivo
+        const tieneEMA = e.alineadasAlcista;
+        const tieneRango = (c.rangoPct24h || 0) >= 10;
+        if (!tieneEMA && !tieneRango) continue;
+
+        const score = scalpScore(symbol);
+        if (score > mejorScore) {
+            mejorScore = score;
+            mejorCandidato = symbol;
+        }
+    }
+
+    if (!mejorCandidato) return;
+
+    const c = cachedData[mejorCandidato];
+    const e = datosEMA[mejorCandidato];
+    const maxLev = MONEDAS_BAJO_APALANCAMIENTO[mejorCandidato];
+    const nombre = mejorCandidato.replace('USDT', '');
+    const direccionLong = (c.cambioReal2Min || 0) > 0;
+    const cambio2m = Math.abs(c.cambioReal2Min || 0).toFixed(2);
+    const ganancia = ((cambio2m / 100) * (SCALP_CAPITAL * SCALP_APALANCAMIENTO)).toFixed(2);
+
+    // Calcular apalancamiento recomendado según volatilidad y riesgo
+    const rango = c.rangoPct24h || 0;
+    let apalRec, apalTexto;
+    if (maxLev <= 3 || rango >= 20) {
+        apalRec = 1; apalTexto = "1x (moneda muy explosiva, riesgo alto)";
+    } else if (maxLev <= 5 || rango >= 15) {
+        apalRec = 2; apalTexto = "2x (equilibrio riesgo/ganancia)";
+    } else {
+        apalRec = 3; apalTexto = "3x (rango moderado, buena oportunidad)";
+    }
+
+    const tipoOp = direccionLong ? 'LONG' : 'SHORT';
+    const emoji = direccionLong ? '🟢' : '🔴';
+    const colorOp = direccionLong ? '#0ecb81' : '#ff2a3b';
+
+    // ── VOZ ─────────────────────────────────────────────────────
+    const textoVoz = `Atención. ${nombre} cumple condiciones de scalping. Entra en ${tipoOp} con ${apalRec}x para ganar ${ganancia} dólares. Se movió ${cambio2m} por ciento en dos minutos. Actúa rápido.`;
+    hablar(textoVoz, direccionLong);
+
+    // ── BANNER VISUAL ────────────────────────────────────────────
+    mostrarBannerScalp(nombre, mejorCandidato, tipoOp, apalRec, apalTexto, cambio2m, ganancia, emoji, colorOp, c, e);
+
+    // Registrar timestamp para silencio
+    ultimosScalpAlertados[mejorCandidato] = ahora;
+}
+
+function mostrarBannerScalp(nombre, symbol, tipoOp, apalRec, apalTexto, cambio2m, ganancia, emoji, colorOp, c, e) {
+    // Eliminar banner anterior si existía
+    const anterior = document.getElementById('scalpAlertaBanner');
+    if (anterior) anterior.remove();
+    if (bannerScalpTimeout) clearTimeout(bannerScalpTimeout);
+
+    const maxLev = MONEDAS_BAJO_APALANCAMIENTO[symbol];
+    const tieneEMA = e && e.alineadasAlcista;
+
+    const banner = document.createElement('div');
+    banner.id = 'scalpAlertaBanner';
+    banner.style.cssText = `
+        position: fixed;
+        top: 0; left: 0; right: 0;
+        z-index: 9999999;
+        background: linear-gradient(135deg, #0a0f1e, #0f0a1e);
+        border-bottom: 3px solid ${colorOp};
+        padding: 14px 16px 12px;
+        box-shadow: 0 4px 30px ${colorOp}55;
+        animation: scalpSlideIn 0.3s ease;
+        font-family: 'Inter', sans-serif;
+    `;
+
+    banner.innerHTML = `
+        <style>
+            @keyframes scalpSlideIn { from { transform:translateY(-100%); opacity:0; } to { transform:translateY(0); opacity:1; } }
+            @keyframes scalpPulse { 0%,100% { box-shadow:0 0 8px ${colorOp}88; } 50% { box-shadow:0 0 22px ${colorOp}; } }
+            #scalpAlertaBanner .scalp-btn {
+                background: ${colorOp}; color: #000; border: none; font-weight: 900;
+                font-size: 12px; padding: 8px 14px; border-radius: 8px; cursor: pointer;
+                animation: scalpPulse 1.5s infinite;
+            }
+        </style>
+        <div style="display:flex; align-items:center; justify-content:space-between; flex-wrap:wrap; gap:8px;">
+            <div style="flex:1; min-width:200px;">
+                <div style="font-size:13px; font-weight:900; color:#fff; letter-spacing:0.5px;">
+                    ${emoji} SCALPING — <span style="color:${colorOp};">${tipoOp} ${nombre}</span>
+                    <span style="font-size:10px; color:#64748b; font-weight:400; margin-left:6px;">apalanc. máx: ${maxLev !== undefined ? maxLev + 'x' : '?'}</span>
+                </div>
+                <div style="font-size:11px; color:#a78bfa; margin-top:2px; font-weight:700;">
+                    Entra con <span style="color:#fff;">${apalRec}x</span> — ${apalTexto}
+                </div>
+                <div style="font-size:11px; color:#94a3b8; margin-top:2px;">
+                    Mov. 2min: <b style="color:#fff;">+${cambio2m}%</b>
+                    &nbsp;·&nbsp; Ganancia est.: <b style="color:#0ecb81;">$${ganancia}</b>
+                    &nbsp;·&nbsp; Rango 24h: <b style="color:#f3ba2f;">${(c.rangoPct24h||0).toFixed(1)}%</b>
+                    ${tieneEMA ? '&nbsp;·&nbsp; <span style="color:#0ecb81;">✓ EMA alineada</span>' : ''}
+                </div>
+                <div style="font-size:10px; color:#475569; margin-top:3px;">
+                    Base: $${SCALP_CAPITAL} × ${SCALP_APALANCAMIENTO}x = $${SCALP_CAPITAL * SCALP_APALANCAMIENTO} posición · Objetivo: 0.25% = $1 USDT
+                </div>
+            </div>
+            <div style="display:flex; gap:8px; align-items:center; flex-shrink:0;">
+                <button class="scalp-btn" onclick="seleccionarMoneda('${symbol}'); cerrarBannerScalp();">
+                    ${emoji} OPERAR ${nombre}
+                </button>
+                <button onclick="cerrarBannerScalp()" style="background:rgba(255,255,255,0.08); border:none; color:#94a3b8; font-size:18px; padding:6px 10px; border-radius:6px; cursor:pointer; font-weight:900; line-height:1;">✕</button>
+            </div>
+        </div>
+    `;
+
+    document.body.appendChild(banner);
+
+    // Auto-cierre a los 25 segundos
+    bannerScalpTimeout = setTimeout(() => cerrarBannerScalp(), 25000);
+}
+
+function cerrarBannerScalp() {
+    const b = document.getElementById('scalpAlertaBanner');
+    if (b) b.remove();
+    if (bannerScalpTimeout) clearTimeout(bannerScalpTimeout);
 }
 
 function probarAudio() {
