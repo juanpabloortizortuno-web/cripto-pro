@@ -999,6 +999,7 @@
 <div id="floatingButtons" class="floating-buttons">
     <button id="simuladorBtn" class="float-btn float-sim" onclick="abrirSimulador()">🧪</button>
     <button id="emaRadarBtn" class="float-btn" onclick="abrirRadarDespegue()" style="background:#0ecb81; color:#fff; font-weight:900;">⚡</button>
+    <button id="scalpRadarBtn" class="float-btn" onclick="abrirRadarScalp()" style="background:linear-gradient(135deg,#7c3aed,#4f46e5); color:#fff; font-weight:900; font-size:16px;" title="RADAR SCALPING — monedas moviéndose ahora">💰</button>
     <a id="linkBinance" class="float-btn float-binance" target="_blank" style="display:none;"><i class="fas fa-chart-line"></i></a>
     <button id="linkApp" class="float-btn float-app" onclick="abrirEnApp()" style="display:none;"><i class="fas fa-mobile-alt"></i></button>
 </div>
@@ -4875,5 +4876,169 @@ document.addEventListener("DOMContentLoaded", () => {
     <div id="emaRadarLista"></div>
     <div style="text-align:center; margin-top:15px;"><button onclick="cerrarRadarDespegue()" class="btn vip" style="width:100%;">Cerrar</button></div>
 </div>
+<!-- ══════════════════════════════════════════════════════
+     💰 RADAR DE SCALPING — monedas moviéndose AHORA MISMO
+     Detecta las que ya se mueven ≥0.25% cada ciclo sostenido
+     ══════════════════════════════════════════════════════ -->
+<div id="scalpRadarPanel" style="display:none; position:fixed; bottom:110px; right:20px; width:340px; max-height:75vh; overflow-y:auto; background:#080c18; border:2px solid #7c3aed; border-radius:14px; z-index:999999; padding:15px; box-shadow:0 0 28px rgba(124,58,237,0.45);">
+    <div style="background:#0f0a1e; border:1px solid #7c3aed; border-radius:10px; padding:10px; margin-bottom:12px; color:#fff; font-size:11px; text-align:center; font-weight:bold; line-height:1.6;">
+        💰 RADAR SCALPING — $200 × 2x = $400<br>
+        <span style="color:#a78bfa;">Monedas moviéndose ≥0.25% ahora mismo</span><br>
+        <span style="color:#64748b; font-size:10px;">Cada 0.25% = +$1 USDT de ganancia</span>
+    </div>
+    <div id="scalpRadarLista"></div>
+    <div style="text-align:center; margin-top:12px;">
+        <button onclick="cerrarRadarScalp()" style="width:100%; background:linear-gradient(135deg,#7c3aed,#4f46e5); border:none; color:#fff; font-weight:900; font-size:13px; padding:10px; border-radius:8px; cursor:pointer;">✕ CERRAR</button>
+    </div>
+</div>
+
+<script>
+// ══════════════════════════════════════════════════════════════════
+// 💰 RADAR SCALPING
+// Busca monedas que ya estén moviéndose ≥0.25% de forma sostenida,
+// con bajo apalancamiento, precio bajo y volumen real.
+// Base de cálculo: $200 capital × 2x apalancamiento = $400 posición.
+// Cada 0.25% de movimiento = $1 USDT de ganancia.
+// ══════════════════════════════════════════════════════════════════
+
+const SCALP_CAPITAL = 200;
+const SCALP_APALANCAMIENTO = 2;
+const SCALP_GANANCIA_OBJETIVO = 1; // $1 USDT por operación
+const SCALP_MOV_NECESARIO = (SCALP_GANANCIA_OBJETIVO / (SCALP_CAPITAL * SCALP_APALANCAMIENTO)) * 100; // 0.25%
+
+// Historial de velocidades para detectar movimiento SOSTENIDO (no picos aislados)
+const histScalp = {};
+
+function scalpScore(symbol) {
+    const c = cachedData[symbol];
+    if (!c) return 0;
+
+    const velAbs = Math.abs(c.velPromedio || 0);       // velocidad promedio últimos 10s
+    const cambio2m = Math.abs(c.cambioReal2Min || 0);  // movimiento neto en 2 min
+    const ciclos = Math.max(c.ciclosSubiendo || 0, c.ciclosBajando || 0);
+    const rango = c.rangoPct24h || 0;
+    const maxLev = MONEDAS_BAJO_APALANCAMIENTO[symbol];
+
+    // Score base: cuántas veces ya superó el 0.25% en los últimos 2 min
+    const vecesObjetivo = cambio2m / SCALP_MOV_NECESARIO; // ej: 1% / 0.25% = 4 veces
+    let score = vecesObjetivo * 30;
+
+    // Velocidad promedio sostenida
+    score += velAbs * 25;
+
+    // Ciclos consistentes en misma dirección
+    score += ciclos * 5;
+
+    // Bonus perfil explosivo (tipo ESPORTS)
+    if (c.price < 0.10 && rango >= 10) score += 35;
+    else if (c.price < 1.00 && rango >= 10) score += 15;
+
+    // Bonus bajo apalancamiento = más volátil naturalmente
+    if (maxLev !== undefined && maxLev <= 5)  score += 30;
+    else if (maxLev !== undefined && maxLev <= 10) score += 15;
+
+    return score;
+}
+
+function abrirRadarScalp() {
+    actualizarRadarScalp();
+    document.getElementById('scalpRadarPanel').style.display = 'block';
+    // Auto-refresh cada 3 segundos mientras está abierto
+    if (window._scalpInterval) clearInterval(window._scalpInterval);
+    window._scalpInterval = setInterval(() => {
+        if (document.getElementById('scalpRadarPanel').style.display === 'block') {
+            actualizarRadarScalp();
+        }
+    }, 3000);
+}
+
+function cerrarRadarScalp() {
+    document.getElementById('scalpRadarPanel').style.display = 'none';
+    if (window._scalpInterval) clearInterval(window._scalpInterval);
+}
+
+function actualizarRadarScalp() {
+    const symbols = Object.keys(cachedData);
+    const candidatos = [];
+
+    for (const symbol of symbols) {
+        if (!tieneApalancamientoBajo(symbol)) continue;
+        const c = cachedData[symbol];
+        if (!c) continue;
+
+        const velAbs = Math.abs(c.velPromedio || 0);
+        const cambio2m = Math.abs(c.cambioReal2Min || 0);
+        const ciclos = Math.max(c.ciclosSubiendo || 0, c.ciclosBajando || 0);
+
+        // Criterios mínimos para entrar al radar:
+        // 1. Movimiento en 2 min ≥ 0.25% (ya alcanzó el objetivo al menos 1 vez)
+        // 2. Velocidad promedio positiva (no fue un pico aislado)
+        // 3. Al menos 2 ciclos consecutivos en la misma dirección
+        const cumpleMinimo = cambio2m >= SCALP_MOV_NECESARIO && velAbs > 0.005 && ciclos >= 2;
+        if (!cumpleMinimo) continue;
+
+        const score = scalpScore(symbol);
+        const maxLev = MONEDAS_BAJO_APALANCAMIENTO[symbol];
+        const vecesObjetivo = Math.floor(cambio2m / SCALP_MOV_NECESARIO);
+        const gananciaEstimada = (cambio2m / 100) * (SCALP_CAPITAL * SCALP_APALANCAMIENTO);
+        const direccion = (c.cambioReal2Min || 0) > 0 ? 'LONG ▲' : 'SHORT ▼';
+        const colorDir = (c.cambioReal2Min || 0) > 0 ? '#0ecb81' : '#ff2a3b';
+
+        candidatos.push({ symbol, c, score, maxLev, vecesObjetivo, gananciaEstimada, direccion, colorDir, cambio2m });
+    }
+
+    // Ordenar por score descendente
+    candidatos.sort((a, b) => b.score - a.score);
+    const top = candidatos.slice(0, 10);
+
+    if (top.length === 0) {
+        document.getElementById('scalpRadarLista').innerHTML = `
+            <div style="text-align:center; padding:20px; color:#475569; font-size:12px;">
+                <div style="font-size:28px; margin-bottom:8px;">😴</div>
+                Mercado tranquilo ahora.<br>
+                <span style="font-size:10px; color:#334155;">Ninguna moneda supera el 0.25% en este momento.<br>El radar actualiza cada 3 segundos.</span>
+            </div>`;
+        return;
+    }
+
+    let html = `<div style="font-size:10px; color:#64748b; margin-bottom:8px; text-align:center;">
+        ⟳ Actualiza cada 3s · ${top.length} monedas activas · objetivo: +${SCALP_MOV_NECESARIO.toFixed(2)}%/operación
+    </div>`;
+
+    top.forEach(({ symbol, c, score, maxLev, vecesObjetivo, gananciaEstimada, direccion, colorDir, cambio2m }) => {
+        const esUltra = maxLev !== undefined && maxLev <= 5;
+        const nombre = symbol.replace('USDT', '');
+        const borderColor = esUltra ? '#ff3333' : '#7c3aed';
+        const glow = esUltra ? 'box-shadow:0 0 14px #ff333355;' : 'box-shadow:0 0 10px #7c3aed44;';
+        const badgeColor = vecesObjetivo >= 4 ? '#ff3333' : vecesObjetivo >= 2 ? '#f3ba2f' : '#7c3aed';
+
+        html += `
+        <div onclick="seleccionarMoneda('${symbol}'); cerrarRadarScalp();"
+             style="background:#050914; border:2px solid ${borderColor}; padding:11px 13px; margin-bottom:8px; border-radius:10px; cursor:pointer; position:relative; ${glow}">
+            <div style="display:flex; justify-content:space-between; align-items:center;">
+                <span style="font-weight:900; font-size:14px; color:#fff;">💰 ${nombre}</span>
+                <span style="background:${badgeColor}; color:#fff; font-size:10px; font-weight:900; padding:2px 7px; border-radius:12px;">
+                    ×${vecesObjetivo} objetivo
+                </span>
+            </div>
+            <div style="display:flex; justify-content:space-between; margin-top:6px;">
+                <span style="font-size:11px; color:#94a3b8;">Precio: <b style="color:#fff;">$${c.price}</b></span>
+                <span style="font-size:12px; font-weight:900; color:${colorDir};">${direccion}</span>
+            </div>
+            <div style="margin-top:5px; font-size:11px; color:#a78bfa; font-weight:700;">
+                Mov. 2min: <b style="color:#fff;">+${cambio2m.toFixed(2)}%</b>
+                &nbsp;·&nbsp; Est. ganancia: <b style="color:#0ecb81;">$${gananciaEstimada.toFixed(2)}</b>
+            </div>
+            <div style="margin-top:3px; font-size:10px; color:#64748b;">
+                Rango 24h: ${(c.rangoPct24h||0).toFixed(1)}%
+                &nbsp;·&nbsp; Apalanc. máx: ${maxLev !== undefined ? maxLev + 'x' : '?'}
+                &nbsp;·&nbsp; Score: ${score.toFixed(0)}
+            </div>
+        </div>`;
+    });
+
+    document.getElementById('scalpRadarLista').innerHTML = html;
+}
+</script>
 </body>
 </html>
