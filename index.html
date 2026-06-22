@@ -1677,6 +1677,70 @@ function procesarColaVoz() {
     }, duracionEstimada + 2500);
 }
 
+// ── HELPER: calcula el apalancamiento recomendado para cualquier moneda ──
+function calcularApalancamientoRecomendado(coinName) {
+    const c = cachedData[coinName];
+    const maxLev = MONEDAS_BAJO_APALANCAMIENTO ? MONEDAS_BAJO_APALANCAMIENTO[coinName] : undefined;
+    const rango = c ? (c.rangoPct24h || 0) : 0;
+    if (maxLev !== undefined && (maxLev <= 3 || rango >= 20)) return { apal: 1, razon: "moneda muy explosiva, usá stop ajustado" };
+    if (maxLev !== undefined && (maxLev <= 5 || rango >= 15)) return { apal: 2, razon: "equilibrio riesgo ganancia" };
+    return { apal: 3, razon: "rango moderado, buena oportunidad" };
+}
+
+// ── HELPER: muestra el panel de señal escrita en pantalla ──
+function mostrarPanelSenalEscrita(coinName, tipoAlerta, direccion, apal, textoDetalle) {
+    let panel = document.getElementById('cdcSenalEscritaPanel');
+    if (!panel) {
+        panel = document.createElement('div');
+        panel.id = 'cdcSenalEscritaPanel';
+        document.body.appendChild(panel);
+    }
+    const esLong = direccion === 'LONG';
+    const colorBorde = esLong ? '#0ecb81' : '#ff2a3b';
+    const colorFondo = esLong ? 'rgba(14,203,129,0.12)' : 'rgba(255,42,59,0.12)';
+    const emoji = esLong ? '🟢' : '🔴';
+    const nombre = coinName.replace('USDT','');
+
+    panel.style.cssText = `
+        position: fixed;
+        bottom: 120px; left: 50%; transform: translateX(-50%);
+        z-index: 9999998;
+        background: #07101f;
+        border: 2px solid ${colorBorde};
+        border-radius: 14px;
+        padding: 14px 18px;
+        min-width: 300px; max-width: 94vw;
+        box-shadow: 0 0 30px ${colorBorde}66;
+        font-family: 'Inter', sans-serif;
+        text-align: center;
+        animation: cdcSenalEntrada 0.35s ease;
+    `;
+
+    panel.innerHTML = `
+        <style>
+            @keyframes cdcSenalEntrada { from { opacity:0; transform:translateX(-50%) translateY(20px); } to { opacity:1; transform:translateX(-50%) translateY(0); } }
+            @keyframes cdcSenalPulse { 0%,100%{ box-shadow:0 0 18px ${colorBorde}55; } 50%{ box-shadow:0 0 38px ${colorBorde}cc; } }
+            #cdcSenalEscritaPanel { animation: cdcSenalEntrada 0.35s ease, cdcSenalPulse 1.6s infinite; }
+        </style>
+        <div style="font-size:11px; font-weight:900; color:#64748b; letter-spacing:1.5px; margin-bottom:4px;">✅ ESTA MONEDA CUMPLE LAS CONDICIONES</div>
+        <div style="font-size:22px; font-weight:900; color:#fff; margin-bottom:2px;">${emoji} ${nombre}</div>
+        <div style="font-size:18px; font-weight:900; color:${colorBorde}; margin-bottom:6px;">
+            ENTRA EN ${direccion} A ${apal}x PARA GANAR
+        </div>
+        <div style="font-size:11px; color:#94a3b8; margin-bottom:10px; line-height:1.5;">${textoDetalle}</div>
+        <button onclick="document.getElementById('cdcSenalEscritaPanel').style.display='none'"
+            style="background:rgba(255,255,255,0.07); border:1px solid rgba(255,255,255,0.1); color:#94a3b8;
+                   font-size:11px; font-weight:700; padding:5px 16px; border-radius:8px; cursor:pointer;">
+            ✕ Cerrar
+        </button>
+    `;
+    panel.style.display = 'block';
+
+    // Auto-cierre a los 30 segundos
+    if (panel._autoClose) clearTimeout(panel._autoClose);
+    panel._autoClose = setTimeout(() => { if (panel) panel.style.display = 'none'; }, 30000);
+}
+
 function generarTextoAlarma(coinName, tipoAlerta) {
     const c = cachedData[coinName];
     const nombre = coinName.replace("USDT", "");
@@ -1691,35 +1755,55 @@ function generarTextoAlarma(coinName, tipoAlerta) {
     if (tipoAlerta === "DESPEGUE") {
         const e = datosEMA[coinName];
         const pct = e ? e.subidaDesdeMinimo.toFixed(1) : '?';
-        return { texto: `¡Despegue! ${nombre}, más ${pct} por ciento desde el piso. EMAs alineadas al alza. Revisar long.`, esMasculino: true };
+        const { apal, razon } = calcularApalancamientoRecomendado(coinName);
+        const detalle = `EMAs alineadas al alza · +${pct}% desde el piso · ${razon}`;
+        mostrarPanelSenalEscrita(coinName, tipoAlerta, 'LONG', apal, detalle);
+        return { texto: `¡Atención! ${nombre} cumple las condiciones. Entra en long a ${apal}x para ganar. Las EMAs están alineadas al alza y el precio subió ${pct} por ciento desde el piso.`, esMasculino: true };
     }
 
     if (tipoAlerta === "BOMBA") {
-        return { texto: `¡Bomba! ${nombre}, más ${cambio2m} por ciento en dos minutos. Rango al ${posRango} por ciento. Subida ${probSubida} por ciento probable.`, esMasculino: true };
+        const { apal, razon } = calcularApalancamientoRecomendado(coinName);
+        const detalle = `+${cambio2m}% en 2 min · Rango al ${posRango}% · ${razon}`;
+        mostrarPanelSenalEscrita(coinName, tipoAlerta, 'LONG', apal, detalle);
+        return { texto: `¡${nombre} cumple las condiciones! Entra en long a ${apal}x para ganar. Subió ${cambio2m} por ciento en dos minutos. Probabilidad de subida ${probSubida} por ciento.`, esMasculino: true };
 
     } else if (tipoAlerta === "DERRUMBE") {
-        return { texto: `¡Derrumbe! ${nombre}, menos ${cambioAbs} por ciento en dos minutos. Rango al ${posRango} por ciento. Caída ${probCaida} por ciento probable.`, esMasculino: false };
+        const { apal, razon } = calcularApalancamientoRecomendado(coinName);
+        const detalle = `-${cambioAbs}% en 2 min · Rango al ${posRango}% · ${razon}`;
+        mostrarPanelSenalEscrita(coinName, tipoAlerta, 'SHORT', apal, detalle);
+        return { texto: `¡${nombre} cumple las condiciones! Entra en short a ${apal}x para ganar. Cayó ${cambioAbs} por ciento en dos minutos. Probabilidad de caída ${probCaida} por ciento.`, esMasculino: false };
 
     } else if (tipoAlerta === "AGOTADO") {
-        return { texto: `Agotado. ${nombre} en el ${posRango} por ciento del rango. Reversión bajista ${probCaida} por ciento probable.`, esMasculino: false };
+        const { apal, razon } = calcularApalancamientoRecomendado(coinName);
+        const detalle = `Posición en rango: ${posRango}% · Agotamiento de subida detectado · ${razon}`;
+        mostrarPanelSenalEscrita(coinName, tipoAlerta, 'SHORT', apal, detalle);
+        return { texto: `¡${nombre} cumple las condiciones! Entra en short a ${apal}x para ganar. Está en el ${posRango} por ciento del rango con señal de agotamiento. Reversión bajista ${probCaida} por ciento probable.`, esMasculino: false };
 
     } else if (tipoAlerta === "REBOTE") {
         const e = datosEMA[coinName];
         const pct = e ? e.subidaDesdeMinimo.toFixed(1) : '?';
         const volPct = c.caidaVolumenPct || 0;
-        const fraseVolumen = volPct >= 30 ? ` El volumen de venta cayó ${volPct.toFixed(0)} por ciento desde su pico reciente.` : '';
-        return { texto: `¡Rebote! ${nombre}, más ${pct} por ciento desde el mínimo. EMA siete girando al alza.${fraseVolumen}`, esMasculino: true };
+        const { apal, razon } = calcularApalancamientoRecomendado(coinName);
+        const fraseVolumen = volPct >= 30 ? ` · Volumen de venta cayó ${volPct.toFixed(0)}%` : '';
+        const detalle = `+${pct}% desde el mínimo · EMA7 girando al alza${fraseVolumen} · ${razon}`;
+        mostrarPanelSenalEscrita(coinName, tipoAlerta, 'LONG', apal, detalle);
+        return { texto: `¡${nombre} cumple las condiciones! Entra en long a ${apal}x para ganar. Rebotó ${pct} por ciento desde el mínimo y la EMA siete ya está girando al alza.${volPct >= 30 ? ` El volumen de venta cayó ${volPct.toFixed(0)} por ciento.` : ''}`, esMasculino: true };
 
     } else if (tipoAlerta === "REVERSION") {
         const caida = c.caidaDesdeMaximo ? c.caidaDesdeMaximo.toFixed(0) : '?';
         const volPct = c.caidaVolumenPct || 0;
-        const fraseVolumen = volPct >= 30 ? ` El volumen de venta también cayó ${volPct.toFixed(0)} por ciento.` : '';
-        return { texto: `Atención, posible reversión. ${nombre} se desplomó ${caida} por ciento desde su máximo y sigue pegada al mínimo, pero está entrando capital de forma sostenida.${fraseVolumen} Vigilando más datos antes de confirmar.`, esMasculino: true };
+        const { apal, razon } = calcularApalancamientoRecomendado(coinName);
+        const detalle = `Cayó ${caida}% desde máximo · Capital entrando sostenido${volPct >= 30 ? ` · Venta -${volPct.toFixed(0)}%` : ''} · ${razon}`;
+        mostrarPanelSenalEscrita(coinName, tipoAlerta, 'LONG', apal, detalle);
+        return { texto: `¡${nombre} cumple las condiciones! Entra en long a ${apal}x para ganar. Se desplomó ${caida} por ciento desde su máximo pero ya está entrando capital de forma sostenida.${volPct >= 30 ? ` El volumen de venta cayó ${volPct.toFixed(0)} por ciento.` : ''}`, esMasculino: true };
 
     } else if (tipoAlerta === "PATRON_60_8") {
         const caidaMax = Math.max(c.caidaDesdeMaximo || 0, c.caidaDesdeMaximo48h || 0).toFixed(0);
         const cambioActual = c.change !== undefined ? c.change.toFixed(1) : '?';
-        return { texto: `Patrón long detectado. ${nombre} se desplomó ${caidaMax} por ciento desde su máximo y ya viene recuperándose, alejándose del mínimo, con un cambio actual de ${cambioActual} por ciento.`, esMasculino: true };
+        const { apal, razon } = calcularApalancamientoRecomendado(coinName);
+        const detalle = `Cayó ${caidaMax}% desde máximo · Cambio actual ${cambioActual}% · Recuperación en curso · ${razon}`;
+        mostrarPanelSenalEscrita(coinName, tipoAlerta, 'LONG', apal, detalle);
+        return { texto: `¡${nombre} cumple las condiciones! Entra en long a ${apal}x para ganar. Se desplomó ${caidaMax} por ciento desde su máximo y ya viene recuperándose alejándose del mínimo. Cambio actual ${cambioActual} por ciento.`, esMasculino: true };
     }
 
     return { texto: `Alerta ${nombre}`, esMasculino: true };
@@ -1803,7 +1887,7 @@ function verificarAlertasScalping() {
     const colorOp = direccionLong ? '#0ecb81' : '#ff2a3b';
 
     // ── VOZ ─────────────────────────────────────────────────────
-    const textoVoz = `Atención. ${nombre} cumple condiciones de scalping. Entra en ${tipoOp} con ${apalRec}x para ganar ${ganancia} dólares. Se movió ${cambio2m} por ciento en dos minutos. Actúa rápido.`;
+    const textoVoz = `¡${nombre} cumple las condiciones! Entra en ${tipoOp} a ${apalRec}x para ganar. Se movió ${cambio2m} por ciento en dos minutos. Ganancia estimada ${ganancia} dólares. Actúa rápido.`;
     hablar(textoVoz, direccionLong);
 
     // ── BANNER VISUAL ────────────────────────────────────────────
