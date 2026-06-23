@@ -5863,6 +5863,195 @@ function actualizarRadarScalp() {
 
     document.getElementById('scalpRadarLista').innerHTML = html;
 }
+
+// ══════════════════════════════════════════════════════════════════
+// 👑 MOTOR DE JEFES — BTC / ETH / BNB / SOL
+// Integrado al motor IA de LONG/SHORT existente.
+// Sin paneles, sin botones nuevos. Usa la misma alarma del sidebar
+// (_setUnifEstado + hablar) y la misma lista de monedas (cachedData).
+// Ciclo: 10s por moneda analizando, 3s de descanso, continúa.
+// ══════════════════════════════════════════════════════════════════
+
+const _JEFES_DEF = [
+    { symbol:'BTCUSDT', nombre:'BTC', red:'Bitcoin',   color:'#f3ba2f' },
+    { symbol:'ETHUSDT', nombre:'ETH', red:'Ethereum',  color:'#627eea' },
+    { symbol:'BNBUSDT', nombre:'BNB', red:'BNB Chain', color:'#f3ba2f' },
+    { symbol:'SOLUSDT', nombre:'SOL', red:'Solana',    color:'#14f195' },
+];
+
+const _jefesHist = { BTCUSDT:[], ETHUSDT:[], BNBUSDT:[], SOLUSDT:[] };
+const _jefesSnap = {};
+
+const _JEFE_CAIDA_PCT  = -1.2;
+const _JEFE_SUBIDA_PCT =  1.8;
+
+let _jefeCicloActivo    = false;
+let _jefeColaMonedas    = [];
+let _jefeUltimoCiclo    = 0;
+const _JEFE_COOLDOWN_MS = 120000;
+let _jefeTipoActual     = '';
+let _jefeNombresActivos = '';
+
+async function _fetchJefes() {
+    try {
+        const res = await fetch('https://api.binance.com/api/v3/ticker/24hr?symbols=["BTCUSDT","ETHUSDT","BNBUSDT","SOLUSDT"]');
+        if (!res.ok) return;
+        const lista = await res.json();
+        const ahora = Date.now();
+        for (const item of lista) {
+            const precio = parseFloat(item.lastPrice);
+            if (!_jefesHist[item.symbol]) _jefesHist[item.symbol] = [];
+            _jefesHist[item.symbol].push({ precio, ts: ahora });
+            if (_jefesHist[item.symbol].length > 30) _jefesHist[item.symbol].shift();
+            const hace2min = ahora - 120000;
+            const ant = _jefesHist[item.symbol].find(p => p.ts >= hace2min) || _jefesHist[item.symbol][0];
+            const cambio2min = ant && ant.precio > 0
+                ? ((precio - ant.precio) / ant.precio) * 100 : 0;
+            _jefesSnap[item.symbol] = { precio, change24: parseFloat(item.priceChangePercent), cambio2min };
+        }
+        _evaluarMovJefes();
+    } catch(e) {}
+}
+
+function _evaluarMovJefes() {
+    if (_jefeCicloActivo) return;
+    const ahora = Date.now();
+    if (ahora - _jefeUltimoCiclo < _JEFE_COOLDOWN_MS) return;
+
+    const enCaida  = _JEFES_DEF.filter(j => _jefesSnap[j.symbol] && _jefesSnap[j.symbol].cambio2min <= _JEFE_CAIDA_PCT);
+    const enSubida = _JEFES_DEF.filter(j => _jefesSnap[j.symbol] && _jefesSnap[j.symbol].cambio2min >= _JEFE_SUBIDA_PCT);
+
+    if (enCaida.length === 0 && enSubida.length === 0) return;
+
+    const simbolos = Object.keys(cachedData || {}).filter(s =>
+        s !== 'BTCUSDT' && s !== 'ETHUSDT' && s !== 'BNBUSDT' && s !== 'SOLUSDT'
+    );
+    if (simbolos.length === 0) return;
+
+    _jefeUltimoCiclo = ahora;
+    if (enCaida.length > 0) {
+        _jefeTipoActual     = 'CAIDA';
+        _jefeNombresActivos = enCaida.map(j => j.nombre).join('+');
+    } else {
+        _jefeTipoActual     = 'SUBIDA';
+        _jefeNombresActivos = enSubida.map(j => j.nombre).join('+');
+    }
+    _jefeColaMonedas = [...simbolos];
+    _iniciarCicloJefes();
+}
+
+async function _iniciarCicloJefes() {
+    if (_jefeCicloActivo) return;
+    _jefeCicloActivo = true;
+
+    while (_jefeColaMonedas.length > 0) {
+        if (Date.now() < audioBloqueadoHasta) {
+            await _jefesSleep(2000);
+            continue;
+        }
+        const sym = _jefeColaMonedas.shift();
+        _analizarMonedalJefe(sym);
+        await _jefesSleep(10000);
+        if (_jefeColaMonedas.length > 0) {
+            _mostrarDescansoJefe();
+            await _jefesSleep(3000);
+        }
+    }
+
+    _jefeCicloActivo = false;
+    if (alertaActivaGlobal) {
+        actualizarAlertaGanadora(alertaActivaGlobal);
+    } else {
+        const wrap = document.getElementById('btnAlarmaUnificado');
+        if (wrap) wrap.style.display = 'none';
+    }
+}
+
+function _jefesSleep(ms) { return new Promise(r => setTimeout(r, ms)); }
+
+function _analizarMonedalJefe(sym) {
+    const c = cachedData[sym];
+    if (!c) return;
+
+    const nombre   = sym.replace('USDT','');
+    const vel2min  = c.cambioReal2Min || 0;
+    const pos      = c.posicionPorcentaje || 50;
+    const tipo     = _jefeTipoActual;
+    const jefeNom  = _jefeNombresActivos;
+    const restantes = _jefeColaMonedas.length;
+
+    let icono, titulo, sub, cuerpo, tipoEstado, textoVoz, esMasculino;
+
+    if (tipo === 'CAIDA') {
+        if (vel2min < -0.4) {
+            icono = '🔴'; tipoEstado = 'short'; esMasculino = false;
+            titulo  = `CUIDADO — ${nombre}`;
+            sub     = `${jefeNom} cae · ${nombre} ya reacciona ${vel2min.toFixed(2)}%`;
+            cuerpo  = `<span style="color:#fca5a5;"><b>${nombre}</b> ya reacciona a la caída de <b>${jefeNom}</b>: bajó <b>${Math.abs(vel2min).toFixed(2)}%</b> en 2 min. Si tienes LONG, riesgo <b>ELEVADO</b>. Considera salir.</span>`;
+            textoVoz = `Cuidado con ${nombre}. El jefe ${jefeNom} está cayendo y ${nombre} ya lo sigue, bajó ${Math.abs(vel2min).toFixed(2)} por ciento en dos minutos. Si tienes long, considera salir.`;
+        } else if (vel2min > 0.5) {
+            icono = '⚠️'; tipoEstado = 'alerta'; esMasculino = false;
+            titulo  = `TRAMPA — ${nombre}`;
+            sub     = `${jefeNom} cae · ${nombre} sube ${vel2min.toFixed(2)}% pero es temporal`;
+            cuerpo  = `<span style="color:#fde68a;"><b>${nombre}</b> sube <b>+${vel2min.toFixed(2)}%</b> mientras <b>${jefeNom}</b> cae. Posible trampa alcista: cuando el mercado procese la caída del jefe, la presión llegará aquí. <b>Salida recomendada.</b></span>`;
+            textoVoz = `Atención con ${nombre}. Sube mientras el jefe ${jefeNom} cae. Esto puede ser una trampa. Ten cuidado si tienes long.`;
+        } else {
+            icono = '🟡'; tipoEstado = 'alerta'; esMasculino = false;
+            titulo  = `VIGILAR — ${nombre}`;
+            sub     = `${jefeNom} cae · ${nombre} no reaccionó aún`;
+            cuerpo  = `<span style="color:#fde68a;"><b>${nombre}</b> no reaccionó todavía a la caída de <b>${jefeNom}</b> (2min: ${vel2min >= 0 ? '+' : ''}${vel2min.toFixed(2)}%). El arrastre puede llegar. Posición: <b>${pos.toFixed(0)}%</b> del rango.</span>`;
+            textoVoz = `${nombre} no reaccionó aún a la caída de ${jefeNom}. El arrastre puede llegar con retraso. Vigilar.`;
+        }
+    } else {
+        if (vel2min > 0.3) {
+            icono = '🟢'; tipoEstado = 'long'; esMasculino = true;
+            titulo  = `LONG ${nombre}`;
+            sub     = `${jefeNom} sube · ${nombre} acompaña +${vel2min.toFixed(2)}%`;
+            cuerpo  = `<span style="color:#6ee7b7;"><b>${nombre}</b> acompaña la subida de <b>${jefeNom}</b>: <b>+${vel2min.toFixed(2)}%</b> en 2 min. Correlación alcista activa.</span>`;
+            textoVoz = `${nombre} acompaña la subida de ${jefeNom}, subió ${vel2min.toFixed(2)} por ciento en dos minutos. Posible entrada long.`;
+        } else if (vel2min < -0.3) {
+            icono = '⚡'; tipoEstado = 'alerta'; esMasculino = true;
+            titulo  = `REZAGADA — ${nombre}`;
+            sub     = `${jefeNom} sube · ${nombre} baja — posible entrada`;
+            cuerpo  = `<span style="color:#a5b4fc;"><b>${nombre}</b> baja mientras <b>${jefeNom}</b> sube. Puede girar al alza con retraso. Oportunidad de entrada anticipada.</span>`;
+            textoVoz = `${nombre} baja mientras ${jefeNom} sube. Puede ser una oportunidad de entrada anticipada.`;
+        } else {
+            icono = '🔵'; tipoEstado = 'long'; esMasculino = true;
+            titulo  = `POSIBLE ENTRY — ${nombre}`;
+            sub     = `${jefeNom} sube · ${nombre} aún quieta`;
+            cuerpo  = `<span style="color:#93c5fd;"><b>${nombre}</b> no reaccionó aún a la subida de <b>${jefeNom}</b>. Posible entrada anticipada si el jefe mantiene impulso.</span>`;
+            textoVoz = `${nombre} no reaccionó todavía a la subida de ${jefeNom}. Puede ser una entrada anticipada. Evalúa.`;
+        }
+    }
+
+    _setUnifEstado({
+        tipo: tipoEstado, icono, titulo,
+        sub:  sub + ` · ${restantes} restantes`,
+        prob: tipo === 'CAIDA' ? '👑 JEFE' : '👑 JEFE',
+        cuerpo,
+        barra: `${Math.min(90, 50 + Math.abs(vel2min) * 10)}%`
+    });
+    const wrap = document.getElementById('btnAlarmaUnificado');
+    if (wrap) { wrap.style.display = 'block'; window._alarmaSideMoneda = sym; }
+    try { hablar(textoVoz, esMasculino); } catch(e) {}
+}
+
+function _mostrarDescansoJefe() {
+    _setUnifEstado({
+        tipo: 'espera', icono: '👑',
+        titulo: `JEFES · ${_jefeNombresActivos} — Descansando`,
+        sub: `${_jefeColaMonedas.length} monedas restantes`,
+        prob: '3s',
+        cuerpo: `<span style="color:#475569;">Próxima moneda en 3 segundos…</span>`,
+        barra: '30%'
+    });
+}
+
+setTimeout(() => {
+    setInterval(_fetchJefes, 5000);
+    _fetchJefes();
+}, 8000);
+
 </script>
 </body>
 </html>
