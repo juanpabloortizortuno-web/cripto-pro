@@ -1100,6 +1100,34 @@
 let cachedData = {};
 
 // ══════════════════════════════════════════════════════════════════
+// 🧠 MEMORIA IA — Historial de monedas vistas (de SUPERRR_GENIAL_2)
+// Guarda hasta 1000 registros en localStorage. Con 5+ registros de
+// una moneda calcula el promedio de cambio y detecta patrón histórico.
+// ══════════════════════════════════════════════════════════════════
+let memoriaIA = JSON.parse(localStorage.getItem("cdc_memoria") || "[]");
+
+function _iaAprenderMoneda(c) {
+    memoriaIA.push({
+        symbol: c.symbol,
+        price: c.price,
+        change: c.change,
+        distLow: c.posicionPorcentaje,
+        fecha: Date.now()
+    });
+    if (memoriaIA.length > 1000) memoriaIA.shift();
+    localStorage.setItem("cdc_memoria", JSON.stringify(memoriaIA));
+}
+
+function _iaAnalizarPatron(symbol) {
+    const historial = memoriaIA.filter(x => x.symbol === symbol);
+    if (historial.length < 5) return "📚 Aprendiendo... (" + historial.length + "/5 registros)";
+    const promedio = historial.reduce((a, b) => a + b.change, 0) / historial.length;
+    if (promedio > 3)  return "🟢 Patrón históricamente <b>alcista</b> (prom. +" + promedio.toFixed(2) + "%)";
+    if (promedio < -3) return "🔴 Patrón históricamente <b>bajista</b> (prom. " + promedio.toFixed(2) + "%)";
+    return "🟡 Patrón <b>neutral</b> (prom. " + promedio.toFixed(2) + "%)";
+}
+
+// ══════════════════════════════════════════════════════════════════
 // 🎯 FILTRO DE FUTUROS USDT-M — solo trabajamos con monedas que tengan
 // contrato REAL en Binance Futures USDT-M (perpetuo), aunque el precio
 // se obtenga de la API de spot. Así el botón "OPERAR YA" / link siempre
@@ -3965,10 +3993,24 @@ function actualizarTablaIzquierda() {
         const barColor = posBar >= 90 ? '#ff3c00' : posBar <= 10 ? '#0ecb81' : posBar >= 70 ? '#f3ba2f' : '#334155';
         const barraRango = `<div style="height:2px;background:rgba(255,255,255,0.06);border-radius:2px;margin-top:3px;overflow:hidden;"><div style="height:100%;width:${posBar}%;background:${barColor};border-radius:2px;transition:width 0.4s;"></div></div>`;
 
+        // ── BADGES DE SUPERRR_GENIAL_2 ──────────────────────────────
+        const _distLow = c.posicionPorcentaje; // alias semántico
+        const _badgeDoji      = Math.abs(c.change) < 0.5
+            ? '<span style="color:#94a3b8;font-size:9px;font-weight:900;margin-left:3px;">⚪Doji</span>' : '';
+        const _badgeExplosion = c.change >= 12
+            ? '<span style="color:#0ecb81;font-size:9px;font-weight:900;margin-left:3px;">💣Explosión</span>' : '';
+        const _badgeCascada   = c.change <= -12
+            ? '<span style="color:#4fc3f7;font-size:9px;font-weight:900;margin-left:3px;">🌊Cascada</span>' : '';
+        const _badgeRebote    = (c.price <= (c.low * 1.03) && c.change > 1)
+            ? '<span style="color:#00d4ff;font-size:9px;font-weight:900;margin-left:3px;">🧲Rebote</span>' : '';
+        const _badgeBallena   = (c.volume > 50000000 && Math.abs(c.change) > 4)
+            ? '<span style="color:#f3ba2f;font-size:9px;font-weight:900;margin-left:3px;">🐋Ballena</span>' : '';
+        const _badgesExtra = _badgeDoji + _badgeExplosion + _badgeCascada + _badgeRebote + _badgeBallena;
+
         let colorCambio = c.change > 0 ? "var(--accent-green)" : "var(--accent-glow)";
         tr.innerHTML = `
             <td style="font-weight:700;">
-                ${iconoAlarma}${symbol.replace("USDT","")} <span style="font-size:10px; color:var(--text-dim);">USDT</span>
+                ${iconoAlarma}${symbol.replace("USDT","")} <span style="font-size:10px; color:var(--text-dim);">USDT</span>${_badgesExtra}
                 ${subEtiqueta || badgeMaxMin}
                 ${barraRango}
             </td>
@@ -3992,6 +4034,8 @@ function actualizarTablaIzquierda() {
 function seleccionarMoneda(symbol) {
     initAudio(); 
     selectedCoin = symbol;
+    // Registrar en memoria IA
+    if (cachedData[symbol]) _iaAprenderMoneda(cachedData[symbol]);
     // Reiniciar el temporizador: el bot no cambia de moneda por 5 segundos después de un click manual
     tiempoUltimoCambioAuto = Date.now();
 
@@ -5349,6 +5393,19 @@ function actualizarTacometroDerecho() {
                 <div class="indicator-label"><i class="fas fa-wave-square"></i> RSI (14)</div>
                 <div class="indicator-value" style="color:${colorRSI};">${rsiTexto}</div>
                 <div style="font-size:9px; color:var(--text-dim); font-weight:700; text-transform:uppercase;">${estadoRSI}</div>
+            </div>
+        </div>
+
+        <!-- BLOQUE MEMORIA IA (de SUPERRR_GENIAL_2) -->
+        <div style="background:rgba(14,203,129,0.06); border:1px solid rgba(14,203,129,0.2); border-radius:12px; padding:14px; margin-top:14px;">
+            <div style="font-size:11px; font-weight:900; color:#0ecb81; text-transform:uppercase; letter-spacing:1px; margin-bottom:8px;">🧠 MEMORIA IA — PATRÓN HISTÓRICO</div>
+            <div style="font-size:12px; color:#e2e8f0; line-height:1.6;">
+                ${_iaAnalizarPatron(selectedCoin)}
+                <br>
+                <span style="color:#64748b; font-size:10px;">
+                    📚 Registros totales: ${memoriaIA.length} &nbsp;|&nbsp;
+                    ${selectedCoin}: ${memoriaIA.filter(x=>x.symbol===selectedCoin).length} visitas
+                </span>
             </div>
         </div>
 
