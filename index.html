@@ -1273,6 +1273,8 @@ let soporteCDC = {};
 let resistenciaCDC = {};
 let riesgoCDC = {};
 let senalCDC = {};
+let listaPrioridadesGlobal = []; // expuesta para que Motor y alarmas la lean
+let alertaActivaGlobal = null;   // expuesta globalmente
 let cerebroCDC = {};
 let prediccionCDC = {};
 let simulaciones = [];
@@ -3412,8 +3414,9 @@ async function obtenerDatosBinance() {
         const data = await response.json();
         fallosBinanceConsecutivos = 0;
         
-        let alertaActivaGlobal = null; 
-        let listaPrioridades = [];
+        alertaActivaGlobal = null; 
+        listaPrioridadesGlobal = []; // reset cada ciclo
+        let listaPrioridades = listaPrioridadesGlobal; // alias → apunta a la global
         
         data.forEach(item => {
             const precio = parseFloat(item.lastPrice);
@@ -3807,16 +3810,15 @@ function actualizarTablaIzquierda() {
         rebotando.sort((a, b) => (datosEMA[b.symbol]?.subidaDesdeMinimo || 0) - (datosEMA[a.symbol]?.subidaDesdeMinimo || 0));
         resto.sort((a, b) => Math.abs(b.cambioReal2Min) - Math.abs(a.cambioReal2Min));
 
-        // Avisar en el ticker Y por voz cuando una moneda nueva entra al filtro de despegue real
-        // ── Solo monedas visibles en la lista central (extremos del rango 24h) ──
-        const COOLDOWN_DESPEGUE_VOZ = 5 * 60 * 1000; // 5 minutos entre avisos de la misma moneda
+        // ── ALERTAS DE VOZ: solo monedas que la IA tiene en su lista de prioridades ──
+        // Despegues: solo si están en listaPrioridadesGlobal (tipo DESPEGUE o REBOTE)
+        const COOLDOWN_DESPEGUE_VOZ = 5 * 60 * 1000;
         const ahoraDespegue = Date.now();
-        // Encolar todas las alertas de despegue en orden: la cola garantiza que
-        // una moneda termina de leerse ANTES de que empiece la siguiente.
+        const symbolsEnIA = new Set(listaPrioridadesGlobal.map(p => p.symbol));
+
         despegando.forEach(c => {
-            const d = cachedData[c.symbol];
-            // Solo monedas visibles en la lista central (extremos del rango 24h)
-            if (!d || (d.posicionPorcentaje < 75 && d.posicionPorcentaje > 25)) return;
+            // Solo si la IA la tiene en su lista (modo alcista activo y está en prioridades)
+            if (!symbolsEnIA.has(c.symbol)) return;
             const e = datosEMA[c.symbol];
             const nombre = c.symbol.replace('USDT', '');
             const ultimoAviso = ultimosDespeguesAlertados[c.symbol] || 0;
@@ -3824,19 +3826,15 @@ function actualizarTablaIzquierda() {
                 ultimosDespeguesAlertados[c.symbol] = ahoraDespegue;
                 const pct = e.subidaDesdeMinimo.toFixed(1);
                 const textoVoz = `¡Alerta de despegue! ${nombre} está despegando desde su mínimo de 48 horas. Las EMAs 7, 25 y 99 están alineadas alcistas y el precio subió ${pct} por ciento desde el piso. Es momento de evaluar una entrada larga con stop bajo el mínimo reciente.`;
-                // Encolar directo — la cola procesa una por una, sin setTimeout que se pisen
                 hablar(textoVoz, true);
             }
         });
 
-        // Avisar en el ticker Y por voz cuando una moneda entra al filtro de REBOTE TRAS CAÍDA
-        // ── Solo monedas visibles en la lista central (extremos del rango 24h) ──
         const COOLDOWN_REBOTE_VOZ = 5 * 60 * 1000;
         const ahoraRebote = Date.now();
         rebotando.forEach(c => {
-            const d = cachedData[c.symbol];
-            // Solo monedas visibles en la lista central (extremos del rango 24h)
-            if (!d || (d.posicionPorcentaje < 75 && d.posicionPorcentaje > 25)) return;
+            // Solo si la IA la tiene en su lista (modo alcista activo y está en prioridades)
+            if (!symbolsEnIA.has(c.symbol)) return;
             const e = datosEMA[c.symbol];
             const nombre = c.symbol.replace('USDT', '');
             const ultimoAviso = ultimosReboteAlertados[c.symbol] || 0;
@@ -3844,7 +3842,6 @@ function actualizarTablaIzquierda() {
                 ultimosReboteAlertados[c.symbol] = ahoraRebote;
                 const pct = e.subidaDesdeMinimo.toFixed(1);
                 const textoVoz = `Atención. ${nombre} venía cayendo en las últimas 24 horas y ahora está mostrando un rebote. Subió ${pct} por ciento desde su mínimo reciente y la EMA 7 ya está girando hacia arriba. Vigilá una posible entrada en largo.`;
-                // Encolar directo — la cola procesa una por una, sin setTimeout que se pisen
                 hablar(textoVoz, true);
             }
         });
@@ -5374,71 +5371,60 @@ function actualizarTacometroDerecho() {
         <!-- ── MOTOR LONG/SHORT: señales activas de mercado ── -->
         ${(function() {
             const motorItems = [];
-            // Solo monedas visibles en la lista central (extremos del rango 24h, igual que actualizarTablaIzquierda)
-            const UMBRAL_EXTREMO = 75;
-            const todosSymbols = Object.keys(cachedData).filter(s => {
-                const d = cachedData[s];
-                if (!d) return false;
-                return d.posicionPorcentaje >= UMBRAL_EXTREMO || d.posicionPorcentaje <= (100 - UMBRAL_EXTREMO);
+            const esLong = modoMercado === 'alcista';
+
+            // Tipos LONG: REBOTE, REVERSION, PATRON_60_8, DESPEGUE (+ BOMBA en cualquier modo)
+            // Tipos SHORT: DERRUMBE, AGOTADO (+ BOMBA en bajista)
+            const tiposLong  = new Set(['REBOTE','REVERSION','PATRON_60_8','DESPEGUE','BOMBA']);
+            const tiposShort = new Set(['DERRUMBE','AGOTADO','BOMBA']);
+            const tiposActivos = esLong ? tiposLong : tiposShort;
+
+            // Filtrar listaPrioridadesGlobal según el modo activo — solo las monedas que la IA estudia
+            const señalesIA = listaPrioridadesGlobal.filter(p => tiposActivos.has(p.tipo));
+
+            señalesIA.forEach(p => {
+                const s  = p.symbol;
+                const c2 = cachedData[s];
+                const e  = datosEMA[s];
+                if (!c2) return;
+                const nombre = s.replace('USDT','');
+
+                if (p.tipo === 'DESPEGUE' || p.tipo === 'REBOTE' || p.tipo === 'REVERSION' || p.tipo === 'PATRON_60_8') {
+                    const pct = e ? e.subidaDesdeMinimo.toFixed(1) : '?';
+                    const label = p.tipo === 'DESPEGUE' ? 'DESPEGUE EMA' : p.tipo === 'REBOTE' ? 'REBOTE' : p.tipo === 'REVERSION' ? 'REVERSIÓN CRASH' : 'PATRÓN -60%';
+                    const color = p.tipo === 'REBOTE' ? '#00d4ff' : '#0ecb81';
+                    const bg    = p.tipo === 'REBOTE' ? 'rgba(0,212,255,0.08)' : 'rgba(14,203,129,0.1)';
+                    const emoji = p.tipo === 'DESPEGUE' ? '🚀' : p.tipo === 'REBOTE' ? '🔄' : '📈';
+                    motorItems.push(`<div style="display:flex;align-items:center;justify-content:space-between;padding:5px 8px;border-radius:7px;background:${bg};border-left:3px solid ${color};margin-bottom:4px;">
+                        <span style="font-size:12px;font-weight:900;color:${color};">${emoji} ${nombre}</span>
+                        <span style="font-size:10px;color:${color};font-weight:700;">${label} +${pct}%</span>
+                    </div>`);
+                } else if (p.tipo === 'BOMBA') {
+                    motorItems.push(`<div style="display:flex;align-items:center;justify-content:space-between;padding:5px 8px;border-radius:7px;background:rgba(14,203,129,0.15);border-left:3px solid #0ecb81;margin-bottom:4px;">
+                        <span style="font-size:12px;font-weight:900;color:#0ecb81;">💥 ${nombre}</span>
+                        <span style="font-size:10px;color:#6ee7b7;font-weight:700;">BOMBA +${c2.cambioReal2Min.toFixed(2)}% /2min</span>
+                    </div>`);
+                } else if (p.tipo === 'DERRUMBE') {
+                    motorItems.push(`<div style="display:flex;align-items:center;justify-content:space-between;padding:5px 8px;border-radius:7px;background:rgba(255,42,59,0.1);border-left:3px solid #ff2a3b;margin-bottom:4px;">
+                        <span style="font-size:12px;font-weight:900;color:#ff2a3b;">📉 ${nombre}</span>
+                        <span style="font-size:10px;color:#fca5a5;font-weight:700;">DERRUMBE ${c2.cambioReal2Min.toFixed(2)}% /2min</span>
+                    </div>`);
+                } else if (p.tipo === 'AGOTADO') {
+                    motorItems.push(`<div style="display:flex;align-items:center;justify-content:space-between;padding:5px 8px;border-radius:7px;background:rgba(243,186,47,0.1);border-left:3px solid #f3ba2f;margin-bottom:4px;">
+                        <span style="font-size:12px;font-weight:900;color:#f3ba2f;">⚠️ ${nombre}</span>
+                        <span style="font-size:10px;color:#fde68a;font-weight:700;">AGOTAMIENTO ${c2.posicionPorcentaje.toFixed(0)}% rango</span>
+                    </div>`);
+                }
             });
 
-            // Despegues EMA
-            const despegues = todosSymbols.filter(s => esDespegueReal(s)).slice(0, 5);
-            despegues.forEach(s => {
-                const e = datosEMA[s]; const nombre = s.replace('USDT','');
-                motorItems.push(`<div style="display:flex;align-items:center;justify-content:space-between;padding:5px 8px;border-radius:7px;background:rgba(14,203,129,0.1);border-left:3px solid #0ecb81;margin-bottom:4px;">
-                    <span style="font-size:12px;font-weight:900;color:#0ecb81;">🚀 ${nombre}</span>
-                    <span style="font-size:10px;color:#6ee7b7;font-weight:700;">DESPEGUE EMA +${e.subidaDesdeMinimo.toFixed(1)}%</span>
-                </div>`);
-            });
-
-            // Rebotes tras caída
-            const rebotes = todosSymbols.filter(s => !esDespegueReal(s) && esReboteTrasCaida(s)).slice(0, 5);
-            rebotes.forEach(s => {
-                const e = datosEMA[s]; const c2 = cachedData[s]; const nombre = s.replace('USDT','');
-                motorItems.push(`<div style="display:flex;align-items:center;justify-content:space-between;padding:5px 8px;border-radius:7px;background:rgba(0,212,255,0.08);border-left:3px solid #00d4ff;margin-bottom:4px;">
-                    <span style="font-size:12px;font-weight:900;color:#00d4ff;">🔄 ${nombre}</span>
-                    <span style="font-size:10px;color:#8be9ff;font-weight:700;">REBOTE +${e.subidaDesdeMinimo.toFixed(1)}%</span>
-                </div>`);
-            });
-
-            // Bombas / subidas fuertes
-            const bombas = todosSymbols.filter(s => cachedData[s] && cachedData[s].alertaBombaSubida).slice(0, 5);
-            bombas.forEach(s => {
-                const c2 = cachedData[s]; const nombre = s.replace('USDT','');
-                motorItems.push(`<div style="display:flex;align-items:center;justify-content:space-between;padding:5px 8px;border-radius:7px;background:rgba(14,203,129,0.15);border-left:3px solid #0ecb81;margin-bottom:4px;">
-                    <span style="font-size:12px;font-weight:900;color:#0ecb81;">💥 ${nombre}</span>
-                    <span style="font-size:10px;color:#6ee7b7;font-weight:700;">BOMBA +${c2.cambioReal2Min.toFixed(2)}% /2min</span>
-                </div>`);
-            });
-
-            // Caídas / derrumbes
-            const caidas = todosSymbols.filter(s => cachedData[s] && cachedData[s].alertaDerrumbe).slice(0, 5);
-            caidas.forEach(s => {
-                const c2 = cachedData[s]; const nombre = s.replace('USDT','');
-                motorItems.push(`<div style="display:flex;align-items:center;justify-content:space-between;padding:5px 8px;border-radius:7px;background:rgba(255,42,59,0.1);border-left:3px solid #ff2a3b;margin-bottom:4px;">
-                    <span style="font-size:12px;font-weight:900;color:#ff2a3b;">📉 ${nombre}</span>
-                    <span style="font-size:10px;color:#fca5a5;font-weight:700;">CAÍDA ${c2.cambioReal2Min.toFixed(2)}% /2min</span>
-                </div>`);
-            });
-
-            // Agotamientos
-            const agotados = todosSymbols.filter(s => cachedData[s] && cachedData[s].alertaAgotamientoSubida).slice(0, 3);
-            agotados.forEach(s => {
-                const c2 = cachedData[s]; const nombre = s.replace('USDT','');
-                motorItems.push(`<div style="display:flex;align-items:center;justify-content:space-between;padding:5px 8px;border-radius:7px;background:rgba(243,186,47,0.1);border-left:3px solid #f3ba2f;margin-bottom:4px;">
-                    <span style="font-size:12px;font-weight:900;color:#f3ba2f;">⚠️ ${nombre}</span>
-                    <span style="font-size:10px;color:#fde68a;font-weight:700;">AGOTAMIENTO ${c2.posicionPorcentaje.toFixed(0)}% rango</span>
-                </div>`);
-            });
-
+            const titulo = esLong ? '⚡ MOTOR LONG — SEÑALES IA' : '⚡ MOTOR SHORT — SEÑALES IA';
             if (motorItems.length === 0) return `<div style="background:#060b16;border:1px solid rgba(255,255,255,0.05);border-radius:10px;padding:10px;margin-bottom:12px;">
-                <div style="font-size:11px;font-weight:900;color:#f3ba2f;margin-bottom:6px;">⚡ MOTOR LONG/SHORT</div>
+                <div style="font-size:11px;font-weight:900;color:#f3ba2f;margin-bottom:6px;">${titulo}</div>
                 <div style="font-size:11px;color:#475569;text-align:center;padding:8px 0;">⏳ Sin señales activas ahora mismo...</div>
             </div>`;
 
             return `<div style="background:#060b16;border:1px solid rgba(255,255,255,0.05);border-radius:10px;padding:10px;margin-bottom:12px;">
-                <div style="font-size:11px;font-weight:900;color:#f3ba2f;margin-bottom:8px;">⚡ MOTOR LONG/SHORT — SEÑALES ACTIVAS (${motorItems.length})</div>
+                <div style="font-size:11px;font-weight:900;color:#f3ba2f;margin-bottom:8px;">${titulo} (${motorItems.length})</div>
                 ${motorItems.join('')}
             </div>`;
         })()}
