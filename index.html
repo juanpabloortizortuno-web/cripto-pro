@@ -197,6 +197,29 @@
         }
         .radar-scanning { animation: radar-scan 1s infinite; }
 
+        /* ── FOCO IA: highlight animado de la moneda que la IA tiene en la mira ── */
+        @keyframes ia-foco-pulse {
+            0%   { box-shadow: inset 3px 0 0 #f3ba2f, 0 0 0 rgba(243,186,47,0); }
+            50%  { box-shadow: inset 3px 0 0 #f3ba2f, 0 0 14px rgba(243,186,47,0.55); }
+            100% { box-shadow: inset 3px 0 0 #f3ba2f, 0 0 0 rgba(243,186,47,0); }
+        }
+        tr.ia-foco-row {
+            animation: ia-foco-pulse 1.2s infinite !important;
+            background: rgba(243,186,47,0.09) !important;
+            border-left: 3px solid #f3ba2f !important;
+            position: relative;
+        }
+        tr.ia-foco-row::after {
+            content: '🤖 IA';
+            position: absolute;
+            right: 6px; top: 50%; transform: translateY(-50%);
+            font-size: 9px; font-weight: 900;
+            color: #f3ba2f;
+            background: rgba(243,186,47,0.12);
+            padding: 2px 6px; border-radius: 8px;
+            pointer-events: none;
+        }
+
         body { margin: 0; font-family: 'Inter', sans-serif; background: var(--bg-deep); color: var(--text-main); overflow: hidden; }
         header { display: flex; justify-content: space-between; align-items: center; padding: 0 20px; background: #060b16; border-bottom: 1px solid rgba(255, 255, 255, 0.03); height: 60px; }
         .brand b { font-size: 16px; font-weight: 900; color: var(--accent-gold); }
@@ -1325,7 +1348,14 @@ if (radarFijado) {
     btn.textContent = "🟢 SEGUIMIENTO EXCLUSIVO";
 
 
-reproducirAlertaVoz("Seguimiento exclusivo activado. Monitoreando únicamente la moneda seleccionada.");
+// Cancelar todo audio en curso y limpiar cola — solo habla de esta moneda
+try { window.speechSynthesis.cancel(); } catch(e) {}
+colaVoz = [];
+vozHablandoAhora = false;
+audioBloqueadoHasta = 0;
+ultimaMonedaHablada = "";
+ultimoTipoAlertaHablada = "";
+reproducirAlertaVoz("Seguimiento exclusivo activado. Todo el poder a " + (selectedCoin ? selectedCoin.replace("USDT","") : "la moneda seleccionada") + ".");
 
     contadorAvisosMismoEstado = 0;
 
@@ -1337,7 +1367,13 @@ reproducirAlertaVoz("Seguimiento exclusivo activado. Monitoreando únicamente la
     btn.textContent = "🔴 RADAR AUTOMÁTICO";
 
     document.getElementById("alertaMonedaFija").style.display = "none";
-
+    // Limpiar estado de voz para que el radar arranque sin arrastre del exclusivo
+    try { window.speechSynthesis.cancel(); } catch(e) {}
+    colaVoz = [];
+    vozHablandoAhora = false;
+    audioBloqueadoHasta = 0;
+    ultimaMonedaHablada = "";
+    ultimoTipoAlertaHablada = "";
     reproducirAlertaVoz("Radar automático activado. Retomando el análisis completo del mercado.");
 }
         }
@@ -1739,10 +1775,11 @@ Ten en cuenta: si lleva muchas horas cayendo desde su máximo y está cerca del 
 // BOTÓN UNIFICADO DE SEÑAL + ALARMA (nuevo diseño)
 // ══════════════════════════════════════════════════
 function manejarClickAlarmaUnificada() {
-    if (window._alarmaSideMoneda && window._alarmaSideMoneda !== selectedCoin) {
-        seleccionarMoneda(window._alarmaSideMoneda);
-    } else if (selectedCoin) {
-        abrirBinanceAlarma();
+    // Siempre llevar al panel central — nunca abrir Binance desde aquí
+    const objetivo = window._alarmaSideMoneda || (alertaActivaGlobal && alertaActivaGlobal.symbol) || selectedCoin;
+    if (objetivo) {
+        seleccionarMoneda(objetivo);
+        window.scrollTo({ top: 0, behavior: 'smooth' });
     }
 }
 
@@ -3680,79 +3717,86 @@ async function obtenerDatosBinance() {
             }
         });
         
+        // ── ENRIQUECER listaPrioridades con monedas de la lista 24h (extremos) y radares ──
+        // Esto garantiza que la IA siempre tenga candidatas aunque no haya señales estrictas.
+        const UMBRAL_EXTREMO_IA = 75;
+        const todasCached = Object.values(cachedData);
+
+        // Monedas en zona de máximo 24h (posición ≥75%)
+        todasCached.filter(c => c.posicionPorcentaje >= UMBRAL_EXTREMO_IA).forEach(c => {
+            const yaEsta = listaPrioridades.some(p => p.symbol === c.symbol);
+            if (!yaEsta) {
+                const score = 10 + c.posicionPorcentaje * 0.3 + Math.abs(c.cambioReal2Min) * 5;
+                listaPrioridades.push({ symbol: c.symbol, tipo: "MAXIMO_24H", score });
+            }
+        });
+
+        // Monedas en zona de mínimo 24h (posición ≤25%)
+        todasCached.filter(c => c.posicionPorcentaje <= (100 - UMBRAL_EXTREMO_IA)).forEach(c => {
+            const yaEsta = listaPrioridades.some(p => p.symbol === c.symbol);
+            if (!yaEsta) {
+                const score = 10 + (100 - UMBRAL_EXTREMO_IA - c.posicionPorcentaje) * 0.5 + Math.abs(c.cambioReal2Min) * 5;
+                listaPrioridades.push({ symbol: c.symbol, tipo: "MINIMO_24H", score });
+            }
+        });
+
+        // Monedas del radar: despegue EMA, rebote, techo, momentum alto
+        todasCached.forEach(c => {
+            const yaEsta = listaPrioridades.some(p => p.symbol === c.symbol);
+            if (yaEsta) return;
+            if (esDespegueReal(c.symbol)) {
+                listaPrioridades.push({ symbol: c.symbol, tipo: "DESPEGUE", score: 80 + momentumScore(c.symbol) });
+            } else if (esReboteTrasCaida(c.symbol)) {
+                listaPrioridades.push({ symbol: c.symbol, tipo: "REBOTE_RADAR", score: 60 + momentumScore(c.symbol) });
+            } else if (detectarEnTechoProximaCaida(c)) {
+                listaPrioridades.push({ symbol: c.symbol, tipo: "TECHO_RADAR", score: 50 + calcularScoreTecho(c) });
+            } else if (detectarMomentumAlto(c)) {
+                listaPrioridades.push({ symbol: c.symbol, tipo: "MOMENTUM", score: 40 + calcularScoreMomentum(c) });
+            }
+        });
+
         // Manejo automático de prioridades de alerta
         if (listaPrioridades.length > 0) {
             listaPrioridades.sort((a, b) => b.score - a.score);
 
-            // En modo LONG rotamos entre las candidatas para que el sistema las muestre todas
-            // En modo SHORT siempre enfocamos la de mayor score (comportamiento original)
-            let foco;
-            if (modoMercado === 'alcista' && listaPrioridades.length > 1) {
-                // Rotar: el indice avanza cada vez que se hace un cambio exitoso
-                indiceRotacionLong = indiceRotacionLong % listaPrioridades.length;
-                foco = listaPrioridades[indiceRotacionLong];
-            } else {
-                foco = listaPrioridades[0];
-            }
-            alertaActivaGlobal = foco;
-            
+            // Siempre rotamos entre candidatas (en cualquier modo) para que la IA nunca se quede fija
             const ahora = Date.now();
-            const audioHablando = ahora < audioBloqueadoHasta || vozHablandoAhora;
-            // No cambiar de moneda mientras el audio esté hablando — esperar a que termine
-            const puedeoCambiar = (ahora - tiempoUltimoCambioAuto) >= BLOQUEO_CAMBIO_MS && !audioHablando;
-
-            // Cambia de moneda solo cuando terminó de hablar Y pasó el cooldown
-            if (!radarFijado && puedeoCambiar) {
-                // En LONG: cambia aunque sea la misma (para rotar), en SHORT: solo si es diferente
-                const debeRotar = modoMercado === 'alcista' || selectedCoin !== foco.symbol;
-                if (debeRotar) {
+            if (listaPrioridades.length > 1) {
+                if ((ahora - tiempoUltimoCambioAuto) >= BLOQUEO_CAMBIO_MS) {
                     tiempoUltimoCambioAuto = ahora;
-                    if (modoMercado === 'alcista') indiceRotacionLong = (indiceRotacionLong + 1) % listaPrioridades.length;
-                    selectedCoin = foco.symbol;
-                    document.getElementById("linkBinance").style.display = "flex";
-                    document.getElementById("linkBinance").href = `https://www.binance.com/es/futures/${selectedCoin}`;
-                    document.getElementById("linkApp").style.display = "flex";
-                    // Mostrar la moneda en el panel central (ocultar bienvenida si aún está visible)
-                    const bienvenida = document.getElementById("bienvenidaScreen");
-                    if (bienvenida) bienvenida.style.display = "none";
-                    calcularPrediccionCDC(selectedCoin);
-                    actualizarPanelCentral();
-                    actualizarTacometroDerecho();
-                    actualizarBotonAlarmaLateral(selectedCoin);
+                    indiceRotacionLong = (indiceRotacionLong + 1) % listaPrioridades.length;
                 }
             }
-if (radarFijado) {
+            indiceRotacionLong = indiceRotacionLong % listaPrioridades.length;
 
-    if (
-        foco.symbol === selectedCoin &&
-        (
-            ultimaMonedaHablada !== foco.symbol ||
-            ultimoTipoAlertaHablada !== foco.tipo
-        )
-    ) {
+            let foco = listaPrioridades[indiceRotacionLong];
+            alertaActivaGlobal = foco;
 
-        if (!audioHablando) {
-            ultimaMonedaHablada = foco.symbol;
-            ultimoTipoAlertaHablada = foco.tipo;
-            playAlarmVoice(foco.symbol, foco.tipo);
-        }
-    }
+            // ── Highlight visual: marcar la moneda en foco de la IA en la lista izquierda ──
+            window._iaFocoSymbol = foco.symbol;
 
-} else {
+            const audioHablando = ahora < audioBloqueadoHasta || vozHablandoAhora;
 
+            // ── REGLA: la IA NUNCA cambia la moneda del panel por su cuenta ──
+            // La moneda del panel la elige el usuario con un click en el Motor.
+// ── ALARMA DE VOZ: solo habla de la moneda que está en el panel central ──
+// En seguimiento exclusivo: 100% de foco en selectedCoin, ignora todo lo demás.
+// En modo automático: la IA avisa solo si el foco coincide con el panel actual.
+const focoEsPanel = foco.symbol === selectedCoin;
+
+if (focoEsPanel) {
     if (
         ultimaMonedaHablada !== foco.symbol ||
         ultimoTipoAlertaHablada !== foco.tipo
     ) {
-
         if (!audioHablando) {
             ultimaMonedaHablada = foco.symbol;
             ultimoTipoAlertaHablada = foco.tipo;
             playAlarmVoice(foco.symbol, foco.tipo);
         }
     }
-
 }
+// Si el foco de la IA es otra moneda, espera — no interrumpe ni cambia el panel.
 
 } else {
     ultimaMonedaHablada = "";
@@ -3873,6 +3917,11 @@ function actualizarTablaIzquierda() {
         if (selectedCoin && selectedCoin === symbol) {
             tr.style.background = "rgba(243, 186, 47, 0.12)";
             tr.style.borderLeft = "4px solid var(--accent-gold)";
+        }
+
+        // ── Resaltar foco actual de la IA (la moneda que la IA está estudiando ahora) ──
+        if (window._iaFocoSymbol && window._iaFocoSymbol === symbol && symbol !== selectedCoin) {
+            tr.classList.add('ia-foco-row');
         }
 
         let subEtiqueta = '';
@@ -5353,6 +5402,10 @@ function actualizarTacometroDerecho() {
                 const e  = datosEMA[s];
                 if (!c2) return;
                 const nombre = s.replace('USDT','');
+                const esActiva = s === selectedCoin;
+                // Borde extra si es la moneda activa en el panel
+                const borderActivo = esActiva ? ';box-shadow:0 0 0 2px #f3ba2f;' : '';
+                const badgeActivo  = esActiva ? `<span style="font-size:9px;background:#f3ba2f;color:#000;font-weight:900;padding:1px 5px;border-radius:4px;margin-left:4px;">EN PANEL</span>` : '';
 
                 if (p.tipo === 'DESPEGUE' || p.tipo === 'REBOTE' || p.tipo === 'REVERSION' || p.tipo === 'PATRON_60_8') {
                     const pct = e ? e.subidaDesdeMinimo.toFixed(1) : '?';
@@ -5360,36 +5413,38 @@ function actualizarTacometroDerecho() {
                     const color = p.tipo === 'REBOTE' ? '#00d4ff' : '#0ecb81';
                     const bg    = p.tipo === 'REBOTE' ? 'rgba(0,212,255,0.08)' : 'rgba(14,203,129,0.1)';
                     const emoji = p.tipo === 'DESPEGUE' ? '🚀' : p.tipo === 'REBOTE' ? '🔄' : '📈';
-                    motorItems.push(`<div style="display:flex;align-items:center;justify-content:space-between;padding:5px 8px;border-radius:7px;background:${bg};border-left:3px solid ${color};margin-bottom:4px;">
-                        <span style="font-size:12px;font-weight:900;color:${color};">${emoji} ${nombre}</span>
+                    motorItems.push(`<div onclick="seleccionarMoneda('${s}')" style="display:flex;align-items:center;justify-content:space-between;padding:5px 8px;border-radius:7px;background:${bg};border-left:3px solid ${color};margin-bottom:4px;cursor:pointer;${borderActivo}" title="Llevar ${nombre} al panel central">
+                        <span style="font-size:12px;font-weight:900;color:${color};">${emoji} ${nombre}${badgeActivo}</span>
                         <span style="font-size:10px;color:${color};font-weight:700;">${label} +${pct}%</span>
                     </div>`);
                 } else if (p.tipo === 'BOMBA') {
-                    motorItems.push(`<div style="display:flex;align-items:center;justify-content:space-between;padding:5px 8px;border-radius:7px;background:rgba(14,203,129,0.15);border-left:3px solid #0ecb81;margin-bottom:4px;">
-                        <span style="font-size:12px;font-weight:900;color:#0ecb81;">💥 ${nombre}</span>
+                    motorItems.push(`<div onclick="seleccionarMoneda('${s}')" style="display:flex;align-items:center;justify-content:space-between;padding:5px 8px;border-radius:7px;background:rgba(14,203,129,0.15);border-left:3px solid #0ecb81;margin-bottom:4px;cursor:pointer;${borderActivo}" title="Llevar ${nombre} al panel central">
+                        <span style="font-size:12px;font-weight:900;color:#0ecb81;">💥 ${nombre}${badgeActivo}</span>
                         <span style="font-size:10px;color:#6ee7b7;font-weight:700;">BOMBA +${c2.cambioReal2Min.toFixed(2)}% /2min</span>
                     </div>`);
                 } else if (p.tipo === 'DERRUMBE') {
-                    motorItems.push(`<div style="display:flex;align-items:center;justify-content:space-between;padding:5px 8px;border-radius:7px;background:rgba(255,42,59,0.1);border-left:3px solid #ff2a3b;margin-bottom:4px;">
-                        <span style="font-size:12px;font-weight:900;color:#ff2a3b;">📉 ${nombre}</span>
+                    motorItems.push(`<div onclick="seleccionarMoneda('${s}')" style="display:flex;align-items:center;justify-content:space-between;padding:5px 8px;border-radius:7px;background:rgba(255,42,59,0.1);border-left:3px solid #ff2a3b;margin-bottom:4px;cursor:pointer;${borderActivo}" title="Llevar ${nombre} al panel central">
+                        <span style="font-size:12px;font-weight:900;color:#ff2a3b;">📉 ${nombre}${badgeActivo}</span>
                         <span style="font-size:10px;color:#fca5a5;font-weight:700;">DERRUMBE ${c2.cambioReal2Min.toFixed(2)}% /2min</span>
                     </div>`);
                 } else if (p.tipo === 'AGOTADO') {
-                    motorItems.push(`<div style="display:flex;align-items:center;justify-content:space-between;padding:5px 8px;border-radius:7px;background:rgba(243,186,47,0.1);border-left:3px solid #f3ba2f;margin-bottom:4px;">
-                        <span style="font-size:12px;font-weight:900;color:#f3ba2f;">⚠️ ${nombre}</span>
+                    motorItems.push(`<div onclick="seleccionarMoneda('${s}')" style="display:flex;align-items:center;justify-content:space-between;padding:5px 8px;border-radius:7px;background:rgba(243,186,47,0.1);border-left:3px solid #f3ba2f;margin-bottom:4px;cursor:pointer;${borderActivo}" title="Llevar ${nombre} al panel central">
+                        <span style="font-size:12px;font-weight:900;color:#f3ba2f;">⚠️ ${nombre}${badgeActivo}</span>
                         <span style="font-size:10px;color:#fde68a;font-weight:700;">AGOTAMIENTO ${c2.posicionPorcentaje.toFixed(0)}% rango</span>
                     </div>`);
                 }
             });
 
             const titulo = esLong ? '⚡ MOTOR LONG — SEÑALES IA' : '⚡ MOTOR SHORT — SEÑALES IA';
+            const hint = `<div style="font-size:9px;color:#475569;text-align:center;margin-bottom:6px;">👆 Tocá una moneda para llevarla al panel</div>`;
             if (motorItems.length === 0) return `<div style="background:#060b16;border:1px solid rgba(255,255,255,0.05);border-radius:10px;padding:10px;margin-bottom:12px;">
                 <div style="font-size:11px;font-weight:900;color:#f3ba2f;margin-bottom:6px;">${titulo}</div>
                 <div style="font-size:11px;color:#475569;text-align:center;padding:8px 0;">⏳ Sin señales activas ahora mismo...</div>
             </div>`;
 
             return `<div style="background:#060b16;border:1px solid rgba(255,255,255,0.05);border-radius:10px;padding:10px;margin-bottom:12px;">
-                <div style="font-size:11px;font-weight:900;color:#f3ba2f;margin-bottom:8px;">${titulo} (${motorItems.length})</div>
+                <div style="font-size:11px;font-weight:900;color:#f3ba2f;margin-bottom:4px;">${titulo} (${motorItems.length})</div>
+                ${hint}
                 ${motorItems.join('')}
             </div>`;
         })()}
