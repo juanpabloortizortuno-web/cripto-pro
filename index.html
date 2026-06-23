@@ -3810,41 +3810,8 @@ function actualizarTablaIzquierda() {
         rebotando.sort((a, b) => (datosEMA[b.symbol]?.subidaDesdeMinimo || 0) - (datosEMA[a.symbol]?.subidaDesdeMinimo || 0));
         resto.sort((a, b) => Math.abs(b.cambioReal2Min) - Math.abs(a.cambioReal2Min));
 
-        // ── ALERTAS DE VOZ: solo monedas que la IA tiene en su lista de prioridades ──
-        // Despegues: solo si están en listaPrioridadesGlobal (tipo DESPEGUE o REBOTE)
-        const COOLDOWN_DESPEGUE_VOZ = 5 * 60 * 1000;
-        const ahoraDespegue = Date.now();
-        const symbolsEnIA = new Set(listaPrioridadesGlobal.map(p => p.symbol));
-
-        despegando.forEach(c => {
-            // Solo si la IA la tiene en su lista (modo alcista activo y está en prioridades)
-            if (!symbolsEnIA.has(c.symbol)) return;
-            const e = datosEMA[c.symbol];
-            const nombre = c.symbol.replace('USDT', '');
-            const ultimoAviso = ultimosDespeguesAlertados[c.symbol] || 0;
-            if (ahoraDespegue - ultimoAviso > COOLDOWN_DESPEGUE_VOZ) {
-                ultimosDespeguesAlertados[c.symbol] = ahoraDespegue;
-                const pct = e.subidaDesdeMinimo.toFixed(1);
-                const textoVoz = `¡Alerta de despegue! ${nombre} está despegando desde su mínimo de 48 horas. Las EMAs 7, 25 y 99 están alineadas alcistas y el precio subió ${pct} por ciento desde el piso. Es momento de evaluar una entrada larga con stop bajo el mínimo reciente.`;
-                hablar(textoVoz, true);
-            }
-        });
-
-        const COOLDOWN_REBOTE_VOZ = 5 * 60 * 1000;
-        const ahoraRebote = Date.now();
-        rebotando.forEach(c => {
-            // Solo si la IA la tiene en su lista (modo alcista activo y está en prioridades)
-            if (!symbolsEnIA.has(c.symbol)) return;
-            const e = datosEMA[c.symbol];
-            const nombre = c.symbol.replace('USDT', '');
-            const ultimoAviso = ultimosReboteAlertados[c.symbol] || 0;
-            if (ahoraRebote - ultimoAviso > COOLDOWN_REBOTE_VOZ) {
-                ultimosReboteAlertados[c.symbol] = ahoraRebote;
-                const pct = e.subidaDesdeMinimo.toFixed(1);
-                const textoVoz = `Atención. ${nombre} venía cayendo en las últimas 24 horas y ahora está mostrando un rebote. Subió ${pct} por ciento desde su mínimo reciente y la EMA 7 ya está girando hacia arriba. Vigilá una posible entrada en largo.`;
-                hablar(textoVoz, true);
-            }
-        });
+        // ── VOZ: la maneja exclusivamente la IA (playAlarmVoice via foco) ──
+        // La tabla izquierda solo ordena y muestra — no genera alertas de voz propias.
         ordenadas = [...despegando, ...rebotando, ...resto];
     } else {
         // Modo bajista: priorizar BOMBA/DERRUMBE/AGOTAMIENTO/GIRO CONFIRMADO (sistema viejo de techo)
@@ -6099,10 +6066,9 @@ function _analizarMonedalJefe(sym) {
     const c = cachedData[sym];
     if (!c) return;
 
-    // Solo hablar de monedas que están en la lista LONG/SHORT (extremos del rango 24h)
-    // Umbral igual al UMBRAL_EXTREMO de la lista: 75%+ = SHORT zona, 0-25% = LONG zona
-    const estaEnLista = c.posicionPorcentaje >= 75 || c.posicionPorcentaje <= 25;
-    if (!estaEnLista) return;
+    // Solo hablar de monedas que la IA tiene en su lista de prioridades — la IA manda
+    const estaEnIA = listaPrioridadesGlobal.some(p => p.symbol === sym);
+    if (!estaEnIA) return;
 
     const nombre   = sym.replace('USDT','');
     const vel2min  = c.cambioReal2Min || 0;
