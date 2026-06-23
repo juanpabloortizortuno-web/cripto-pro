@@ -1268,6 +1268,17 @@ let btcEthHistorial = { BTCUSDT: [], ETHUSDT: [] };
 // Seguimiento del máximo de 48h (guardamos el high más alto visto en las últimas 24 horas de ciclos)
 let maximo48h = {};       // symbol -> precio más alto visto en las últimas ~43200 lecturas
 let maximo48hTimestamp = {}; // cuándo se registró ese máximo
+
+// ── ESTUDIO DE CICLO 24H POR MONEDA (independiente para cada una) ─────────
+// Cada moneda llega a su máximo/mínimo de 24h en un momento distinto.
+// Aquí guardamos CUÁNDO ocurrió ese máximo/mínimo (estimado por detección de
+// rotura de nivel) para poder calcular: cuánto tiempo lleva cayendo desde su
+// máximo, en qué "bloque de estudio" de 6h está (1=0-6h, 2=6-12h, 3=12-18h,
+// 4=18-24h) y cuánto le falta para que esa ventana de 24h se renueve.
+let maximo24hValor = {};      // symbol -> precio del máximo 24h detectado
+let maximo24hTimestamp = {};  // symbol -> cuándo se vio ese máximo (Date.now())
+let minimo24hValor = {};      // symbol -> precio del mínimo 24h detectado
+let minimo24hTimestamp = {};  // symbol -> cuándo se vio ese mínimo (Date.now())
 let btcEthInfluencia = {}; // symbol -> { btcCorr, ethCorr }
 let techoScoreHistorial = {}; // historial de score de techo
         let contadorAvisosMismoEstado = 0;
@@ -1659,10 +1670,15 @@ DATOS:
 - Alerta derrumbe: ${c.alertaDerrumbe ? 'SÍ' : 'NO'}
 - Agotamiento subida: ${c.alertaAgotamientoSubida ? 'SÍ' : 'NO'}
 - Movimiento 2min ya cubre 1 USDT con $50 a 1x: ${puedeLlegar1USDT ? 'SÍ' : 'NO'}
+- Tiempo desde su máximo del día: ${_fmtHoras(c.horasDesdeMaximo24h)} (bloque ${c.bloqueEstudio24h||1}/4 de 6h)
+- Tiempo desde su mínimo del día: ${_fmtHoras(c.horasDesdeMinimo24h)}
+- Ventana de 24h se renueva en: ${_fmtHoras(c.horasParaRenovarVentana)}
 
 Responde SOLO con:
 DIRECCIÓN: LONG o SHORT o ESPERAR
-TEXTO: [una frase corta y directa de máximo 12 palabras que diga qué hacer y por qué, mencionando si se puede ganar 1 USDT]`;
+TEXTO: [una frase corta y directa de máximo 12 palabras que diga qué hacer y por qué, mencionando si se puede ganar 1 USDT]
+
+Ten en cuenta: si lleva muchas horas cayendo desde su máximo y está cerca del piso (bloque 3 o 4), el movimiento bajista puede estar agotado → favorece LONG. Si lleva muchas horas subiendo desde su mínimo y está cerca del techo, el movimiento alcista puede estar agotado → favorece SHORT.`;
 
     try {
         const resp = await fetch("https://api.anthropic.com/v1/messages", {
@@ -3391,6 +3407,29 @@ async function obtenerDatosBinance() {
             let rangoPct24h = low > 0 ? ((high - low) / low) * 100 : 0; // rango relativo % del día
             let posicionPorcentaje = rango24h > 0 ? ((precio - low) / rango24h) * 100 : 0;
             let caidaDesdeMaximo = rango24h > 0 ? ((high - precio) / high) * 100 : 0;
+
+            // ── ESTUDIO DE CICLO 24H (independiente por moneda) ──
+            // Detecta cuándo cambió el máximo/mínimo de la ventana de 24h que reporta
+            // Binance para estimar hace cuánto ocurrió y cuánto falta para que "expire".
+            const ahoraTs = Date.now();
+            if (maximo24hValor[item.symbol] === undefined || high !== maximo24hValor[item.symbol]) {
+                // El máximo reportado cambió: o se hizo un máximo nuevo ahora mismo,
+                // o el máximo anterior salió de la ventana de 24h y aparece otro "techo".
+                // En ambos casos, lo más preciso que podemos hacer es marcar "ahora"
+                // como el instante de referencia de este nuevo máximo.
+                maximo24hValor[item.symbol] = high;
+                maximo24hTimestamp[item.symbol] = ahoraTs;
+            }
+            if (minimo24hValor[item.symbol] === undefined || low !== minimo24hValor[item.symbol]) {
+                minimo24hValor[item.symbol] = low;
+                minimo24hTimestamp[item.symbol] = ahoraTs;
+            }
+            const horasDesdeMaximo24h = (ahoraTs - maximo24hTimestamp[item.symbol]) / 3600000;
+            const horasDesdeMinimo24h = (ahoraTs - minimo24hTimestamp[item.symbol]) / 3600000;
+            // Bloques de estudio de 6h desde el máximo: 1 (0-6h) → 4 (18-24h)
+            const bloqueEstudio24h = Math.min(4, Math.floor(horasDesdeMaximo24h / 6) + 1);
+            // Cuánto falta para que esa ventana de 24h se renueve (el máximo "expire")
+            const horasParaRenovarVentana = Math.max(0, 24 - horasDesdeMaximo24h);
             
             if (!historialPrecios2Min[item.symbol]) {
                 historialPrecios2Min[item.symbol] = [];
@@ -3471,7 +3510,14 @@ async function obtenerDatosBinance() {
                 alertaAgotamientoSubida: alertaAgotamientoSubida,
                 velPromedio: velPromedio,
                 ciclosSubiendo: ciclosSubiendo,
-                ciclosBajando: ciclosBajando
+                ciclosBajando: ciclosBajando,
+                // ── Estudio de ciclo 24h independiente por moneda ──
+                horasDesdeMaximo24h: horasDesdeMaximo24h,
+                horasDesdeMinimo24h: horasDesdeMinimo24h,
+                bloqueEstudio24h: bloqueEstudio24h,
+                horasParaRenovarVentana: horasParaRenovarVentana,
+                estaCayendoDesdeMaximo: precio < maximo24hValor[item.symbol],
+                estaSubiendoDesdeMinimo: precio > minimo24hValor[item.symbol]
             };
             
             soporteCDC[item.symbol] = low;
@@ -4667,6 +4713,16 @@ function actualizarContadorRadar() {
     if (radarAbierto) renderizarRadar();
 }
 
+// Formatea horas decimales en formato legible "Xh Ym" (usado en el panel de ciclo 24h)
+function _fmtHoras(h) {
+    if (h === undefined || h === null || isNaN(h)) return '—';
+    if (h < 0) h = 0;
+    const horas = Math.floor(h);
+    const mins  = Math.round((h - horas) * 60);
+    if (horas === 0) return `${mins}m`;
+    return `${horas}h ${mins}m`;
+}
+
 // Calcula un RSI simplificado a partir del historial de precios de 2 minutos (ciclos de ~2s)
 function calcularRSI(symbol, periodo = 14) {
     const precios = historialPrecios2Min[symbol];
@@ -4741,6 +4797,22 @@ function calcularPrediccionCDC(symbol){
         score = Math.min(score, -10);
     }
 
+    // 7. CICLO DE TIEMPO 24H — cuánto tiempo lleva cayendo desde su máximo o subiendo
+    //    desde su mínimo (independiente para cada moneda, dividido en bloques de 6h).
+    //    Mientras más tiempo lleva en el extremo opuesto a su posición actual, más cerca
+    //    está de agotar el movimiento → más probable la reversión (LONG o SHORT).
+    let contribTiempo = 0;
+    if (c.posicionPorcentaje <= 35 && c.bloqueEstudio24h) {
+        // Cerca del piso y ya lleva varias horas cayendo desde el techo del día
+        contribTiempo += (c.bloqueEstudio24h - 1) * 4; // hasta +12 a favor de LONG (bloque 4 = 18-24h)
+    }
+    if (c.posicionPorcentaje >= 65) {
+        const bloqueMin = Math.min(4, Math.floor((c.horasDesdeMinimo24h || 0) / 6) + 1);
+        contribTiempo -= (bloqueMin - 1) * 4; // hasta -12 a favor de SHORT
+    }
+    contribTiempo = Math.max(-12, Math.min(12, contribTiempo));
+    score += contribTiempo;
+
     // Limitar score final dentro de -100..100
     score = Math.max(-100, Math.min(100, score));
 
@@ -4750,14 +4822,21 @@ function calcularPrediccionCDC(symbol){
     let caida = 100 - subida;
 
     let agotamiento = Math.round(c.posicionPorcentaje);
-    prediccionCDC[symbol] = { subida, caida, agotamiento, rsi: rsi !== null ? Math.round(rsi) : null };
+    prediccionCDC[symbol] = {
+        subida, caida, agotamiento, rsi: rsi !== null ? Math.round(rsi) : null,
+        horasDesdeMaximo24h: c.horasDesdeMaximo24h,
+        horasDesdeMinimo24h: c.horasDesdeMinimo24h,
+        bloqueEstudio24h: c.bloqueEstudio24h,
+        horasParaRenovarVentana: c.horasParaRenovarVentana
+    };
 
     // ─── Registro para el sistema de auto-aprendizaje ───
     registrarPrediccionCDC(symbol, c.price, subida >= 50, {
         rango: contribRango,
         momentum: contribMomentum,
         tendencia: contribTendencia,
-        rsi: contribRSI
+        rsi: contribRSI,
+        tiempo: contribTiempo
     });
 }
 
@@ -4901,7 +4980,34 @@ function actualizarPanelCentral() {
             </div>
         </div>
 
-        <!-- BLOQUE 2: NIVELES Y SEÑAL -->
+        <!-- BLOQUE NUEVO: ESTUDIO DE CICLO 24H (independiente por moneda) -->
+        <div class="intel-box">
+            <div class="intel-title">⏳ ESTUDIO DE CICLO 24H — ${simbolo}</div>
+            <div class="intel-row">
+                <span class="intel-label">🕐 Tiempo desde su máximo del día</span>
+                <span class="intel-value" style="color:#fff;">${_fmtHoras(c.horasDesdeMaximo24h)}</span>
+            </div>
+            <div class="intel-row">
+                <span class="intel-label">🕐 Tiempo desde su mínimo del día</span>
+                <span class="intel-value" style="color:#fff;">${_fmtHoras(c.horasDesdeMinimo24h)}</span>
+            </div>
+            <div class="intel-row">
+                <span class="intel-label">📦 Bloque de estudio (6h c/u)</span>
+                <span class="intel-value" style="color:var(--accent-gold);">${c.bloqueEstudio24h || 1}/4 ${'▮'.repeat(c.bloqueEstudio24h||1)}${'▯'.repeat(4-(c.bloqueEstudio24h||1))}</span>
+            </div>
+            <div class="intel-row">
+                <span class="intel-label">🔄 Ventana 24h se renueva en</span>
+                <span class="intel-value" style="color:#00d4ff;">${_fmtHoras(c.horasParaRenovarVentana)}</span>
+            </div>
+            <div style="margin-top:8px; font-size:11px; color:#64748b; line-height:1.5;">
+                ${c.posicionPorcentaje <= 35
+                    ? `📉 Cerca del suelo y ya lleva ${_fmtHoras(c.horasDesdeMaximo24h)} desde el techo del día → entre más avanza el bloque, más cerca del agotamiento bajista (sesgo LONG).`
+                    : c.posicionPorcentaje >= 65
+                        ? `📈 Cerca del techo y lleva ${_fmtHoras(c.horasDesdeMinimo24h)} desde el suelo del día → entre más avanza el bloque, más cerca del agotamiento alcista (sesgo SHORT).`
+                        : `↔️ En zona media del rango 24h · sin sesgo de agotamiento por tiempo todavía.`}
+            </div>
+        </div>
+
         <div class="intel-box">
             <div class="intel-title"><i class="fas fa-chart-bar"></i> NIVELES Y SEÑAL CDC</div>
             <div class="intel-row">
