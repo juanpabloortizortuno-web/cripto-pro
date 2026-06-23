@@ -3718,6 +3718,7 @@ async function obtenerDatosBinance() {
                     calcularPrediccionCDC(selectedCoin);
                     actualizarPanelCentral();
                     actualizarTacometroDerecho();
+                    actualizarBotonAlarmaLateral(selectedCoin);
                 }
             }
 if (radarFijado) {
@@ -5428,8 +5429,13 @@ function actualizarAlertaGanadora(alertaActiva) {
         alerta.onclick = null;
     }
 
-    // Si hay una moneda seleccionada y tiene señal propia, dejar que el botón unificado la maneje
-    if (selectedCoin) return;
+    // ── PRIORIDAD: si hay una moneda en el panel central, la alarma SIEMPRE la sigue ──
+    // Antes salía con return aquí y la alarma quedaba desconectada del panel.
+    // Ahora: si hay selectedCoin, actualizamos la alarma con ESA moneda y salimos.
+    if (selectedCoin) {
+        actualizarBotonAlarmaLateral(selectedCoin);
+        return;
+    }
 
     // Sin moneda seleccionada: mostrar alerta del mercado en el botón unificado
     const wrap = document.getElementById("btnAlarmaUnificado");
