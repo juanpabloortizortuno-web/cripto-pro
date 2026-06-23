@@ -290,9 +290,14 @@
             border-right: 1px solid rgba(255,255,255,.03);
             display: flex;
             flex-direction: column;
+            height: 100%;
+            overflow-y: auto;
+            overflow-x: hidden;
         }
 
-        .sidebar-header { padding: 16px; display: flex; flex-direction: column; gap: 12px; }
+        .sidebar-header { padding: 16px; display: flex; flex-direction: column; gap: 12px; flex-shrink: 0; }
+
+        
 
         .search-box input {
             width: 100%; box-sizing: border-box; padding: 12px 15px;
@@ -307,7 +312,7 @@
             border-radius: 8px; border: 1px solid rgba(243, 186, 47, 0.1);
         }
 
-        .table-wrapper { overflow-y: auto; flex: 1; }
+        .table-wrapper { flex: 1; min-height: 200px; }
         table { width: 100%; border-collapse: collapse; table-layout: fixed; }
 
         th:nth-child(1), td:nth-child(1){ width:50%; }
@@ -1758,7 +1763,7 @@ function _iniciarAnimacionAnalisis(nombre) {
         document.getElementById('alarmaUnifSub').textContent   = s.txt;
         document.getElementById('alarmaUnifCuerpo').innerHTML  = `<span style="color:#94a3b8;">${s.txt}</span>`;
         document.getElementById('alarmaUnifBarra').style.width = s.p;
-    }, 650);
+    }, 1400); // 7 pasos x 1.4s ≈ 10s de "estudio" de la moneda
 }
 
 function actualizarBotonAlarmaLateral(symbol) {
@@ -1812,8 +1817,44 @@ function _mostrarSeñalBase(nombre, esCompra, esVenta, pred) {
     } else if (esCompra) {
         _setUnifEstado({ tipo:'long', icono:'🟢', titulo:`LONG ${nombre}`, sub:`${pred.subida||50}% probabilidad de subida`, prob:`${pred.subida||50}%`, cuerpo:'Señal LONG detectada · Condiciones de compra activas', barra:`${pred.subida||50}%` });
     } else {
-        _setUnifEstado({ tipo:'espera', icono:'⏸', titulo:`${nombre} · SIN SEÑAL`, sub:'Mercado lateral · Espera entrada', prob:'50%', cuerpo:'Sin señal clara en este momento. Esperando confirmación.', barra:'50%' });
+        const e = _estadoEsperaPorCDC(nombre, pred);
+        _setUnifEstado(e);
     }
+}
+
+// ── Calcula el estado "sin señal" usando el porcentaje REAL del modelo CDC
+// (prediccionCDC ya viene de calcularPrediccionCDC, no es un valor fijo).
+// El color se asigna según qué tan lejos esté del 50% neutral.
+function _estadoEsperaPorCDC(nombre, pred) {
+    const subida = (pred && typeof pred.subida === 'number') ? pred.subida : 50;
+    const caida  = (pred && typeof pred.caida  === 'number') ? pred.caida  : 50;
+    const dominante = subida >= caida ? subida : caida;
+    const esAlcista = subida >= caida;
+
+    // tipo y color según fuerza de la señal (aunque no llegue a LONG/SHORT confirmado)
+    let tipo, icono, etiqueta;
+    if (dominante >= 65) {
+        tipo = esAlcista ? 'long' : 'short';
+        icono = esAlcista ? '🟢' : '🔴';
+        etiqueta = esAlcista ? 'SESGO ALCISTA' : 'SESGO BAJISTA';
+    } else if (dominante >= 55) {
+        tipo = 'alerta';
+        icono = esAlcista ? '🟡' : '🟠';
+        etiqueta = esAlcista ? 'LEVE SESGO ALCISTA' : 'LEVE SESGO BAJISTA';
+    } else {
+        tipo = 'espera';
+        icono = '⏸';
+        etiqueta = 'SIN SEÑAL';
+    }
+
+    return {
+        tipo, icono,
+        titulo: `${nombre} · ${etiqueta}`,
+        sub: `${dominante}% ${esAlcista ? 'probabilidad de subida' : 'probabilidad de bajada'} (modelo CDC)`,
+        prob: `${dominante}%`,
+        cuerpo: `<span style="color:#94a3b8;">Mercado lateral · ${dominante}% ${esAlcista ? 'subida' : 'bajada'} según estudio CDC en vivo.</span>`,
+        barra: `${dominante}%`
+    };
 }
 
 function _aplicarResultadoIA(btn, txt, nombre, cache, esCompra, esVenta, pred) {
@@ -1836,13 +1877,9 @@ function _aplicarResultadoIA(btn, txt, nombre, cache, esCompra, esVenta, pred) {
             barra:`${pred.caida||50}%`
         });
     } else {
-        _setUnifEstado({
-            tipo:'espera', icono:'⏸', titulo:`${nombre} · SIN SEÑAL`,
-            sub:'Mercado lateral · Espera entrada',
-            prob:'50%',
-            cuerpo: `<span style="color:#94a3b8;">${frase || 'Sin señal clara · Espera una mejor entrada'}</span>`,
-            barra:'50%'
-        });
+        const e = _estadoEsperaPorCDC(nombre, pred);
+        e.cuerpo = `<span style="color:#94a3b8;">${frase || e.cuerpo.replace(/<[^>]+>/g,'')}</span>`;
+        _setUnifEstado(e);
     }
 }
 
@@ -3820,13 +3857,40 @@ function actualizarTablaIzquierda() {
         } else if (!e) {
             subEtiqueta = `<span style="color:#475569;font-size:9px;display:block;">⏳ calculando EMAs…</span>`;
         }
-        // El sistema de badges activo depende de modoMercado (alcista = despegue EMA, bajista = techo/derrumbe)
+
+        // ── COLORES DE MÁXIMO / MÍNIMO 24H (siempre, en ambos modos) ──
+        // Solo aplica si la fila aún no tiene color asignado por otra señal más urgente
+        const enMaximo24h = c.posicionPorcentaje >= 90;
+        const enMinimo24h = c.posicionPorcentaje <= 10;
+        if (enMaximo24h && !tr.style.borderLeft) {
+            tr.style.background = "rgba(255,60,0,0.13)";
+            tr.style.borderLeft = "4px solid #ff3c00";
+        } else if (enMinimo24h && !tr.style.borderLeft) {
+            tr.style.background = "rgba(14,203,129,0.10)";
+            tr.style.borderLeft = "4px solid #0ecb81";
+        }
+
+        // Badge de máximo/mínimo (se suma a los badges existentes si no hay señal activa)
+        let badgeMaxMin = '';
+        if (enMaximo24h && !subEtiqueta) {
+            const scoreTecho = calcularScoreTecho(c);
+            const colorRiesgo = scoreTecho >= 65 ? '#ff2a3b' : scoreTecho >= 45 ? '#ff6b00' : '#f3ba2f';
+            badgeMaxMin = `<span style="display:inline-flex;align-items:center;gap:3px;background:rgba(255,60,0,0.18);color:#ff3c00;font-size:9px;font-weight:900;padding:2px 7px;border-radius:6px;margin-top:3px;border:1px solid rgba(255,60,0,0.4);">🔴 MÁX 24H <span style="color:${colorRiesgo};margin-left:2px;">⚠️${scoreTecho}%</span></span>`;
+        } else if (enMinimo24h && !subEtiqueta) {
+            badgeMaxMin = `<span style="display:inline-flex;align-items:center;gap:3px;background:rgba(14,203,129,0.15);color:#0ecb81;font-size:9px;font-weight:900;padding:2px 7px;border-radius:6px;margin-top:3px;border:1px solid rgba(14,203,129,0.4);">🟢 MÍN 24H · ZONA REBOTE</span>`;
+        }
+
+        // Barra visual de posición en rango 24h (siempre visible al fondo de la fila)
+        const posBar = Math.min(Math.max(c.posicionPorcentaje, 0), 100);
+        const barColor = posBar >= 90 ? '#ff3c00' : posBar <= 10 ? '#0ecb81' : posBar >= 70 ? '#f3ba2f' : '#334155';
+        const barraRango = `<div style="height:2px;background:rgba(255,255,255,0.06);border-radius:2px;margin-top:3px;overflow:hidden;"><div style="height:100%;width:${posBar}%;background:${barColor};border-radius:2px;transition:width 0.4s;"></div></div>`;
 
         let colorCambio = c.change > 0 ? "var(--accent-green)" : "var(--accent-glow)";
         tr.innerHTML = `
             <td style="font-weight:700;">
                 ${iconoAlarma}${symbol.replace("USDT","")} <span style="font-size:10px; color:var(--text-dim);">USDT</span>
-                ${subEtiqueta}
+                ${subEtiqueta || badgeMaxMin}
+                ${barraRango}
             </td>
             <td style="text-align:right; font-weight:700; color:${colorCambio};">
                 ${c.change > 0 ? '+' : ''}${c.change.toFixed(2)}%
@@ -3834,7 +3898,7 @@ function actualizarTablaIzquierda() {
             </td>
             <td style="text-align:right; font-weight:700; color:#e2e8f0;">
                 2m: ${c.cambioReal2Min > 0 ? '+' : ''}${c.cambioReal2Min.toFixed(2)}%
-                <span style="display:block; font-size:9px; color:var(--text-dim);">Rango: ${c.posicionPorcentaje.toFixed(0)}%</span>
+                <span style="display:block; font-size:9px; color:${enMaximo24h ? '#ff3c00' : enMinimo24h ? '#0ecb81' : 'var(--text-dim)'}; font-weight:${enMaximo24h||enMinimo24h ? '900' : '600'};">Rango: ${c.posicionPorcentaje.toFixed(0)}%</span>
             </td>
         `;
         fragmento.appendChild(tr);
