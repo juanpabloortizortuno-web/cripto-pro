@@ -3697,13 +3697,11 @@ async function obtenerDatosBinance() {
             alertaActivaGlobal = foco;
             
             const ahora = Date.now();
-            const audioHablando = ahora < audioBloqueadoHasta;
-            // El PANEL nunca debe congelarse esperando al audio — solo respeta el cooldown
-            // de cambio. El corte de palabras se soluciona aparte, con una cola de voz real
-            // (ver función hablar()), así que aquí no hace falta frenar el cambio visual.
-            const puedeoCambiar = (ahora - tiempoUltimoCambioAuto) >= BLOQUEO_CAMBIO_MS;
+            const audioHablando = ahora < audioBloqueadoHasta || vozHablandoAhora;
+            // No cambiar de moneda mientras el audio esté hablando — esperar a que termine
+            const puedeoCambiar = (ahora - tiempoUltimoCambioAuto) >= BLOQUEO_CAMBIO_MS && !audioHablando;
 
-            // Cambia de moneda si pasaron los segundos de cooldown
+            // Cambia de moneda solo cuando terminó de hablar Y pasó el cooldown
             if (!radarFijado && puedeoCambiar) {
                 // En LONG: cambia aunque sea la misma (para rotar), en SHORT: solo si es diferente
                 const debeRotar = modoMercado === 'alcista' || selectedCoin !== foco.symbol;
