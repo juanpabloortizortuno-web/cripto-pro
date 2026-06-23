@@ -2842,42 +2842,38 @@ function agregarNoticia(texto, tipo, claveCooldown, prioritario = false) {
 const UMBRAL_COLAPSO_2MIN = -15;   // % de caída en 2 minutos para considerarse "anormal"
 const UMBRAL_SPIKE_2MIN = 20;      // % de subida en 2 minutos para considerarse "anormal" (pump repentino)
 
-// Interpreta el evento real de UNA moneda en el ciclo actual y genera una alerta SOLO si el
-// movimiento de precio es anormal (posible señal de riesgo real). Las noticias normales de
-// mercado (bomba/derrumbe/rebote/volumen comunes) ya NO se publican en el ticker: eran ruido,
-// no señales de riesgo, y cortaban la animación cada 2 segundos.
+// (evaluarNoticiaParaMoneda está definido más abajo junto con monedasEnBreakingNews)
+
+// Set de monedas que aparecieron en breaking news (colapso/spike anormal)
+// Se usa para marcarlas visualmente en la lista LONG/SHORT del sidebar
+let monedasEnBreakingNews = {}; // symbol -> { tipo: 'colapso'|'spike', ts }
+const BREAKING_NEWS_TTL_MS = 5 * 60 * 1000; // las monedas se limpian del set tras 5 minutos
+
 function evaluarNoticiaParaMoneda(c) {
-    const nombre = c.symbol.replace('USDT', '');
-
+    // Solo registrar la moneda en el set de breaking para marcarla en la lista LONG/SHORT.
+    // NO agregarla al ticker de noticias — el ticker solo muestra noticias reales (Binance/Cointelegraph).
     if (c.cambioReal2Min <= UMBRAL_COLAPSO_2MIN) {
-        agregarNoticia(
-            `🚨 ALERTA: ${nombre} se desploma ${Math.abs(c.cambioReal2Min).toFixed(1)}% en solo 2 minutos — caída anormal, posible señal de riesgo (hackeo, delisting o colapso de liquidez). Revisa posiciones.`,
-            'riesgo',
-            nombre + '_colapso_precio'
-        );
-        try { hablar(`Atención. Caída anormal detectada en ${nombre}. Riesgo elevado.`, true); } catch(e) {}
+        monedasEnBreakingNews[c.symbol] = { tipo: 'colapso', ts: Date.now() };
     }
-
     if (c.cambioReal2Min >= UMBRAL_SPIKE_2MIN) {
-        agregarNoticia(
-            `🚨 ALERTA: ${nombre} se dispara ${c.cambioReal2Min.toFixed(1)}% en solo 2 minutos — movimiento anormal, posible pump repentino o manipulación. Precaución.`,
-            'riesgo',
-            nombre + '_spike_precio'
-        );
-        try { hablar(`Atención. Movimiento anormal detectado en ${nombre}.`, true); } catch(e) {}
+        monedasEnBreakingNews[c.symbol] = { tipo: 'spike', ts: Date.now() };
     }
 }
 
-// Recorre todas las monedas del ciclo actual y genera alertas SOLO para movimientos de precio
-// anormales. Las noticias normales de mercado (subidas/bajadas comunes, rebotes, volumen) ya no
-// entran al ticker: el ticker ahora es exclusivamente de alertas de riesgo.
+// Recorre todas las monedas del ciclo actual y registra las que tienen movimiento anormal
+// para marcarlas en la lista LONG/SHORT. Ya NO genera alertas en el ticker de noticias.
 function evaluarNoticiasMercado() {
     const todas = Object.values(cachedData);
     if (todas.length === 0) return;
+    // Limpiar entradas viejas del set de breaking news
+    const ahora = Date.now();
+    Object.keys(monedasEnBreakingNews).forEach(sym => {
+        if (ahora - monedasEnBreakingNews[sym].ts > BREAKING_NEWS_TTL_MS) delete monedasEnBreakingNews[sym];
+    });
     const candidatas = todas
         .filter(c => c.cambioReal2Min <= UMBRAL_COLAPSO_2MIN || c.cambioReal2Min >= UMBRAL_SPIKE_2MIN)
         .sort((a,b) => Math.abs(b.cambioReal2Min) - Math.abs(a.cambioReal2Min))
-        .slice(0, 6); // máximo 6 eventos nuevos por ciclo
+        .slice(0, 6);
     candidatas.forEach(evaluarNoticiaParaMoneda);
 }
 
@@ -3881,7 +3877,7 @@ function actualizarTablaIzquierda() {
     // Abajo:  las que cayeron más allá de su MÍNIMO de 24h (zona de rebote)
     // Las monedas NEUTRAS (entre 10% y 90% del rango) se descartan de la lista:
     // de estas dos zonas es de donde se sacan las monedas con las que se trabaja.
-    const UMBRAL_EXTREMO = 90; // 90-100% = zona de máximo · 0-10% = zona de mínimo
+    const UMBRAL_EXTREMO = 75; // 75-100% = zona de máximo · 0-25% = zona de mínimo
     let grupoMaximo = ordenadas.filter(c => c.posicionPorcentaje >= UMBRAL_EXTREMO);
     let grupoMinimo = ordenadas.filter(c => c.posicionPorcentaje <= (100 - UMBRAL_EXTREMO));
 
@@ -3926,6 +3922,11 @@ function actualizarTablaIzquierda() {
 
         let subEtiqueta = '';
         let iconoAlarma = '';
+
+        // Badge de BREAKING NEWS si esta moneda aparecio recientemente en el ticker de noticias
+        const breakingInfo = monedasEnBreakingNews && monedasEnBreakingNews[symbol];
+        const badgeBreaking = breakingInfo
+            ? `<span style="display:inline-flex;align-items:center;gap:3px;background:#cc0000;color:#fff;font-size:9px;font-weight:900;padding:2px 7px;border-radius:5px;letter-spacing:0.5px;animation:blinker-glow 0.6s linear infinite;">📺 BREAKING ${breakingInfo.tipo === 'colapso' ? '📉 CAÍDA' : '📈 SPIKE'}</span>` : '';
 
         if (modoMercado === 'bajista') {
             // Badges del sistema viejo: techo, derrumbe, agotamiento
@@ -4009,11 +4010,22 @@ function actualizarTablaIzquierda() {
         const _badgesExtra = _badgeDoji + _badgeExplosion + _badgeCascada + _badgeRebote + _badgeBallena;
 
         let colorCambio = c.change > 0 ? "var(--accent-green)" : "var(--accent-glow)";
+        // Calcular % de su máximo y % de su mínimo
+        const pctDelMax = c.posicionPorcentaje.toFixed(0); // 100% = en el maximo exacto
+        const pctDelMin = (100 - c.posicionPorcentaje).toFixed(0); // 0% = en el minimo exacto
+        const colorPctMax = c.posicionPorcentaje >= 90 ? '#ff3c00' : c.posicionPorcentaje >= 75 ? '#f3ba2f' : '#94a3b8';
+        const colorPctMin = c.posicionPorcentaje <= 10 ? '#0ecb81' : c.posicionPorcentaje <= 25 ? '#00b4d8' : '#94a3b8';
+
         tr.innerHTML = `
             <td style="font-weight:700;">
                 ${iconoAlarma}${symbol.replace("USDT","")} <span style="font-size:10px; color:var(--text-dim);">USDT</span>${_badgesExtra}
+                ${badgeBreaking ? '<div style="margin-top:2px;">' + badgeBreaking + '</div>' : ''}
                 ${subEtiqueta || badgeMaxMin}
                 ${barraRango}
+                <div style="display:flex;gap:4px;margin-top:3px;">
+                    <span style="font-size:9px;background:rgba(255,60,0,0.12);color:${colorPctMax};padding:1px 5px;border-radius:5px;font-weight:900;" title="% del maximo 24h">MAX: ${pctDelMax}%</span>
+                    <span style="font-size:9px;background:rgba(14,203,129,0.10);color:${colorPctMin};padding:1px 5px;border-radius:5px;font-weight:900;" title="% del minimo 24h">MIN: ${pctDelMin}%</span>
+                </div>
             </td>
             <td style="text-align:right; font-weight:700; color:${colorCambio};">
                 ${c.change > 0 ? '+' : ''}${c.change.toFixed(2)}%
@@ -6035,6 +6047,11 @@ function _jefesSleep(ms) { return new Promise(r => setTimeout(r, ms)); }
 function _analizarMonedalJefe(sym) {
     const c = cachedData[sym];
     if (!c) return;
+
+    // Solo hablar de monedas que están en la lista LONG/SHORT (extremos del rango 24h)
+    // Umbral igual al UMBRAL_EXTREMO de la lista: 75%+ = SHORT zona, 0-25% = LONG zona
+    const estaEnLista = c.posicionPorcentaje >= 75 || c.posicionPorcentaje <= 25;
+    if (!estaEnLista) return;
 
     const nombre   = sym.replace('USDT','');
     const vel2min  = c.cambioReal2Min || 0;
