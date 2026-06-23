@@ -1922,7 +1922,7 @@ let vozFemenina = null;
 
 // Control de tiempo para no cambiar de moneda muy rápido (5 segundos)
 let tiempoUltimoCambioAuto = 0;
-const BLOQUEO_CAMBIO_MS = 8000; // 8 segundos entre cambios automaticos
+const BLOQUEO_CAMBIO_MS = 10000; // 10 segundos entre cambios automaticos — tiempo para que el sistema acumule historial/cálculo antes de mostrar otra moneda
 let indiceRotacionLong = 0;      // rota entre las candidatas en modo LONG
 
 // Control de audio: no interrumpir hasta terminar + 5 seg extra
