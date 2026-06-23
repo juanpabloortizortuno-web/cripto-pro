@@ -2069,7 +2069,7 @@ if (window.speechSynthesis) {
 // habla en orden, uno termina antes de que empiece el siguiente.
 let colaVoz = [];
 let vozHablandoAhora = false;
-const MAX_COLA_VOZ = 4; // si el usuario se ausenta, no dejamos que se acumulen avisos viejos
+const MAX_COLA_VOZ = 20; // capacidad suficiente para todas las monedas de la lista central
 
 function hablar(texto, esMasculino) {
     if (!('speechSynthesis' in window)) return;
@@ -3808,31 +3808,35 @@ function actualizarTablaIzquierda() {
         resto.sort((a, b) => Math.abs(b.cambioReal2Min) - Math.abs(a.cambioReal2Min));
 
         // Avisar en el ticker Y por voz cuando una moneda nueva entra al filtro de despegue real
+        // ── Solo monedas visibles en la lista central (extremos del rango 24h) ──
         const COOLDOWN_DESPEGUE_VOZ = 5 * 60 * 1000; // 5 minutos entre avisos de la misma moneda
         const ahoraDespegue = Date.now();
+        // Encolar todas las alertas de despegue en orden: la cola garantiza que
+        // una moneda termina de leerse ANTES de que empiece la siguiente.
         despegando.forEach(c => {
+            const d = cachedData[c.symbol];
+            // Solo monedas visibles en la lista central (extremos del rango 24h)
+            if (!d || (d.posicionPorcentaje < 75 && d.posicionPorcentaje > 25)) return;
             const e = datosEMA[c.symbol];
             const nombre = c.symbol.replace('USDT', '');
-            // Alerta de voz para despegue: solo si pasaron más de 5 minutos desde el último aviso de esta moneda
             const ultimoAviso = ultimosDespeguesAlertados[c.symbol] || 0;
             if (ahoraDespegue - ultimoAviso > COOLDOWN_DESPEGUE_VOZ) {
                 ultimosDespeguesAlertados[c.symbol] = ahoraDespegue;
                 const pct = e.subidaDesdeMinimo.toFixed(1);
                 const textoVoz = `¡Alerta de despegue! ${nombre} está despegando desde su mínimo de 48 horas. Las EMAs 7, 25 y 99 están alineadas alcistas y el precio subió ${pct} por ciento desde el piso. Es momento de evaluar una entrada larga con stop bajo el mínimo reciente.`;
-                // Dar prioridad a despegue: esperar a que termine audio actual si hay uno
-                const esperaMs = (Date.now() < audioBloqueadoHasta) ? (audioBloqueadoHasta - Date.now() + 500) : 0;
-                setTimeout(() => {
-                    if (Date.now() - ultimosDespeguesAlertados[c.symbol] < COOLDOWN_DESPEGUE_VOZ + 5000) {
-                        hablar(textoVoz, true);
-                    }
-                }, esperaMs);
+                // Encolar directo — la cola procesa una por una, sin setTimeout que se pisen
+                hablar(textoVoz, true);
             }
         });
 
         // Avisar en el ticker Y por voz cuando una moneda entra al filtro de REBOTE TRAS CAÍDA
+        // ── Solo monedas visibles en la lista central (extremos del rango 24h) ──
         const COOLDOWN_REBOTE_VOZ = 5 * 60 * 1000;
         const ahoraRebote = Date.now();
         rebotando.forEach(c => {
+            const d = cachedData[c.symbol];
+            // Solo monedas visibles en la lista central (extremos del rango 24h)
+            if (!d || (d.posicionPorcentaje < 75 && d.posicionPorcentaje > 25)) return;
             const e = datosEMA[c.symbol];
             const nombre = c.symbol.replace('USDT', '');
             const ultimoAviso = ultimosReboteAlertados[c.symbol] || 0;
@@ -3840,12 +3844,8 @@ function actualizarTablaIzquierda() {
                 ultimosReboteAlertados[c.symbol] = ahoraRebote;
                 const pct = e.subidaDesdeMinimo.toFixed(1);
                 const textoVoz = `Atención. ${nombre} venía cayendo en las últimas 24 horas y ahora está mostrando un rebote. Subió ${pct} por ciento desde su mínimo reciente y la EMA 7 ya está girando hacia arriba. Vigilá una posible entrada en largo.`;
-                const esperaMs = (Date.now() < audioBloqueadoHasta) ? (audioBloqueadoHasta - Date.now() + 500) : 0;
-                setTimeout(() => {
-                    if (Date.now() - ultimosReboteAlertados[c.symbol] < COOLDOWN_REBOTE_VOZ + 5000) {
-                        hablar(textoVoz, true);
-                    }
-                }, esperaMs);
+                // Encolar directo — la cola procesa una por una, sin setTimeout que se pisen
+                hablar(textoVoz, true);
             }
         });
         ordenadas = [...despegando, ...rebotando, ...resto];
@@ -5374,7 +5374,13 @@ function actualizarTacometroDerecho() {
         <!-- ── MOTOR LONG/SHORT: señales activas de mercado ── -->
         ${(function() {
             const motorItems = [];
-            const todosSymbols = Object.keys(cachedData);
+            // Solo monedas visibles en la lista central (extremos del rango 24h, igual que actualizarTablaIzquierda)
+            const UMBRAL_EXTREMO = 75;
+            const todosSymbols = Object.keys(cachedData).filter(s => {
+                const d = cachedData[s];
+                if (!d) return false;
+                return d.posicionPorcentaje >= UMBRAL_EXTREMO || d.posicionPorcentaje <= (100 - UMBRAL_EXTREMO);
+            });
 
             // Despegues EMA
             const despegues = todosSymbols.filter(s => esDespegueReal(s)).slice(0, 5);
