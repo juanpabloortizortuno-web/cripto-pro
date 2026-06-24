@@ -267,13 +267,7 @@
             font-size: 18px; cursor: pointer; padding: 5px;
         }
 
-        #nuclearAlert {
-            background: #060b16;
-            border-bottom: 1px solid rgba(255, 255, 255, 0.03);
-            color: #fff; font-weight: 600; font-size: 12px; text-align: center;
-            padding: 10px; cursor: pointer; letter-spacing: 0.5px;
-            transition: background 0.3s;
-        }
+        /* #nuclearAlert movido al panel central */
 
         /* ALARMAS DINÁMICAS DE FUERZA EXTREMA */
         .fuerza-extrema-alert {
@@ -311,7 +305,7 @@
 
         .container {
             display: flex;
-            height: calc(100vh - 95px);
+            height: calc(100vh - 135px); /* sobrescrito en desktop por flex */
             box-sizing: border-box;
         }
 
@@ -327,7 +321,11 @@
             overflow-x: hidden;
         }
 
-        .sidebar-header { padding: 16px; display: flex; flex-direction: column; gap: 12px; flex-shrink: 0; padding-bottom: 8px; }
+        .sidebar-header { padding: 16px; display: flex; flex-direction: column; gap: 12px; flex-shrink: 0; padding-bottom: 8px; overflow: visible; }
+        #sidebarScroll::-webkit-scrollbar { width: 8px !important; display: block !important; }
+        #sidebarScroll::-webkit-scrollbar-track { background: #0a1220; border-radius: 4px; }
+        #sidebarScroll::-webkit-scrollbar-thumb { background: rgba(243,186,47,0.7); border-radius: 4px; min-height: 40px; }
+        #sidebarScroll::-webkit-scrollbar-thumb:hover { background: rgba(243,186,47,0.95); }
 
         
 
@@ -458,7 +456,110 @@
 
         #paperBox { position: fixed; left: 20px; bottom: 50px; background: var(--bg-card); border: 1px solid var(--accent-gold); border-radius: 10px; padding: 12px; width: 210px; z-index: 9999; display: none; font-size: 12px; }
 
-        footer { height: 35px; background: #040812; border-top: 1px solid rgba(255, 255, 255, 0.02); display: flex; justify-content: space-between; align-items: center; padding: 0 20px; font-size: 11px; color: #475569; }
+        footer {
+            background: linear-gradient(135deg, #040812 0%, #060b16 50%, #040812 100%);
+            border-top: 1px solid rgba(243,186,47,0.2);
+            box-shadow: 0 -4px 20px rgba(0,0,0,0.6);
+            padding: 0;
+            font-size: 11px;
+            color: #475569;
+            display: flex;
+            flex-direction: column;
+            flex-shrink: 0;
+        }
+        .footer-top {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 8px 20px 6px;
+            border-bottom: 1px solid rgba(255,255,255,0.04);
+            flex-wrap: wrap;
+            gap: 8px;
+        }
+        .footer-creator {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+        .footer-flag {
+            font-size: 18px;
+            filter: drop-shadow(0 1px 4px rgba(0,0,0,0.5));
+        }
+        .footer-name {
+            font-size: 12px;
+            font-weight: 900;
+            color: var(--accent-gold);
+            letter-spacing: 0.5px;
+            line-height: 1.2;
+        }
+        .footer-location {
+            font-size: 10px;
+            color: #64748b;
+            font-weight: 600;
+            letter-spacing: 0.3px;
+        }
+        .footer-socials {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+        .footer-social-btn {
+            display: flex;
+            align-items: center;
+            gap: 5px;
+            padding: 4px 10px;
+            border-radius: 20px;
+            font-size: 11px;
+            font-weight: 700;
+            text-decoration: none;
+            transition: transform 0.2s, box-shadow 0.2s;
+            letter-spacing: 0.3px;
+        }
+        .footer-social-btn:hover { transform: translateY(-1px); }
+        .footer-tiktok {
+            background: linear-gradient(135deg,#010101,#2d2d2d 40%,#69C9D0 75%,#EE1D52);
+            color: #fff;
+            border: 1px solid rgba(238,29,82,0.3);
+            box-shadow: 0 2px 8px rgba(238,29,82,0.3);
+        }
+        .footer-instagram {
+            background: linear-gradient(135deg,#833ab4,#fd1d1d,#fcb045);
+            color: #fff;
+            border: 1px solid rgba(253,29,29,0.3);
+            box-shadow: 0 2px 8px rgba(131,58,180,0.3);
+        }
+        .footer-bottom {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 5px 20px;
+            flex-wrap: wrap;
+            gap: 4px;
+        }
+        .footer-status {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            font-size: 10px;
+            color: #334155;
+        }
+        .footer-dot {
+            width: 6px; height: 6px;
+            border-radius: 50%;
+            background: var(--accent-green);
+            box-shadow: 0 0 6px rgba(14,203,129,0.6);
+            animation: pulse-dot 1.5s infinite;
+            display: inline-block;
+        }
+        @keyframes pulse-dot {
+            0%,100% { opacity:1; } 50% { opacity:0.4; }
+        }
+        .footer-copy {
+            font-size: 10px;
+            color: #1e293b;
+            font-weight: 600;
+            letter-spacing: 0.3px;
+        }
 
         .hidden { display: none !important; }
 
@@ -504,19 +605,15 @@
         }
         /* FOOTER MEJORADO */
         footer {
-            background: linear-gradient(90deg, #040812, #060b16) !important;
-            border-top: 1px solid rgba(243,186,47,0.08) !important;
+            background: linear-gradient(135deg, #040812 0%, #060b16 50%, #040812 100%) !important;
+            border-top: 1px solid rgba(243,186,47,0.2) !important;
         }
         /* SCROLLBAR PERSONALIZADA */
         ::-webkit-scrollbar { width: 4px; }
         ::-webkit-scrollbar-track { background: #030712; }
         ::-webkit-scrollbar-thumb { background: rgba(243,186,47,0.3); border-radius: 4px; }
         ::-webkit-scrollbar-thumb:hover { background: rgba(243,186,47,0.5); }
-        /* BARRA NUCLEAR MEJORADA */
-        #nuclearAlert {
-            background: linear-gradient(90deg, #060b16, #080d1a, #060b16) !important;
-            border-bottom: 1px solid rgba(243,186,47,0.1) !important;
-        }
+        /* #nuclearAlert barra eliminada */
         /* BOTONES FLOTANTES MEJORADOS */
         .float-btn {
             box-shadow: 0 4px 16px rgba(0,0,0,0.6) !important;
@@ -549,12 +646,14 @@
 
         /* FORZAR 3 COLUMNAS EN DESKTOP */
         @media (min-width: 951px) {
-            body { overflow: hidden; }
-            .container { display: flex !important; flex-direction: row !important; height: calc(100vh - 95px) !important; }
-            /* sidebar: scroll interno para ver todas las opciones hasta el final */
-            .sidebar { display: flex !important; width: 300px !important; min-width: 300px !important; max-width: 300px !important; flex-direction: column !important; flex-shrink: 0 !important; overflow-y: auto !important; overflow-x: hidden !important; }
-            /* table-wrapper crece para llenar el espacio restante sin cortar */
-            .sidebar .table-wrapper { flex: 1 1 auto; overflow-y: auto; min-height: 0; }
+            body { overflow: hidden; display: flex; flex-direction: column; height: 100vh; }
+            .container { display: flex !important; flex-direction: row !important; flex: 1 1 auto !important; height: 0 !important; min-height: 0 !important; margin-bottom: 0 !important; }
+            /* sidebar: flex column sin scroll global, cada sección tiene su propio scroll */
+            .sidebar { display: flex !important; width: 300px !important; min-width: 300px !important; max-width: 300px !important; flex-direction: column !important; flex-shrink: 0 !important; overflow: hidden !important; height: 100% !important; }
+            /* sidebarScroll: scroll unificado que cubre todo el sidebar */
+            .sidebar .sidebar-header { overflow: visible !important; max-height: none !important; }
+            /* table-wrapper dentro del scroll unificado */
+            .sidebar .table-wrapper { flex: 1 1 auto; min-height: 0; overflow-y: visible; }
             .main-workspace { display: flex !important; flex-direction: row !important; flex: 1 !important; overflow: hidden !important; min-width: 0 !important; }
             .column-center { display: flex !important; flex: 1 !important; flex-direction: column !important; overflow-y: auto !important; min-width: 0 !important; }
             .column-right { display: flex !important; width: 420px !important; min-width: 420px !important; max-width: 420px !important; flex-direction: column !important; overflow-y: auto !important; flex-shrink: 0 !important; }
@@ -837,8 +936,7 @@
     </div>
 </header>
 
-<div id="modoBanner" style="text-align:center;padding:5px;font-size:11px;font-weight:900;letter-spacing:1.5px;transition:all 0.3s;"></div>
-<div id="nuclearAlert">🏆 MONITOR DE REVERSIÓN EXTREMA ACTIVO...</div>
+<!-- barras eliminadas: modoBanner y nuclearAlert integrados en panel central -->
 <div id="btcEthBar" style="background:#07101f;border-bottom:1px solid rgba(255,255,255,0.04);padding:5px 16px;display:flex;align-items:center;gap:12px;font-size:11px;overflow-x:auto;">
     <span style="color:#475569;font-weight:700;white-space:nowrap;">CORRELACIÓN:</span>
     <span id="btcCorrelDisplay" style="white-space:nowrap;">₿ BTC: <b style="color:#94a3b8;">—</b></span>
@@ -896,81 +994,83 @@
 <div class="container">
 
     <div class="sidebar" id="sidebar">
-        <div class="sidebar-header">
-            <button onclick="document.getElementById('activationPanel').style.display='flex'" class="btn vip" style="width:100%; font-size:11px; padding:8px;"><i class="fas fa-crown"></i> ACTIVAR LICENCIA</button>
-            <!-- LONG / SHORT en el sidebar -->
-            <div style="display:flex;gap:6px;">
-                <button id="btnModoAlcistaSide" onclick="cambiarModoMercado('alcista')"
-                    style="flex:1;padding:10px 6px;border-radius:10px;border:none;cursor:pointer;font-size:12px;font-weight:900;transition:all 0.25s;letter-spacing:0.3px;">
-                    🟢 LONG<br><span style="font-size:9px;font-weight:700;opacity:0.85;">COMPRA · PISO</span>
-                </button>
-                <button id="btnModoBajistaSide" onclick="cambiarModoMercado('bajista')"
-                    style="flex:1;padding:10px 6px;border-radius:10px;border:none;cursor:pointer;font-size:12px;font-weight:900;transition:all 0.25s;letter-spacing:0.3px;">
-                    🔴 SHORT<br><span style="font-size:9px;font-weight:700;opacity:0.85;">VENTA · TECHO</span>
-                </button>
-            </div>
-            <!-- 🚨 CARRUSEL IA: LONG + SHORT rotando -->
-            <div id="btnAlarmaUnificado" style="display:none; width:100%; margin-top:8px; border-radius:12px; overflow:hidden; box-shadow:0 4px 18px rgba(0,0,0,0.5);">
-                <!-- Cabecera IA (oculta, compatibilidad) -->
-                <div id="alarmaUnifHeader" style="display:none;"><span id="alarmaUnifIcono"></span><div><div id="alarmaUnifTitulo"></div><div id="alarmaUnifSub"></div></div><div id="alarmaUnifProb"></div></div>
-                <div id="alarmaUnifBarraWrap" style="display:none;"><div id="alarmaUnifBarra"></div></div>
-                <div id="alarmaUnifCuerpo" style="display:none;"></div>
-                <!-- Grid de monedas LONG / SHORT -->
-                <div style="display:flex; gap:0; width:100%;">
-                    <!-- LONG -->
-                    <div id="iaCarruselLong" onclick="_iaCarruselClick('long')" style="flex:1; background:linear-gradient(135deg,#042d18,#064d2b); border:2px solid rgba(14,203,129,0.4); border-right:1px solid rgba(14,203,129,0.2); border-radius:10px 0 0 10px; padding:8px 6px; cursor:pointer; text-align:center; transition:all 0.2s;">
-                        <div style="font-size:9px; font-weight:900; color:#0ecb81; letter-spacing:1px; margin-bottom:4px;">▲ COMPRA · LONG</div>
-                        <div id="iaLongNombre" style="font-size:17px; font-weight:900; color:#fff; line-height:1;">—</div>
-                        <div id="iaLongSub" style="font-size:9px; color:#6ee7b7; margin-top:3px; font-weight:700;">—</div>
-                    </div>
-                    <!-- SHORT -->
-                    <div id="iaCarruselShort" onclick="_iaCarruselClick('short')" style="flex:1; background:linear-gradient(135deg,#2d0408,#4d0612); border:2px solid rgba(255,42,59,0.4); border-left:1px solid rgba(255,42,59,0.2); border-radius:0 10px 10px 0; padding:8px 6px; cursor:pointer; text-align:center; transition:all 0.2s;">
-                        <div style="font-size:9px; font-weight:900; color:#ff2a3b; letter-spacing:1px; margin-bottom:4px;">▼ VENTA · SHORT</div>
-                        <div id="iaShortNombre" style="font-size:17px; font-weight:900; color:#fff; line-height:1;">—</div>
-                        <div id="iaShortSub" style="font-size:9px; color:#fca5a5; margin-top:3px; font-weight:700;">—</div>
+        <!-- ZONA ÚNICA CON SCROLL: desde ACTIVAR LICENCIA hasta la lista de monedas 24h completa -->
+        <div id="sidebarScroll" style="display:flex; flex-direction:column; overflow-y:auto; overflow-x:hidden; height:100%;
+             scrollbar-width:auto; scrollbar-color:rgba(243,186,47,0.7) #0a1220;">
+            <!-- Controles superiores -->
+            <div class="sidebar-header" style="flex-shrink:0; overflow:visible; max-height:none; overflow-y:visible;">
+                <button onclick="document.getElementById('activationPanel').style.display='flex'" class="btn vip" style="width:100%; font-size:11px; padding:8px;"><i class="fas fa-crown"></i> ACTIVAR LICENCIA</button>
+                <!-- LONG / SHORT en el sidebar -->
+                <div style="display:flex;gap:6px;">
+                    <button id="btnModoAlcistaSide" onclick="cambiarModoMercado('alcista')"
+                        style="flex:1;padding:10px 6px;border-radius:10px;border:none;cursor:pointer;font-size:12px;font-weight:900;transition:all 0.25s;letter-spacing:0.3px;">
+                        🟢 LONG<br><span style="font-size:9px;font-weight:700;opacity:0.85;">COMPRA · PISO</span>
+                    </button>
+                    <button id="btnModoBajistaSide" onclick="cambiarModoMercado('bajista')"
+                        style="flex:1;padding:10px 6px;border-radius:10px;border:none;cursor:pointer;font-size:12px;font-weight:900;transition:all 0.25s;letter-spacing:0.3px;">
+                        🔴 SHORT<br><span style="font-size:9px;font-weight:700;opacity:0.85;">VENTA · TECHO</span>
+                    </button>
+                </div>
+                <!-- 🚨 CARRUSEL IA: LONG + SHORT rotando -->
+                <div id="btnAlarmaUnificado" style="display:none; width:100%; margin-top:8px; border-radius:12px; overflow:hidden; box-shadow:0 4px 18px rgba(0,0,0,0.5);">
+                    <div id="alarmaUnifHeader" style="display:none;"><span id="alarmaUnifIcono"></span><div><div id="alarmaUnifTitulo"></div><div id="alarmaUnifSub"></div></div><div id="alarmaUnifProb"></div></div>
+                    <div id="alarmaUnifBarraWrap" style="display:none;"><div id="alarmaUnifBarra"></div></div>
+                    <div id="alarmaUnifCuerpo" style="display:none;"></div>
+                    <div style="display:flex; gap:0; width:100%;">
+                        <div id="iaCarruselLong" onclick="_iaCarruselClick('long')" style="flex:1; background:linear-gradient(135deg,#042d18,#064d2b); border:2px solid rgba(14,203,129,0.4); border-right:1px solid rgba(14,203,129,0.2); border-radius:10px 0 0 10px; padding:8px 6px; cursor:pointer; text-align:center; transition:all 0.2s;">
+                            <div style="font-size:9px; font-weight:900; color:#0ecb81; letter-spacing:1px; margin-bottom:4px;">▲ COMPRA · LONG</div>
+                            <div id="iaLongNombre" style="font-size:17px; font-weight:900; color:#fff; line-height:1;">—</div>
+                            <div id="iaLongSub" style="font-size:9px; color:#6ee7b7; margin-top:3px; font-weight:700;">—</div>
+                        </div>
+                        <div id="iaCarruselShort" onclick="_iaCarruselClick('short')" style="flex:1; background:linear-gradient(135deg,#2d0408,#4d0612); border:2px solid rgba(255,42,59,0.4); border-left:1px solid rgba(255,42,59,0.2); border-radius:0 10px 10px 0; padding:8px 6px; cursor:pointer; text-align:center; transition:all 0.2s;">
+                            <div style="font-size:9px; font-weight:900; color:#ff2a3b; letter-spacing:1px; margin-bottom:4px;">▼ VENTA · SHORT</div>
+                            <div id="iaShortNombre" style="font-size:17px; font-weight:900; color:#fff; line-height:1;">—</div>
+                            <div id="iaShortSub" style="font-size:9px; color:#fca5a5; margin-top:3px; font-weight:700;">—</div>
+                        </div>
                     </div>
                 </div>
+                <!-- Botones ocultos compatibilidad -->
+                <button id="btnAlarmaLateral" style="display:none;"></button>
+                <span id="alarmaLateralTexto" style="display:none;"></span>
+                <div id="alarmaSidePanel" style="display:none;"><div id="alarmaSideTexto"></div></div>
+                <div class="search-box">
+                    <div id="botSaludo" class="bot-saludo" style="margin-bottom:8px;">🤖 Analizando el mercado en tiempo real...</div>
+                    <input type="text" id="searchCoin" placeholder="Buscar low-caps o filtros (BOMBA, POTENCIA, AGOTADO)..." onkeyup="buscarMoneda()">
+                </div>
             </div>
-            <!-- Botones ocultos para mantener compatibilidad con código existente -->
-            <button id="btnAlarmaLateral" style="display:none;"></button>
-            <span id="alarmaLateralTexto" style="display:none;"></span>
-            <div id="alarmaSidePanel" style="display:none;"><div id="alarmaSideTexto"></div></div>
-            <div class="search-box">
-                <div id="botSaludo" class="bot-saludo" style="margin-bottom:8px;">🤖 Analizando el mercado en tiempo real...</div>
-                <input type="text" id="searchCoin" placeholder="Buscar low-caps o filtros (BOMBA, POTENCIA, AGOTADO)..." onkeyup="buscarMoneda()">
-            </div>
-        </div>
-        <!-- ══ DESLIZADOR MAX/MIN 24H ══ -->
-        <div id="deslizadorMaxMin" style="display:none; background:#060b16; border-top:1px solid rgba(255,255,255,0.05); flex-shrink:0; max-height:210px; overflow-y:auto;">
-            <!-- Tabs -->
-            <div style="display:flex; border-bottom:1px solid rgba(255,255,255,0.06);">
-                <button id="tabMaxBtn" onclick="mostrarTabMaxMin('max')" style="flex:1; padding:7px 4px; font-size:10px; font-weight:900; border:none; cursor:pointer; letter-spacing:0.5px; background:rgba(255,60,0,0.18); color:#ff3c00; border-bottom:2px solid #ff3c00;">
-                    🔴 EN MÁXIMO
-                </button>
-                <button id="tabMinBtn" onclick="mostrarTabMaxMin('min')" style="flex:1; padding:7px 4px; font-size:10px; font-weight:900; border:none; cursor:pointer; letter-spacing:0.5px; background:transparent; color:#475569; border-bottom:2px solid transparent;">
-                    🟢 EN MÍNIMO
-                </button>
-            </div>
-            <div id="deslizadorLista" style="padding:6px 8px; display:flex; flex-direction:column; gap:5px;"></div>
-        </div>
-        <!-- Toggle para abrir/cerrar el deslizador -->
-        <button id="btnToggleDeslizador" onclick="toggleDeslizador()" style="width:100%; padding:6px 12px; background:#07101f; border:none; border-top:1px solid rgba(255,255,255,0.06); border-bottom:1px solid rgba(255,255,255,0.06); color:#475569; font-size:10px; font-weight:900; cursor:pointer; letter-spacing:1px; display:flex; align-items:center; justify-content:center; gap:6px; flex-shrink:0;">
-            <span id="deslizadorToggleIcono">▼</span>
-            <span id="deslizadorToggleTxt">VER MONEDAS EN MÁX/MÍN 24H</span>
-            <span id="deslizadorBadge" style="background:#ff3c00; color:#fff; font-size:9px; font-weight:900; padding:1px 6px; border-radius:8px; display:none;">0</span>
-        </button>
 
-        <div class="table-wrapper">
-            <table>
-                <thead>
-                    <tr>
-                        <th>CRIPTO</th>
-                        <th style="text-align:right;">CAMBIO</th>
-                        <th style="text-align:right;">DETALLES</th>
-                    </tr>
-                </thead>
-                <tbody id="cryptoList"></tbody>
-            </table>
+            <!-- ══ DESLIZADOR MAX/MIN 24H ══ (dentro del scroll unificado) -->
+            <div id="deslizadorMaxMin" style="display:none; background:#060b16; border-top:1px solid rgba(255,255,255,0.05); flex-shrink:0;">
+                <div style="display:flex; border-bottom:1px solid rgba(255,255,255,0.06);">
+                    <button id="tabMaxBtn" onclick="mostrarTabMaxMin('max')" style="flex:1; padding:7px 4px; font-size:10px; font-weight:900; border:none; cursor:pointer; letter-spacing:0.5px; background:rgba(255,60,0,0.18); color:#ff3c00; border-bottom:2px solid #ff3c00;">
+                        🔴 EN MÁXIMO
+                    </button>
+                    <button id="tabMinBtn" onclick="mostrarTabMaxMin('min')" style="flex:1; padding:7px 4px; font-size:10px; font-weight:900; border:none; cursor:pointer; letter-spacing:0.5px; background:transparent; color:#475569; border-bottom:2px solid transparent;">
+                        🟢 EN MÍNIMO
+                    </button>
+                </div>
+                <div id="deslizadorLista" style="padding:6px 8px; display:flex; flex-direction:column; gap:5px;"></div>
+            </div>
+            <!-- Toggle MAX/MIN -->
+            <button id="btnToggleDeslizador" onclick="toggleDeslizador()" style="width:100%; padding:6px 12px; background:#07101f; border:none; border-top:1px solid rgba(255,255,255,0.06); border-bottom:1px solid rgba(255,255,255,0.06); color:#475569; font-size:10px; font-weight:900; cursor:pointer; letter-spacing:1px; display:flex; align-items:center; justify-content:center; gap:6px; flex-shrink:0;">
+                <span id="deslizadorToggleIcono">▼</span>
+                <span id="deslizadorToggleTxt">VER MONEDAS EN MÁX/MÍN 24H</span>
+                <span id="deslizadorBadge" style="background:#ff3c00; color:#fff; font-size:9px; font-weight:900; padding:1px 6px; border-radius:8px; display:none;">0</span>
+            </button>
+
+            <!-- ══ LISTA PRINCIPAL DE MONEDAS ══ -->
+            <div class="table-wrapper" style="flex:1; min-height:200px;">
+                <table>
+                    <thead>
+                        <tr>
+                            <th>CRIPTO</th>
+                            <th style="text-align:right;">CAMBIO</th>
+                            <th style="text-align:right;">DETALLES</th>
+                        </tr>
+                    </thead>
+                    <tbody id="cryptoList"></tbody>
+                </table>
+            </div>
         </div>
     </div>
 
@@ -1020,6 +1120,16 @@
                         <div style="font-size:13px; color:#f3ba2f; font-weight:700; letter-spacing:0.5px;">
                             👈 Selecciona una moneda de la lista para comenzar
                         </div>
+                    </div>
+
+                    <!-- BANNER MODO LONG/SHORT integrado -->
+                    <div id="modoBanner" style="margin-top:20px; padding:10px 18px; border-radius:12px; font-size:12px; font-weight:900; letter-spacing:1px; transition:all 0.4s; background:linear-gradient(90deg,rgba(14,203,129,0.12),rgba(14,203,129,0.25),rgba(14,203,129,0.12)); color:#0ecb81; border:1px solid rgba(14,203,129,0.3); display:inline-block;">
+                        ✅ MODO LONG · BUSCANDO MONEDAS EN EL PISO QUE ESTÁN DESPEGANDO · COMPRA
+                    </div>
+
+                    <!-- MONITOR STATUS integrado -->
+                    <div id="nuclearAlert" style="margin-top:10px; padding:8px 16px; border-radius:10px; font-size:11px; font-weight:700; letter-spacing:0.5px; color:#f3ba2f; background:rgba(243,186,47,0.06); border:1px solid rgba(243,186,47,0.15); display:inline-block; cursor:pointer;" onclick="document.getElementById('radarExplosivo') && (document.getElementById('radarExplosivo').style.display='flex')">
+                        🏆 CDC FUTURO-PRO | MONITOR ACTIVO EN TIEMPO REAL
                     </div>
                 </div><!-- fin bienvenidaScreen -->
             </div>
@@ -1130,8 +1240,33 @@
 </div>
 
 <footer>
-    <div id="footerTime"><i class="far fa-clock"></i> Seguimiento activo desde: 00:00:00</div>
-    <div><i class="fas fa-wave-square" style="color:var(--accent-glow);"></i> Actualizando cada 2s</div>
+    <div class="footer-top">
+        <!-- CREADOR -->
+        <div class="footer-creator">
+            <span class="footer-flag">🇧🇴</span>
+            <div>
+                <div class="footer-name">✦ Juan Pablo Ortiz Ortuño</div>
+                <div class="footer-location">📍 Santa Cruz, Bolivia · Creador de CDC FUTURO-PRO</div>
+            </div>
+        </div>
+        <!-- REDES SOCIALES -->
+        <div class="footer-socials">
+            <a href="https://www.tiktok.com/@chicodelascomputadoras" target="_blank" class="footer-social-btn footer-tiktok">
+                <i class="fab fa-tiktok" style="font-size:12px;"></i> chicodelascomputadoras
+            </a>
+            <a href="https://www.instagram.com/chicodelascomputadoras" target="_blank" class="footer-social-btn footer-instagram">
+                <i class="fab fa-instagram" style="font-size:13px;"></i> chicodelascomputadoras
+            </a>
+        </div>
+    </div>
+    <div class="footer-bottom">
+        <div class="footer-status">
+            <span><span class="footer-dot"></span> EN VIVO</span>
+            <span id="footerTime"><i class="far fa-clock"></i> Activo desde: 00:00:00</span>
+            <span><i class="fas fa-wave-square" style="color:var(--accent-glow);"></i> Actualización cada 2s</span>
+        </div>
+        <div class="footer-copy">© 2025 CDC FUTURO-PRO · PROYECTO TECNOMAN · 🇧🇴</div>
+    </div>
 </footer>
 
 <script>
@@ -2371,60 +2506,129 @@ function mostrarBannerScalp(nombre, symbol, tipoOp, apalRec, apalTexto, cambio2m
 
     const maxLev = MONEDAS_BAJO_APALANCAMIENTO[symbol];
     const tieneEMA = e && e.alineadasAlcista;
+    const esLong = tipoOp === 'LONG';
+
+    // ── 1. ABRIR MONEDA EN PANEL CENTRAL AUTOMÁTICAMENTE ──
+    seleccionarMoneda(symbol);
+
+    // ── 2. HACER PARPADEAR EL PANEL CENTRAL ──
+    const panelCentral = document.getElementById('detailView');
+    if (panelCentral) {
+        panelCentral.style.transition = 'box-shadow 0.3s, border-color 0.3s';
+        panelCentral.style.borderColor = colorOp;
+        // Animación de parpadeo
+        let parpadeos = 0;
+        const intervalo = setInterval(() => {
+            parpadeos++;
+            if (parpadeos % 2 === 0) {
+                panelCentral.style.boxShadow = `0 0 40px ${colorOp}99, inset 0 0 20px ${colorOp}22`;
+            } else {
+                panelCentral.style.boxShadow = `0 0 8px ${colorOp}33`;
+            }
+            if (parpadeos >= 20) {
+                clearInterval(intervalo);
+                panelCentral.style.boxShadow = '';
+                panelCentral.style.borderColor = '';
+            }
+        }, 400);
+    }
+
+    // ── 3. BANNER COMPACTO SOBRE EL PANEL CENTRAL (no fixed top) ──
+    const columnCenter = document.getElementById('columnCenter');
+    if (!columnCenter) return;
 
     const banner = document.createElement('div');
     banner.id = 'scalpAlertaBanner';
     banner.style.cssText = `
-        position: fixed;
-        top: 0; left: 0; right: 0;
-        z-index: 9999999;
-        background: linear-gradient(135deg, #0a0f1e, #0f0a1e);
-        border-bottom: 3px solid ${colorOp};
-        padding: 14px 16px 12px;
-        box-shadow: 0 4px 30px ${colorOp}55;
-        animation: scalpSlideIn 0.3s ease;
+        background: linear-gradient(135deg, #080d1a, #0a1020);
+        border: 2px solid ${colorOp};
+        border-radius: 14px;
+        padding: 14px 16px;
+        margin-bottom: 12px;
+        box-shadow: 0 0 28px ${colorOp}55;
         font-family: 'Inter', sans-serif;
+        animation: scalpPulseCard 0.8s ease-in-out infinite alternate;
+        flex-shrink: 0;
     `;
 
     banner.innerHTML = `
         <style>
-            @keyframes scalpSlideIn { from { transform:translateY(-100%); opacity:0; } to { transform:translateY(0); opacity:1; } }
-            @keyframes scalpPulse { 0%,100% { box-shadow:0 0 8px ${colorOp}88; } 50% { box-shadow:0 0 22px ${colorOp}; } }
+            @keyframes scalpPulseCard {
+                from { box-shadow: 0 0 14px ${colorOp}55; border-color: ${colorOp}99; }
+                to   { box-shadow: 0 0 36px ${colorOp}cc; border-color: ${colorOp}; }
+            }
             #scalpAlertaBanner .scalp-btn {
                 background: ${colorOp}; color: #000; border: none; font-weight: 900;
-                font-size: 12px; padding: 8px 14px; border-radius: 8px; cursor: pointer;
-                animation: scalpPulse 1.5s infinite;
+                font-size: 12px; padding: 9px 16px; border-radius: 9px; cursor: pointer;
+                letter-spacing: 0.5px;
             }
+            #scalpAlertaBanner .scalp-btn:hover { opacity: 0.85; }
         </style>
-        <div style="display:flex; align-items:center; justify-content:space-between; flex-wrap:wrap; gap:8px;">
-            <div style="flex:1; min-width:200px;">
-                <div style="font-size:13px; font-weight:900; color:#fff; letter-spacing:0.5px;">
-                    ${emoji} SCALPING — <span style="color:${colorOp};">${tipoOp} ${nombre}</span>
-                    <span style="font-size:10px; color:#64748b; font-weight:400; margin-left:6px;">apalanc. máx: ${maxLev !== undefined ? maxLev + 'x' : '?'}</span>
-                </div>
-                <div style="font-size:11px; color:#a78bfa; margin-top:2px; font-weight:700;">
-                    Entra con <span style="color:#fff;">${apalRec}x</span> — ${apalTexto}
-                </div>
-                <div style="font-size:11px; color:#94a3b8; margin-top:2px;">
-                    Mov. 2min: <b style="color:#fff;">+${cambio2m}%</b>
-                    &nbsp;·&nbsp; Ganancia est.: <b style="color:#0ecb81;">$${ganancia}</b>
-                    &nbsp;·&nbsp; Rango 24h: <b style="color:#f3ba2f;">${(c.rangoPct24h||0).toFixed(1)}%</b>
-                    ${tieneEMA ? '&nbsp;·&nbsp; <span style="color:#0ecb81;">✓ EMA alineada</span>' : ''}
-                </div>
-                <div style="font-size:10px; color:#475569; margin-top:3px;">
-                    Base: $${SCALP_CAPITAL} × ${SCALP_APALANCAMIENTO}x = $${SCALP_CAPITAL * SCALP_APALANCAMIENTO} posición · Objetivo: 0.25% = $1 USDT
+
+        <!-- CABECERA -->
+        <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:10px;">
+            <div style="display:flex; align-items:center; gap:10px;">
+                <span style="font-size:22px;">${emoji}</span>
+                <div>
+                    <div style="font-size:15px; font-weight:900; color:${colorOp}; letter-spacing:0.5px;">
+                        🚨 ALERTA SCALPING — ${tipoOp} ${nombre}
+                    </div>
+                    <div style="font-size:10px; color:#64748b; font-weight:600; margin-top:1px;">
+                        Apalancamiento máximo permitido: ${maxLev !== undefined ? maxLev + 'x' : '?'}
+                    </div>
                 </div>
             </div>
-            <div style="display:flex; gap:8px; align-items:center; flex-shrink:0;">
-                <button class="scalp-btn" onclick="seleccionarMoneda('${symbol}'); cerrarBannerScalp();">
-                    ${emoji} OPERAR ${nombre}
-                </button>
-                <button onclick="cerrarBannerScalp()" style="background:rgba(255,255,255,0.08); border:none; color:#94a3b8; font-size:18px; padding:6px 10px; border-radius:6px; cursor:pointer; font-weight:900; line-height:1;">✕</button>
+            <button onclick="cerrarBannerScalp()" style="background:rgba(255,255,255,0.06); border:1px solid rgba(255,255,255,0.1); color:#94a3b8; font-size:16px; width:30px; height:30px; border-radius:8px; cursor:pointer; font-weight:900; line-height:1; display:flex; align-items:center; justify-content:center;">✕</button>
+        </div>
+
+        <!-- RECOMENDACIÓN PRINCIPAL -->
+        <div style="background:${colorOp}18; border:1px solid ${colorOp}33; border-radius:10px; padding:10px 14px; margin-bottom:10px;">
+            <div style="font-size:13px; font-weight:900; color:#fff; margin-bottom:6px;">
+                📋 RECOMENDACIÓN DEL SISTEMA
             </div>
+            <div style="font-size:12px; color:#e2e8f0; line-height:1.7;">
+                ${esLong
+                    ? `✅ <b style="color:#0ecb81;">COMPRA (LONG)</b> — La moneda está en el piso y despegando`
+                    : `🔴 <b style="color:#ff2a3b;">VENTA (SHORT)</b> — La moneda está en el techo y cayendo`
+                }<br>
+                🎯 Entra con <b style="color:${colorOp};">${apalRec}x de apalancamiento</b> — ${apalTexto}<br>
+                ${tieneEMA
+                    ? `📈 <span style="color:#0ecb81;">EMA alineada ✓</span> — Tendencia confirmada por indicadores<br>`
+                    : `⚡ Rango explosivo — Alta volatilidad detectada<br>`
+                }
+                💰 Ganancia estimada: <b style="color:#f3ba2f;">$${ganancia} USDT</b>
+            </div>
+        </div>
+
+        <!-- ESTADÍSTICAS -->
+        <div style="display:grid; grid-template-columns:1fr 1fr 1fr; gap:8px; margin-bottom:12px;">
+            <div style="background:rgba(255,255,255,0.04); border-radius:8px; padding:8px; text-align:center;">
+                <div style="font-size:10px; color:#64748b; font-weight:700; text-transform:uppercase;">Mov. 2 min</div>
+                <div style="font-size:16px; font-weight:900; color:${colorOp};">${esLong ? '+' : '-'}${cambio2m}%</div>
+            </div>
+            <div style="background:rgba(255,255,255,0.04); border-radius:8px; padding:8px; text-align:center;">
+                <div style="font-size:10px; color:#64748b; font-weight:700; text-transform:uppercase;">Rango 24h</div>
+                <div style="font-size:16px; font-weight:900; color:#f3ba2f;">${(c.rangoPct24h||0).toFixed(1)}%</div>
+            </div>
+            <div style="background:rgba(255,255,255,0.04); border-radius:8px; padding:8px; text-align:center;">
+                <div style="font-size:10px; color:#64748b; font-weight:700; text-transform:uppercase;">Posición</div>
+                <div style="font-size:16px; font-weight:900; color:#a78bfa;">${(c.posicionPorcentaje||50).toFixed(0)}%</div>
+            </div>
+        </div>
+
+        <!-- BOTÓN OPERAR -->
+        <div style="display:flex; gap:8px;">
+            <button class="scalp-btn" style="flex:1; font-size:13px; padding:11px;" onclick="cerrarBannerScalp();">
+                ${emoji} ${esLong ? 'COMPRAR' : 'VENDER'} ${nombre} — EL ANÁLISIS YA ESTÁ ABAJO ↓
+            </button>
+        </div>
+        <div style="font-size:10px; color:#334155; text-align:center; margin-top:8px;">
+            Base $${SCALP_CAPITAL} × ${SCALP_APALANCAMIENTO}x · Objetivo 0.25% = $1 USDT · Se cierra en 25s
         </div>
     `;
 
-    document.body.appendChild(banner);
+    // Insertar al inicio del columnCenter (antes del detailView)
+    columnCenter.insertBefore(banner, columnCenter.firstChild);
 
     // Auto-cierre a los 25 segundos
     bannerScalpTimeout = setTimeout(() => cerrarBannerScalp(), 25000);
@@ -5876,7 +6080,7 @@ document.getElementById("menuToggle").onclick = () => {
             sidebar.style.display = "flex";
             sidebar.style.position = "fixed";
             sidebar.style.top = "60px"; sidebar.style.left = "0"; sidebar.style.zIndex = "99999";
-            sidebar.style.background = "#060b16"; sidebar.style.height = "calc(100vh - 60px)";
+            sidebar.style.background = "#060b16"; sidebar.style.height = "calc(100vh - 125px)";
         }else{ sidebar.style.display = "none"; }
     }else{ sidebar.classList.toggle("hidden"); }
 };
