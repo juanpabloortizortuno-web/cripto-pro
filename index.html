@@ -5604,6 +5604,145 @@ function actualizarTacometroDerecho() {
                 &bull; ${Math.abs(cdcVal) > 70 ? '🔥 Zona roja · máxima fuerza' : Math.abs(cdcVal) > 40 ? '⚡ Acelerando con fuerza' : Math.abs(cdcVal) > 15 ? '▶ Movimiento activo' : '⏸ Motor en ralentí'}
                 ${esUltra ? ' &bull; 🔥 Motor turbo ×1.7' : esMuyVol ? ' &bull; ⚡ Motor sport ×1.35' : ''}
             </div>
+
+            <!-- ══ PANEL RESUMEN CLARO: CAÍDA / SUBIDA / PRESIÓN ══ -->
+            ${(function() {
+                const cambio24h = c.change || 0;
+                const cambio2m  = c.cambioReal2Min || 0;
+                const pos       = c.posicionPorcentaje || 50;
+                const high      = c.high || 0;
+                const low       = c.low || 0;
+                const precio    = c.price || 0;
+
+                // ── DIRECCIÓN DOMINANTE ──
+                const subiendo = cambio24h >= 0;
+                const colorDir = subiendo ? '#0ecb81' : '#ff2a3b';
+                const iconoDir = subiendo ? '📈' : '📉';
+                const textoDir = subiendo
+                    ? `Subió <b style="color:#0ecb81;">+${cambio24h.toFixed(2)}%</b> en 24h`
+                    : `Cayó <b style="color:#ff2a3b;">${cambio24h.toFixed(2)}%</b> en 24h`;
+
+                // ── PRESIÓN COMPRADORES vs VENDEDORES ──
+                // pos 0-100% del rango 24h: >60 = compradores, <40 = vendedores
+                const ciclosS = c.ciclosSubiendo || 0;
+                const ciclosB = c.ciclosBajando  || 0;
+                const totalCiclos = ciclosS + ciclosB || 1;
+                const pctCompra = Math.round((ciclosS / totalCiclos) * 100);
+                const pctVenta  = 100 - pctCompra;
+                const colorCompra = pctCompra >= 60 ? '#0ecb81' : pctCompra >= 40 ? '#f3ba2f' : '#ff2a3b';
+                const colorVenta  = pctVenta  >= 60 ? '#ff2a3b' : pctVenta  >= 40 ? '#f3ba2f' : '#0ecb81';
+                const labelPresion = pctCompra >= 65 ? '🟢 MUCHA COMPRA' : pctCompra <= 35 ? '🔴 MUCHA VENTA' : pctCompra >= 55 ? '🟡 MÁS COMPRA' : pctCompra <= 45 ? '🟡 MÁS VENTA' : '⚖️ EQUILIBRADO';
+                const colorPresion = pctCompra >= 65 ? '#0ecb81' : pctCompra <= 35 ? '#ff2a3b' : '#f3ba2f';
+
+                // ── POSICIÓN EN RANGO ──
+                const posLabel = pos >= 85 ? '🔴 CERCA DEL MÁXIMO — riesgo de caída'
+                               : pos >= 65 ? '🟡 ZONA ALTA — precaución'
+                               : pos <= 15 ? '🟢 CERCA DEL MÍNIMO — zona de rebote'
+                               : pos <= 35 ? '🟡 ZONA BAJA — posible rebote'
+                               : '⚪ ZONA MEDIA — sin señal clara';
+                const colorPos = pos >= 85 ? '#ff2a3b' : pos >= 65 ? '#f3ba2f' : pos <= 15 ? '#0ecb81' : pos <= 35 ? '#38bdf8' : '#64748b';
+
+                // ── CAMBIO 2 MIN con interpretación ──
+                const txt2m = cambio2m > 0.3 ? `Acelerando fuerte ⚡ +${cambio2m.toFixed(2)}%`
+                            : cambio2m > 0.1 ? `Subiendo suave +${cambio2m.toFixed(2)}%`
+                            : cambio2m < -0.3 ? `Cayendo fuerte ⚡ ${cambio2m.toFixed(2)}%`
+                            : cambio2m < -0.1 ? `Bajando suave ${cambio2m.toFixed(2)}%`
+                            : `Sin movimiento (${cambio2m.toFixed(2)}%)`;
+                const color2m = cambio2m >= 0 ? '#0ecb81' : '#ff2a3b';
+
+                // ── DISTANCIA A MAX Y MIN ──
+                const distMax = high > 0 ? (((high - precio) / high) * 100).toFixed(2) : '—';
+                const distMin = low  > 0 ? (((precio - low)  / low)  * 100).toFixed(2) : '—';
+
+                return `
+                <div style="background:#04080f; border:1px solid rgba(255,255,255,0.07); border-radius:14px; padding:12px 14px; margin-bottom:10px;">
+                    
+                    <!-- Título -->
+                    <div style="font-size:10px; font-weight:900; color:#475569; letter-spacing:1.5px; text-transform:uppercase; margin-bottom:10px; display:flex; align-items:center; gap:6px;">
+                        <span style="width:16px;height:2px;background:#f3ba2f;display:inline-block;border-radius:2px;"></span>
+                        RESUMEN DE MERCADO — ${simbolo}
+                        <span style="width:16px;height:2px;background:#f3ba2f;display:inline-block;border-radius:2px;"></span>
+                    </div>
+
+                    <!-- Fila 1: Dirección 24h + Impulso 2min -->
+                    <div style="display:grid; grid-template-columns:1fr 1fr; gap:8px; margin-bottom:8px;">
+                        <div style="background:rgba(255,255,255,0.03); border-radius:10px; padding:9px 11px; border-left:3px solid ${colorDir};">
+                            <div style="font-size:9px; color:#475569; font-weight:700; text-transform:uppercase; margin-bottom:3px;">${iconoDir} TENDENCIA 24H</div>
+                            <div style="font-size:13px; font-weight:900; color:${colorDir};">${subiendo ? '+' : ''}${cambio24h.toFixed(2)}%</div>
+                            <div style="font-size:9px; color:#64748b; margin-top:2px;">${subiendo ? 'En alza hoy' : 'En baja hoy'}</div>
+                        </div>
+                        <div style="background:rgba(255,255,255,0.03); border-radius:10px; padding:9px 11px; border-left:3px solid ${color2m};">
+                            <div style="font-size:9px; color:#475569; font-weight:700; text-transform:uppercase; margin-bottom:3px;">⚡ ÚLTIMOS 2 MIN</div>
+                            <div style="font-size:13px; font-weight:900; color:${color2m};">${cambio2m > 0 ? '+' : ''}${cambio2m.toFixed(2)}%</div>
+                            <div style="font-size:9px; color:#64748b; margin-top:2px;">${cambio2m > 0.15 ? 'Comprando fuerte' : cambio2m < -0.15 ? 'Vendiendo fuerte' : 'Movimiento leve'}</div>
+                        </div>
+                    </div>
+
+                    <!-- Fila 2: Presión Compra/Venta -->
+                    <div style="background:rgba(255,255,255,0.03); border-radius:10px; padding:9px 11px; margin-bottom:8px;">
+                        <div style="font-size:9px; color:#475569; font-weight:700; text-transform:uppercase; margin-bottom:6px;">🏋️ PRESIÓN COMPRADORES vs VENDEDORES</div>
+                        <div style="display:flex; align-items:center; gap:8px; margin-bottom:5px;">
+                            <span style="font-size:10px; color:#0ecb81; font-weight:900; min-width:80px;">🟢 COMPRA ${pctCompra}%</span>
+                            <div style="flex:1; height:8px; background:rgba(255,255,255,0.06); border-radius:6px; overflow:hidden;">
+                                <div style="height:100%; width:${pctCompra}%; background:linear-gradient(90deg,#0ecb81,#05a660); border-radius:6px; transition:width 0.5s;"></div>
+                            </div>
+                            <span style="font-size:10px; color:#ff2a3b; font-weight:900; min-width:80px; text-align:right;">VENTA ${pctVenta}% 🔴</span>
+                        </div>
+                        <div style="text-align:center;">
+                            <span style="font-size:12px; font-weight:900; color:${colorPresion};">${labelPresion}</span>
+                        </div>
+                        <div style="font-size:9px; color:#334155; text-align:center; margin-top:3px;">Basado en ${totalCiclos} ciclos de 2s — ${ciclosS} subiendo · ${ciclosB} bajando</div>
+                    </div>
+
+                    <!-- Fila 3: Posición en rango 24h -->
+                    <div style="background:rgba(255,255,255,0.03); border-radius:10px; padding:9px 11px; margin-bottom:8px;">
+                        <div style="font-size:9px; color:#475569; font-weight:700; text-transform:uppercase; margin-bottom:6px;">📍 POSICIÓN EN RANGO 24H</div>
+                        <div style="display:flex; align-items:center; gap:6px; margin-bottom:4px;">
+                            <span style="font-size:9px; color:#ff2a3b; white-space:nowrap;">MÍN<br>${low > 0 ? '$'+low.toFixed(4) : '—'}</span>
+                            <div style="flex:1; height:10px; background:rgba(255,255,255,0.06); border-radius:6px; overflow:visible; position:relative;">
+                                <!-- Barra de rango -->
+                                <div style="height:100%; background:linear-gradient(90deg,#0ecb81,#f3ba2f,#ff2a3b); border-radius:6px; opacity:0.5;"></div>
+                                <!-- Indicador de posición -->
+                                <div style="position:absolute; top:-3px; left:calc(${Math.min(Math.max(pos,2),98)}% - 8px); width:16px; height:16px; background:${colorPos}; border-radius:50%; border:2px solid #fff; box-shadow:0 0 8px ${colorPos}88;"></div>
+                            </div>
+                            <span style="font-size:9px; color:#ff3c00; white-space:nowrap; text-align:right;">MÁX<br>${high > 0 ? '$'+high.toFixed(4) : '—'}</span>
+                        </div>
+                        <div style="font-size:10px; font-weight:700; color:${colorPos}; text-align:center;">${posLabel}</div>
+                        <div style="display:flex; justify-content:space-between; margin-top:4px; font-size:9px; color:#475569;">
+                            <span>⬆ Hasta máx: <b style="color:#ff6b00;">-${distMax}%</b></span>
+                            <span style="font-size:11px;font-weight:900;color:#fff;">$${precio < 0.01 ? precio.toFixed(6) : precio < 1 ? precio.toFixed(4) : precio.toFixed(4)}</span>
+                            <span>⬇ Desde mín: <b style="color:#0ecb81;">+${distMin}%</b></span>
+                        </div>
+                    </div>
+
+                    <!-- Fila 4: Diagnóstico rápido en texto claro -->
+                    <div style="background:${colorPresion}11; border:1px solid ${colorPresion}33; border-radius:10px; padding:8px 11px;">
+                        <div style="font-size:10px; font-weight:700; color:${colorPresion}; line-height:1.6;">
+                            ${(function(){
+                                const lines = [];
+                                if (cambio24h > 5) lines.push(`📈 Subió <b>${cambio24h.toFixed(1)}%</b> en el día — momentum positivo`);
+                                else if (cambio24h > 1) lines.push(`📈 Ligera subida de <b>+${cambio24h.toFixed(1)}%</b> en 24h`);
+                                else if (cambio24h < -5) lines.push(`📉 Cayó <b>${Math.abs(cambio24h).toFixed(1)}%</b> en el día — presión bajista`);
+                                else if (cambio24h < -1) lines.push(`📉 Ligera caída de <b>${cambio24h.toFixed(1)}%</b> en 24h`);
+                                else lines.push(`↔️ Precio casi sin cambio en 24h (<b>${cambio24h.toFixed(2)}%</b>)`);
+
+                                if (cambio2m > 0.3) lines.push(`⚡ Está <b>acelerando fuerte</b> ahora mismo — +${cambio2m.toFixed(2)}% en 2 min`);
+                                else if (cambio2m < -0.3) lines.push(`⚡ Está <b>cayendo fuerte</b> ahora mismo — ${cambio2m.toFixed(2)}% en 2 min`);
+
+                                if (pctCompra >= 65) lines.push(`🟢 <b>Compradores dominan</b> (${pctCompra}% de ciclos comprando)`);
+                                else if (pctVenta >= 65) lines.push(`🔴 <b>Vendedores dominan</b> (${pctVenta}% de ciclos vendiendo)`);
+                                else lines.push(`⚖️ Compra y venta casi iguales — mercado indeciso`);
+
+                                if (pos >= 85) lines.push(`⚠️ En el <b>máximo</b> del día — riesgo de corrección`);
+                                else if (pos <= 15) lines.push(`💡 En el <b>mínimo</b> del día — posible zona de rebote`);
+
+                                return lines.map(l => `<div>• ${l}</div>`).join('');
+                            })()}
+                        </div>
+                    </div>
+
+                </div>`;
+            })()}
         </div>
 
         <!-- ── MOTOR LONG/SHORT: señales activas de mercado ── -->
@@ -5687,20 +5826,36 @@ function actualizarTacometroDerecho() {
             </div>
         </div>
 
-        <!-- Indicadores 3 columnas -->
+        <!-- Indicadores 3 columnas mejorados -->
         <div class="grid-indicators" style="grid-template-columns: 1fr 1fr 1fr;">
-            <div class="indicator-box">
-                <div class="indicator-label"><i class="fas fa-bolt"></i> IMPULSO 2M</div>
+            <div class="indicator-box" style="text-align:center;">
+                <div class="indicator-label" style="justify-content:center;"><i class="fas fa-bolt"></i> IMPULSO 2M</div>
                 <div class="indicator-value" style="color:${c.cambioReal2Min >= 0 ? '#0ecb81' : '#ff2a3b'};">${c.cambioReal2Min > 0 ? '+' : ''}${c.cambioReal2Min.toFixed(2)}%</div>
+                <div style="font-size:9px;font-weight:700;color:${c.cambioReal2Min > 0.2 ? '#0ecb81' : c.cambioReal2Min < -0.2 ? '#ff2a3b' : '#64748b'};">
+                    ${c.cambioReal2Min > 0.2 ? '⬆ SUBIENDO' : c.cambioReal2Min < -0.2 ? '⬇ BAJANDO' : '↔ LATERAL'}
+                </div>
+                <!-- mini barra impulso -->
+                <div style="height:4px;background:rgba(255,255,255,0.06);border-radius:4px;margin-top:5px;overflow:hidden;">
+                    <div style="height:100%;width:${Math.min(Math.abs(c.cambioReal2Min)*33,100)}%;background:${c.cambioReal2Min >= 0 ? '#0ecb81' : '#ff2a3b'};border-radius:4px;transition:width 0.3s;margin:${c.cambioReal2Min >= 0 ? '0 0 0 0' : '0 0 0 auto'};"></div>
+                </div>
             </div>
-            <div class="indicator-box">
-                <div class="indicator-label"><i class="fas fa-compress-alt"></i> TECHOMAX</div>
-                <div class="indicator-value" style="color:#f3ba2f;">-${c.caidaDesdeMaximo.toFixed(1)}%</div>
+            <div class="indicator-box" style="text-align:center;">
+                <div class="indicator-label" style="justify-content:center;"><i class="fas fa-compress-alt"></i> DIST. AL MÁX</div>
+                <div class="indicator-value" style="color:${c.caidaDesdeMaximo <= 0.5 ? '#ff2a3b' : c.caidaDesdeMaximo <= 3 ? '#f3ba2f' : '#64748b'};">-${c.caidaDesdeMaximo.toFixed(1)}%</div>
+                <div style="font-size:9px;font-weight:700;color:${c.caidaDesdeMaximo <= 0.5 ? '#ff2a3b' : c.caidaDesdeMaximo <= 3 ? '#f3ba2f' : '#64748b'};">
+                    ${c.caidaDesdeMaximo <= 0.5 ? '🔴 EN TECHO' : c.caidaDesdeMaximo <= 3 ? '⚠️ CERCA MAX' : c.caidaDesdeMaximo >= 15 ? '🟢 LEJOS MAX' : '📊 ZONA MED.'}
+                </div>
+                <div style="height:4px;background:rgba(255,255,255,0.06);border-radius:4px;margin-top:5px;overflow:hidden;">
+                    <div style="height:100%;width:${Math.min(100-c.caidaDesdeMaximo*2,100)}%;background:${c.caidaDesdeMaximo <= 2 ? '#ff2a3b' : '#f3ba2f'};border-radius:4px;"></div>
+                </div>
             </div>
-            <div class="indicator-box">
-                <div class="indicator-label"><i class="fas fa-wave-square"></i> RSI (14)</div>
+            <div class="indicator-box" style="text-align:center;">
+                <div class="indicator-label" style="justify-content:center;"><i class="fas fa-wave-square"></i> RSI (14)</div>
                 <div class="indicator-value" style="color:${colorRSI};">${rsiTexto}</div>
-                <div style="font-size:9px; color:var(--text-dim); font-weight:700; text-transform:uppercase;">${estadoRSI}</div>
+                <div style="font-size:9px; color:${colorRSI}; font-weight:700; text-transform:uppercase;">${estadoRSI}</div>
+                <div style="height:4px;background:rgba(255,255,255,0.06);border-radius:4px;margin-top:5px;overflow:hidden;">
+                    <div style="height:100%;width:${rsiVal || 50}%;background:${colorRSI};border-radius:4px;"></div>
+                </div>
             </div>
         </div>
 
