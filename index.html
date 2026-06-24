@@ -197,6 +197,15 @@
         }
         .radar-scanning { animation: radar-scan 1s infinite; }
 
+        /* ── CARRUSEL IA LONG/SHORT ── */
+        @keyframes ia-flip-in {
+            from { opacity:0; transform:translateY(-6px) scale(0.92); }
+            to   { opacity:1; transform:translateY(0)   scale(1);    }
+        }
+        #iaLongNombre, #iaShortNombre { animation: ia-flip-in 0.35s ease; }
+        #iaCarruselLong:hover  { border-color:rgba(14,203,129,0.8)!important; transform:scaleY(1.03); }
+        #iaCarruselShort:hover { border-color:rgba(255,42,59,0.8)!important;  transform:scaleY(1.03); }
+
         /* ── FOCO IA: highlight animado de la moneda que la IA tiene en la mira ── */
         @keyframes ia-foco-pulse {
             0%   { box-shadow: inset 3px 0 0 #f3ba2f, 0 0 0 rgba(243,186,47,0); }
@@ -318,7 +327,7 @@
             overflow-x: hidden;
         }
 
-        .sidebar-header { padding: 16px; display: flex; flex-direction: column; gap: 12px; flex-shrink: 0; }
+        .sidebar-header { padding: 16px; display: flex; flex-direction: column; gap: 12px; flex-shrink: 0; padding-bottom: 8px; }
 
         
 
@@ -335,7 +344,7 @@
             border-radius: 8px; border: 1px solid rgba(243, 186, 47, 0.1);
         }
 
-        .table-wrapper { flex: 1; min-height: 200px; }
+        .table-wrapper { flex: 1; min-height: 200px; overflow-y: auto; }
         table { width: 100%; border-collapse: collapse; table-layout: fixed; }
 
         th:nth-child(1), td:nth-child(1){ width:50%; }
@@ -349,6 +358,7 @@
             border-bottom: 1px solid rgba(255, 255, 255, 0.03);
         }
         td { padding: 14px 16px; font-size: 13px; border-bottom: 1px solid rgba(255, 255, 255, 0.02); cursor: pointer; }
+        #cryptoList tr:last-child td { padding-bottom: 80px; } /* espacio para barra del navegador en móvil */
         tr:hover td { background: rgba(255, 255, 255, 0.01); }
 
         .main-workspace {
@@ -541,7 +551,10 @@
         @media (min-width: 951px) {
             body { overflow: hidden; }
             .container { display: flex !important; flex-direction: row !important; height: calc(100vh - 95px) !important; }
-            .sidebar { display: flex !important; width: 300px !important; min-width: 300px !important; max-width: 300px !important; flex-direction: column !important; flex-shrink: 0 !important; }
+            /* sidebar: scroll interno para ver todas las opciones hasta el final */
+            .sidebar { display: flex !important; width: 300px !important; min-width: 300px !important; max-width: 300px !important; flex-direction: column !important; flex-shrink: 0 !important; overflow-y: auto !important; overflow-x: hidden !important; }
+            /* table-wrapper crece para llenar el espacio restante sin cortar */
+            .sidebar .table-wrapper { flex: 1 1 auto; overflow-y: auto; min-height: 0; }
             .main-workspace { display: flex !important; flex-direction: row !important; flex: 1 !important; overflow: hidden !important; min-width: 0 !important; }
             .column-center { display: flex !important; flex: 1 !important; flex-direction: column !important; overflow-y: auto !important; min-width: 0 !important; }
             .column-right { display: flex !important; width: 420px !important; min-width: 420px !important; max-width: 420px !important; flex-direction: column !important; overflow-y: auto !important; flex-shrink: 0 !important; }
@@ -552,7 +565,7 @@
         @media (max-width: 950px) {
             body { overflow-x: hidden; overflow-y: auto; }
             .container { display: flex; flex-direction: column; height: auto; overflow: visible; }
-            .sidebar { width: 100%; min-width: 100%; height: 100vh; overflow-y: auto; overflow-x: hidden; border-right: none; border-bottom: 1px solid rgba(255,255,255,.05); }
+            .sidebar { width: 100%; min-width: 100%; height: auto; min-height: 100vh; overflow-y: visible; overflow-x: hidden; border-right: none; border-bottom: 1px solid rgba(255,255,255,.05); }
             .main-workspace { display: flex; flex-direction: column; overflow: visible; }
             .column-center { width: 100%; min-width: 100%; padding: 10px; border-right: none; box-sizing: border-box; }
             .column-right { width: 100%; min-width: 100%; padding: 10px; box-sizing: border-box; }
@@ -896,24 +909,26 @@
                     🔴 SHORT<br><span style="font-size:9px;font-weight:700;opacity:0.85;">VENTA · TECHO</span>
                 </button>
             </div>
-            <!-- 🚨 BOTÓN UNIFICADO DE SEÑAL + ALARMA -->
-            <div id="btnAlarmaUnificado" style="display:none; width:100%; margin-top:8px; border-radius:12px; overflow:hidden; cursor:pointer; box-shadow:0 4px 18px rgba(0,0,0,0.5); transition:all 0.3s;" onclick="manejarClickAlarmaUnificada()">
-                <!-- Cabecera de estado IA -->
-                <div id="alarmaUnifHeader" style="padding:9px 12px 5px; display:flex; align-items:center; gap:8px; background:rgba(0,0,0,0.3);">
-                    <span id="alarmaUnifIcono" style="font-size:18px;">⏳</span>
-                    <div style="flex:1; min-width:0;">
-                        <div id="alarmaUnifTitulo" style="font-size:12px; font-weight:900; letter-spacing:0.5px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">— ANALIZANDO —</div>
-                        <div id="alarmaUnifSub" style="font-size:9px; font-weight:700; opacity:0.75; margin-top:1px;">IA calculando señal...</div>
+            <!-- 🚨 CARRUSEL IA: LONG + SHORT rotando -->
+            <div id="btnAlarmaUnificado" style="display:none; width:100%; margin-top:8px; border-radius:12px; overflow:hidden; box-shadow:0 4px 18px rgba(0,0,0,0.5);">
+                <!-- Cabecera IA (oculta, compatibilidad) -->
+                <div id="alarmaUnifHeader" style="display:none;"><span id="alarmaUnifIcono"></span><div><div id="alarmaUnifTitulo"></div><div id="alarmaUnifSub"></div></div><div id="alarmaUnifProb"></div></div>
+                <div id="alarmaUnifBarraWrap" style="display:none;"><div id="alarmaUnifBarra"></div></div>
+                <div id="alarmaUnifCuerpo" style="display:none;"></div>
+                <!-- Grid de monedas LONG / SHORT -->
+                <div style="display:flex; gap:0; width:100%;">
+                    <!-- LONG -->
+                    <div id="iaCarruselLong" onclick="_iaCarruselClick('long')" style="flex:1; background:linear-gradient(135deg,#042d18,#064d2b); border:2px solid rgba(14,203,129,0.4); border-right:1px solid rgba(14,203,129,0.2); border-radius:10px 0 0 10px; padding:8px 6px; cursor:pointer; text-align:center; transition:all 0.2s;">
+                        <div style="font-size:9px; font-weight:900; color:#0ecb81; letter-spacing:1px; margin-bottom:4px;">▲ COMPRA · LONG</div>
+                        <div id="iaLongNombre" style="font-size:17px; font-weight:900; color:#fff; line-height:1;">—</div>
+                        <div id="iaLongSub" style="font-size:9px; color:#6ee7b7; margin-top:3px; font-weight:700;">—</div>
                     </div>
-                    <div id="alarmaUnifProb" style="font-size:16px; font-weight:900; white-space:nowrap;">—%</div>
-                </div>
-                <!-- Barra de progreso IA -->
-                <div id="alarmaUnifBarraWrap" style="height:3px; background:rgba(255,255,255,0.08);">
-                    <div id="alarmaUnifBarra" style="height:100%; width:0%; transition:width 0.4s; background:#f3ba2f;"></div>
-                </div>
-                <!-- Cuerpo: texto de la señal o alerta del mercado -->
-                <div id="alarmaUnifCuerpo" style="padding:8px 12px 10px; font-size:10px; font-weight:700; line-height:1.5; color:rgba(255,255,255,0.75);">
-                    Escaneando mercado...
+                    <!-- SHORT -->
+                    <div id="iaCarruselShort" onclick="_iaCarruselClick('short')" style="flex:1; background:linear-gradient(135deg,#2d0408,#4d0612); border:2px solid rgba(255,42,59,0.4); border-left:1px solid rgba(255,42,59,0.2); border-radius:0 10px 10px 0; padding:8px 6px; cursor:pointer; text-align:center; transition:all 0.2s;">
+                        <div style="font-size:9px; font-weight:900; color:#ff2a3b; letter-spacing:1px; margin-bottom:4px;">▼ VENTA · SHORT</div>
+                        <div id="iaShortNombre" style="font-size:17px; font-weight:900; color:#fff; line-height:1;">—</div>
+                        <div id="iaShortSub" style="font-size:9px; color:#fca5a5; margin-top:3px; font-weight:700;">—</div>
+                    </div>
                 </div>
             </div>
             <!-- Botones ocultos para mantener compatibilidad con código existente -->
@@ -921,7 +936,7 @@
             <span id="alarmaLateralTexto" style="display:none;"></span>
             <div id="alarmaSidePanel" style="display:none;"><div id="alarmaSideTexto"></div></div>
             <div class="search-box">
-                <div id="botSaludo" class="bot-saludo" style="margin-bottom:8px;">🤖 Buscando giros o despegues (< 20 USDT)</div>
+                <div id="botSaludo" class="bot-saludo" style="margin-bottom:8px;">🤖 Analizando el mercado en tiempo real...</div>
                 <input type="text" id="searchCoin" placeholder="Buscar low-caps o filtros (BOMBA, POTENCIA, AGOTADO)..." onkeyup="buscarMoneda()">
             </div>
         </div>
@@ -1029,7 +1044,7 @@
     <div class="radar-header">
         <div>
             <div style="font-size:16px;font-weight:900;color:#f3ba2f;letter-spacing:1px;">🔭 RADAR EXPLOSIVO CDC</div>
-            <div style="font-size:10px;color:#64748b;margin-top:2px;" id="radarSubtitulo">Escaneando mercado en tiempo real...</div>
+            <div style="font-size:10px;color:#64748b;margin-top:2px;" id="radarSubtitulo">Analizando el mercado en tiempo real...</div>
         </div>
         <div style="display:flex;gap:10px;align-items:center;">
             <div style="font-size:11px;color:#0ecb81;font-weight:700;" id="radarUltimaActualizacion">–</div>
@@ -1829,12 +1844,12 @@ let _unif_pasos_timer = null;
 function _iniciarAnimacionAnalisis(nombre) {
     if (_unif_pasos_timer) clearInterval(_unif_pasos_timer);
     const pasos = [
-        { p:'8%',  txt:'📡 Capturando datos de mercado...'},
-        { p:'22%', txt:'📊 Calculando posición en rango 24h...'},
-        { p:'38%', txt:'⚡ Midiendo velocidad y momentum...'},
-        { p:'55%', txt:'🧮 Evaluando ciclos y tendencia...'},
-        { p:'68%', txt:'🔮 Consultando modelo de predicción...'},
-        { p:'80%', txt:'🤖 IA analizando señal óptima...'},
+        { p:'8%',  txt:'📡 Capturando datos del mercado...'},
+        { p:'22%', txt:'📊 Calculando posición en el rango de 24 horas...'},
+        { p:'38%', txt:'⚡ Midiendo velocidad y fuerza del movimiento...'},
+        { p:'55%', txt:'🧮 Evaluando ciclos y tendencia reciente...'},
+        { p:'68%', txt:'🔮 Consultando modelo de predicción CDC...'},
+        { p:'80%', txt:'🤖 Inteligencia artificial analizando la señal...'},
         { p:'92%', txt:'✅ Procesando resultado final...'},
     ];
     let i = 0;
@@ -1896,9 +1911,9 @@ function actualizarBotonAlarmaLateral(symbol) {
 
 function _mostrarSeñalBase(nombre, esCompra, esVenta, pred) {
     if (esVenta) {
-        _setUnifEstado({ tipo:'short', icono:'🔴', titulo:`SHORT ${nombre}`, sub:`${pred.caida||50}% probabilidad de bajada`, prob:`${pred.caida||50}%`, cuerpo:'Señal SHORT detectada · Condiciones de venta activas', barra:`${pred.caida||50}%` });
+        _setUnifEstado({ tipo:'short', icono:'🔴', titulo:`SHORT ${nombre}`, sub:`${pred.caida||50}% probabilidad de bajada`, prob:`${pred.caida||50}%`, cuerpo:'Señal de venta detectada · Condiciones SHORT activas', barra:`${pred.caida||50}%` });
     } else if (esCompra) {
-        _setUnifEstado({ tipo:'long', icono:'🟢', titulo:`LONG ${nombre}`, sub:`${pred.subida||50}% probabilidad de subida`, prob:`${pred.subida||50}%`, cuerpo:'Señal LONG detectada · Condiciones de compra activas', barra:`${pred.subida||50}%` });
+        _setUnifEstado({ tipo:'long', icono:'🟢', titulo:`LONG ${nombre}`, sub:`${pred.subida||50}% probabilidad de subida`, prob:`${pred.subida||50}%`, cuerpo:'Señal de compra detectada · Condiciones LONG activas', barra:`${pred.subida||50}%` });
     } else {
         const e = _estadoEsperaPorCDC(nombre, pred);
         _setUnifEstado(e);
@@ -1919,7 +1934,7 @@ function _estadoEsperaPorCDC(nombre, pred) {
     if (dominante >= 65) {
         tipo = esAlcista ? 'long' : 'short';
         icono = esAlcista ? '🟢' : '🔴';
-        etiqueta = esAlcista ? 'SESGO ALCISTA' : 'SESGO BAJISTA';
+        etiqueta = esAlcista ? 'POSIBLE SUBIDA' : 'POSIBLE BAJADA';
     } else if (dominante >= 55) {
         tipo = 'alerta';
         icono = esAlcista ? '🟡' : '🟠';
@@ -1933,7 +1948,7 @@ function _estadoEsperaPorCDC(nombre, pred) {
     return {
         tipo, icono,
         titulo: `${nombre} · ${etiqueta}`,
-        sub: `${dominante}% ${esAlcista ? 'probabilidad de subida' : 'probabilidad de bajada'} (modelo CDC)`,
+        sub: `${dominante}% ${esAlcista ? 'probabilidad de subida (modelo CDC)' : 'probabilidad de bajada (modelo CDC)'} (modelo CDC)`,
         prob: `${dominante}%`,
         cuerpo: `<span style="color:#94a3b8;">Mercado lateral · ${dominante}% ${esAlcista ? 'subida' : 'bajada'} según estudio CDC en vivo.</span>`,
         barra: `${dominante}%`
@@ -1948,7 +1963,7 @@ function _aplicarResultadoIA(btn, txt, nombre, cache, esCompra, esVenta, pred) {
             tipo:'long', icono:'🟢', titulo:`LONG ${nombre}`,
             sub:`${pred.subida||50}% prob. subida · IA confirmó`,
             prob:`${pred.subida||50}%`,
-            cuerpo: `<span style="color:#6ee7b7;">${frase || 'Señal LONG · Condiciones favorables de compra'}</span>`,
+            cuerpo: `<span style="color:#6ee7b7;">${frase || 'Señal de compra detectada · Condiciones favorables'}</span>`,
             barra:`${pred.subida||50}%`
         });
     } else if (dir === 'SHORT' || (dir !== 'LONG' && esVenta)) {
@@ -1956,7 +1971,7 @@ function _aplicarResultadoIA(btn, txt, nombre, cache, esCompra, esVenta, pred) {
             tipo:'short', icono:'🔴', titulo:`SHORT ${nombre}`,
             sub:`${pred.caida||50}% prob. bajada · IA confirmó`,
             prob:`${pred.caida||50}%`,
-            cuerpo: `<span style="color:#fca5a5;">${frase || 'Señal SHORT · Condiciones favorables de venta'}</span>`,
+            cuerpo: `<span style="color:#fca5a5;">${frase || 'Señal de venta detectada · Condiciones favorables'}</span>`,
             barra:`${pred.caida||50}%`
         });
     } else {
@@ -2531,7 +2546,7 @@ function buscarMoneda() {
 
     const saludo = document.getElementById('botSaludo');
     if (query === '') { 
-        saludo.innerText = "🤖 Buscando giros o despegues (< 20 USDT)"; 
+        saludo.innerText = "🤖 Analizando el mercado en tiempo real..."; 
     } else if (query === 'POTENCIA') {
         saludo.innerText = `⚡ Mostrando ${encontradas} monedas con volumen explosivo`;
     } else if (query === 'BOMBA') {
@@ -3779,24 +3794,28 @@ async function obtenerDatosBinance() {
 
             // ── REGLA: la IA NUNCA cambia la moneda del panel por su cuenta ──
             // La moneda del panel la elige el usuario con un click en el Motor.
-// ── ALARMA DE VOZ: solo habla de la moneda que está en el panel central ──
-// En seguimiento exclusivo: 100% de foco en selectedCoin, ignora todo lo demás.
-// En modo automático: la IA avisa solo si el foco coincide con el panel actual.
-const focoEsPanel = foco.symbol === selectedCoin;
 
-if (focoEsPanel) {
-    if (
-        ultimaMonedaHablada !== foco.symbol ||
-        ultimoTipoAlertaHablada !== foco.tipo
-    ) {
+// ── ALARMA DE VOZ: SIEMPRE habla de la moneda que está en el panel central ──
+// La rotación de la IA es solo visual (carrusel). La voz sigue al panel central.
+if (selectedCoin) {
+    // Buscar qué señal tiene la moneda del panel en la lista de prioridades
+    const señalPanel = listaPrioridades.find(p => p.symbol === selectedCoin);
+    const tipoPanel  = señalPanel ? señalPanel.tipo : null;
+
+    if (tipoPanel && (
+        ultimaMonedaHablada !== selectedCoin ||
+        ultimoTipoAlertaHablada !== tipoPanel
+    )) {
         if (!audioHablando) {
-            ultimaMonedaHablada = foco.symbol;
-            ultimoTipoAlertaHablada = foco.tipo;
-            playAlarmVoice(foco.symbol, foco.tipo);
+            ultimaMonedaHablada = selectedCoin;
+            ultimoTipoAlertaHablada = tipoPanel;
+            playAlarmVoice(selectedCoin, tipoPanel);
         }
     }
+} else {
+    ultimaMonedaHablada = "";
+    ultimoTipoAlertaHablada = "";
 }
-// Si el foco de la IA es otra moneda, espera — no interrumpe ni cambia el panel.
 
 } else {
     ultimaMonedaHablada = "";
@@ -3804,6 +3823,7 @@ if (focoEsPanel) {
 }
 
 actualizarAlertaGanadora(alertaActivaGlobal);
+_actualizarCarruselIA(listaPrioridadesGlobal);
 
 evaluarNoticiasMercado();
 
@@ -5503,6 +5523,94 @@ function actualizarTacometroDerecho() {
     actualizarBotonAlarmaLateral(selectedCoin);
 }
 
+// ══════════════════════════════════════════════════════════
+// 🤖 CARRUSEL IA — LONG y SHORT rotando en paralelo
+// ══════════════════════════════════════════════════════════
+let _carruselLongIdx  = 0;
+let _carruselShortIdx = 0;
+let _carruselLongList  = [];
+let _carruselShortList = [];
+
+const _TIPO_LONG  = new Set(['BOMBA','DESPEGUE','REBOTE','REBOTE_RADAR','REVERSION','PATRON_60_8','MINIMO_24H','MOMENTUM']);
+const _TIPO_SHORT = new Set(['DERRUMBE','AGOTADO','TECHO_RADAR','MAXIMO_24H']);
+
+function _iaCarruselClick(lado) {
+    const sym = lado === 'long'
+        ? (_carruselLongList[_carruselLongIdx]   && _carruselLongList[_carruselLongIdx].symbol)
+        : (_carruselShortList[_carruselShortIdx] && _carruselShortList[_carruselShortIdx].symbol);
+    if (sym) { seleccionarMoneda(sym); window.scrollTo({top:0, behavior:'smooth'}); }
+}
+
+function _actualizarCarruselIA(listaPrioridadesActual) {
+    // Filtrar LONG: solo monedas con movimiento real ahora mismo
+    // Excluir lentas (momentumScore bajo) y casi sin cambio en 2 min
+    const _UMBRAL_MOV_2M   = 0.08;  // mínimo 0.08% de movimiento en 2 minutos
+    const _UMBRAL_MOMENTUM = 10;    // mínimo momentum score para considerarse "rápida"
+
+    _carruselLongList  = listaPrioridadesActual.filter(p => {
+        if (!_TIPO_LONG.has(p.tipo)) return false;
+        const c = cachedData[p.symbol];
+        if (!c) return false;
+        const mov2m     = Math.abs(c.cambioReal2Min || 0);
+        const mscore    = momentumScore(p.symbol);
+        const enMovimiento = mov2m >= _UMBRAL_MOV_2M && mscore >= _UMBRAL_MOMENTUM;
+        // Los tipos con señal fuerte (BOMBA, DESPEGUE, REVERSION) siempre pasan aunque
+        // en este ciclo puntual estén un tick quietas — ya demostraron velocidad
+        const señalFuerte = ['BOMBA','DESPEGUE','REVERSION','PATRON_60_8'].includes(p.tipo);
+        return enMovimiento || señalFuerte;
+    });
+
+    // Filtrar SHORT: igual, solo monedas con movimiento real bajista
+    _carruselShortList = listaPrioridadesActual.filter(p => {
+        if (!_TIPO_SHORT.has(p.tipo)) return false;
+        const c = cachedData[p.symbol];
+        if (!c) return false;
+        const mov2m  = Math.abs(c.cambioReal2Min || 0);
+        const mscore = momentumScore(p.symbol);
+        const enMovimiento = mov2m >= _UMBRAL_MOV_2M && mscore >= _UMBRAL_MOMENTUM;
+        const señalFuerte  = ['DERRUMBE','AGOTADO'].includes(p.tipo);
+        return enMovimiento || señalFuerte;
+    });
+
+    // Rotar índices (se llama cada ciclo ~2s)
+    if (_carruselLongList.length  > 1) _carruselLongIdx  = (_carruselLongIdx  + 1) % _carruselLongList.length;
+    if (_carruselShortList.length > 1) _carruselShortIdx = (_carruselShortIdx + 1) % _carruselShortList.length;
+
+    const lFoco = _carruselLongList[_carruselLongIdx];
+    const sFoco = _carruselShortList[_carruselShortIdx];
+
+    const elLN = document.getElementById('iaLongNombre');
+    const elLS = document.getElementById('iaLongSub');
+    const elSN = document.getElementById('iaShortNombre');
+    const elSS = document.getElementById('iaShortSub');
+    const wrap = document.getElementById('btnAlarmaUnificado');
+    if (!elLN || !wrap) return;
+
+    // Reanimar el nombre para que el usuario note el cambio
+    [elLN, elSN].forEach(el => { el.style.animation='none'; void el.offsetWidth; el.style.animation='ia-flip-in 0.35s ease'; });
+
+    elLN.textContent = lFoco ? lFoco.symbol.replace('USDT','') : '—';
+    elLS.textContent = lFoco ? _iaSubtexto(lFoco) : 'Sin señal ahora';
+
+    elSN.textContent = sFoco ? sFoco.symbol.replace('USDT','') : '—';
+    elSS.textContent = sFoco ? _iaSubtexto(sFoco) : 'Sin señal ahora';
+
+    wrap.style.display = (lFoco || sFoco) ? 'block' : 'none';
+
+    // Sincronizar _alarmaSideMoneda con el lado más relevante
+    window._alarmaSideMoneda = (lFoco || sFoco) ? (lFoco || sFoco).symbol : null;
+}
+
+function _iaSubtexto(p) {
+    const c = cachedData[p.symbol];
+    if (!c) return p.tipo;
+    const cambio  = c.cambioReal2Min || 0;
+    const signo   = cambio >= 0 ? '+' : '';
+    const mscore  = momentumScore(p.symbol);
+    const velTag  = mscore >= 40 ? '⚡ rápida' : mscore >= 20 ? '↗ activa' : '→ lenta';
+    return signo + cambio.toFixed(2) + '% 2m · ' + velTag;
+}
+
 function actualizarAlertaGanadora(alertaActiva) {
     // El nuclearAlert queda siempre silencioso (solo muestra un estado neutro)
     const alerta = document.getElementById("nuclearAlert");
@@ -5543,7 +5651,7 @@ function actualizarAlertaGanadora(alertaActiva) {
             titulo: titulos[alertaActiva.tipo] || sim,
             sub: subs[alertaActiva.tipo] || '',
             prob: esLong ? '▲ LONG' : '▼ SHORT',
-            cuerpo: `<span style="font-size:9px; opacity:0.7;">Toca para ver esta moneda</span>`,
+            cuerpo: `<span style="font-size:9px; opacity:0.7;">Toca para analizar esta moneda en el panel</span>`,
             barra: '85%'
         });
         wrap.style.display = 'block';
