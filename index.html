@@ -5302,29 +5302,139 @@ function actualizarPanelCentral() {
         <!-- BLOQUE NUEVO: ESTUDIO DE CICLO 24H (independiente por moneda) -->
         <div class="intel-box">
             <div class="intel-title">⏳ ESTUDIO DE CICLO 24H — ${simbolo}</div>
+            
+            ${(() => {
+                // ── FASE DEL CICLO ─────────────────────────────────────
+                const pos = c.posicionPorcentaje;
+                const hMax = c.horasDesdeMaximo24h || 0;
+                const hMin = c.horasDesdeMinimo24h || 0;
+                const bloque = c.bloqueEstudio24h || 1;
+                const ciclosUp = c.ciclosSubiendo || 0;
+                const ciclosDown = c.ciclosBajando || 0;
+                const e48 = datosEMA[selectedCoin];
+                const subida48 = e48?.subidaDesdeMinimo || 0;
+                const min48 = e48?.minimo48h;
+                const max48 = e48?.maximo48h;
+                
+                // Calcular fase del ciclo
+                let faseNombre, faseColor, faseIcono, faseDesc;
+                const enSuelo = pos <= 20;
+                const enTecho = pos >= 80;
+                const zonaMedia = pos > 20 && pos < 80;
+                const agotandoseBajista = enSuelo && bloque >= 3;
+                const agotandoseAlcista = enTecho && hMin >= 12;
+                const subientoFuerte = ciclosUp >= 4 && pos > 40;
+                const cayendoFuerte = ciclosDown >= 4 && pos < 60;
+                
+                if (agotandoseBajista) {
+                    faseNombre = 'AGOTAMIENTO BAJISTA'; faseColor = '#0ecb81'; faseIcono = '🔄';
+                    faseDesc = `Lleva ${_fmtHoras(hMax)} cayendo. Bloque ${bloque}/4 avanzado. Alta probabilidad de REVERSIÓN ALCISTA próxima.`;
+                } else if (agotandoseAlcista) {
+                    faseNombre = 'AGOTAMIENTO ALCISTA'; faseColor = '#ff2a3b'; faseIcono = '⚠️';
+                    faseDesc = `Lleva ${_fmtHoras(hMin)} subiendo desde el mínimo. Zona de techo. Riesgo de CORRECCIÓN.`;
+                } else if (enSuelo && ciclosUp > 0) {
+                    faseNombre = 'REBOTE DESDE SUELO'; faseColor = '#0ecb81'; faseIcono = '🚀';
+                    faseDesc = `Tocó suelo (${pos.toFixed(0)}%) y empieza a recuperar. ${ciclosUp}/5 ciclos alcistas confirmados.`;
+                } else if (enTecho && ciclosDown > 0) {
+                    faseNombre = 'DISTRIBUCIÓN EN TECHO'; faseColor = '#ff2a3b'; faseIcono = '🔴';
+                    faseDesc = `En zona alta (${pos.toFixed(0)}%) con momentum bajista. ${ciclosDown}/5 ciclos bajistas. Posible salida.`;
+                } else if (subientoFuerte) {
+                    faseNombre = 'IMPULSO ALCISTA'; faseColor = '#0ecb81'; faseIcono = '⚡';
+                    faseDesc = `${ciclosUp}/5 ciclos consecutivos al alza. Momentum fuerte. Tendencia activa.`;
+                } else if (cayendoFuerte) {
+                    faseNombre = 'IMPULSO BAJISTA'; faseColor = '#ff2a3b'; faseIcono = '⚡';
+                    faseDesc = `${ciclosDown}/5 ciclos consecutivos a la baja. Evitar entradas LONG sin confirmación.`;
+                } else {
+                    faseNombre = 'CONSOLIDACIÓN'; faseColor = '#f3ba2f'; faseIcono = '↔️';
+                    faseDesc = `En zona media (${pos.toFixed(0)}%). Sin señal de ciclo dominante. Esperar ruptura.`;
+                }
+
+                // Probabilidad estimada de giro (heurística)
+                let probGiro = 0;
+                if (enSuelo) probGiro += 40 + (bloque * 8);
+                if (enTecho) probGiro += 35 + (Math.min(hMin, 18) * 1.5);
+                if (agotandoseBajista) probGiro = Math.max(probGiro, 75);
+                if (agotandoseAlcista) probGiro = Math.max(probGiro, 70);
+                if (ciclosUp >= 4 && enSuelo) probGiro = Math.min(90, probGiro + 15);
+                if (ciclosDown >= 4 && enTecho) probGiro = Math.min(90, probGiro + 15);
+                probGiro = Math.min(92, Math.max(10, Math.round(probGiro)));
+                const probColor = probGiro >= 70 ? '#0ecb81' : probGiro >= 50 ? '#f3ba2f' : '#ff2a3b';
+
+                // Tiempo estimado de reversión
+                const horasRestantes = Math.max(0, (4 - bloque) * 6);
+                const tiempoLabel = horasRestantes === 0 ? '🔥 INMINENTE' : `~${horasRestantes}h para próximo bloque`;
+
+                return `
+            <!-- Fase del ciclo (destacada) -->
+            <div style="background:rgba(${faseColor==='#0ecb81'?'14,203,129':'255,42,59,0'}${faseColor==='#f3ba2f'?'243,186,47,0':''},0);
+                        background:${faseColor}15;border:1px solid ${faseColor}40;
+                        border-radius:10px;padding:10px 12px;margin-bottom:10px;text-align:center;">
+                <div style="font-size:18px;margin-bottom:4px;">${faseIcono}</div>
+                <div style="font-size:12px;font-weight:900;color:${faseColor};letter-spacing:1px;">${faseNombre}</div>
+                <div style="font-size:10px;color:#94a3b8;margin-top:4px;line-height:1.4;">${faseDesc}</div>
+            </div>
+
+            <!-- Probabilidad de giro -->
             <div class="intel-row">
-                <span class="intel-label">🕐 Tiempo desde su máximo del día</span>
-                <span class="intel-value" style="color:#fff;">${_fmtHoras(c.horasDesdeMaximo24h)}</span>
+                <span class="intel-label">🎯 Prob. de reversión estimada</span>
+                <span class="intel-value" style="color:${probColor};font-size:15px;font-weight:900;">${probGiro}%</span>
+            </div>
+            <div style="height:6px;background:rgba(255,255,255,0.05);border-radius:4px;overflow:hidden;margin:-2px 0 8px;">
+                <div style="width:${probGiro}%;height:100%;background:linear-gradient(90deg,${probColor}88,${probColor});border-radius:4px;transition:width 0.4s;"></div>
+            </div>
+
+            <!-- Datos de ciclo -->
+            <div class="intel-row">
+                <span class="intel-label">⬇️ Horas desde máximo del día</span>
+                <span class="intel-value" style="color:#fff;">${_fmtHoras(hMax)}</span>
             </div>
             <div class="intel-row">
-                <span class="intel-label">🕐 Tiempo desde su mínimo del día</span>
-                <span class="intel-value" style="color:#fff;">${_fmtHoras(c.horasDesdeMinimo24h)}</span>
+                <span class="intel-label">⬆️ Horas desde mínimo del día</span>
+                <span class="intel-value" style="color:#fff;">${_fmtHoras(hMin)}</span>
             </div>
             <div class="intel-row">
-                <span class="intel-label">📦 Bloque de estudio (6h c/u)</span>
-                <span class="intel-value" style="color:var(--accent-gold);">${c.bloqueEstudio24h || 1}/4 ${'▮'.repeat(c.bloqueEstudio24h||1)}${'▯'.repeat(4-(c.bloqueEstudio24h||1))}</span>
+                <span class="intel-label">📦 Bloque de ciclo (6h c/u)</span>
+                <span class="intel-value" style="color:var(--accent-gold);">
+                    ${bloque}/4 ${'▮'.repeat(bloque)}${'▯'.repeat(4-bloque)}
+                </span>
             </div>
             <div class="intel-row">
-                <span class="intel-label">🔄 Ventana 24h se renueva en</span>
-                <span class="intel-value" style="color:#00d4ff;">${_fmtHoras(c.horasParaRenovarVentana)}</span>
+                <span class="intel-label">⏱️ Próx. bloque / renovación</span>
+                <span class="intel-value" style="color:#00d4ff;">${tiempoLabel}</span>
             </div>
-            <div style="margin-top:8px; font-size:11px; color:#64748b; line-height:1.5;">
-                ${c.posicionPorcentaje <= 35
-                    ? `📉 Cerca del suelo y ya lleva ${_fmtHoras(c.horasDesdeMaximo24h)} desde el techo del día → entre más avanza el bloque, más cerca del agotamiento bajista (sesgo LONG).`
-                    : c.posicionPorcentaje >= 65
-                        ? `📈 Cerca del techo y lleva ${_fmtHoras(c.horasDesdeMinimo24h)} desde el suelo del día → entre más avanza el bloque, más cerca del agotamiento alcista (sesgo SHORT).`
-                        : `↔️ En zona media del rango 24h · sin sesgo de agotamiento por tiempo todavía.`}
+            
+            ${min48 ? `
+            <!-- Niveles de 48h -->
+            <div style="margin-top:8px;padding-top:8px;border-top:1px solid rgba(255,255,255,0.05);">
+                <div style="font-size:9px;font-weight:900;color:#475569;letter-spacing:1px;margin-bottom:6px;">CONTEXTO 48 HORAS</div>
+                <div class="intel-row">
+                    <span class="intel-label">📉 Mínimo 48h</span>
+                    <span class="intel-value" style="color:#ff2a3b;">$${min48.toFixed?.(6) || min48}</span>
+                </div>
+                ${max48 ? `<div class="intel-row">
+                    <span class="intel-label">📈 Máximo 48h</span>
+                    <span class="intel-value" style="color:#0ecb81;">$${max48.toFixed?.(6) || max48}</span>
+                </div>` : ''}
+                <div class="intel-row">
+                    <span class="intel-label">↕️ Subida desde mínimo 48h</span>
+                    <span class="intel-value" style="color:${subida48 > 3 ? '#0ecb81' : '#f3ba2f'};">+${subida48.toFixed(2)}%</span>
+                </div>
+            </div>` : ''}
+
+            <!-- Interpretación inteligente del ciclo -->
+            <div style="margin-top:8px;padding:8px 10px;background:rgba(255,255,255,0.02);border-radius:8px;border-left:3px solid ${faseColor};font-size:10px;color:#94a3b8;line-height:1.6;">
+                ${enSuelo && bloque >= 3 
+                    ? `🟢 SESGO LONG: Lleva ${_fmtHoras(hMax)} bajando desde el techo. Bloque ${bloque}/4 avanzado → el vendedor está exhausto. La reversión estadísticamente se acerca.`
+                    : enTecho && hMin >= 12
+                        ? `🔴 SESGO SHORT: Lleva ${_fmtHoras(hMin)} subiendo desde el mínimo. En zona alta → el comprador se agota. Riesgo de corrección elevado.`
+                        : enSuelo 
+                            ? `⚠️ En zona de suelo (${pos.toFixed(0)}%). Aún en bloque ${bloque}/4 de la caída. Esperar bloque 3+ para mayor confirmación de reversión.`
+                            : enTecho 
+                                ? `⚠️ En zona de techo (${pos.toFixed(0)}%). Solo ${_fmtHoras(hMin)} subiendo. Puede continuar o girar. Vigilar volumen y RSI.`
+                                : `↔️ Zona media del rango (${pos.toFixed(0)}%). Sin agotamiento de ciclo detectado todavía. Esperar posicionamiento en extremos.`}
             </div>
+                `;
+            })()}
         </div>
 
         <div class="intel-box">
@@ -6618,6 +6728,408 @@ setTimeout(() => {
     setInterval(_fetchJefes, 5000);
     _fetchJefes();
 }, 8000);
+
+// ══════════════════════════════════════════════════════════════════
+// 🤖 MOTOR IA MULTI-OPINIÓN CDC — 5 perspectivas cada 5 segundos
+// Usa la API de Claude para generar pronósticos inteligentes con
+// diferentes enfoques: Técnico, Alcista, Bajista, Volumen, Jefes
+// ══════════════════════════════════════════════════════════════════
+
+const CDC_IA_MOTORES = [
+    { id: 'tecnico',    nombre: '📊 ANÁLISIS TÉCNICO',     icono: '📊', color: '#f3ba2f'  },
+    { id: 'alcista',    nombre: '🚀 PERSPECTIVA ALCISTA',  icono: '🚀', color: '#0ecb81'  },
+    { id: 'bajista',    nombre: '🔴 PERSPECTIVA BAJISTA',  icono: '🔴', color: '#ff2a3b'  },
+    { id: 'volumen',    nombre: '💧 ANÁLISIS DE VOLUMEN',  icono: '💧', color: '#00d4ff'  },
+    { id: 'correlacion',nombre: '👑 CORRELACIÓN JEFES',   icono: '👑', color: '#c084fc'  },
+];
+
+let _iaMotorIndex    = 0;        // cuál motor va ahora
+let _iaMonedaActual  = null;     // moneda que se está analizando
+let _iaTimer         = null;     // setInterval de la rotación
+let _iaEnCurso       = false;    // evita llamadas solapadas
+let _iaUltimoSnap    = null;     // snapshot de datos de la moneda
+
+// ── Contenedor visual que se inyecta en el panel central ──────────
+function _iaCrearContenedor() {
+    if (document.getElementById('iaMultiOpinionBox')) return;
+    // Insertar justo debajo del gauge/termómetro en el panel central
+    const target = document.getElementById('thermometerView') || document.getElementById('columnRight');
+    if (!target) return;
+
+    const box = document.createElement('div');
+    box.id = 'iaMultiOpinionBox';
+    box.style.cssText = `
+        background: #060b16;
+        border: 1px solid rgba(243,186,47,0.2);
+        border-radius: 14px;
+        padding: 14px 16px;
+        margin: 10px 0;
+        font-family: Inter, sans-serif;
+        position: relative;
+        overflow: hidden;
+    `;
+    box.innerHTML = `
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;">
+            <div style="display:flex;align-items:center;gap:8px;">
+                <span style="font-size:14px;">🤖</span>
+                <span style="font-size:12px;font-weight:900;color:#f3ba2f;letter-spacing:1px;">IA MULTI-OPINIÓN CDC</span>
+            </div>
+            <div id="iaMotorBadge" style="font-size:10px;font-weight:900;padding:3px 10px;border-radius:20px;background:rgba(243,186,47,0.15);color:#f3ba2f;border:1px solid rgba(243,186,47,0.3);transition:all 0.4s;">
+                INICIANDO…
+            </div>
+        </div>
+        <!-- Tabs de motores -->
+        <div id="iaTabsRow" style="display:flex;gap:5px;flex-wrap:wrap;margin-bottom:10px;"></div>
+        <!-- Área de pronóstico activo -->
+        <div id="iaPronosticoArea" style="min-height:90px;position:relative;">
+            <div id="iaPronosticoContenido" style="font-size:12px;color:#94a3b8;line-height:1.6;">
+                Selecciona una moneda para activar el análisis IA en tiempo real…
+            </div>
+            <div id="iaLoading" style="display:none;position:absolute;inset:0;background:rgba(6,11,22,0.92);border-radius:8px;display:none;align-items:center;justify-content:center;gap:10px;">
+                <div style="width:18px;height:18px;border:2px solid rgba(243,186,47,0.3);border-top-color:#f3ba2f;border-radius:50%;animation:spin-ia 0.8s linear infinite;"></div>
+                <span id="iaLoadingTexto" style="font-size:11px;font-weight:700;color:#f3ba2f;">Consultando IA…</span>
+            </div>
+        </div>
+        <!-- Barra de progreso hasta próximo motor -->
+        <div style="margin-top:10px;">
+            <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px;">
+                <span style="font-size:9px;font-weight:700;color:#475569;letter-spacing:0.5px;" id="iaProximoTexto">Próximo motor en 5s</span>
+                <span style="font-size:9px;color:#475569;" id="iaConteoMotor">1/5</span>
+            </div>
+            <div style="height:3px;background:rgba(255,255,255,0.05);border-radius:3px;overflow:hidden;">
+                <div id="iaBarraProgreso" style="height:100%;width:0%;background:linear-gradient(90deg,#f3ba2f,#0ecb81);transition:width 5s linear;border-radius:3px;"></div>
+            </div>
+        </div>
+        <!-- Mini histórico de opiniones -->
+        <div id="iaHistoricoMini" style="margin-top:8px;display:flex;gap:4px;flex-wrap:wrap;"></div>
+        <style>
+            @keyframes spin-ia { from { transform:rotate(0deg); } to { transform:rotate(360deg); } }
+            @keyframes ia-slide-in { from { opacity:0; transform:translateY(6px); } to { opacity:1; transform:translateY(0); } }
+            .ia-opinion-chip { font-size:10px;font-weight:900;padding:3px 8px;border-radius:10px;cursor:pointer;opacity:0.6;transition:opacity 0.2s; }
+            .ia-opinion-chip.activo { opacity:1; }
+        </style>
+    `;
+
+    // Insertar ANTES del detailView (panel de análisis de moneda) para que quede arriba del ciclo
+    const detailView = document.getElementById('detailView');
+    const thermo = document.getElementById('thermometerView');
+    if (detailView && detailView.parentNode) {
+        detailView.parentNode.insertBefore(box, detailView);
+    } else if (thermo && thermo.parentNode) {
+        thermo.parentNode.insertBefore(box, thermo.nextSibling);
+    } else {
+        (target.parentNode || document.body).appendChild(box);
+    }
+
+    _iaRenderizarTabs();
+}
+
+function _iaRenderizarTabs() {
+    const row = document.getElementById('iaTabsRow');
+    if (!row) return;
+    row.innerHTML = CDC_IA_MOTORES.map((m, i) => `
+        <div class="ia-opinion-chip ${i === _iaMotorIndex ? 'activo' : ''}"
+             id="iaTab_${m.id}"
+             style="background:${i === _iaMotorIndex ? m.color + '22' : 'rgba(255,255,255,0.04)'};
+                    color:${i === _iaMotorIndex ? m.color : '#475569'};
+                    border:1px solid ${i === _iaMotorIndex ? m.color + '55' : 'transparent'};"
+             onclick="_iaSaltarAMotor(${i})">
+            ${m.icono} ${m.nombre.split(' ').slice(1).join(' ')}
+        </div>
+    `).join('');
+}
+
+function _iaSaltarAMotor(idx) {
+    _iaMotorIndex = idx;
+    clearInterval(_iaTimer);
+    _iaEjecutarMotorActual();
+    _iaIniciarRotacion();
+}
+
+// ── Construye el prompt para cada motor según los datos de la moneda ──
+function _iaConstruirPrompt(motor, snap) {
+    const posLabel = snap.posicion <= 20 ? 'SUELO (zona compra)' : snap.posicion >= 80 ? 'TECHO (zona peligro)' : snap.posicion >= 60 ? 'ZONA ALTA' : snap.posicion <= 40 ? 'ZONA BAJA' : 'ZONA MEDIA';
+    const cicloFase = snap.ciclosSubiendo >= 4 ? 'IMPULSO ALCISTA FUERTE' : snap.ciclosBajando >= 4 ? 'IMPULSO BAJISTA FUERTE' : snap.ciclosSubiendo > snap.ciclosBajando ? 'FASE ALCISTA' : 'FASE BAJISTA';
+    const rsiEstado = snap.rsi !== null ? (snap.rsi > 70 ? 'SOBRECOMPRADO' : snap.rsi < 30 ? 'SOBREVENDIDO' : 'NEUTRAL') : 'N/D';
+    const emaAlineadas = snap.ema7 && snap.ema25 && snap.ema99 ? (snap.ema7 > snap.ema25 && snap.ema25 > snap.ema99 ? 'ALCISTAS (7>25>99)' : snap.ema7 < snap.ema25 && snap.ema25 < snap.ema99 ? 'BAJISTAS (7<25<99)' : 'CRUZADAS/MIXTAS') : 'N/D';
+    const scoreLabel = snap.scoreCDC > 50 ? 'FUERTE ALCISTA' : snap.scoreCDC > 20 ? 'ALCISTA' : snap.scoreCDC < -50 ? 'FUERTE BAJISTA' : snap.scoreCDC < -20 ? 'BAJISTA' : 'NEUTRAL';
+
+    const base = `Eres TECNOBOT, el mejor analista de criptomonedas del mundo. Analiza ${snap.nombre} (${snap.symbol}) en Binance Futuros USDT-M con estos datos EN TIEMPO REAL. Da tu veredicto CLARO: COMPRAR / VENDER / ESPERAR. Máximo 5 oraciones. DIRECTO AL PUNTO. Sin saludos. En ESPAÑOL. Usa emojis estratégicos.
+
+═══════ DATOS COMPLETOS EN TIEMPO REAL ═══════
+💰 PRECIO: $${snap.precio?.toLocaleString(undefined,{minimumFractionDigits:2,maximumFractionDigits:6})}
+📊 CAMBIO 24H: ${snap.change > 0 ? '+' : ''}${snap.change?.toFixed(2)}%
+⚡ CAMBIO 2 MIN: ${snap.cambio2min > 0 ? '+' : ''}${snap.cambio2min?.toFixed(3)}%
+🎯 POSICIÓN RANGO 24H: ${snap.posicion?.toFixed(1)}% → ${posLabel}
+📍 DISTANCIA AL MÁXIMO 24H: -${snap.caidaDesdeMaximo?.toFixed(2)}%
+🌪️ VELOCIDAD INSTANTÁNEA: ${snap.velocidad?.toFixed(4)}%/seg
+🔄 CICLOS SUBIENDO: ${snap.ciclosSubiendo}/5 | CICLOS BAJANDO: ${snap.ciclosBajando}/5
+⚙️ FASE ACTUAL: ${cicloFase}
+📈 RSI (14p): ${snap.rsi !== null ? snap.rsi?.toFixed(1) + ' → ' + rsiEstado : 'calculando'}
+📉 EMA7: ${snap.ema7 ? '$'+snap.ema7?.toFixed(6) : 'N/D'} | EMA25: ${snap.ema25 ? '$'+snap.ema25?.toFixed(6) : 'N/D'} | EMA99: ${snap.ema99 ? '$'+snap.ema99?.toFixed(6) : 'N/D'}
+📐 EMAs ALINEADAS: ${emaAlineadas}
+💵 VOLUMEN 24H: $${(snap.volume / 1000000)?.toFixed(2)}M
+🧠 SCORE CDC: ${snap.scoreCDC?.toFixed(0)}/100 → ${scoreLabel}
+👑 BTC: ${snap.btcCayendo ? '🔴 CAYENDO' : '🟢 SUBIENDO'} | ETH: ${snap.ethCayendo ? '🔴 CAYENDO' : '🟢 SUBIENDO'}
+🚨 ALERTAS ACTIVAS: ${snap.alertas.join(', ') || 'ninguna'}
+🌊 MODO MERCADO: ${snap.modoMercado?.toUpperCase()}
+═════════════════════════════════════════════
+
+REGLA IMPORTANTE: Siempre termina con una línea así:
+▶ VEREDICTO: [COMPRAR 🟢 / VENDER 🔴 / ESPERAR ⚪] — [razón en 6 palabras]`;
+
+    const perspectivas = {
+        tecnico: `${base}\n\nPERSPECTIVA — ANÁLISIS TÉCNICO PURO:\nAnaliza RSI (${snap.rsi?.toFixed(0) || 'N/D'}), EMAs (${emaAlineadas}), posición ${snap.posicion?.toFixed(0)}% del rango, ciclos (${snap.ciclosSubiendo} sube / ${snap.ciclosBajando} baja) y velocidad (${snap.velocidad?.toFixed(4)}%). ¿Hay señal técnica de entrada o salida? ¿Divergencia RSI-precio? ¿Las EMAs confirman la dirección? ¿Hay sospechas de caída (techo) o despegue (suelo)?`,
+        
+        alcista: `${base}\n\nPERSPECTIVA — CASO ALCISTA / SEÑAL LONG:\n¿Por qué podría SUBIR ${snap.nombre} ahora mismo? Busca: ¿está en zona de suelo (${snap.posicion?.toFixed(0)}%)? ¿RSI sobrevendido? ¿BTC apoyando? ¿Velocidad acelerando positivo? ¿Ciclos cambiando a alza? Si hay señal de compra, di CUÁNDO entrar. Si no hay señal real, sé honesto y di ESPERAR.`,
+        
+        bajista: `${base}\n\nPERSPECTIVA — CASO BAJISTA / SEÑAL SHORT:\n¿Hay señales de CAÍDA PRÓXIMA en ${snap.nombre}? Busca: ¿está cerca del techo (${snap.posicion?.toFixed(0)}%)? ¿RSI sobrecomprado (${snap.rsi?.toFixed(0) || 'N/D'})? ¿Agotamiento de volumen? ¿BTC o ETH cayendo arrastrando? ¿Velocidad perdiendo fuerza? ¿Hay SOSPECHA DE TRAMPA ALCISTA o distribución? Di claramente si hay riesgo real de caída.`,
+        
+        volumen: `${base}\n\nPERSPECTIVA — ANÁLISIS DE VOLUMEN Y LIQUIDEZ:\nVolumen 24H: $${(snap.volume/1000000)?.toFixed(2)}M. ¿Es alto o bajo para ${snap.nombre}? ¿El volumen CONFIRMA o CONTRADICE el movimiento del precio? ¿Hay señal de acumulación (compra silenciosa) o distribución (venta oculta)? ¿Es seguro operar con esta liquidez ahora? ¿El volumen apoya una entrada o mejor esperar?`,
+        
+        correlacion: `${base}\n\nPERSPECTIVA — CORRELACIÓN MERCADO (BTC/ETH/MODO):\nBTC: ${snap.btcCayendo ? 'CAYENDO 🔴' : 'SUBIENDO 🟢'} | ETH: ${snap.ethCayendo ? 'CAYENDO 🔴' : 'SUBIENDO 🟢'} | Modo: ${snap.modoMercado?.toUpperCase()}.\n¿${snap.nombre} se mueve CON el mercado o en CONTRA? Si BTC y ETH caen y ${snap.nombre} aún no reacciona: ¿es trampa o resiliente? Si el mercado sube y ${snap.nombre} está quieta: ¿es rezagada y hay oportunidad? ¿El contexto macro apoya entrar ahora o esperar confirmación?`,
+    };
+    return perspectivas[motor.id] || base;
+}
+
+// ── Toma un snapshot de los datos actuales de la moneda ──
+function _iaTomarSnapshot(symbol) {
+    const c = cachedData[symbol];
+    const e = datosEMA[symbol];
+    const pred = prediccionCDC[symbol];
+    const infl = btcEthInfluencia[symbol];
+    if (!c) return null;
+
+    const alertas = [];
+    if (c.alertaBombaSubida)         alertas.push('🚀 BOMBA/LONG');
+    if (c.alertaDerrumbe)            alertas.push('💥 DERRUMBE/SHORT');
+    if (c.alertaAgotamientoSubida)   alertas.push('⚠️ AGOTAMIENTO');
+    if (esDespegueReal && esDespegueReal(symbol)) alertas.push('🚀 DESPEGUE EMA');
+    if (esReboteTrasCaida && esReboteTrasCaida(symbol)) alertas.push('🔄 REBOTE');
+
+    return {
+        symbol,
+        nombre:           symbol.replace('USDT', ''),
+        precio:           c.price,
+        change:           c.change,
+        cambio2min:       c.cambioReal2Min,
+        posicion:         c.posicionPorcentaje,
+        velocidad:        c.velocidad,
+        ciclosSubiendo:   c.ciclosSubiendo || 0,
+        ciclosBajando:    c.ciclosBajando  || 0,
+        rsi:              pred?.rsi,
+        volume:           c.volume,
+        caidaDesdeMaximo: c.caidaDesdeMaximo,
+        scoreCDC:         pred?.score || 0,
+        ema7:             e?.ema7,
+        ema25:            e?.ema25,
+        ema99:            e?.ema99,
+        // Datos de ciclo 24h/48h — críticos para detectar agotamiento
+        horasDesdeMaximo: c.horasDesdeMaximo24h,
+        horasDesdeMinimo: c.horasDesdeMinimo24h,
+        bloqueEstudio:    c.bloqueEstudio24h || 1,
+        horasParaRenovar: c.horasParaRenovarVentana,
+        minimo48h:        e?.minimo48h,
+        maximo48h:        e?.maximo48h,
+        subidaDesdeMin48: e?.subidaDesdeMinimo,
+        // Niveles del día
+        high24h:          c.high,
+        low24h:           c.low,
+        // Estado market
+        btcCayendo:       infl?.btcCayendo,
+        ethCayendo:       infl?.ethCayendo,
+        alertas,
+        modoMercado:      modoMercado || 'alcista',
+        cerebroEstado:    cerebroCDC ? cerebroCDC[symbol] : 'N/D',
+        senalActiva:      senalCDC   ? senalCDC[symbol]   : 'N/D',
+    };
+}
+
+// ── Llama a la API de Claude y muestra el resultado ───────────────
+async function _iaConsultarClaude(motor, snap) {
+    const prompt = _iaConstruirPrompt(motor, snap);
+
+    const resp = await fetch('https://api.anthropic.com/v1/messages', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+            model: 'claude-sonnet-4-6',
+            max_tokens: 1000,
+            messages: [{ role: 'user', content: prompt }]
+        })
+    });
+
+    if (!resp.ok) throw new Error('API error ' + resp.status);
+    const data = await resp.json();
+    return data.content?.[0]?.text || '(Sin respuesta)';
+}
+
+// ── Muestra el resultado en el panel ─────────────────────────────
+function _iaMostrarOpinion(motor, texto, snap) {
+    const area = document.getElementById('iaPronosticoContenido');
+    const badge = document.getElementById('iaMotorBadge');
+    const loading = document.getElementById('iaLoading');
+    const historico = document.getElementById('iaHistoricoMini');
+
+    if (loading) loading.style.display = 'none';
+
+    if (badge) {
+        badge.textContent = motor.nombre;
+        badge.style.background = motor.color + '22';
+        badge.style.color = motor.color;
+        badge.style.borderColor = motor.color + '55';
+    }
+
+    if (area) {
+        area.style.animation = 'none';
+        void area.offsetWidth;
+        area.style.animation = 'ia-slide-in 0.4s ease';
+        area.innerHTML = `
+            <div style="display:flex;align-items:center;gap:6px;margin-bottom:8px;">
+                <span style="font-size:16px;">${motor.icono}</span>
+                <span style="font-size:11px;font-weight:900;color:${motor.color};letter-spacing:1px;">${motor.nombre}</span>
+                <span style="font-size:9px;color:#475569;margin-left:auto;">${snap.nombre} · ${new Date().toLocaleTimeString('es-BO')}</span>
+            </div>
+            <div style="font-size:12px;color:#e2e8f0;line-height:1.65;padding:8px 10px;background:rgba(255,255,255,0.03);border-radius:8px;border-left:3px solid ${motor.color};">
+                ${texto.replace(/\n/g, '<br>')}
+            </div>
+        `;
+    }
+
+    // Agregar al histórico mini
+    if (historico) {
+        const chip = document.createElement('div');
+        chip.className = 'ia-opinion-chip activo';
+        chip.style.background = motor.color + '22';
+        chip.style.color = motor.color;
+        chip.style.border = `1px solid ${motor.color}55`;
+        chip.innerHTML = `${motor.icono} ${new Date().toLocaleTimeString('es-BO', {hour:'2-digit',minute:'2-digit',second:'2-digit'})}`;
+        chip.title = texto;
+        // Guardar el texto para poder volver a verlo
+        chip.onclick = () => {
+            if (area) area.querySelector('div:last-child') && (area.querySelector('div:last-child').style.display = 'block');
+        };
+        historico.appendChild(chip);
+        // Máximo 5 chips
+        while (historico.children.length > 5) historico.removeChild(historico.firstChild);
+    }
+
+    // Hablar la opinión (voz sintética, máximo 300 chars)
+    const textoVoz = texto.replace(/<[^>]*>/g, '').substring(0, 280);
+    try {
+        // Alternar voz por motor
+        const esMasc = ['tecnico','alcista','correlacion'].includes(motor.id);
+        hablar(textoVoz, esMasc);
+    } catch(e) {}
+}
+
+// ── Ejecuta el motor activo ───────────────────────────────────────
+async function _iaEjecutarMotorActual() {
+    if (!_iaMonedaActual || _iaEnCurso) return;
+
+    const snap = _iaTomarSnapshot(_iaMonedaActual);
+    if (!snap) return;
+
+    _iaEnCurso = true;
+    _iaUltimoSnap = snap;
+
+    const motor = CDC_IA_MOTORES[_iaMotorIndex];
+    _iaRenderizarTabs();
+
+    // Mostrar loading
+    const loading = document.getElementById('iaLoading');
+    const area    = document.getElementById('iaPronosticoContenido');
+    const proximo = document.getElementById('iaProximoTexto');
+    const conteo  = document.getElementById('iaConteoMotor');
+    const barra   = document.getElementById('iaBarraProgreso');
+
+    if (loading) { loading.style.display = 'flex'; }
+    if (area)    { area.style.opacity = '0.3'; }
+    if (proximo) proximo.textContent = `${motor.nombre} analizando…`;
+    if (conteo)  conteo.textContent = `${_iaMotorIndex + 1}/${CDC_IA_MOTORES.length}`;
+
+    // Reiniciar barra de progreso
+    if (barra) { barra.style.transition = 'none'; barra.style.width = '0%'; }
+
+    try {
+        const texto = await _iaConsultarClaude(motor, snap);
+        _iaMostrarOpinion(motor, texto, snap);
+    } catch(err) {
+        const area2 = document.getElementById('iaPronosticoContenido');
+        if (loading) loading.style.display = 'none';
+        if (area2) {
+            area2.style.opacity = '1';
+            area2.innerHTML = `<span style="color:#ff2a3b;font-size:11px;">⚠️ ${motor.nombre}: No se pudo conectar con la IA. Reintentando en el próximo ciclo…</span>`;
+        }
+    } finally {
+        if (area) area.style.opacity = '1';
+        _iaEnCurso = false;
+    }
+
+    // Arrancar barra hacia el próximo ciclo (5s)
+    if (barra) {
+        setTimeout(() => {
+            barra.style.transition = 'width 5s linear';
+            barra.style.width = '100%';
+        }, 50);
+    }
+    if (proximo) proximo.textContent = `Próximo motor en 5s`;
+}
+
+// ── Avanza al siguiente motor ─────────────────────────────────────
+function _iaAvanzarMotor() {
+    _iaMotorIndex = (_iaMotorIndex + 1) % CDC_IA_MOTORES.length;
+    _iaEjecutarMotorActual();
+}
+
+// ── Inicia la rotación automática cada 5 segundos ────────────────
+function _iaIniciarRotacion() {
+    if (_iaTimer) clearInterval(_iaTimer);
+    _iaTimer = setInterval(_iaAvanzarMotor, 5000);
+}
+
+// ── API pública: activar cuando se selecciona una moneda ─────────
+function _iaActivarParaMoneda(symbol) {
+    if (_iaMonedaActual === symbol) return; // ya está corriendo para esta moneda
+    _iaMonedaActual  = symbol;
+    _iaMotorIndex    = 0;
+    _iaEnCurso       = false;
+    clearInterval(_iaTimer);
+
+    _iaCrearContenedor();
+    _iaEjecutarMotorActual();
+    _iaIniciarRotacion();
+}
+
+// ── Hook en seleccionarMoneda: activar IA cuando el usuario clickea ─
+const _iaOriginalSeleccionarMoneda = (typeof seleccionarMoneda === 'function') ? seleccionarMoneda : null;
+window.seleccionarMonedaConIA = function(symbol) {
+    if (_iaOriginalSeleccionarMoneda) _iaOriginalSeleccionarMoneda(symbol);
+    setTimeout(() => _iaActivarParaMoneda(symbol), 500);
+};
+
+// Patch: reemplazar seleccionarMoneda con versión IA
+// (se ejecuta después de que el DOM y funciones estén listas)
+setTimeout(() => {
+    if (typeof seleccionarMoneda === 'function') {
+        const _orig = seleccionarMoneda;
+        window.seleccionarMoneda = function(symbol) {
+            _orig(symbol);
+            setTimeout(() => _iaActivarParaMoneda(symbol), 600);
+        };
+    }
+    // Si ya hay una moneda seleccionada, activar IA para ella
+    if (typeof selectedCoin !== 'undefined' && selectedCoin) {
+        _iaActivarParaMoneda(selectedCoin);
+    }
+}, 3000);
+
+// ── Actualizar snapshot cada 5s para que la IA use datos frescos ──
+setInterval(() => {
+    if (_iaMonedaActual && !_iaEnCurso) {
+        _iaUltimoSnap = _iaTomarSnapshot(_iaMonedaActual);
+    }
+}, 5000);
 
 </script>
 </body>
