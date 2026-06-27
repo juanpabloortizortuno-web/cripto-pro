@@ -3721,7 +3721,116 @@ async function actualizarEMASimbolo(symbol) {
 
         const alineadasAlcista = ema7 > ema25 && ema25 > ema99 && ema7 > ema7Prev && ema25 > ema25Prev;
 
-        datosEMA[symbol] = { ema7, ema25, ema99, ema7Prev, ema25Prev, ema99Prev, minimo48h, subidaDesdeMinimo, alineadasAlcista, actualizado: Date.now() };
+        // ── BANDAS DE BOLLINGER (20 períodos, 2σ) ──────────────────────
+        const BB_PERIODO = 20;
+        const bb_serie = cierres.slice(-BB_PERIODO);
+        const bb_media = bb_serie.reduce((a,b)=>a+b,0) / BB_PERIODO;
+        const bb_desv  = Math.sqrt(bb_serie.reduce((a,b)=>a+(b-bb_media)**2,0) / BB_PERIODO);
+        const bb_upper = bb_media + 2 * bb_desv;
+        const bb_lower = bb_media - 2 * bb_desv;
+        const bb_ancho = bb_desv > 0 ? ((bb_upper - bb_lower) / bb_media * 100) : 0;
+        // Posición del precio dentro de las bandas (0=banda inferior, 100=banda superior)
+        const bb_posicion = bb_upper > bb_lower ? ((precioActual - bb_lower) / (bb_upper - bb_lower) * 100) : 50;
+        const bb_estado = bb_posicion >= 95 ? 'SOBRECOMPRADO BB' : bb_posicion <= 5 ? 'SOBREVENDIDO BB' : bb_posicion >= 80 ? 'CERCA BANDA ALTA' : bb_posicion <= 20 ? 'CERCA BANDA BAJA' : 'DENTRO DE BANDAS';
+
+        // ── MACD (12/26/9 sobre cierres 1h) ───────────────────────────
+        function _ema(arr, p) { // helper local
+            const k = 2/(p+1); let v = arr[0];
+            for (let i=1;i<arr.length;i++) v = arr[i]*k + v*(1-k);
+            return v;
+        }
+        function _emaSerie(arr, p) {
+            const k = 2/(p+1); const out=[arr[0]];
+            for(let i=1;i<arr.length;i++) out.push(arr[i]*k+out[out.length-1]*(1-k));
+            return out;
+        }
+        // Necesitamos series para calcular la señal MACD (9 períodos de la diferencia)
+        const macd_fast_serie = _emaSerie(cierres, 12);
+        const macd_slow_serie = _emaSerie(cierres, 26);
+        const macd_linea_serie = macd_fast_serie.map((v,i) => v - macd_slow_serie[i]);
+        const macd_signal_serie = _emaSerie(macd_linea_serie, 9);
+        const macd_linea   = macd_linea_serie[macd_linea_serie.length-1];
+        const macd_signal  = macd_signal_serie[macd_signal_serie.length-1];
+        const macd_histo   = macd_linea - macd_signal;
+        const macd_histo_prev = macd_linea_serie[macd_linea_serie.length-2] - macd_signal_serie[macd_signal_serie.length-2];
+        // Detectar cruce
+        let macd_cruce = 'SIN CRUCE';
+        if (macd_histo > 0 && macd_histo_prev <= 0) macd_cruce = '🟢 CRUCE ALCISTA (MACD cruzó señal al alza)';
+        else if (macd_histo < 0 && macd_histo_prev >= 0) macd_cruce = '🔴 CRUCE BAJISTA (MACD cruzó señal a la baja)';
+        else if (macd_histo > 0) macd_cruce = '🟢 MACD sobre señal (momentum alcista)';
+        else macd_cruce = '🔴 MACD bajo señal (momentum bajista)';
+
+        // ── ATR (True Range promedio 14 períodos) ──────────────────────
+        const ATR_P = 14;
+        const atr_klines_raw = klines.slice(-(ATR_P + 1));
+        let atr_sum = 0;
+        for (let i = 1; i < atr_klines_raw.length; i++) {
+            const hi  = parseFloat(atr_klines_raw[i][2]);
+            const lo  = parseFloat(atr_klines_raw[i][3]);
+            const pcp = parseFloat(atr_klines_raw[i-1][4]);
+            atr_sum += Math.max(hi - lo, Math.abs(hi - pcp), Math.abs(lo - pcp));
+        }
+        const atr = atr_sum / ATR_P;
+        const atr_pct = precioActual > 0 ? (atr / precioActual * 100) : 0;
+        const atr_estado = atr_pct > 3 ? '🔥 VOLATILIDAD EXTREMA' : atr_pct > 1.5 ? '⚡ VOLATILIDAD ALTA' : atr_pct > 0.7 ? '📊 VOLATILIDAD NORMAL' : '😴 BAJA VOLATILIDAD';
+
+        // ── PUNTOS PIVOTE (sobre la última vela completa de 1h como proxy del día) ──
+        // Usamos las últimas 24 velas (1 día aprox) para high/low/close del "día anterior"
+        const piv_klines = klines.slice(-25, -1); // 24 velas del período anterior
+        const piv_H = Math.max(...piv_klines.map(k=>parseFloat(k[2])));
+        const piv_L = Math.min(...piv_klines.map(k=>parseFloat(k[3])));
+        const piv_C = parseFloat(piv_klines[piv_klines.length-1][4]);
+        const PP  = (piv_H + piv_L + piv_C) / 3;
+        const R1  = 2*PP - piv_L;
+        const R2  = PP + (piv_H - piv_L);
+        const R3  = piv_H + 2*(PP - piv_L);
+        const S1  = 2*PP - piv_H;
+        const S2  = PP - (piv_H - piv_L);
+        const S3  = piv_L - 2*(piv_H - PP);
+        // ¿El precio está sobre o bajo el Punto Pivote central?
+        const piv_posicion = precioActual >= PP ? '🟢 SOBRE PP (zona alcista)' : '🔴 BAJO PP (zona bajista)';
+
+        // ── CONFLUENCIA FIBONACCI + OTROS NIVELES ─────────────────────
+        // Los niveles de Fibonacci se calculan igual que en _iaCalcularFibonacci pero con los datos de klines
+        const fib_H = Math.max(...cierres.slice(-24));  // high 24h de cierres
+        const fib_L = Math.min(...cierres.slice(-24));  // low 24h de cierres
+        const fib_D = fib_H - fib_L;
+        const fib_niveles = fib_D > 0 ? {
+            r236: fib_H - fib_D*0.236, r382: fib_H - fib_D*0.382,
+            r500: fib_H - fib_D*0.500, r618: fib_H - fib_D*0.618, r786: fib_H - fib_D*0.786
+        } : null;
+        // Detectar confluencias: nivel Fibonacci que coincide (±0.3%) con Pivote o Bollinger
+        let confluencias = [];
+        if (fib_niveles) {
+            const todos_niveles = [
+                { nombre:'S1', val: S1 }, { nombre:'S2', val: S2 },
+                { nombre:'R1', val: R1 }, { nombre:'R2', val: R2 }, { nombre:'PP', val: PP },
+                { nombre:'BB Inf', val: bb_lower }, { nombre:'BB Sup', val: bb_upper },
+            ];
+            Object.entries(fib_niveles).forEach(([fk, fv]) => {
+                todos_niveles.forEach(({nombre, val}) => {
+                    const diff_pct = Math.abs(fv - val) / (val||1) * 100;
+                    if (diff_pct < 0.5) confluencias.push(`Fib ${fk} ≈ ${nombre} ($${fv.toFixed(6)})`);
+                });
+            });
+        }
+        const confluencias_texto = confluencias.length ? confluencias.join(' | ') : 'Sin confluencias detectadas';
+
+        datosEMA[symbol] = {
+            ema7, ema25, ema99, ema7Prev, ema25Prev, ema99Prev,
+            minimo48h, subidaDesdeMinimo, alineadasAlcista,
+            // Bollinger
+            bb_upper, bb_lower, bb_media, bb_ancho, bb_posicion, bb_estado,
+            // MACD
+            macd_linea, macd_signal, macd_histo, macd_cruce,
+            // ATR
+            atr, atr_pct, atr_estado,
+            // Pivotes
+            PP, R1, R2, R3, S1, S2, S3, piv_posicion,
+            // Confluencia Fib
+            confluencias_texto,
+            actualizado: Date.now()
+        };
     } catch (e) {
         // silencioso: si falla un símbolo puntual, simplemente no se actualiza este ciclo
     }
@@ -5407,6 +5516,20 @@ function calcularPrediccionCDC(symbol){
     });
 }
 
+// ── Estado de la pestaña colapsable "MEMORIA IA — PATRÓN HISTÓRICO" ──
+window._memoriaIaAbierta = false; // empieza retraída
+function _toggleMemoriaIA() {
+    window._memoriaIaAbierta = !window._memoriaIaAbierta;
+    if (typeof actualizarPanelCentral === 'function') actualizarPanelCentral();
+}
+
+// ── Estado de la pestaña colapsable "MOTOR LONG/SHORT — SEÑALES IA" ──
+window._motorLongShortAbierto = false; // empieza retraída (oculta la lista de monedas)
+function _toggleMotorLongShort() {
+    window._motorLongShortAbierto = !window._motorLongShortAbierto;
+    if (typeof actualizarPanelCentral === 'function') actualizarPanelCentral();
+}
+
 function actualizarPanelCentral() {
     const c = cachedData[selectedCoin];
     if (!c) return;
@@ -5500,6 +5623,61 @@ function actualizarPanelCentral() {
             </div>
             <div style="font-size:22px; font-weight:900; color:${colorCambio};">
                 ${c.change >= 0 ? '+' : ''}${c.change.toFixed(2)}% <span style="font-size:12px; color:#64748b; font-weight:600;">cambio 24h</span>
+            </div>
+        </div>
+
+        <!-- BLOQUE MEMORIA IA AVANZADA (colapsable) -->
+        <div style="background:rgba(14,203,129,0.05); border:1px solid rgba(14,203,129,0.18); border-radius:12px; padding:14px; margin-bottom:14px;">
+            <div onclick="_toggleMemoriaIA()" style="display:flex;align-items:center;justify-content:space-between;margin-bottom:${window._memoriaIaAbierta ? '10px' : '0px'};cursor:pointer;">
+                <div style="font-size:11px; font-weight:900; color:#0ecb81; text-transform:uppercase; letter-spacing:1px;">🧠 MEMORIA IA — PATRÓN HISTÓRICO</div>
+                <div style="display:flex;align-items:center;gap:6px;">
+                    <span style="font-size:9px;background:rgba(14,203,129,0.15);color:#0ecb81;padding:2px 7px;border-radius:10px;font-weight:700;">
+                        ${memoriaIA.filter(x=>x.symbol===selectedCoin).length} registros
+                    </span>
+                    <span style="font-size:11px;color:#0ecb81;transition:transform 0.25s;transform:${window._memoriaIaAbierta ? 'rotate(180deg)' : 'rotate(0deg)'};">▾</span>
+                </div>
+            </div>
+
+            <div style="display:${window._memoriaIaAbierta ? 'block' : 'none'};">
+            ${(() => {
+                const ms = _memoriaScoreMoneda(selectedCoin);
+                if (!ms) return '';
+                const barL = `<div style="height:5px;background:rgba(255,255,255,0.06);border-radius:3px;overflow:hidden;margin:3px 0;">
+                    <div style="width:${ms.scoreLong}%;height:100%;background:${ms.colorLong};border-radius:3px;transition:width 0.4s;"></div></div>`;
+                const barS = `<div style="height:5px;background:rgba(255,255,255,0.06);border-radius:3px;overflow:hidden;margin:3px 0;">
+                    <div style="width:${ms.scoreShort}%;height:100%;background:${ms.colorShort};border-radius:3px;transition:width 0.4s;"></div></div>`;
+                return `
+                <!-- Veredicto $1 USDT/min -->
+                <div style="background:rgba(0,0,0,0.3);border-radius:10px;padding:10px 12px;margin-bottom:10px;border:1px solid rgba(255,255,255,0.06);">
+                    <div style="font-size:9px;font-weight:900;color:#f3ba2f;letter-spacing:1px;margin-bottom:8px;">
+                        💰 ¿VALE PARA $1 USDT/MIN? — $${ms.CAPITAL} × ${ms.APAL}x → necesita ${ms.MOV_NECESARIO.toFixed(2)}%/min
+                    </div>
+                    <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;">
+                        <div style="background:${ms.colorLong}12;border:1px solid ${ms.colorLong}40;border-radius:8px;padding:8px;text-align:center;">
+                            <div style="font-size:10px;font-weight:900;color:#0ecb81;margin-bottom:3px;">LONG 🟢</div>
+                            <div style="font-size:18px;font-weight:900;color:${ms.colorLong};">${ms.veredictoLong}</div>
+                            ${barL}
+                            <div style="font-size:10px;color:#94a3b8;">${ms.scoreLong}/100 pts</div>
+                        </div>
+                        <div style="background:${ms.colorShort}12;border:1px solid ${ms.colorShort}40;border-radius:8px;padding:8px;text-align:center;">
+                            <div style="font-size:10px;font-weight:900;color:#ff2a3b;margin-bottom:3px;">SHORT 🔴</div>
+                            <div style="font-size:18px;font-weight:900;color:${ms.colorShort};">${ms.veredictoShort}</div>
+                            ${barS}
+                            <div style="font-size:10px;color:#94a3b8;">${ms.scoreShort}/100 pts</div>
+                        </div>
+                    </div>
+                    <div style="margin-top:8px;font-size:10px;color:#94a3b8;text-align:center;">
+                        Mov. 2min actual: <b style="color:${ms.yaAlcanza?'#0ecb81':'#f3ba2f'};">${ms.vel2m.toFixed(3)}%</b>
+                        ${ms.yaAlcanza ? `✅ YA supera objetivo (×${ms.vecesObj})` : `⚠️ Falta ${(ms.MOV_NECESARIO - ms.vel2m).toFixed(3)}% para $1`}
+                        &nbsp;·&nbsp; Ganancia aprox: <b style="color:#0ecb81;">$${ms.gananciaReal}</b>
+                        ${ms.n < 3 ? `<br><span style="color:#475569;">📚 Con ${ms.n}/3 registros mín — aprendiendo rápido</span>` : ''}
+                    </div>
+                </div>`;
+            })()}
+
+            <div style="font-size:12px; color:#e2e8f0; line-height:1.6;">
+                ${_iaAnalizarPatron(selectedCoin)}
+            </div>
             </div>
         </div>
 
@@ -6345,15 +6523,25 @@ function actualizarTacometroDerecho() {
 
             const titulo = esLong ? '⚡ MOTOR LONG — SEÑALES IA' : '⚡ MOTOR SHORT — SEÑALES IA';
             const hint = `<div style="font-size:9px;color:#475569;text-align:center;margin-bottom:6px;">👆 Tocá una moneda para llevarla al panel</div>`;
-            if (motorItems.length === 0) return `<div style="background:#060b16;border:1px solid rgba(255,255,255,0.05);border-radius:10px;padding:10px;margin-bottom:12px;">
-                <div style="font-size:11px;font-weight:900;color:#f3ba2f;margin-bottom:6px;">${titulo}</div>
-                <div style="font-size:11px;color:#475569;text-align:center;padding:8px 0;">⏳ Sin señales activas ahora mismo...</div>
+            const flechaMotor = `<span style="font-size:11px;color:#f3ba2f;transition:transform 0.25s;transform:${window._motorLongShortAbierto ? 'rotate(180deg)' : 'rotate(0deg)'};">▾</span>`;
+            const headerMotor = (cant) => `<div onclick="_toggleMotorLongShort()" style="display:flex;align-items:center;justify-content:space-between;cursor:pointer;margin-bottom:${window._motorLongShortAbierto ? '4px' : '0px'};">
+                <div style="font-size:11px;font-weight:900;color:#f3ba2f;">${titulo}${cant !== null ? ` (${cant})` : ''}</div>
+                ${flechaMotor}
             </div>`;
 
-            return `<div style="background:#060b16;border:1px solid rgba(255,255,255,0.05);border-radius:10px;padding:10px;margin-bottom:12px;">
-                <div style="font-size:11px;font-weight:900;color:#f3ba2f;margin-bottom:4px;">${titulo} (${motorItems.length})</div>
-                ${hint}
-                ${motorItems.join('')}
+            if (motorItems.length === 0) return `<div id="motorLongShortBlockCentral" style="background:#060b16;border:1px solid rgba(255,255,255,0.05);border-radius:10px;padding:10px;margin-bottom:12px;">
+                ${headerMotor(null)}
+                <div style="display:${window._motorLongShortAbierto ? 'block' : 'none'};">
+                    <div style="font-size:11px;color:#475569;text-align:center;padding:8px 0;">⏳ Sin señales activas ahora mismo...</div>
+                </div>
+            </div>`;
+
+            return `<div id="motorLongShortBlockCentral" style="background:#060b16;border:1px solid rgba(255,255,255,0.05);border-radius:10px;padding:10px;margin-bottom:12px;">
+                ${headerMotor(motorItems.length)}
+                <div style="display:${window._motorLongShortAbierto ? 'block' : 'none'};">
+                    ${hint}
+                    ${motorItems.join('')}
+                </div>
             </div>`;
         })()}
 
@@ -6404,55 +6592,7 @@ function actualizarTacometroDerecho() {
             </div>
         </div>
 
-        <!-- BLOQUE MEMORIA IA AVANZADA -->
-        <div style="background:rgba(14,203,129,0.05); border:1px solid rgba(14,203,129,0.18); border-radius:12px; padding:14px; margin-top:14px;">
-            <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;">
-                <div style="font-size:11px; font-weight:900; color:#0ecb81; text-transform:uppercase; letter-spacing:1px;">🧠 MEMORIA IA — PATRÓN HISTÓRICO</div>
-                <span style="font-size:9px;background:rgba(14,203,129,0.15);color:#0ecb81;padding:2px 7px;border-radius:10px;font-weight:700;">
-                    ${memoriaIA.filter(x=>x.symbol===selectedCoin).length} registros
-                </span>
-            </div>
-
-            ${(() => {
-                const ms = _memoriaScoreMoneda(selectedCoin);
-                if (!ms) return '';
-                const barL = `<div style="height:5px;background:rgba(255,255,255,0.06);border-radius:3px;overflow:hidden;margin:3px 0;">
-                    <div style="width:${ms.scoreLong}%;height:100%;background:${ms.colorLong};border-radius:3px;transition:width 0.4s;"></div></div>`;
-                const barS = `<div style="height:5px;background:rgba(255,255,255,0.06);border-radius:3px;overflow:hidden;margin:3px 0;">
-                    <div style="width:${ms.scoreShort}%;height:100%;background:${ms.colorShort};border-radius:3px;transition:width 0.4s;"></div></div>`;
-                return `
-                <!-- Veredicto $1 USDT/min -->
-                <div style="background:rgba(0,0,0,0.3);border-radius:10px;padding:10px 12px;margin-bottom:10px;border:1px solid rgba(255,255,255,0.06);">
-                    <div style="font-size:9px;font-weight:900;color:#f3ba2f;letter-spacing:1px;margin-bottom:8px;">
-                        💰 ¿VALE PARA $1 USDT/MIN? — $${ms.CAPITAL} × ${ms.APAL}x → necesita ${ms.MOV_NECESARIO.toFixed(2)}%/min
-                    </div>
-                    <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;">
-                        <div style="background:${ms.colorLong}12;border:1px solid ${ms.colorLong}40;border-radius:8px;padding:8px;text-align:center;">
-                            <div style="font-size:10px;font-weight:900;color:#0ecb81;margin-bottom:3px;">LONG 🟢</div>
-                            <div style="font-size:18px;font-weight:900;color:${ms.colorLong};">${ms.veredictoLong}</div>
-                            ${barL}
-                            <div style="font-size:10px;color:#94a3b8;">${ms.scoreLong}/100 pts</div>
-                        </div>
-                        <div style="background:${ms.colorShort}12;border:1px solid ${ms.colorShort}40;border-radius:8px;padding:8px;text-align:center;">
-                            <div style="font-size:10px;font-weight:900;color:#ff2a3b;margin-bottom:3px;">SHORT 🔴</div>
-                            <div style="font-size:18px;font-weight:900;color:${ms.colorShort};">${ms.veredictoShort}</div>
-                            ${barS}
-                            <div style="font-size:10px;color:#94a3b8;">${ms.scoreShort}/100 pts</div>
-                        </div>
-                    </div>
-                    <div style="margin-top:8px;font-size:10px;color:#94a3b8;text-align:center;">
-                        Mov. 2min actual: <b style="color:${ms.yaAlcanza?'#0ecb81':'#f3ba2f'};">${ms.vel2m.toFixed(3)}%</b>
-                        ${ms.yaAlcanza ? `✅ YA supera objetivo (×${ms.vecesObj})` : `⚠️ Falta ${(ms.MOV_NECESARIO - ms.vel2m).toFixed(3)}% para $1`}
-                        &nbsp;·&nbsp; Ganancia aprox: <b style="color:#0ecb81;">$${ms.gananciaReal}</b>
-                        ${ms.n < 3 ? `<br><span style="color:#475569;">📚 Con ${ms.n}/3 registros mín — aprendiendo rápido</span>` : ''}
-                    </div>
-                </div>`;
-            })()}
-
-            <div style="font-size:12px; color:#e2e8f0; line-height:1.6;">
-                ${_iaAnalizarPatron(selectedCoin)}
-            </div>
-        </div>
+        <!-- (BLOQUE MEMORIA IA AVANZADA se movió arriba, antes del botón RADAR) -->
 
         <!-- Botones -->
         <div style="display:grid; grid-template-columns:1fr 1fr; gap:10px; margin-top:15px;">
@@ -7543,7 +7683,30 @@ function _iaConstruirPrompt(motor, snap) {
     if (snap.posicion <= 20 && snap.ciclosSubiendo >= 2) sospechas.push('🟢 Suelo + ciclos alcistas = posible rebote en curso');
     if (snap.rsi !== null && snap.rsi < 30 && snap.posicion <= 30) sospechas.push('🎯 RSI sobrevendido en zona baja = zona de compra fuerte');
     if (snap.subidaDesdeMin48 >= 15 && emaAlineadas.includes('ALCISTAS')) sospechas.push('🚀 EMA alineadas + +15% desde mín48h = DESPEGUE REAL confirmado');
+    // ── Sospechas con nuevos indicadores técnicos ──────────────────
+    if (snap.bb_posicion != null && snap.bb_posicion >= 95) sospechas.push('🔴 Precio toca Banda de Bollinger Superior = posible rebote bajista');
+    if (snap.bb_posicion != null && snap.bb_posicion <= 5)  sospechas.push('🟢 Precio toca Banda de Bollinger Inferior = posible rebote alcista');
+    if (snap.macd_cruce && snap.macd_cruce.includes('CRUCE BAJISTA')) sospechas.push('📉 MACD cruzó la señal a la baja = momentum bajista confirmado');
+    if (snap.macd_cruce && snap.macd_cruce.includes('CRUCE ALCISTA')) sospechas.push('📈 MACD cruzó la señal al alza = momentum alcista confirmado');
+    if (snap.atr_pct != null && snap.atr_pct > 3 && snap.posicion >= 70) sospechas.push('🔥 Volatilidad extrema (ATR) en zona alta = riesgo de reversión violenta');
+    if (snap.piv_posicion && snap.piv_posicion.includes('BAJO PP') && snap.rsi !== null && snap.rsi < 40) sospechas.push('⚠️ Precio bajo el Punto Pivote + RSI bajo = presión bajista dominante');
+    if (snap.confluencias && !snap.confluencias.includes('Sin confluencias') && snap.posicion <= 30) sospechas.push('🔗 Confluencia técnica detectada en zona baja = soporte fuerte (alta probabilidad de rebote)');
     const sospechasTexto = sospechas.length > 0 ? sospechas.join('\n') : '(sin señales de alerta especiales)';
+
+    // ── Preparar textos de los nuevos estudios técnicos ──────────────
+    const bbTexto = snap.bb_upper
+        ? `BB Superior: $${snap.bb_upper?.toFixed(6)} | Media: $${snap.bb_media?.toFixed(6)} | Inferior: $${snap.bb_lower?.toFixed(6)} | Posición: ${snap.bb_posicion?.toFixed(0)}% → ${snap.bb_estado} | Amplitud: ${snap.bb_ancho?.toFixed(2)}%`
+        : '(calculando…)';
+    const macdTexto = snap.macd_linea != null
+        ? `Línea MACD: ${snap.macd_linea?.toFixed(6)} | Señal: ${snap.macd_signal?.toFixed(6)} | Histograma: ${snap.macd_histo?.toFixed(6)} → ${snap.macd_cruce}`
+        : '(calculando…)';
+    const atrTexto = snap.atr != null
+        ? `ATR(14): $${snap.atr?.toFixed(6)} (${snap.atr_pct?.toFixed(2)}% del precio) → ${snap.atr_estado}`
+        : '(calculando…)';
+    const pivTexto = snap.piv_PP != null
+        ? `PP: $${snap.piv_PP?.toFixed(6)} | R1: $${snap.piv_R1?.toFixed(6)} | R2: $${snap.piv_R2?.toFixed(6)} | S1: $${snap.piv_S1?.toFixed(6)} | S2: $${snap.piv_S2?.toFixed(6)} → ${snap.piv_posicion}`
+        : '(calculando…)';
+    const confTexto = snap.confluencias || '(calculando…)';
 
     const base = `Eres TECNOBOT, el mejor analista de criptomonedas del mundo. Tu trabajo: dar un veredicto CONCRETO sobre si COMPRAR / VENDER / ESPERAR en este momento exacto. Máximo 5 oraciones DIRECTAS. Sin saludos. En ESPAÑOL. Emojis estratégicos.
 
@@ -7565,21 +7728,28 @@ function _iaConstruirPrompt(motor, snap) {
 🌊 MODO MERCADO GLOBAL: ${snap.modoMercado?.toUpperCase()}
 ⚠️ SEÑALES DE SOSPECHA DETECTADAS:
 ${sospechasTexto}
+
+━━━ ESTUDIOS TÉCNICOS AVANZADOS (calculados sobre historial real 1h) ━━━
+🎯 BANDAS DE BOLLINGER (20p, 2σ): ${bbTexto}
+⚡ MACD (12/26/9): ${macdTexto}
+🌡️ ATR — VOLATILIDAD REAL: ${atrTexto}
+📍 PUNTOS PIVOTE (período 24h anterior): ${pivTexto}
+🔗 CONFLUENCIAS Fibonacci+Pivotes+Bollinger: ${confTexto}
 ════════════════════════════════════════════════
 
 INSTRUCCIÓN FINAL: Analiza TODO lo anterior. Detecta si hay SOSPECHA DE CAÍDA (trampa, agotamiento, distribución) o SOSPECHA DE SUBIDA (rebote, despegue, acumulación). Da tu veredicto final obligatoriamente así:
 ▶ VEREDICTO: [COMPRAR 🟢 / VENDER 🔴 / ESPERAR ⚪] — [razón en 6 palabras máximo]`;
 
     const perspectivas = {
-        tecnico: `${base}\n\nPERSPECTIVA — TÉCNICO PURO:\nAnaliza RSI (${snap.rsi?.toFixed(0) || 'N/D'}), EMAs (${emaAlineadas.split('—')[0].trim()}), posición ${snap.posicion?.toFixed(0)}% del rango 24h, ciclos (${snap.ciclosSubiendo}↑/${snap.ciclosBajando}↓) y velocidad (${velLabel}). ¿Hay divergencia RSI-precio? ¿Las EMAs confirman o contradicen el precio? ¿La estructura técnica es alcista, bajista o trampa? Detecta si hay SOSPECHA DE CAÍDA (techo) o DESPEGUE (suelo). Sé brutal y directo.`,
-        
-        alcista: `${base}\n\nPERSPECTIVA — CASO ALCISTA:\n¿Por qué PODRÍA SUBIR ${snap.nombre} ahora? Considera: posición ${snap.posicion?.toFixed(0)}% del rango (${posLabel}), RSI ${snap.rsi?.toFixed(0) || 'N/D'} (${rsiEstado}), subida desde mín48h: ${subida48Label}, ciclos alcistas ${snap.ciclosSubiendo}/5, velocidad ${velLabel}. Si hay señal real de compra, di CUÁNDO entrar y POR QUÉ. Si NO hay señal, sé honesto y di ESPERAR. No inventes señales que no existen.`,
-        
-        bajista: `${base}\n\nPERSPECTIVA — CASO BAJISTA / RIESGO:\n¿Hay SEÑALES DE CAÍDA PRÓXIMA en ${snap.nombre}? Analiza: ¿está en techo (${snap.posicion?.toFixed(0)}%)? RSI: ${snap.rsi?.toFixed(0) || 'N/D'} (${rsiEstado}). ¿Hay agotamiento de impulso? ¿BTC/ETH arrastrando?: ${btcEthLabel}. ¿Velocidad frenando?: ${velLabel}. Detecta si hay TRAMPA ALCISTA (sube pero va a caer), DISTRIBUCIÓN (venta oculta) o INICIO DE CAÍDA real. Si hay riesgo real, di VENDER. Si no hay señal bajista, di ESPERAR.`,
-        
-        volumen: `${base}\n\nPERSPECTIVA — VOLUMEN Y LIQUIDEZ:\nVolumen 24H: $${(snap.volume/1000000)?.toFixed(2)}M. ¿Es alto o bajo para ${snap.nombre} en este momento? ¿El volumen CONFIRMA o CONTRADICE el movimiento del precio (${snap.cambio2min > 0 ? '+' : ''}${snap.cambio2min?.toFixed(2)}% en 2min)? ¿Hay señal de ACUMULACIÓN (compra institucional silenciosa) o DISTRIBUCIÓN (venta oculta en picos)? ¿El volumen soporta una entrada ahora o hay riesgo de manipulación/trampa? Veredicto basado solo en lo que dice el volumen.`,
-        
-        correlacion: `${base}\n\nPERSPECTIVA — CORRELACIÓN Y CONTEXTO:\n${btcEthLabel} | Modo: ${snap.modoMercado?.toUpperCase()}. ¿${snap.nombre} se mueve CON el mercado o en CONTRA? Si BTC/ETH caen y ${snap.nombre} todavía no reacciona: ¿es resiliente o trampa? Si el mercado sube y ${snap.nombre} está quieta o baja: ¿rezagada (oportunidad) o distribución (trampa)? Score CDC: ${scoreLabel}. ¿El contexto macro APOYA o CONTRADICE entrar ahora? Detecta señales de sospecha cruzando todos los datos.`,
+        tecnico: `${base}\n\nPERSPECTIVA — TÉCNICO PURO:\nAnaliza RSI (${snap.rsi?.toFixed(0) || 'N/D'}), EMAs (${emaAlineadas.split('—')[0].trim()}), Bandas de Bollinger (${snap.bb_estado || 'N/D'}), MACD (${snap.macd_cruce || 'N/D'}), posición ${snap.posicion?.toFixed(0)}% del rango 24h y ciclos (${snap.ciclosSubiendo}↑/${snap.ciclosBajando}↓). ¿El MACD confirma o contradice el RSI? ¿El precio está en las bandas de Bollinger como zona de soporte/resistencia? ¿Las EMAs y el MACD están alineados o divergentes? Detecta SOSPECHA DE CAÍDA (techo técnico) o DESPEGUE (suelo técnico). Sé brutal y directo.`,
+
+        alcista: `${base}\n\nPERSPECTIVA — CASO ALCISTA:\n¿Por qué PODRÍA SUBIR ${snap.nombre} ahora? Considera: posición ${snap.posicion?.toFixed(0)}% del rango (${posLabel}), RSI ${snap.rsi?.toFixed(0) || 'N/D'} (${rsiEstado}), MACD (${snap.macd_cruce || 'N/D'}), Bollinger posición ${snap.bb_posicion?.toFixed(0) || 'N/D'}% (${snap.bb_estado || 'N/D'}), Punto Pivote ${snap.piv_posicion || 'N/D'}, subida desde mín48h: ${subida48Label}. ¿Hay confluencia de señales alcistas? ¿El precio está en soporte clave (Bollinger inferior, S1, S2, Fibonacci 61.8%)? Si hay señal real, di CUÁNDO entrar y POR QUÉ. Si NO hay señal, sé honesto y di ESPERAR.`,
+
+        bajista: `${base}\n\nPERSPECTIVA — CASO BAJISTA / RIESGO:\n¿Hay SEÑALES DE CAÍDA PRÓXIMA en ${snap.nombre}? Analiza: posición en Bollinger (${snap.bb_estado || 'N/D'} al ${snap.bb_posicion?.toFixed(0) || '?'}%), MACD (${snap.macd_cruce || 'N/D'}), ATR de volatilidad (${snap.atr_estado || 'N/D'}), resistencias en Pivotes R1=$${snap.piv_R1?.toFixed(4) || '?'}/R2=$${snap.piv_R2?.toFixed(4) || '?'}. ¿Está tocando resistencia técnica múltiple (Bollinger + Pivote + Fibonacci)? ¿El MACD sugiere agotamiento? Detecta TRAMPA ALCISTA, DISTRIBUCIÓN o INICIO DE CAÍDA real. Si hay riesgo real, di VENDER.`,
+
+        volumen: `${base}\n\nPERSPECTIVA — VOLUMEN Y LIQUIDEZ:\nVolumen 24H: $${(snap.volume/1000000)?.toFixed(2)}M. ¿El volumen CONFIRMA o CONTRADICE el movimiento? Volatilidad ATR: ${snap.atr_estado || 'N/D'} (${snap.atr_pct?.toFixed(2) || '?'}% del precio). ¿La amplitud de las Bandas de Bollinger (${snap.bb_ancho?.toFixed(2) || '?'}%) indica expansión (breakout real) o compresión (movimiento falso próximo)? ¿Hay señal de ACUMULACIÓN o DISTRIBUCIÓN con este contexto de volatilidad y volumen? ¿El ATR soporta el tamaño del movimiento?`,
+
+        correlacion: `${base}\n\nPERSPECTIVA — CORRELACIÓN Y CONTEXTO:\n${btcEthLabel} | Modo: ${snap.modoMercado?.toUpperCase()}. ¿${snap.nombre} se mueve CON el mercado o en CONTRA? Confluencias técnicas detectadas: ${confTexto}. ¿El precio está cerca de una zona de confluencia (Fibonacci + Pivote + Bollinger) que actúe como soporte o resistencia fuerte? Score CDC: ${scoreLabel}. ¿El contexto macro APOYA o CONTRADICE la lectura técnica de las confluencias? ¿Hay señal de sospecha cruzando correlación + indicadores?`,
     };
     return perspectivas[motor.id] || base;
 }
@@ -7634,6 +7804,30 @@ function _iaTomarSnapshot(symbol) {
         modoMercado:      modoMercado || 'alcista',
         cerebroEstado:    cerebroCDC ? cerebroCDC[symbol] : 'N/D',
         senalActiva:      senalCDC   ? senalCDC[symbol]   : 'N/D',
+        // ── Estudios técnicos avanzados ──────────────────────────────
+        // Bandas de Bollinger (20p, 2σ, sobre cierres 1h)
+        bb_upper:         e?.bb_upper,
+        bb_lower:         e?.bb_lower,
+        bb_media:         e?.bb_media,
+        bb_ancho:         e?.bb_ancho,    // % de amplitud respecto a precio
+        bb_posicion:      e?.bb_posicion, // 0=banda baja, 100=banda alta
+        bb_estado:        e?.bb_estado,
+        // MACD (12/26/9, cierres 1h)
+        macd_linea:       e?.macd_linea,
+        macd_signal:      e?.macd_signal,
+        macd_histo:       e?.macd_histo,
+        macd_cruce:       e?.macd_cruce,
+        // ATR – Volatilidad real (14p, cierres 1h)
+        atr:              e?.atr,
+        atr_pct:          e?.atr_pct,
+        atr_estado:       e?.atr_estado,
+        // Puntos Pivote clásicos (período 24h anterior)
+        piv_PP:           e?.PP,
+        piv_R1:           e?.R1,  piv_R2:  e?.R2,  piv_R3:  e?.R3,
+        piv_S1:           e?.S1,  piv_S2:  e?.S2,  piv_S3:  e?.S3,
+        piv_posicion:     e?.piv_posicion,
+        // Confluencia Fibonacci + Pivotes + Bollinger
+        confluencias:     e?.confluencias_texto,
     };
 }
 
@@ -7825,6 +8019,480 @@ setInterval(() => {
         _iaUltimoSnap = _iaTomarSnapshot(_iaMonedaActual);
     }
 }, 5000);
+
+// ════════════════════════════════════════════════════════════════
+// ══  CAPA DE ALMACENAMIENTO — localStorage del navegador        ══
+// ══  (funciona en GitHub Pages, hosting normal, file:// , etc.) ══
+// ══  Persiste en ESTE navegador/dispositivo entre sesiones.     ══
+// ════════════════════════════════════════════════════════════════
+const _iaStoragePrefix = 'cdc_ia_';
+
+const window_storage_local = {
+    async get(key) {
+        try {
+            const raw = localStorage.getItem(_iaStoragePrefix + key);
+            if (raw === null) return null;
+            return { key, value: raw };
+        } catch (e) { return null; }
+    },
+    async set(key, value) {
+        try {
+            localStorage.setItem(_iaStoragePrefix + key, value);
+            return { key, value };
+        } catch (e) {
+            console.error('localStorage lleno o no disponible:', e);
+            return null;
+        }
+    },
+    async delete(key) {
+        try {
+            localStorage.removeItem(_iaStoragePrefix + key);
+            return { key, deleted: true };
+        } catch (e) { return null; }
+    },
+    async list(prefix) {
+        try {
+            const keys = [];
+            const fullPrefix = _iaStoragePrefix + (prefix || '');
+            for (let i = 0; i < localStorage.length; i++) {
+                const k = localStorage.key(i);
+                if (k && k.startsWith(fullPrefix)) keys.push(k.slice(_iaStoragePrefix.length));
+            }
+            return { keys, prefix };
+        } catch (e) { return null; }
+    }
+};
+// Usamos localStorage como "window.storage" para todo el sistema de memoria de la IA.
+window.storage = window_storage_local;
+
+// ════════════════════════════════════════════════════════════════
+// ══  MEMORIA Y APRENDIZAJE PERSISTENTE — CDC IA               ══
+// ══  Guarda pronósticos pasados, los compara con el resultado  ══
+// ══  real, y recuerda preferencias del usuario entre sesiones. ══
+// ════════════════════════════════════════════════════════════════
+
+
+// ══  Guarda pronósticos pasados, los compara con el resultado  ══
+// ══  real, y recuerda preferencias del usuario entre sesiones. ══
+// ════════════════════════════════════════════════════════════════
+
+let _iaStatsCache    = {};   // { motorId: { aciertos, total } }
+let _iaPreferencias  = null; // { riesgo, monedasFavoritas }
+
+// ── Preferencias del usuario ──────────────────────────────────────
+async function _iaCargarPreferencias() {
+    try {
+        const r = await window.storage.get('preferencias_usuario');
+        _iaPreferencias = r ? JSON.parse(r.value) : { riesgo: 'medio', monedasFavoritas: [] };
+    } catch (e) {
+        _iaPreferencias = { riesgo: 'medio', monedasFavoritas: [] };
+    }
+}
+
+async function _iaGuardarPreferencias(prefs) {
+    _iaPreferencias = prefs;
+    try { await window.storage.set('preferencias_usuario', JSON.stringify(prefs)); }
+    catch (e) { console.error('No se pudieron guardar las preferencias', e); }
+}
+
+// ── Extraer el veredicto (COMPRAR/VENDER/ESPERAR) del texto de la IA ──
+function _iaExtraerVeredicto(texto) {
+    const m = texto.match(/VEREDICTO:\s*\[?\s*([A-ZÁÉÍÓÚ]+)/i);
+    const candidato = (m ? m[1] : texto).toUpperCase();
+    if (candidato.includes('COMPRAR')) return 'COMPRAR';
+    if (candidato.includes('VENDER'))  return 'VENDER';
+    if (candidato.includes('ESPERAR')) return 'ESPERAR';
+    return null;
+}
+
+// ── Guardar cada pronóstico para evaluarlo después ────────────────
+async function _iaGuardarPrediccion(motor, snap, texto) {
+    const veredicto = _iaExtraerVeredicto(texto);
+    if (!veredicto || !snap.precio) return;
+
+    const id = `pred:${snap.symbol}:${motor.id}:${Date.now()}`;
+    const registro = {
+        symbol: snap.symbol, motorId: motor.id, veredicto,
+        precioEntrada: snap.precio, timestamp: Date.now(), evaluado: false
+    };
+
+    try {
+        await window.storage.set(id, JSON.stringify(registro));
+        let idx = [];
+        try {
+            const idxRaw = await window.storage.get('predicciones_index');
+            idx = idxRaw ? JSON.parse(idxRaw.value) : [];
+        } catch (e) { idx = []; }
+        idx.push(id);
+        if (idx.length > 300) idx.shift(); // limitar historial
+        await window.storage.set('predicciones_index', JSON.stringify(idx));
+    } catch (e) { console.error('No se pudo guardar la predicción', e); }
+}
+
+// ── Evaluar pronósticos pendientes contra el precio real actual ───
+async function _iaEvaluarPrediccionesPendientes() {
+    let idx;
+    try {
+        const idxRaw = await window.storage.get('predicciones_index');
+        if (!idxRaw) return;
+        idx = JSON.parse(idxRaw.value);
+    } catch (e) { return; }
+
+    const ahora = Date.now();
+    const ventanaEvaluacion = 15 * 60 * 1000; // evaluar 15 min después del pronóstico
+
+    for (const id of idx) {
+        let reg;
+        try {
+            const raw = await window.storage.get(id);
+            if (!raw) continue;
+            reg = JSON.parse(raw.value);
+        } catch (e) { continue; }
+
+        if (reg.evaluado) continue;
+        if (ahora - reg.timestamp < ventanaEvaluacion) continue;
+
+        const cActual = (typeof cachedData !== 'undefined') ? cachedData[reg.symbol] : null;
+        if (!cActual || !cActual.price) continue;
+
+        const cambioPct = ((cActual.price - reg.precioEntrada) / reg.precioEntrada) * 100;
+        let acierto = false;
+        if (reg.veredicto === 'COMPRAR' && cambioPct > 0.3)        acierto = true;
+        if (reg.veredicto === 'VENDER'  && cambioPct < -0.3)       acierto = true;
+        if (reg.veredicto === 'ESPERAR' && Math.abs(cambioPct) < 0.5) acierto = true;
+
+        reg.evaluado  = true;
+        reg.acierto   = acierto;
+        reg.cambioPct = cambioPct;
+
+        try {
+            await window.storage.set(id, JSON.stringify(reg));
+
+            const statsKey = `stats:${reg.motorId}`;
+            let stats;
+            try {
+                const sRaw = await window.storage.get(statsKey);
+                stats = sRaw ? JSON.parse(sRaw.value) : { aciertos: 0, total: 0 };
+            } catch (e) { stats = { aciertos: 0, total: 0 }; }
+
+            stats.total += 1;
+            if (acierto) stats.aciertos += 1;
+            await window.storage.set(statsKey, JSON.stringify(stats));
+            _iaStatsCache[reg.motorId] = stats;
+        } catch (e) { console.error('Error guardando evaluación', e); }
+    }
+}
+
+// ── Cargar estadísticas históricas al iniciar ──────────────────────
+async function _iaCargarStatsIniciales() {
+    for (const motor of CDC_IA_MOTORES) {
+        try {
+            const sRaw = await window.storage.get(`stats:${motor.id}`);
+            _iaStatsCache[motor.id] = sRaw ? JSON.parse(sRaw.value) : { aciertos: 0, total: 0 };
+        } catch (e) {
+            _iaStatsCache[motor.id] = { aciertos: 0, total: 0 };
+        }
+    }
+}
+
+function _iaResumenAprendizaje(motor) {
+    const s = _iaStatsCache[motor.id] || { aciertos: 0, total: 0 };
+    if (s.total === 0) return '(sin historial de aciertos todavía para este motor — sé prudente)';
+    const pct = ((s.aciertos / s.total) * 100).toFixed(0);
+    return `Historial REAL de este motor: ${s.aciertos}/${s.total} pronósticos acertados (${pct}% de aciertos verificados contra el precio real). Ajusta tu nivel de confianza y contundencia según este desempeño histórico.`;
+}
+
+function _iaResumenPreferencias() {
+    if (!_iaPreferencias) return '';
+    const favs = (_iaPreferencias.monedasFavoritas && _iaPreferencias.monedasFavoritas.length)
+        ? _iaPreferencias.monedasFavoritas.join(', ')
+        : 'ninguna en particular';
+    return `\n👤 PERFIL DEL USUARIO: tolerancia al riesgo = ${(_iaPreferencias.riesgo || 'medio').toUpperCase()}. Monedas de interés: ${favs}. Ajusta el tono y la contundencia del veredicto a este perfil (si el riesgo es BAJO, prioriza ESPERAR ante cualquier duda; si es ALTO, puedes ser más agresivo con COMPRAR/VENDER).`;
+}
+
+// ── Inyectar memoria y preferencias en cada prompt ─────────────────
+const _iaConstruirPromptOriginal = _iaConstruirPrompt;
+_iaConstruirPrompt = function (motor, snap) {
+    const promptBase = _iaConstruirPromptOriginal(motor, snap);
+    return `${promptBase}\n\n🧠 APRENDIZAJE ACUMULADO: ${_iaResumenAprendizaje(motor)}${_iaResumenPreferencias()}`;
+};
+
+// ── Guardar la predicción justo después de mostrarla ───────────────
+const _iaMostrarOpinionOriginal = _iaMostrarOpinion;
+_iaMostrarOpinion = function (motor, texto, snap) {
+    _iaMostrarOpinionOriginal(motor, texto, snap);
+    _iaGuardarPrediccion(motor, snap, texto);
+};
+
+// ── Inicializar memoria al cargar la página ────────────────────────
+(async () => {
+    await _iaCargarPreferencias();
+    await _iaCargarStatsIniciales();
+})();
+
+// Revisar pronósticos pendientes de evaluar cada 2 minutos
+setInterval(_iaEvaluarPrediccionesPendientes, 2 * 60 * 1000);
+
+// ════════════════════════════════════════════════════════════════
+// ══  UI: botones de preferencias (⚙️) y estadísticas (📊)       ══
+// ════════════════════════════════════════════════════════════════
+function _iaInyectarPanelPreferencias() {
+    if (document.getElementById('iaPrefsBtn')) return;
+    const badge = document.getElementById('iaMotorBadge');
+    if (!badge || !badge.parentNode) return;
+
+    const estiloBtn = 'margin-left:8px;background:transparent;border:1px solid rgba(255,255,255,0.15);color:#94a3b8;border-radius:6px;width:24px;height:24px;cursor:pointer;font-size:11px;';
+
+    const btnPrefs = document.createElement('button');
+    btnPrefs.id = 'iaPrefsBtn';
+    btnPrefs.textContent = '⚙️';
+    btnPrefs.title = 'Preferencias de trading';
+    btnPrefs.style.cssText = estiloBtn;
+    btnPrefs.onclick = _iaAbrirModalPreferencias;
+    badge.parentNode.appendChild(btnPrefs);
+
+    const btnStats = document.createElement('button');
+    btnStats.id = 'iaStatsBtn';
+    btnStats.textContent = '📊';
+    btnStats.title = 'Ver estadísticas de aciertos';
+    btnStats.style.cssText = estiloBtn;
+    btnStats.onclick = _iaMostrarStatsModal;
+    badge.parentNode.appendChild(btnStats);
+}
+
+function _iaAbrirModalPreferencias() {
+    let modal = document.getElementById('iaPrefsModal');
+    if (modal) modal.remove();
+
+    modal = document.createElement('div');
+    modal.id = 'iaPrefsModal';
+    modal.style.cssText = 'position:fixed;inset:0;background:rgba(3,7,18,0.85);z-index:9999;display:flex;align-items:center;justify-content:center;';
+
+    const favs = (_iaPreferencias && _iaPreferencias.monedasFavoritas) ? _iaPreferencias.monedasFavoritas.join(', ') : '';
+
+    modal.innerHTML = `
+        <div style="background:#090f1c;border:1px solid rgba(243,186,47,0.3);border-radius:14px;padding:22px;width:320px;font-family:Inter,sans-serif;">
+            <div style="font-size:14px;font-weight:900;color:#f3ba2f;margin-bottom:14px;">⚙️ Preferencias de trading</div>
+            <label style="font-size:11px;color:#94a3b8;font-weight:700;">Tolerancia al riesgo</label>
+            <select id="iaPrefRiesgo" style="width:100%;margin:6px 0 14px;padding:8px;background:#050914;color:#fff;border:1px solid rgba(255,255,255,0.1);border-radius:8px;">
+                <option value="bajo">Bajo (conservador)</option>
+                <option value="medio">Medio</option>
+                <option value="alto">Alto (agresivo)</option>
+            </select>
+            <label style="font-size:11px;color:#94a3b8;font-weight:700;">Monedas favoritas (separadas por coma)</label>
+            <input id="iaPrefFavs" value="${favs}" placeholder="BTC, ETH, SOL" style="width:100%;margin:6px 0 16px;padding:8px;background:#050914;color:#fff;border:1px solid rgba(255,255,255,0.1);border-radius:8px;">
+            <div style="display:flex;gap:8px;">
+                <button id="iaPrefCancelar" style="flex:1;padding:9px;border-radius:8px;border:1px solid rgba(255,255,255,0.15);background:transparent;color:#94a3b8;cursor:pointer;">Cancelar</button>
+                <button id="iaPrefGuardar" style="flex:1;padding:9px;border-radius:8px;border:none;background:#f3ba2f;color:#030712;font-weight:900;cursor:pointer;">Guardar</button>
+            </div>
+        </div>
+    `;
+    document.body.appendChild(modal);
+
+    document.getElementById('iaPrefRiesgo').value = (_iaPreferencias && _iaPreferencias.riesgo) || 'medio';
+    document.getElementById('iaPrefCancelar').onclick = () => modal.remove();
+    document.getElementById('iaPrefGuardar').onclick = async () => {
+        const riesgo = document.getElementById('iaPrefRiesgo').value;
+        const favsArr = document.getElementById('iaPrefFavs').value.split(',').map(s => s.trim()).filter(Boolean);
+        await _iaGuardarPreferencias({ riesgo, monedasFavoritas: favsArr });
+        modal.remove();
+    };
+}
+
+async function _iaMostrarStatsModal() {
+    let modal = document.getElementById('iaStatsModal');
+    if (modal) modal.remove();
+
+    modal = document.createElement('div');
+    modal.id = 'iaStatsModal';
+    modal.style.cssText = 'position:fixed;inset:0;background:rgba(3,7,18,0.85);z-index:9999;display:flex;align-items:center;justify-content:center;';
+
+    const filas = CDC_IA_MOTORES.map(m => {
+        const s = _iaStatsCache[m.id] || { aciertos: 0, total: 0 };
+        const pct = s.total ? ((s.aciertos / s.total) * 100).toFixed(0) : '–';
+        return `<div style="display:flex;justify-content:space-between;padding:8px 0;border-bottom:1px solid rgba(255,255,255,0.06);font-size:12px;">
+            <span>${m.icono} ${m.nombre}</span>
+            <span style="color:${m.color};font-weight:900;">${s.aciertos}/${s.total} (${pct}%)</span>
+        </div>`;
+    }).join('');
+
+    modal.innerHTML = `
+        <div style="background:#090f1c;border:1px solid rgba(243,186,47,0.3);border-radius:14px;padding:22px;width:340px;font-family:Inter,sans-serif;">
+            <div style="font-size:14px;font-weight:900;color:#f3ba2f;margin-bottom:14px;">📊 Aciertos históricos por motor</div>
+            ${filas}
+            <div style="font-size:10px;color:#475569;margin-top:12px;line-height:1.4;">Cada pronóstico se evalúa ~15 min después contra el movimiento real del precio. Este historial se usa como contexto para que la IA ajuste su confianza con el tiempo.</div>
+            <button id="iaStatsCerrar" style="margin-top:16px;width:100%;padding:9px;border-radius:8px;border:none;background:#f3ba2f;color:#030712;font-weight:900;cursor:pointer;">Cerrar</button>
+        </div>
+    `;
+    document.body.appendChild(modal);
+    document.getElementById('iaStatsCerrar').onclick = () => modal.remove();
+}
+
+// Inyectar los botones cada vez que se crea el contenedor de la IA
+const _iaCrearContenedorOriginal = _iaCrearContenedor;
+_iaCrearContenedor = function () {
+    _iaCrearContenedorOriginal();
+    setTimeout(_iaInyectarPanelPreferencias, 100);
+};
+
+// ════════════════════════════════════════════════════════════════
+// ══  FIBONACCI — niveles de retroceso y extensión              ══
+// ══  Se calculan sobre el rango 24h (high24h / low24h) y se     ══
+// ══  inyectan en el snapshot + en el prompt de TODOS los motores ══
+// ════════════════════════════════════════════════════════════════
+function _iaCalcularFibonacci(high, low) {
+    if (!high || !low || high <= low) return null;
+    const diff = high - low;
+    return {
+        high, low, diff,
+        // Niveles de RETROCESO (posibles zonas de rebote/soporte si el precio viene cayendo
+        // desde el máximo, o zonas de resistencia si viene subiendo desde el mínimo)
+        retroceso: {
+            r236: +(high - diff * 0.236).toFixed(8),
+            r382: +(high - diff * 0.382).toFixed(8),
+            r500: +(high - diff * 0.500).toFixed(8),
+            r618: +(high - diff * 0.618).toFixed(8),
+            r786: +(high - diff * 0.786).toFixed(8),
+        },
+        // Niveles de EXTENSIÓN (objetivos de precio si el movimiento continúa más allá del rango)
+        extension: {
+            e1272: +(high + diff * 0.272).toFixed(8),
+            e1618: +(high + diff * 0.618).toFixed(8),
+            e2000: +(high + diff * 1.000).toFixed(8),
+        },
+        // Extensión hacia abajo, útil para SHORT (objetivos si rompe el mínimo)
+        extensionAbajo: {
+            e1272: +(low - diff * 0.272).toFixed(8),
+            e1618: +(low - diff * 0.618).toFixed(8),
+        }
+    };
+}
+
+function _iaTextoFibonacci(fibo) {
+    if (!fibo) return '(sin datos suficientes de rango 24h para calcular Fibonacci)';
+    return `Rango 24h: máx ${fibo.high} / mín ${fibo.low}.
+Retrocesos (zonas de rebote/soporte en caída o resistencia en subida): 23.6%=${fibo.retroceso.r236} · 38.2%=${fibo.retroceso.r382} · 50%=${fibo.retroceso.r500} · 61.8%=${fibo.retroceso.r618} · 78.6%=${fibo.retroceso.r786}.
+Extensiones al alza (objetivos LONG si rompe el máximo): 127.2%=${fibo.extension.e1272} · 161.8%=${fibo.extension.e1618}.
+Extensiones a la baja (objetivos SHORT si rompe el mínimo): 127.2%=${fibo.extensionAbajo.e1272} · 161.8%=${fibo.extensionAbajo.e1618}.`;
+}
+
+// ── Inyectar Fibonacci en cada snapshot ────────────────────────────
+const _iaTomarSnapshotOriginal = _iaTomarSnapshot;
+_iaTomarSnapshot = function (symbol) {
+    const snap = _iaTomarSnapshotOriginal(symbol);
+    if (!snap) return snap;
+    snap.fibo = _iaCalcularFibonacci(snap.high24h, snap.low24h);
+    return snap;
+};
+
+// ── Inyectar el texto de Fibonacci en el prompt de TODOS los motores ──
+const _iaConstruirPromptConMemoria = _iaConstruirPrompt; // ya incluye memoria/preferencias
+_iaConstruirPrompt = function (motor, snap) {
+    const promptConMemoria = _iaConstruirPromptConMemoria(motor, snap);
+    return `${promptConMemoria}\n\n📐 NIVELES DE FIBONACCI (rango 24h):\n${_iaTextoFibonacci(snap?.fibo)}\nUsa estos niveles como referencia de soportes/resistencias en tu análisis si aplica a tu enfoque (${motor.nombre}).`;
+};
+
+// ════════════════════════════════════════════════════════════════
+// ══  PESTAÑA DESPLEGABLE: SEÑALES IA LONG vs SHORT              ══
+// ══  Panel lado a lado con el veredicto/score de cada lado y     ══
+// ══  los niveles de Fibonacci relevantes para cada uno.          ══
+// ════════════════════════════════════════════════════════════════
+let _iaLongShortInterval = null;
+let _iaLongShortAbierto  = false;
+
+function _iaInyectarPanelLongShort() {
+    const box = document.getElementById('iaMultiOpinionBox');
+    if (!box || document.getElementById('iaLongShortToggle')) return;
+
+    const wrap = document.createElement('div');
+    wrap.style.cssText = 'margin-top:12px;border-top:1px solid rgba(255,255,255,0.06);padding-top:10px;';
+    wrap.innerHTML = `
+        <button id="iaLongShortToggle" style="width:100%;display:flex;align-items:center;justify-content:space-between;background:rgba(255,255,255,0.03);border:1px solid rgba(255,255,255,0.08);border-radius:10px;padding:8px 12px;cursor:pointer;color:#cbd5e1;font-family:Inter,sans-serif;">
+            <span style="font-size:11px;font-weight:900;letter-spacing:0.5px;">📈📉 SEÑALES IA: LONG vs SHORT</span>
+            <span id="iaLongShortFlecha" style="font-size:11px;transition:transform 0.25s;">▾</span>
+        </button>
+        <div id="iaLongShortBody" style="display:none;margin-top:8px;">
+            <div style="display:flex;gap:8px;">
+                <div id="iaPanelLong" style="flex:1;background:linear-gradient(135deg,#042d18,#06301c);border:1px solid rgba(14,203,129,0.35);border-radius:10px;padding:10px;font-family:Inter,sans-serif;">
+                    <div style="font-size:10px;font-weight:900;color:#0ecb81;letter-spacing:0.5px;margin-bottom:6px;">🟢 MOTOR LONG</div>
+                    <div id="iaLongVeredicto" style="font-size:13px;font-weight:900;color:#fff;">—</div>
+                    <div id="iaLongScore" style="font-size:10px;color:#6ee7b7;margin:4px 0 8px;">Score: —</div>
+                    <div id="iaLongFibo" style="font-size:9.5px;color:#9ad9b9;line-height:1.5;"></div>
+                </div>
+                <div id="iaPanelShort" style="flex:1;background:linear-gradient(135deg,#2d0408,#330610);border:1px solid rgba(255,42,59,0.35);border-radius:10px;padding:10px;font-family:Inter,sans-serif;">
+                    <div style="font-size:10px;font-weight:900;color:#ff2a3b;letter-spacing:0.5px;margin-bottom:6px;">🔴 MOTOR SHORT</div>
+                    <div id="iaShortVeredicto" style="font-size:13px;font-weight:900;color:#fff;">—</div>
+                    <div id="iaShortScore" style="font-size:10px;color:#fca5a5;margin:4px 0 8px;">Score: —</div>
+                    <div id="iaShortFibo" style="font-size:9.5px;color:#f2a8ae;line-height:1.5;"></div>
+                </div>
+            </div>
+            <div style="font-size:9px;color:#475569;margin-top:8px;line-height:1.4;">
+                Score 0-100 basado en velocidad de movimiento, ciclos, posición en rango 24h, volumen, alertas e historial de la moneda. Niveles de soporte/resistencia calculados con Fibonacci sobre el rango de 24h.
+            </div>
+        </div>
+    `;
+    box.appendChild(wrap);
+
+    document.getElementById('iaLongShortToggle').onclick = () => {
+        _iaLongShortAbierto = !_iaLongShortAbierto;
+        const body   = document.getElementById('iaLongShortBody');
+        const flecha = document.getElementById('iaLongShortFlecha');
+        if (body)   body.style.display = _iaLongShortAbierto ? 'block' : 'none';
+        if (flecha) flecha.style.transform = _iaLongShortAbierto ? 'rotate(180deg)' : 'rotate(0deg)';
+        if (_iaLongShortAbierto) _iaActualizarPanelLongShort();
+    };
+}
+
+function _iaActualizarPanelLongShort() {
+    if (!_iaLongShortAbierto || !_iaMonedaActual) return;
+    if (typeof _memoriaScoreMoneda !== 'function') return;
+
+    let res;
+    try { res = _memoriaScoreMoneda(_iaMonedaActual); } catch (e) { return; }
+    if (!res) return;
+
+    const c = cachedData ? cachedData[_iaMonedaActual] : null;
+    const fibo = c ? _iaCalcularFibonacci(c.high, c.low) : null;
+
+    const elLongV = document.getElementById('iaLongVeredicto');
+    const elLongS = document.getElementById('iaLongScore');
+    const elLongF = document.getElementById('iaLongFibo');
+    const elShortV = document.getElementById('iaShortVeredicto');
+    const elShortS = document.getElementById('iaShortScore');
+    const elShortF = document.getElementById('iaShortFibo');
+
+    if (elLongV) { elLongV.textContent = res.veredictoLong || '—'; elLongV.style.color = res.colorLong || '#fff'; }
+    if (elLongS) elLongS.textContent = `Score: ${res.scoreLong ?? '—'}/100`;
+    if (elShortV) { elShortV.textContent = res.veredictoShort || '—'; elShortV.style.color = res.colorShort || '#fff'; }
+    if (elShortS) elShortS.textContent = `Score: ${res.scoreShort ?? '—'}/100`;
+
+    if (fibo) {
+        if (elLongF) elLongF.innerHTML = `Soporte 61.8%: <b>${fibo.retroceso.r618}</b><br>Objetivo ext. 127.2%: <b>${fibo.extension.e1272}</b>`;
+        if (elShortF) elShortF.innerHTML = `Resistencia 38.2%: <b>${fibo.retroceso.r382}</b><br>Objetivo ext. 127.2%: <b>${fibo.extensionAbajo.e1272}</b>`;
+    } else {
+        if (elLongF) elLongF.textContent = 'Sin datos de rango 24h aún.';
+        if (elShortF) elShortF.textContent = 'Sin datos de rango 24h aún.';
+    }
+}
+
+// Refrescar el panel Long/Short cada 5s (igual que el resto de la IA)
+if (!_iaLongShortInterval) {
+    _iaLongShortInterval = setInterval(_iaActualizarPanelLongShort, 5000);
+}
+
+// Encadenar la inyección del panel Long/Short a la creación del contenedor IA
+const _iaCrearContenedorConPrefs = _iaCrearContenedor; // ya incluye el panel de preferencias
+_iaCrearContenedor = function () {
+    _iaCrearContenedorConPrefs();
+    setTimeout(_iaInyectarPanelLongShort, 120);
+};
+
+// ════════════════════════════════════════════════════════════════
+// ══  NOTA: el bloque "MOTOR LONG/SHORT — SEÑALES IA" se quedó    ══
+// ══  donde estaba originalmente (panel central). Se intentó      ══
+// ══  trasladar al sidebar derecho pero rompía el velocímetro,    ══
+// ══  así que se revirtió ese cambio.                              ══
+// ════════════════════════════════════════════════════════════════
 
 </script>
 </body>
