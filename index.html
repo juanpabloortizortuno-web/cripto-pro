@@ -1390,14 +1390,45 @@ function _memoriaScoreMoneda(symbol) {
     }
     scoreShort = Math.min(100, Math.max(0, scoreShort));
 
-    // Veredicto
-    const veredictoLong  = scoreLong  >= 65 ? 'VALE ✅'  : scoreLong  >= 40 ? 'DUDOSA ⚠️' : 'EVITAR ❌';
-    const veredictoShort = scoreShort >= 65 ? 'VALE ✅'  : scoreShort >= 40 ? 'DUDOSA ⚠️' : 'EVITAR ❌';
-    const colorLong  = scoreLong  >= 65 ? '#0ecb81' : scoreLong  >= 40 ? '#f3ba2f' : '#ff2a3b';
-    const colorShort = scoreShort >= 65 ? '#0ecb81' : scoreShort >= 40 ? '#f3ba2f' : '#ff2a3b';
+    // Veredicto con desempate inteligente
+    // Si ambos pasan 65 pts (ambos "VALE"), usar posición en rango y ciclos para elegir ganador
+    let veredictoLong, veredictoShort, colorLong, colorShort;
+    const ambosPasan = scoreLong >= 65 && scoreShort >= 65;
+
+    if (ambosPasan) {
+        // Desempate: la posición en el rango 24h es el árbitro principal
+        // Posición baja (suelo) => favorece LONG, posición alta (techo) => favorece SHORT
+        const favoreceLong  = pos <= 35 || ciclosUp   >= ciclosDown + 2;
+        const favoreceShort = pos >= 65 || ciclosDown >= ciclosUp   + 2;
+
+        if (favoreceLong && !favoreceShort) {
+            // LONG gana el desempate
+            veredictoLong  = 'VALE ✅';
+            veredictoShort = 'ESPERAR ⏸️';
+            colorLong  = '#0ecb81';
+            colorShort = '#f3ba2f';
+        } else if (favoreceShort && !favoreceLong) {
+            // SHORT gana el desempate
+            veredictoLong  = 'ESPERAR ⏸️';
+            veredictoShort = 'VALE ✅';
+            colorLong  = '#f3ba2f';
+            colorShort = '#0ecb81';
+        } else {
+            // Empate real: mercado en zona media sin dirección clara
+            veredictoLong  = 'CONFLICTO ⚡';
+            veredictoShort = 'CONFLICTO ⚡';
+            colorLong  = '#f3ba2f';
+            colorShort = '#f3ba2f';
+        }
+    } else {
+        veredictoLong  = scoreLong  >= 65 ? 'VALE ✅'  : scoreLong  >= 40 ? 'DUDOSA ⚠️' : 'EVITAR ❌';
+        veredictoShort = scoreShort >= 65 ? 'VALE ✅'  : scoreShort >= 40 ? 'DUDOSA ⚠️' : 'EVITAR ❌';
+        colorLong  = scoreLong  >= 65 ? '#0ecb81' : scoreLong  >= 40 ? '#f3ba2f' : '#ff2a3b';
+        colorShort = scoreShort >= 65 ? '#0ecb81' : scoreShort >= 40 ? '#f3ba2f' : '#ff2a3b';
+    }
 
     return { scoreLong, scoreShort, veredictoLong, veredictoShort, colorLong, colorShort,
-             gananciaReal, yaAlcanza, vecesObj, vel2m, MOV_NECESARIO, n, CAPITAL, APAL };
+             gananciaReal, yaAlcanza, vecesObj, vel2m, MOV_NECESARIO, n, CAPITAL, APAL, ambosPasan };
 }
 
 function _iaAnalizarPatron(symbol) {
@@ -5575,14 +5606,15 @@ function actualizarPanelCentral() {
                     <div style="font-size:9px;font-weight:900;color:#f3ba2f;letter-spacing:1px;margin-bottom:8px;">
                         💰 ¿VALE PARA $1 USDT/MIN? — $${ms.CAPITAL} × ${ms.APAL}x → necesita ${ms.MOV_NECESARIO.toFixed(2)}%/min
                     </div>
+                    ${ms.ambosPasan && ms.veredictoLong === 'CONFLICTO ⚡' ? `<div style="background:rgba(243,186,47,0.1);border:1px solid rgba(243,186,47,0.3);border-radius:8px;padding:7px 10px;margin-bottom:8px;font-size:10px;color:#f3ba2f;font-weight:700;text-align:center;">⚡ Señal en CONFLICTO — ambos lados tienen fuerza. Esperá una dirección clara antes de entrar.</div>` : ms.ambosPasan ? `<div style="background:rgba(14,203,129,0.08);border:1px solid rgba(14,203,129,0.2);border-radius:8px;padding:7px 10px;margin-bottom:8px;font-size:10px;color:#0ecb81;font-weight:700;text-align:center;">✅ Dirección definida por posición y ciclos</div>` : ''}
                     <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;">
-                        <div style="background:${ms.colorLong}12;border:1px solid ${ms.colorLong}40;border-radius:8px;padding:8px;text-align:center;">
+                        <div style="background:${ms.colorLong}12;border:2px solid ${ms.colorLong}${ms.veredictoLong==='VALE ✅'?'99':'30'};border-radius:8px;padding:8px;text-align:center;${ms.veredictoLong==='ESPERAR ⏸️'?'opacity:0.5;':''}">
                             <div style="font-size:10px;font-weight:900;color:#0ecb81;margin-bottom:3px;">LONG 🟢</div>
                             <div style="font-size:18px;font-weight:900;color:${ms.colorLong};">${ms.veredictoLong}</div>
                             ${barL}
                             <div style="font-size:10px;color:#94a3b8;">${ms.scoreLong}/100 pts</div>
                         </div>
-                        <div style="background:${ms.colorShort}12;border:1px solid ${ms.colorShort}40;border-radius:8px;padding:8px;text-align:center;">
+                        <div style="background:${ms.colorShort}12;border:2px solid ${ms.colorShort}${ms.veredictoShort==='VALE ✅'?'99':'30'};border-radius:8px;padding:8px;text-align:center;${ms.veredictoShort==='ESPERAR ⏸️'?'opacity:0.5;':''}">
                             <div style="font-size:10px;font-weight:900;color:#ff2a3b;margin-bottom:3px;">SHORT 🔴</div>
                             <div style="font-size:18px;font-weight:900;color:${ms.colorShort};">${ms.veredictoShort}</div>
                             ${barS}
@@ -8344,6 +8376,37 @@ function _iaActualizarPanelLongShort() {
     if (elLongS) elLongS.textContent = `Score: ${res.scoreLong ?? '—'}/100`;
     if (elShortV) { elShortV.textContent = res.veredictoShort || '—'; elShortV.style.color = res.colorShort || '#fff'; }
     if (elShortS) elShortS.textContent = `Score: ${res.scoreShort ?? '—'}/100`;
+
+    // Atenuar visualmente el lado que perdió el desempate
+    const panelLong  = document.getElementById('iaPanelLong');
+    const panelShort = document.getElementById('iaPanelShort');
+    if (panelLong)  panelLong.style.opacity  = res.veredictoLong  === 'ESPERAR ⏸️' ? '0.45' : '1';
+    if (panelShort) panelShort.style.opacity = res.veredictoShort === 'ESPERAR ⏸️' ? '0.45' : '1';
+
+    // Banner de conflicto debajo de los paneles
+    let bannerConflicto = document.getElementById('iaConflictoBanner');
+    if (res.ambosPasan) {
+        if (!bannerConflicto) {
+            bannerConflicto = document.createElement('div');
+            bannerConflicto.id = 'iaConflictoBanner';
+            bannerConflicto.style.cssText = 'margin-top:8px;padding:7px 10px;border-radius:8px;font-size:10px;font-weight:700;text-align:center;';
+            const body = document.getElementById('iaLongShortBody');
+            if (body) body.appendChild(bannerConflicto);
+        }
+        if (res.veredictoLong === 'CONFLICTO ⚡') {
+            bannerConflicto.style.background = 'rgba(243,186,47,0.1)';
+            bannerConflicto.style.border = '1px solid rgba(243,186,47,0.3)';
+            bannerConflicto.style.color = '#f3ba2f';
+            bannerConflicto.textContent = '⚡ Conflicto de señales — ambos lados tienen fuerza similar. Esperá definición antes de entrar.';
+        } else {
+            bannerConflicto.style.background = 'rgba(14,203,129,0.08)';
+            bannerConflicto.style.border = '1px solid rgba(14,203,129,0.2)';
+            bannerConflicto.style.color = '#6ee7b7';
+            bannerConflicto.textContent = '✅ Dirección elegida por posición en rango y ciclos dominantes.';
+        }
+    } else if (bannerConflicto) {
+        bannerConflicto.remove();
+    }
 
     if (fibo) {
         if (elLongF) elLongF.innerHTML = `Soporte 61.8%: <b>${fibo.retroceso.r618}</b><br>Objetivo ext. 127.2%: <b>${fibo.extension.e1272}</b>`;
