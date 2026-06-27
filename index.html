@@ -1551,16 +1551,16 @@ async function cargarSimbolosFuturosUSDTM() {
         if (!res.ok) throw new Error('exchangeInfo respondió ' + res.status);
         const info = await res.json();
 
+        // Aceptar TODOS los contratos activos en USDT — sin filtrar por contractType.
+        // Esto incluye PERPETUAL, ESPORTS, KR_EQUITY y cualquier tipo nuevo de Binance.
         const perpetuos = info.symbols.filter(
-            s => s.contractType === 'PERPETUAL' && s.quoteAsset === 'USDT' && s.status === 'TRADING'
+            s => s.quoteAsset === 'USDT' && s.status === 'TRADING'
         );
 
         const validos = new Set(perpetuos.map(s => s.symbol));
         simbolosFuturosUSDTM = validos;
 
         // ✅ Calcular apalancamiento máximo real desde maintMarginPercent
-        // maxLeverage ≈ 1 / maintMarginPercent
-        // Ej: 0.20 (20%) → 5x | 0.10 (10%) → 10x | 0.025 (2.5%) → 40x
         let contadorBajoApal = 0;
         perpetuos.forEach(s => {
             const mmp = parseFloat(s.maintMarginPercent);
@@ -2945,56 +2945,81 @@ function detectarReversionAlcistaEMA(symbol){
 }
 function buscarMoneda() {
     const query = document.getElementById('searchCoin').value.toUpperCase().trim();
-    const rows = document.querySelectorAll('#cryptoList tr');
-    let encontradas = 0;
-
-    rows.forEach(row => {
-        const symbol = row.getAttribute('data-symbol') || '';
-        if (query === '') {
-            row.style.display = '';
-            encontradas++;
-            return;
-        }
-
-        let coincideNombre = symbol.includes(query);
-        let coincideComportamiento = false;
-        const infoMoneda = cachedData[symbol];
-        
-        if (infoMoneda) {
-            if (query === 'POTENCIA' || query === 'VELOCIDAD') {
-                coincideComportamiento = Math.abs(infoMoneda.velocidad) > 0.50;
-            } else if (query === 'GIRO') {
-                coincideComportamiento = infoMoneda.caidaDesdeMaximo >= 2.0 && infoMoneda.caidaDesdeMaximo <= 5.0 && infoMoneda.velocidad < 0;
-            } else if (query === 'DERRUMBE' || query === 'DUMP') {
-                coincideComportamiento = infoMoneda.alertaDerrumbe;
-            } else if (query === 'BOMBA' || query === 'LONG') {
-                coincideComportamiento = infoMoneda.alertaBombaSubida;
-            } else if (query === 'AGOTADO') {
-                coincideComportamiento = infoMoneda.alertaAgotamientoSubida;
-            }
-        }
-
-        if (coincideNombre || coincideComportamiento) {
-            row.style.display = '';
-            encontradas++;
-        } else {
-            row.style.display = 'none';
-        }
-    });
-
+    const tbody = document.getElementById('cryptoList');
     const saludo = document.getElementById('botSaludo');
-    if (query === '') { 
-        saludo.innerText = "🤖 Analizando el mercado en tiempo real..."; 
-    } else if (query === 'POTENCIA') {
-        saludo.innerText = `⚡ Mostrando ${encontradas} monedas con volumen explosivo`;
-    } else if (query === 'BOMBA') {
-        saludo.innerText = `🚀 Mostrando ${encontradas} subidas verticales a toda potencia`;
-    } else if (query === 'AGOTADO') {
-        saludo.innerText = `⚠️ Mostrando ${encontradas} activos agotándose en máximos`;
-    } else if (encontradas === 0) { 
-        saludo.innerText = "❌ No encontré esa cripto o filtro"; 
-    } else { 
-        saludo.innerText = `🔍 Encontré ${encontradas} coincidencias para "${query}"`; 
+
+    // Sin búsqueda: volver a la tabla normal (top 50)
+    if (query === '') {
+        actualizarTablaIzquierda();
+        if (saludo) saludo.innerText = "🤖 Analizando el mercado en tiempo real...";
+        return;
+    }
+
+    // Filtros de comportamiento: buscar en TODAS las monedas del caché (no solo las 50 renderizadas)
+    const esFiltroComportamiento = ['POTENCIA','VELOCIDAD','GIRO','DERRUMBE','DUMP','BOMBA','LONG','AGOTADO'].includes(query);
+    let resultados = [];
+
+    if (esFiltroComportamiento) {
+        // Filtrar todo cachedData por comportamiento
+        resultados = Object.values(cachedData).filter(infoMoneda => {
+            if (query === 'POTENCIA' || query === 'VELOCIDAD') return Math.abs(infoMoneda.velocidad) > 0.50;
+            if (query === 'GIRO') return infoMoneda.caidaDesdeMaximo >= 2.0 && infoMoneda.caidaDesdeMaximo <= 5.0 && infoMoneda.velocidad < 0;
+            if (query === 'DERRUMBE' || query === 'DUMP') return infoMoneda.alertaDerrumbe;
+            if (query === 'BOMBA' || query === 'LONG') return infoMoneda.alertaBombaSubida;
+            if (query === 'AGOTADO') return infoMoneda.alertaAgotamientoSubida;
+            return false;
+        });
+    } else {
+        // Búsqueda por nombre: buscar en TODO cachedData, no solo las filas visibles
+        resultados = Object.values(cachedData).filter(infoMoneda => infoMoneda.symbol.includes(query));
+    }
+
+    // Renderizar resultados en la tabla
+    const fragmento = document.createDocumentFragment();
+    if (resultados.length === 0) {
+        const trVacio = document.createElement('tr');
+        trVacio.innerHTML = `<td colspan="3" style="text-align:center; padding:16px; color:#64748b; font-size:11px;">❌ No encontré "${query}" — puede que aún no haya datos o no tenga contrato activo</td>`;
+        fragmento.appendChild(trVacio);
+    } else {
+        resultados.forEach(c => {
+            const symbol = c.symbol;
+            const tr = document.createElement('tr');
+            tr.setAttribute('data-symbol', symbol);
+            tr.onclick = () => seleccionarMoneda(symbol);
+            if (selectedCoin === symbol) {
+                tr.style.background = "rgba(243,186,47,0.12)";
+                tr.style.borderLeft = "4px solid var(--accent-gold)";
+            }
+            const cambioColor = c.change >= 0 ? '#0ecb81' : '#ff2a3b';
+            const signo = c.change >= 0 ? '+' : '';
+            const p = c.price;
+            const precioStr = p == null ? '—' : p < 0.001 ? p.toFixed(6) : p < 1 ? p.toFixed(4) : p.toFixed(2);
+            tr.innerHTML = `
+                <td>
+                    <div style="font-weight:700;font-size:13px;">${symbol.replace('USDT','')}</div>
+                    <div style="font-size:10px;color:#475569;">USDT · Futuros</div>
+                </td>
+                <td style="color:${cambioColor};font-weight:700;">${signo}${c.change != null ? c.change.toFixed(2) : '—'}%</td>
+                <td style="font-weight:600;font-size:12px;">${precioStr}</td>
+            `;
+            fragmento.appendChild(tr);
+        });
+    }
+    tbody.innerHTML = '';
+    tbody.appendChild(fragmento);
+
+    if (saludo) {
+        if (resultados.length === 0) {
+            saludo.innerText = `❌ No encontré esa cripto o filtro`;
+        } else if (query === 'POTENCIA' || query === 'VELOCIDAD') {
+            saludo.innerText = `⚡ Mostrando ${resultados.length} monedas con volumen explosivo`;
+        } else if (query === 'BOMBA' || query === 'LONG') {
+            saludo.innerText = `🚀 Mostrando ${resultados.length} subidas verticales a toda potencia`;
+        } else if (query === 'AGOTADO') {
+            saludo.innerText = `⚠️ Mostrando ${resultados.length} activos agotándose en máximos`;
+        } else {
+            saludo.innerText = `🔍 Encontré ${resultados.length} coincidencia${resultados.length !== 1 ? 's' : ''} para "${query}"`;
+        }
     }
 }
 
@@ -3721,116 +3746,7 @@ async function actualizarEMASimbolo(symbol) {
 
         const alineadasAlcista = ema7 > ema25 && ema25 > ema99 && ema7 > ema7Prev && ema25 > ema25Prev;
 
-        // ── BANDAS DE BOLLINGER (20 períodos, 2σ) ──────────────────────
-        const BB_PERIODO = 20;
-        const bb_serie = cierres.slice(-BB_PERIODO);
-        const bb_media = bb_serie.reduce((a,b)=>a+b,0) / BB_PERIODO;
-        const bb_desv  = Math.sqrt(bb_serie.reduce((a,b)=>a+(b-bb_media)**2,0) / BB_PERIODO);
-        const bb_upper = bb_media + 2 * bb_desv;
-        const bb_lower = bb_media - 2 * bb_desv;
-        const bb_ancho = bb_desv > 0 ? ((bb_upper - bb_lower) / bb_media * 100) : 0;
-        // Posición del precio dentro de las bandas (0=banda inferior, 100=banda superior)
-        const bb_posicion = bb_upper > bb_lower ? ((precioActual - bb_lower) / (bb_upper - bb_lower) * 100) : 50;
-        const bb_estado = bb_posicion >= 95 ? 'SOBRECOMPRADO BB' : bb_posicion <= 5 ? 'SOBREVENDIDO BB' : bb_posicion >= 80 ? 'CERCA BANDA ALTA' : bb_posicion <= 20 ? 'CERCA BANDA BAJA' : 'DENTRO DE BANDAS';
-
-        // ── MACD (12/26/9 sobre cierres 1h) ───────────────────────────
-        function _ema(arr, p) { // helper local
-            const k = 2/(p+1); let v = arr[0];
-            for (let i=1;i<arr.length;i++) v = arr[i]*k + v*(1-k);
-            return v;
-        }
-        function _emaSerie(arr, p) {
-            const k = 2/(p+1); const out=[arr[0]];
-            for(let i=1;i<arr.length;i++) out.push(arr[i]*k+out[out.length-1]*(1-k));
-            return out;
-        }
-        // Necesitamos series para calcular la señal MACD (9 períodos de la diferencia)
-        const macd_fast_serie = _emaSerie(cierres, 12);
-        const macd_slow_serie = _emaSerie(cierres, 26);
-        const macd_linea_serie = macd_fast_serie.map((v,i) => v - macd_slow_serie[i]);
-        const macd_signal_serie = _emaSerie(macd_linea_serie, 9);
-        const macd_linea   = macd_linea_serie[macd_linea_serie.length-1];
-        const macd_signal  = macd_signal_serie[macd_signal_serie.length-1];
-        const macd_histo   = macd_linea - macd_signal;
-        const macd_histo_prev = macd_linea_serie[macd_linea_serie.length-2] - macd_signal_serie[macd_signal_serie.length-2];
-        // Detectar cruce
-        let macd_cruce = 'SIN CRUCE';
-        if (macd_histo > 0 && macd_histo_prev <= 0) macd_cruce = '🟢 CRUCE ALCISTA (MACD cruzó señal al alza)';
-        else if (macd_histo < 0 && macd_histo_prev >= 0) macd_cruce = '🔴 CRUCE BAJISTA (MACD cruzó señal a la baja)';
-        else if (macd_histo > 0) macd_cruce = '🟢 MACD sobre señal (momentum alcista)';
-        else macd_cruce = '🔴 MACD bajo señal (momentum bajista)';
-
-        // ── ATR (True Range promedio 14 períodos) ──────────────────────
-        const ATR_P = 14;
-        const atr_klines_raw = klines.slice(-(ATR_P + 1));
-        let atr_sum = 0;
-        for (let i = 1; i < atr_klines_raw.length; i++) {
-            const hi  = parseFloat(atr_klines_raw[i][2]);
-            const lo  = parseFloat(atr_klines_raw[i][3]);
-            const pcp = parseFloat(atr_klines_raw[i-1][4]);
-            atr_sum += Math.max(hi - lo, Math.abs(hi - pcp), Math.abs(lo - pcp));
-        }
-        const atr = atr_sum / ATR_P;
-        const atr_pct = precioActual > 0 ? (atr / precioActual * 100) : 0;
-        const atr_estado = atr_pct > 3 ? '🔥 VOLATILIDAD EXTREMA' : atr_pct > 1.5 ? '⚡ VOLATILIDAD ALTA' : atr_pct > 0.7 ? '📊 VOLATILIDAD NORMAL' : '😴 BAJA VOLATILIDAD';
-
-        // ── PUNTOS PIVOTE (sobre la última vela completa de 1h como proxy del día) ──
-        // Usamos las últimas 24 velas (1 día aprox) para high/low/close del "día anterior"
-        const piv_klines = klines.slice(-25, -1); // 24 velas del período anterior
-        const piv_H = Math.max(...piv_klines.map(k=>parseFloat(k[2])));
-        const piv_L = Math.min(...piv_klines.map(k=>parseFloat(k[3])));
-        const piv_C = parseFloat(piv_klines[piv_klines.length-1][4]);
-        const PP  = (piv_H + piv_L + piv_C) / 3;
-        const R1  = 2*PP - piv_L;
-        const R2  = PP + (piv_H - piv_L);
-        const R3  = piv_H + 2*(PP - piv_L);
-        const S1  = 2*PP - piv_H;
-        const S2  = PP - (piv_H - piv_L);
-        const S3  = piv_L - 2*(piv_H - PP);
-        // ¿El precio está sobre o bajo el Punto Pivote central?
-        const piv_posicion = precioActual >= PP ? '🟢 SOBRE PP (zona alcista)' : '🔴 BAJO PP (zona bajista)';
-
-        // ── CONFLUENCIA FIBONACCI + OTROS NIVELES ─────────────────────
-        // Los niveles de Fibonacci se calculan igual que en _iaCalcularFibonacci pero con los datos de klines
-        const fib_H = Math.max(...cierres.slice(-24));  // high 24h de cierres
-        const fib_L = Math.min(...cierres.slice(-24));  // low 24h de cierres
-        const fib_D = fib_H - fib_L;
-        const fib_niveles = fib_D > 0 ? {
-            r236: fib_H - fib_D*0.236, r382: fib_H - fib_D*0.382,
-            r500: fib_H - fib_D*0.500, r618: fib_H - fib_D*0.618, r786: fib_H - fib_D*0.786
-        } : null;
-        // Detectar confluencias: nivel Fibonacci que coincide (±0.3%) con Pivote o Bollinger
-        let confluencias = [];
-        if (fib_niveles) {
-            const todos_niveles = [
-                { nombre:'S1', val: S1 }, { nombre:'S2', val: S2 },
-                { nombre:'R1', val: R1 }, { nombre:'R2', val: R2 }, { nombre:'PP', val: PP },
-                { nombre:'BB Inf', val: bb_lower }, { nombre:'BB Sup', val: bb_upper },
-            ];
-            Object.entries(fib_niveles).forEach(([fk, fv]) => {
-                todos_niveles.forEach(({nombre, val}) => {
-                    const diff_pct = Math.abs(fv - val) / (val||1) * 100;
-                    if (diff_pct < 0.5) confluencias.push(`Fib ${fk} ≈ ${nombre} ($${fv.toFixed(6)})`);
-                });
-            });
-        }
-        const confluencias_texto = confluencias.length ? confluencias.join(' | ') : 'Sin confluencias detectadas';
-
-        datosEMA[symbol] = {
-            ema7, ema25, ema99, ema7Prev, ema25Prev, ema99Prev,
-            minimo48h, subidaDesdeMinimo, alineadasAlcista,
-            // Bollinger
-            bb_upper, bb_lower, bb_media, bb_ancho, bb_posicion, bb_estado,
-            // MACD
-            macd_linea, macd_signal, macd_histo, macd_cruce,
-            // ATR
-            atr, atr_pct, atr_estado,
-            // Pivotes
-            PP, R1, R2, R3, S1, S2, S3, piv_posicion,
-            // Confluencia Fib
-            confluencias_texto,
-            actualizado: Date.now()
-        };
+        datosEMA[symbol] = { ema7, ema25, ema99, ema7Prev, ema25Prev, ema99Prev, minimo48h, subidaDesdeMinimo, alineadasAlcista, actualizado: Date.now() };
     } catch (e) {
         // silencioso: si falla un símbolo puntual, simplemente no se actualiza este ciclo
     }
@@ -4032,7 +3948,7 @@ async function obtenerDatosBinance() {
         
         data.forEach(item => {
             const precio = parseFloat(item.lastPrice);
-            if(!item.symbol.endsWith("USDT") || precio < 0.010 || precio > 50.00){ return; } // rango de trabajo: 0.010 a 50 USDT
+            if(!item.symbol.endsWith("USDT")){ return; } // solo pares USDT — sin filtro de precio
             if(!esFuturoUSDTMValido(item.symbol)){ return; } // solo monedas con contrato real en Binance Futures USDT-M
             
             let change = parseFloat(item.priceChangePercent);
@@ -4087,14 +4003,10 @@ async function obtenerDatosBinance() {
             
             let enZonaAlta = (posicionPorcentaje >= 80.0); 
             let enZonaBaja = (posicionPorcentaje <= 20.0);
-            // Monedas tipo ESPORTS: precio bajo + rango amplio → umbral de volumen reducido
+            // Sin filtro de volumen mínimo — todas las monedas de Binance Futures USDT-M son válidas
             const esPerfilExplosivo = precio < 0.10 && rangoPct24h >= 10;
-            let esMonedaRapida = esPerfilExplosivo
-                ? (parseFloat(item.quoteVolume) > 5000000)   // 5M es suficiente para monedas micro
-                : (parseFloat(item.quoteVolume) > 15000000);
-            let volumenFuerte = esPerfilExplosivo
-                ? (parseFloat(item.quoteVolume) > 15000000)  // 15M = fuerte para moneda micro
-                : (parseFloat(item.quoteVolume) > 30000000);
+            let esMonedaRapida = true;  // todas pasan — los motores IA sacan sus propias conclusiones
+            let volumenFuerte = parseFloat(item.quoteVolume) > 15000000; // solo para badges especiales
 
             // ── HISTORIAL DE VELOCIDAD para detectar aceleración sostenida ──
             if (!historialVelocidad[item.symbol]) historialVelocidad[item.symbol] = [];
@@ -4640,6 +4552,17 @@ function seleccionarMoneda(symbol) {
     // Ocultar pantalla de presentación al hacer click por primera vez en una moneda
     const bienvenida = document.getElementById("bienvenidaScreen");
     if (bienvenida) bienvenida.style.display = "none";
+
+    // PRIORIDAD INMEDIATA: si la moneda no tiene EMAs calculadas todavía
+    // (porque aún no le tocó en la cola rotativa), calcularlas ahora mismo
+    // antes de activar la IA, para que tenga todos los datos disponibles.
+    if (!datosEMA[symbol]) {
+        actualizarEMASimbolo(symbol).then(() => {
+            calcularPrediccionCDC(symbol);
+            actualizarPanelCentral();
+            actualizarTacometroDerecho();
+        });
+    }
 
     calcularPrediccionCDC(symbol);
     actualizarTablaIzquierda();
@@ -7683,30 +7606,7 @@ function _iaConstruirPrompt(motor, snap) {
     if (snap.posicion <= 20 && snap.ciclosSubiendo >= 2) sospechas.push('🟢 Suelo + ciclos alcistas = posible rebote en curso');
     if (snap.rsi !== null && snap.rsi < 30 && snap.posicion <= 30) sospechas.push('🎯 RSI sobrevendido en zona baja = zona de compra fuerte');
     if (snap.subidaDesdeMin48 >= 15 && emaAlineadas.includes('ALCISTAS')) sospechas.push('🚀 EMA alineadas + +15% desde mín48h = DESPEGUE REAL confirmado');
-    // ── Sospechas con nuevos indicadores técnicos ──────────────────
-    if (snap.bb_posicion != null && snap.bb_posicion >= 95) sospechas.push('🔴 Precio toca Banda de Bollinger Superior = posible rebote bajista');
-    if (snap.bb_posicion != null && snap.bb_posicion <= 5)  sospechas.push('🟢 Precio toca Banda de Bollinger Inferior = posible rebote alcista');
-    if (snap.macd_cruce && snap.macd_cruce.includes('CRUCE BAJISTA')) sospechas.push('📉 MACD cruzó la señal a la baja = momentum bajista confirmado');
-    if (snap.macd_cruce && snap.macd_cruce.includes('CRUCE ALCISTA')) sospechas.push('📈 MACD cruzó la señal al alza = momentum alcista confirmado');
-    if (snap.atr_pct != null && snap.atr_pct > 3 && snap.posicion >= 70) sospechas.push('🔥 Volatilidad extrema (ATR) en zona alta = riesgo de reversión violenta');
-    if (snap.piv_posicion && snap.piv_posicion.includes('BAJO PP') && snap.rsi !== null && snap.rsi < 40) sospechas.push('⚠️ Precio bajo el Punto Pivote + RSI bajo = presión bajista dominante');
-    if (snap.confluencias && !snap.confluencias.includes('Sin confluencias') && snap.posicion <= 30) sospechas.push('🔗 Confluencia técnica detectada en zona baja = soporte fuerte (alta probabilidad de rebote)');
     const sospechasTexto = sospechas.length > 0 ? sospechas.join('\n') : '(sin señales de alerta especiales)';
-
-    // ── Preparar textos de los nuevos estudios técnicos ──────────────
-    const bbTexto = snap.bb_upper
-        ? `BB Superior: $${snap.bb_upper?.toFixed(6)} | Media: $${snap.bb_media?.toFixed(6)} | Inferior: $${snap.bb_lower?.toFixed(6)} | Posición: ${snap.bb_posicion?.toFixed(0)}% → ${snap.bb_estado} | Amplitud: ${snap.bb_ancho?.toFixed(2)}%`
-        : '(calculando…)';
-    const macdTexto = snap.macd_linea != null
-        ? `Línea MACD: ${snap.macd_linea?.toFixed(6)} | Señal: ${snap.macd_signal?.toFixed(6)} | Histograma: ${snap.macd_histo?.toFixed(6)} → ${snap.macd_cruce}`
-        : '(calculando…)';
-    const atrTexto = snap.atr != null
-        ? `ATR(14): $${snap.atr?.toFixed(6)} (${snap.atr_pct?.toFixed(2)}% del precio) → ${snap.atr_estado}`
-        : '(calculando…)';
-    const pivTexto = snap.piv_PP != null
-        ? `PP: $${snap.piv_PP?.toFixed(6)} | R1: $${snap.piv_R1?.toFixed(6)} | R2: $${snap.piv_R2?.toFixed(6)} | S1: $${snap.piv_S1?.toFixed(6)} | S2: $${snap.piv_S2?.toFixed(6)} → ${snap.piv_posicion}`
-        : '(calculando…)';
-    const confTexto = snap.confluencias || '(calculando…)';
 
     const base = `Eres TECNOBOT, el mejor analista de criptomonedas del mundo. Tu trabajo: dar un veredicto CONCRETO sobre si COMPRAR / VENDER / ESPERAR en este momento exacto. Máximo 5 oraciones DIRECTAS. Sin saludos. En ESPAÑOL. Emojis estratégicos.
 
@@ -7728,28 +7628,21 @@ function _iaConstruirPrompt(motor, snap) {
 🌊 MODO MERCADO GLOBAL: ${snap.modoMercado?.toUpperCase()}
 ⚠️ SEÑALES DE SOSPECHA DETECTADAS:
 ${sospechasTexto}
-
-━━━ ESTUDIOS TÉCNICOS AVANZADOS (calculados sobre historial real 1h) ━━━
-🎯 BANDAS DE BOLLINGER (20p, 2σ): ${bbTexto}
-⚡ MACD (12/26/9): ${macdTexto}
-🌡️ ATR — VOLATILIDAD REAL: ${atrTexto}
-📍 PUNTOS PIVOTE (período 24h anterior): ${pivTexto}
-🔗 CONFLUENCIAS Fibonacci+Pivotes+Bollinger: ${confTexto}
 ════════════════════════════════════════════════
 
 INSTRUCCIÓN FINAL: Analiza TODO lo anterior. Detecta si hay SOSPECHA DE CAÍDA (trampa, agotamiento, distribución) o SOSPECHA DE SUBIDA (rebote, despegue, acumulación). Da tu veredicto final obligatoriamente así:
 ▶ VEREDICTO: [COMPRAR 🟢 / VENDER 🔴 / ESPERAR ⚪] — [razón en 6 palabras máximo]`;
 
     const perspectivas = {
-        tecnico: `${base}\n\nPERSPECTIVA — TÉCNICO PURO:\nAnaliza RSI (${snap.rsi?.toFixed(0) || 'N/D'}), EMAs (${emaAlineadas.split('—')[0].trim()}), Bandas de Bollinger (${snap.bb_estado || 'N/D'}), MACD (${snap.macd_cruce || 'N/D'}), posición ${snap.posicion?.toFixed(0)}% del rango 24h y ciclos (${snap.ciclosSubiendo}↑/${snap.ciclosBajando}↓). ¿El MACD confirma o contradice el RSI? ¿El precio está en las bandas de Bollinger como zona de soporte/resistencia? ¿Las EMAs y el MACD están alineados o divergentes? Detecta SOSPECHA DE CAÍDA (techo técnico) o DESPEGUE (suelo técnico). Sé brutal y directo.`,
-
-        alcista: `${base}\n\nPERSPECTIVA — CASO ALCISTA:\n¿Por qué PODRÍA SUBIR ${snap.nombre} ahora? Considera: posición ${snap.posicion?.toFixed(0)}% del rango (${posLabel}), RSI ${snap.rsi?.toFixed(0) || 'N/D'} (${rsiEstado}), MACD (${snap.macd_cruce || 'N/D'}), Bollinger posición ${snap.bb_posicion?.toFixed(0) || 'N/D'}% (${snap.bb_estado || 'N/D'}), Punto Pivote ${snap.piv_posicion || 'N/D'}, subida desde mín48h: ${subida48Label}. ¿Hay confluencia de señales alcistas? ¿El precio está en soporte clave (Bollinger inferior, S1, S2, Fibonacci 61.8%)? Si hay señal real, di CUÁNDO entrar y POR QUÉ. Si NO hay señal, sé honesto y di ESPERAR.`,
-
-        bajista: `${base}\n\nPERSPECTIVA — CASO BAJISTA / RIESGO:\n¿Hay SEÑALES DE CAÍDA PRÓXIMA en ${snap.nombre}? Analiza: posición en Bollinger (${snap.bb_estado || 'N/D'} al ${snap.bb_posicion?.toFixed(0) || '?'}%), MACD (${snap.macd_cruce || 'N/D'}), ATR de volatilidad (${snap.atr_estado || 'N/D'}), resistencias en Pivotes R1=$${snap.piv_R1?.toFixed(4) || '?'}/R2=$${snap.piv_R2?.toFixed(4) || '?'}. ¿Está tocando resistencia técnica múltiple (Bollinger + Pivote + Fibonacci)? ¿El MACD sugiere agotamiento? Detecta TRAMPA ALCISTA, DISTRIBUCIÓN o INICIO DE CAÍDA real. Si hay riesgo real, di VENDER.`,
-
-        volumen: `${base}\n\nPERSPECTIVA — VOLUMEN Y LIQUIDEZ:\nVolumen 24H: $${(snap.volume/1000000)?.toFixed(2)}M. ¿El volumen CONFIRMA o CONTRADICE el movimiento? Volatilidad ATR: ${snap.atr_estado || 'N/D'} (${snap.atr_pct?.toFixed(2) || '?'}% del precio). ¿La amplitud de las Bandas de Bollinger (${snap.bb_ancho?.toFixed(2) || '?'}%) indica expansión (breakout real) o compresión (movimiento falso próximo)? ¿Hay señal de ACUMULACIÓN o DISTRIBUCIÓN con este contexto de volatilidad y volumen? ¿El ATR soporta el tamaño del movimiento?`,
-
-        correlacion: `${base}\n\nPERSPECTIVA — CORRELACIÓN Y CONTEXTO:\n${btcEthLabel} | Modo: ${snap.modoMercado?.toUpperCase()}. ¿${snap.nombre} se mueve CON el mercado o en CONTRA? Confluencias técnicas detectadas: ${confTexto}. ¿El precio está cerca de una zona de confluencia (Fibonacci + Pivote + Bollinger) que actúe como soporte o resistencia fuerte? Score CDC: ${scoreLabel}. ¿El contexto macro APOYA o CONTRADICE la lectura técnica de las confluencias? ¿Hay señal de sospecha cruzando correlación + indicadores?`,
+        tecnico: `${base}\n\nPERSPECTIVA — TÉCNICO PURO:\nAnaliza RSI (${snap.rsi?.toFixed(0) || 'N/D'}), EMAs (${emaAlineadas.split('—')[0].trim()}), posición ${snap.posicion?.toFixed(0)}% del rango 24h, ciclos (${snap.ciclosSubiendo}↑/${snap.ciclosBajando}↓) y velocidad (${velLabel}). ¿Hay divergencia RSI-precio? ¿Las EMAs confirman o contradicen el precio? ¿La estructura técnica es alcista, bajista o trampa? Detecta si hay SOSPECHA DE CAÍDA (techo) o DESPEGUE (suelo). Sé brutal y directo.`,
+        
+        alcista: `${base}\n\nPERSPECTIVA — CASO ALCISTA:\n¿Por qué PODRÍA SUBIR ${snap.nombre} ahora? Considera: posición ${snap.posicion?.toFixed(0)}% del rango (${posLabel}), RSI ${snap.rsi?.toFixed(0) || 'N/D'} (${rsiEstado}), subida desde mín48h: ${subida48Label}, ciclos alcistas ${snap.ciclosSubiendo}/5, velocidad ${velLabel}. Si hay señal real de compra, di CUÁNDO entrar y POR QUÉ. Si NO hay señal, sé honesto y di ESPERAR. No inventes señales que no existen.`,
+        
+        bajista: `${base}\n\nPERSPECTIVA — CASO BAJISTA / RIESGO:\n¿Hay SEÑALES DE CAÍDA PRÓXIMA en ${snap.nombre}? Analiza: ¿está en techo (${snap.posicion?.toFixed(0)}%)? RSI: ${snap.rsi?.toFixed(0) || 'N/D'} (${rsiEstado}). ¿Hay agotamiento de impulso? ¿BTC/ETH arrastrando?: ${btcEthLabel}. ¿Velocidad frenando?: ${velLabel}. Detecta si hay TRAMPA ALCISTA (sube pero va a caer), DISTRIBUCIÓN (venta oculta) o INICIO DE CAÍDA real. Si hay riesgo real, di VENDER. Si no hay señal bajista, di ESPERAR.`,
+        
+        volumen: `${base}\n\nPERSPECTIVA — VOLUMEN Y LIQUIDEZ:\nVolumen 24H: $${(snap.volume/1000000)?.toFixed(2)}M. ¿Es alto o bajo para ${snap.nombre} en este momento? ¿El volumen CONFIRMA o CONTRADICE el movimiento del precio (${snap.cambio2min > 0 ? '+' : ''}${snap.cambio2min?.toFixed(2)}% en 2min)? ¿Hay señal de ACUMULACIÓN (compra institucional silenciosa) o DISTRIBUCIÓN (venta oculta en picos)? ¿El volumen soporta una entrada ahora o hay riesgo de manipulación/trampa? Veredicto basado solo en lo que dice el volumen.`,
+        
+        correlacion: `${base}\n\nPERSPECTIVA — CORRELACIÓN Y CONTEXTO:\n${btcEthLabel} | Modo: ${snap.modoMercado?.toUpperCase()}. ¿${snap.nombre} se mueve CON el mercado o en CONTRA? Si BTC/ETH caen y ${snap.nombre} todavía no reacciona: ¿es resiliente o trampa? Si el mercado sube y ${snap.nombre} está quieta o baja: ¿rezagada (oportunidad) o distribución (trampa)? Score CDC: ${scoreLabel}. ¿El contexto macro APOYA o CONTRADICE entrar ahora? Detecta señales de sospecha cruzando todos los datos.`,
     };
     return perspectivas[motor.id] || base;
 }
@@ -7804,30 +7697,6 @@ function _iaTomarSnapshot(symbol) {
         modoMercado:      modoMercado || 'alcista',
         cerebroEstado:    cerebroCDC ? cerebroCDC[symbol] : 'N/D',
         senalActiva:      senalCDC   ? senalCDC[symbol]   : 'N/D',
-        // ── Estudios técnicos avanzados ──────────────────────────────
-        // Bandas de Bollinger (20p, 2σ, sobre cierres 1h)
-        bb_upper:         e?.bb_upper,
-        bb_lower:         e?.bb_lower,
-        bb_media:         e?.bb_media,
-        bb_ancho:         e?.bb_ancho,    // % de amplitud respecto a precio
-        bb_posicion:      e?.bb_posicion, // 0=banda baja, 100=banda alta
-        bb_estado:        e?.bb_estado,
-        // MACD (12/26/9, cierres 1h)
-        macd_linea:       e?.macd_linea,
-        macd_signal:      e?.macd_signal,
-        macd_histo:       e?.macd_histo,
-        macd_cruce:       e?.macd_cruce,
-        // ATR – Volatilidad real (14p, cierres 1h)
-        atr:              e?.atr,
-        atr_pct:          e?.atr_pct,
-        atr_estado:       e?.atr_estado,
-        // Puntos Pivote clásicos (período 24h anterior)
-        piv_PP:           e?.PP,
-        piv_R1:           e?.R1,  piv_R2:  e?.R2,  piv_R3:  e?.R3,
-        piv_S1:           e?.S1,  piv_S2:  e?.S2,  piv_S3:  e?.S3,
-        piv_posicion:     e?.piv_posicion,
-        // Confluencia Fibonacci + Pivotes + Bollinger
-        confluencias:     e?.confluencias_texto,
     };
 }
 
@@ -8004,7 +7873,17 @@ setTimeout(() => {
         const _orig = seleccionarMoneda;
         window.seleccionarMoneda = function(symbol) {
             _orig(symbol);
-            setTimeout(() => _iaActivarParaMoneda(symbol), 600);
+            // Si la moneda no tiene EMAs todavía (monedas nuevas como ESPORTS, HEI, etc.),
+            // calcularlas primero y DESPUÉS arrancar la IA con datos completos.
+            if (!datosEMA[symbol]) {
+                actualizarEMASimbolo(symbol).then(() => {
+                    _iaActivarParaMoneda(symbol);
+                }).catch(() => {
+                    _iaActivarParaMoneda(symbol); // arrancar igual aunque falle EMA
+                });
+            } else {
+                setTimeout(() => _iaActivarParaMoneda(symbol), 600);
+            }
         };
     }
     // Si ya hay una moneda seleccionada, activar IA para ella
