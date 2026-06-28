@@ -1295,13 +1295,53 @@ let cachedData = {};
 // ══════════════════════════════════════════════════════════════════
 let memoriaIA = JSON.parse(localStorage.getItem("cdc_memoria_v2") || "[]");
 
+// ── Índice por símbolo para acceso O(1) ──────────────────────────────
+// Antes, cada lugar que necesitaba el historial de una moneda hacía
+// memoriaIA.filter(x => x.symbol === symbol), recorriendo TODO el arreglo
+// (que puede tener miles de registros) una y otra vez, varias veces por
+// segundo y por cada moneda. Con cientos de monedas eso es lo que
+// generaba el lag. Ahora cada moneda tiene su propio arreglo dentro de
+// este índice — el ÚNICO lugar donde se guardan los registros — así
+// nunca hay que recorrer ni recortar un arreglo gigante compartido.
+let _memIndice = {};
+memoriaIA.forEach(r => {
+    (_memIndice[r.symbol] || (_memIndice[r.symbol] = [])).push(r);
+});
+memoriaIA = null; // ya no se usa como arreglo plano en memoria, solo al guardar (ver abajo)
+
+// Acceso rápido al historial de una moneda (reemplaza memoriaIA.filter(...))
+function _histMoneda(symbol) {
+    return _memIndice[symbol] || [];
+}
+
+// ── Guardado en localStorage DIFERIDO ────────────────────────────────
+// Antes se hacía JSON.stringify(memoriaIA) + localStorage.setItem en
+// CADA registro aprendido. Con muchas monedas aprendiendo cada pocos
+// segundos, eso eran escrituras pesadas y constantes al disco que
+// bloqueaban el hilo principal → lag. Ahora se agenda como máximo
+// una escritura cada 5 segundos, y el arreglo plano para guardar se
+// construye solo en ese momento a partir del índice (nunca se mantiene
+// un arreglo plano gigante actualizándose en cada registro).
+let _memGuardarTimer = null;
+function _memGuardarDiferido() {
+    if (_memGuardarTimer) return;
+    _memGuardarTimer = setTimeout(() => {
+        _memGuardarTimer = null;
+        try {
+            const planos = [];
+            for (const sym in _memIndice) { for (const r of _memIndice[sym]) planos.push(r); }
+            localStorage.setItem("cdc_memoria_v2", JSON.stringify(planos));
+        } catch(e) {}
+    }, 5000);
+}
+
 function _iaAprenderMoneda(c) {
     const pred  = prediccionCDC[c.symbol] || {};
     const e48   = datosEMA[c.symbol]      || {};
     const infl  = btcEthInfluencia[c.symbol] || {};
     const hora  = new Date().getHours();
 
-    memoriaIA.push({
+    const nuevo = {
         symbol:        c.symbol,
         ts:            Date.now(),
         hora,
@@ -1322,11 +1362,19 @@ function _iaAprenderMoneda(c) {
         alAgotamiento: c.alertaAgotamientoSubida || false,
         vol:           c.volume || 0,
         score:         pred.score || 0,
-    });
+    };
 
-    // Máximo 2000 registros globales
-    if (memoriaIA.length > 2000) memoriaIA.shift();
-    try { localStorage.setItem("cdc_memoria_v2", JSON.stringify(memoriaIA)); } catch(e) {}
+    const arrSym = (_memIndice[c.symbol] || (_memIndice[c.symbol] = []));
+    arrSym.push(nuevo);
+
+    // ── Límite POR MONEDA (no global) ──────────────────────────────
+    // Cada moneda conserva sus propios últimos N registros, sin afectar
+    // a las demás (antes un tope global borraba el historial de monedas
+    // poco activas cuando otras eran muy activas).
+    const MAX_POR_SYMBOL = 80; // 80 registros × ~6-10s ≈ 8-13 min de historial por moneda
+    if (arrSym.length > MAX_POR_SYMBOL) arrSym.shift(); // O(1)-ish, arreglo pequeño y propio de esta moneda
+
+    _memGuardarDiferido();
 
     // También aprender cada 10 segundos mientras la moneda está seleccionada
     if (typeof selectedCoin !== 'undefined' && selectedCoin === c.symbol) {
@@ -1343,7 +1391,7 @@ let _memoriaAutoTimer = null;
 // Usa la memoria histórica + datos en tiempo real para dar un
 // veredicto claro: VALE / DUDOSA / EVITAR para LONG y SHORT
 function _memoriaScoreMoneda(symbol) {
-    const hist = memoriaIA.filter(x => x.symbol === symbol);
+    const hist = _histMoneda(symbol);
     const c    = cachedData[symbol];
     if (!c) return null;
 
@@ -1414,7 +1462,7 @@ function _memoriaScoreMoneda(symbol) {
 }
 
 function _iaAnalizarPatron(symbol) {
-    const hist = memoriaIA.filter(x => x.symbol === symbol);
+    const hist = _histMoneda(symbol);
     const n = hist.length;
     if (n < 3) return `<span style="color:#475569;">📚 Aprendiendo... (${n}/3 registros mínimos)</span>`;
 
@@ -5546,7 +5594,7 @@ function actualizarPanelCentral() {
                 <div style="font-size:11px; font-weight:900; color:#0ecb81; text-transform:uppercase; letter-spacing:1px;">🧠 MEMORIA IA — PATRÓN HISTÓRICO</div>
                 <div style="display:flex;align-items:center;gap:6px;">
                     <span style="font-size:9px;background:rgba(14,203,129,0.15);color:#0ecb81;padding:2px 7px;border-radius:10px;font-weight:700;">
-                        ${memoriaIA.filter(x=>x.symbol===selectedCoin).length} registros
+                        ${_histMoneda(selectedCoin).length} registros
                     </span>
                     <span style="font-size:11px;color:#0ecb81;transition:transform 0.25s;transform:${window._memoriaIaAbierta ? 'rotate(180deg)' : 'rotate(0deg)'};">▾</span>
                 </div>
@@ -6548,7 +6596,7 @@ function _memoriaEstudiarCandidatas(listaPrioridadesActual) {
         const c = cachedData[p.symbol];
         if (!c) return;
         // Controlar ritmo: no más de 1 registro por moneda cada 6 segundos
-        const hist = memoriaIA.filter(x => x.symbol === p.symbol);
+        const hist = _histMoneda(p.symbol);
         const ultimo = hist.length > 0 ? hist[hist.length - 1].ts : 0;
         if (Date.now() - ultimo < 6000) return; // ya fue registrada hace menos de 6s
         _iaAprenderMoneda(c);
@@ -6564,7 +6612,7 @@ function _iaCarruselClick(lado) {
 
 // ── Calcula % de caída histórica probable y % de subida histórica probable ──
 function _memoriaCalcMovimientoHistorico(symbol) {
-    const hist = memoriaIA.filter(x => x.symbol === symbol);
+    const hist = _histMoneda(symbol);
     if (hist.length < 3) return null;
 
     // Subidas: cuando vel2m > 0
@@ -6587,8 +6635,15 @@ function _memoriaCalcMovimientoHistorico(symbol) {
 }
 
 function _actualizarCarruselIA(listaPrioridadesActual) {
-    // ── PASO 1: Estudiar automáticamente TODAS las candidatas ──
-    _memoriaEstudiarCandidatas(listaPrioridadesActual);
+    // ── PASO 1: Estudiar TODAS las monedas en cache, no solo las que ya
+    // muestran una señal fuerte. Antes solo se estudiaban las que ya estaban
+    // en listaPrioridadesActual (BOMBA/DERRUMBE/DESPEGUE/etc.), así que una
+    // moneda "tranquila" nunca acumulaba registros y se quedaba parada para
+    // siempre en "Aprendiendo... 0/3". Ahora cualquier moneda con datos en
+    // cachedData entra al ciclo de aprendizaje (sigue limitado a 1 registro
+    // cada 6s por moneda dentro de _memoriaEstudiarCandidatas).
+    const todasLasMonedas = Object.keys(cachedData).map(symbol => ({ symbol }));
+    _memoriaEstudiarCandidatas(todasLasMonedas);
 
     // ── PASO 2: Filtrar con MEMORIA — solo pasan las que tienen certeza ──
     const _UMBRAL_MOV_2M   = 0.08;
@@ -6606,7 +6661,7 @@ function _actualizarCarruselIA(listaPrioridadesActual) {
         if (!enMovimiento && !señalFuerte) return false;
 
         // ── FILTRO MEMORIA: verificar certeza ──
-        const hist = memoriaIA.filter(x => x.symbol === p.symbol);
+        const hist = _histMoneda(p.symbol);
         const n = hist.length;
         if (n < _MEM_MIN_BASICA) return false; // sin suficientes datos → no aparece
 
@@ -6630,7 +6685,7 @@ function _actualizarCarruselIA(listaPrioridadesActual) {
         const enMovimiento = mov2m >= _UMBRAL_MOV_2M && mscore >= _UMBRAL_MOMENTUM;
         if (!enMovimiento && !señalFuerte) return false;
 
-        const hist = memoriaIA.filter(x => x.symbol === p.symbol);
+        const hist = _histMoneda(p.symbol);
         const n = hist.length;
         if (n < _MEM_MIN_BASICA) return false;
 
@@ -6670,7 +6725,7 @@ function _actualizarCarruselIA(listaPrioridadesActual) {
     if (lFoco) {
         const ms  = _memoriaScoreMoneda(lFoco.symbol);
         const mov = _memoriaCalcMovimientoHistorico(lFoco.symbol);
-        const n   = memoriaIA.filter(x => x.symbol === lFoco.symbol).length;
+        const n   = _histMoneda(lFoco.symbol).length;
         elLN.textContent = lFoco.symbol.replace('USDT','');
         elLS.textContent = _iaSubtexto(lFoco);
         if (elLE && ms && mov) {
@@ -6689,7 +6744,7 @@ function _actualizarCarruselIA(listaPrioridadesActual) {
     if (sFoco) {
         const ms  = _memoriaScoreMoneda(sFoco.symbol);
         const mov = _memoriaCalcMovimientoHistorico(sFoco.symbol);
-        const n   = memoriaIA.filter(x => x.symbol === sFoco.symbol).length;
+        const n   = _histMoneda(sFoco.symbol).length;
         elSN.textContent = sFoco.symbol.replace('USDT','');
         elSS.textContent = _iaSubtexto(sFoco);
         if (elSE && ms && mov) {
