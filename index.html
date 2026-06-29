@@ -5873,6 +5873,23 @@ function actualizarPanelCentral() {
             <div style="font-size:22px; font-weight:900; color:${colorCambio};">
                 ${c.change >= 0 ? '+' : ''}${c.change.toFixed(2)}% <span style="font-size:12px; color:#64748b; font-weight:600;">cambio 24h</span>
             </div>
+            ${(() => {
+                const pos = c.posicionPorcentaje || 0;
+                const pct = Math.min(100, Math.max(0, pos));
+                const barColor = pct >= 95 ? '#ff2a3b' : pct >= 85 ? '#f97316' : pct >= 70 ? '#f3ba2f' : pct <= 15 ? '#0ecb81' : '#64748b';
+                const alerta   = pct >= 95 ? '🔴 TECHO' : pct >= 85 ? '🟠 Zona alta' : pct <= 15 ? '🟢 SUELO' : '';
+                const alertaTxt = alerta ? `<span style="color:${barColor};font-weight:900;">${alerta} · </span>` : '';
+                return `<div style="margin-top:8px;padding:0 8px;">
+                    <div style="display:flex;justify-content:space-between;align-items:center;font-size:9px;color:#64748b;margin-bottom:3px;">
+                        <span>SUELO 0%</span>
+                        <span style="font-size:10px;">${alertaTxt}<span style="color:${barColor};font-weight:900;">Rango: ${pct.toFixed(1)}%</span></span>
+                        <span>TECHO 100%</span>
+                    </div>
+                    <div style="height:7px;background:linear-gradient(to right,#0ecb81,#f3ba2f,#ff2a3b);border-radius:4px;position:relative;overflow:visible;">
+                        <div style="position:absolute;top:-3px;left:calc(${pct}% - 6px);width:13px;height:13px;background:#fff;border:2.5px solid ${barColor};border-radius:50%;box-shadow:0 0 6px ${barColor};transition:left 0.5s;"></div>
+                    </div>
+                </div>`;
+            })()}
         </div>
 
         <!-- BLOQUE MEMORIA IA AVANZADA (colapsable) -->
@@ -6743,7 +6760,7 @@ function actualizarTacometroDerecho() {
             // Tipos LONG: REBOTE, REVERSION, PATRON_60_8, DESPEGUE (+ BOMBA en cualquier modo)
             // Tipos SHORT: DERRUMBE, AGOTADO (+ BOMBA en bajista) + REVERSION_SHORT de memoria
             const tiposLong  = new Set(['REBOTE','REVERSION','PATRON_60_8','DESPEGUE','BOMBA']);
-            const tiposShort = new Set(['DERRUMBE','AGOTADO','BOMBA','REVERSION_SHORT']);
+            const tiposShort = new Set(['DERRUMBE','AGOTADO','BOMBA','REVERSION_SHORT','TECHO_ALTO']);
             const tiposActivos = esLong ? tiposLong : tiposShort;
 
             // Filtrar listaPrioridadesGlobal según el modo activo — solo las monedas que la IA estudia
@@ -6752,7 +6769,7 @@ function actualizarTacometroDerecho() {
             if (!esLong && typeof _carruselShortList !== 'undefined') {
                 const yaEnSeñales = new Set(señalesIA.map(p => p.symbol));
                 const revShort = _carruselShortList
-                    .filter(p => p.tipo === 'REVERSION_SHORT' && !yaEnSeñales.has(p.symbol));
+                    .filter(p => (p.tipo === 'REVERSION_SHORT' || p.tipo === 'TECHO_ALTO') && !yaEnSeñales.has(p.symbol));
                 señalesIA = [...señalesIA, ...revShort];
             }
 
@@ -6798,6 +6815,15 @@ function actualizarTacometroDerecho() {
                     motorItems.push(`<div onclick="seleccionarMoneda('${s}')" style="display:flex;align-items:center;justify-content:space-between;padding:5px 8px;border-radius:7px;background:rgba(168,85,247,0.1);border-left:3px solid #a855f7;margin-bottom:4px;cursor:pointer;${borderActivo}" title="Llevar ${nombre} al panel central">
                         <span style="font-size:12px;font-weight:900;color:#a855f7;">🔄 ${nombre}${badgeActivo}</span>
                         <span style="font-size:10px;color:#d8b4fe;font-weight:700;">REV. SHORT · ${scoreLabel}</span>
+                    </div>`);
+                } else if (p.tipo === 'TECHO_ALTO') {
+                    const pos2 = (c2.posicionPorcentaje || 0).toFixed(1);
+                    const ms2  = (typeof _memoriaScoreMoneda === 'function') ? _memoriaScoreMoneda(s) : null;
+                    const scoreLabel = ms2 ? ` · ${ms2.scoreShort}/100` : '';
+                    const colorTecho = pos2 >= 95 ? '#ff2a3b' : '#f97316';
+                    motorItems.push(`<div onclick="seleccionarMoneda('${s}')" style="display:flex;align-items:center;justify-content:space-between;padding:5px 8px;border-radius:7px;background:rgba(255,42,59,0.08);border-left:3px solid ${colorTecho};margin-bottom:4px;cursor:pointer;${borderActivo}" title="Llevar ${nombre} al panel central">
+                        <span style="font-size:12px;font-weight:900;color:${colorTecho};">🔴 ${nombre}${badgeActivo}</span>
+                        <span style="font-size:10px;color:#fca5a5;font-weight:700;">TECHO ${pos2}%${scoreLabel}</span>
                     </div>`);
                 }
             });
@@ -6934,7 +6960,7 @@ let _carruselLongList  = [];
 let _carruselShortList = [];
 
 const _TIPO_LONG  = new Set(['BOMBA','DESPEGUE','REBOTE','REBOTE_RADAR','REVERSION','PATRON_60_8','MINIMO_24H','MOMENTUM']);
-const _TIPO_SHORT = new Set(['DERRUMBE','AGOTADO','TECHO_RADAR','MAXIMO_24H','REVERSION_SHORT']);
+const _TIPO_SHORT = new Set(['DERRUMBE','AGOTADO','TECHO_RADAR','MAXIMO_24H','REVERSION_SHORT','TECHO_ALTO']);
 
 // ── Cuántos registros necesita una moneda para "estar aprobada" ──
 // 5 registros × 8s = 40 segundos mínimo de observación
@@ -7076,8 +7102,27 @@ function _actualizarCarruselIA(listaPrioridadesActual) {
         return true;
     }).map(sym => ({ symbol: sym, tipo: 'REVERSION_SHORT' }));
 
-    // Mezclar: primero los SHORT de tendencia, luego los de reversión
-    _carruselShortList = [..._carruselShortList, ..._reversionCandidatas];
+    // ── SHORT DE TECHO: monedas en posición ≥ 85% con suficiente historial ──
+    const _yaEnShortFinal = new Set(_carruselShortList.map(p => p.symbol));
+    const _techoCandidatas = Object.keys(cachedData).filter(sym => {
+        if (_yaEnShortFinal.has(sym)) return false;
+        const c2 = cachedData[sym];
+        if (!c2) return false;
+        const pos = c2.posicionPorcentaje || 0;
+        if (pos < 85) return false;                          // solo zona alta
+        const hist = _histMoneda(sym);
+        if (hist.length < _MEM_MIN_BASICA) return false;
+        const ms = _memoriaScoreMoneda(sym);
+        if (!ms) return false;
+        if (ms.scoreShort < 40) return false;               // mínimo algo de score
+        const mov2m = Math.abs(c2.cambioReal2Min || 0);
+        if (mov2m < 0.03) return false;                     // necesita moverse
+        return true;
+    // Ordenar: primero las más cerca del techo
+    }).sort((a,b) => (cachedData[b].posicionPorcentaje||0) - (cachedData[a].posicionPorcentaje||0))
+      .map(sym => ({ symbol: sym, tipo: 'TECHO_ALTO' }));
+
+    _carruselShortList = [..._carruselShortList, ..._reversionCandidatas, ..._techoCandidatas];
 
     // NOTA: ya NO hay modo respaldo — solo se muestran monedas GANADORAS
     // (veredicto VALE ✅, score >= 65). Si no hay ninguna, el panel queda
