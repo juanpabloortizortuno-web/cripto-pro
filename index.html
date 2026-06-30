@@ -4687,7 +4687,7 @@ function actualizarTablaIzquierda() {
         });
     }
 
-    let grupoMaximo, grupoMinimo;
+    let grupoMaximo, grupoMinimo, grupoExplosivo;
 
     if (queryBusqueda !== '') {
         // Con búsqueda activa: mostramos TODAS las coincidencias de TODA la lista,
@@ -4695,7 +4695,26 @@ function actualizarTablaIzquierda() {
         ordenadas = ordenadas.filter(coincideFiltroBusqueda);
         grupoMaximo = ordenadas; // se usa solo para el conteo del encabezado
         grupoMinimo = [];
+        grupoExplosivo = [];
     } else {
+        // ── PRIORIDAD ABSOLUTA: monedas EN SU MÁXIMO de las 24H con subida >10% ──
+        // Estas van SIEMPRE primero en la lista. Se usan monedas desde el precio
+        // más bajo hasta 50 USDT (se excluyen las de precio mayor a 50 USDT para
+        // este grupo prioritario). No se quita ninguna moneda de la lista normal,
+        // solo se reordena para que estas aparezcan arriba de todo.
+        const UMBRAL_POSICION_MAXIMO = 98; // % de cercanía al máximo del rango 24h (≈ tocando el techo)
+        const CAMBIO_MINIMO_EXPLOSIVO = 10; // % de subida mínima exigida
+        const PRECIO_MAXIMO_EXPLOSIVO = 50; // USDT
+
+        grupoExplosivo = todas
+            .filter(c =>
+                c.posicionPorcentaje >= UMBRAL_POSICION_MAXIMO &&
+                c.change > CAMBIO_MINIMO_EXPLOSIVO &&
+                c.price > 0 &&
+                c.price <= PRECIO_MAXIMO_EXPLOSIVO
+            )
+            .sort((a, b) => b.change - a.change);
+
         // ── TABLA DE TRABAJO: siempre mostrar las monedas más cerca de su extremo 24h ──
         // En vez de un umbral fijo (que puede dar 0 resultados si el mercado está calmo),
         // se toman las N monedas más cercanas al máximo y las N más cercanas al mínimo,
@@ -4703,13 +4722,27 @@ function actualizarTablaIzquierda() {
         // siguen marcando con color fuerte más abajo; las demás se ven más sutiles.
         const TOP_N = 25;
 
-        let porMaximo = [...ordenadas].sort((a, b) => (b.posicionPorcentaje - a.posicionPorcentaje) || (b.change - a.change));
+        // 1) Primero identificamos el "pool" de monedas que están realmente cerca de su
+        //    máximo de 24h (esto NO cambia: sigue siendo el filtro por cercanía al techo).
+        let poolCercaDelMaximo = [...ordenadas].sort((a, b) => b.posicionPorcentaje - a.posicionPorcentaje).slice(0, TOP_N);
+
+        // 2) Pero dentro de ese pool, ya NO ordenamos por cercanía al máximo: ordenamos por
+        //    MAYOR % DE CAMBIO primero (las que más subieron), y como criterio de desempate
+        //    usamos que estén subiendo ahora mismo (cambioReal2Min) y luego la cercanía real
+        //    al techo. Así "lo máximo de lo máximo en cambios" queda arriba de todo.
+        let porMaximo = [...poolCercaDelMaximo].sort((a, b) =>
+            (b.change - a.change) ||
+            (b.cambioReal2Min - a.cambioReal2Min) ||
+            (b.posicionPorcentaje - a.posicionPorcentaje)
+        );
         let porMinimo = [...ordenadas].sort((a, b) => (a.posicionPorcentaje - b.posicionPorcentaje) || (a.change - b.change));
 
-        grupoMaximo = porMaximo.slice(0, TOP_N);
-        grupoMinimo = porMinimo.slice(0, TOP_N).filter(c => !grupoMaximo.includes(c)); // evitar duplicados si hay pocas monedas
+        // Se excluyen del grupo de máximo/mínimo las que ya van en el grupo explosivo,
+        // para no repetirlas dos veces en la lista.
+        grupoMaximo = porMaximo.filter(c => !grupoExplosivo.includes(c)).slice(0, TOP_N);
+        grupoMinimo = porMinimo.slice(0, TOP_N).filter(c => !grupoExplosivo.includes(c) && !grupoMaximo.includes(c)); // evitar duplicados si hay pocas monedas
 
-        ordenadas = [...grupoMaximo, ...grupoMinimo];
+        ordenadas = [...grupoExplosivo, ...grupoMaximo, ...grupoMinimo];
     }
 
     if (ordenadas.length === 0) {
@@ -4722,8 +4755,14 @@ function actualizarTablaIzquierda() {
 
 
     ordenadas.forEach((c, idx) => {
+        // Encabezado separador al inicio del grupo EXPLOSIVO (máximo 24h + subida >10%)
+        if (idx === 0 && grupoExplosivo && grupoExplosivo.length > 0) {
+            const trH = document.createElement('tr');
+            trH.innerHTML = `<td colspan="3" style="background:rgba(255,60,0,0.28); color:#fff; font-size:10px; font-weight:900; padding:6px 10px; letter-spacing:0.5px; animation:blinker-glow 0.8s linear infinite;">🚀🔥 AL MÁXIMO 24H + SUBIDA +10% (${grupoExplosivo.length})</td>`;
+            fragmento.appendChild(trH);
+        }
         // Encabezado separador al inicio del grupo de MÁXIMO (o de resultados de búsqueda)
-        if (idx === 0 && grupoMaximo.length > 0) {
+        if (idx === (grupoExplosivo ? grupoExplosivo.length : 0) && grupoMaximo.length > 0) {
             const trH = document.createElement('tr');
             trH.innerHTML = queryBusqueda !== ''
                 ? `<td colspan="3" style="background:rgba(243,186,47,0.15); color:#f3ba2f; font-size:10px; font-weight:900; padding:6px 10px; letter-spacing:0.5px;">🔍 RESULTADOS PARA "${queryBusqueda}" (${grupoMaximo.length})</td>`
@@ -4731,7 +4770,7 @@ function actualizarTablaIzquierda() {
             fragmento.appendChild(trH);
         }
         // Encabezado separador al inicio del grupo de MÍNIMO
-        if (idx === grupoMaximo.length && grupoMinimo.length > 0) {
+        if (idx === (grupoExplosivo ? grupoExplosivo.length : 0) + grupoMaximo.length && grupoMinimo.length > 0) {
             const trH = document.createElement('tr');
             trH.innerHTML = `<td colspan="3" style="background:rgba(14,203,129,0.15); color:#0ecb81; font-size:10px; font-weight:900; padding:6px 10px; letter-spacing:0.5px;">🟢 ZONA DE MÍNIMO 24H (${grupoMinimo.length})</td>`;
             fragmento.appendChild(trH);
@@ -4819,7 +4858,8 @@ function actualizarTablaIzquierda() {
         if (enMaximo24h && !subEtiqueta) {
             const scoreTecho = calcularScoreTecho(c);
             const colorRiesgo = scoreTecho >= 65 ? '#ff2a3b' : scoreTecho >= 45 ? '#ff6b00' : '#f3ba2f';
-            badgeMaxMin = `<span style="display:inline-flex;align-items:center;gap:3px;background:rgba(255,60,0,0.18);color:#ff3c00;font-size:9px;font-weight:900;padding:2px 7px;border-radius:6px;margin-top:3px;border:1px solid rgba(255,60,0,0.4);">🔴 MÁX 24H <span style="color:${colorRiesgo};margin-left:2px;">⚠️${scoreTecho}%</span></span>`;
+            const faltaParaMax = Math.max(0, 100 - Math.round(c.posicionPorcentaje));
+            badgeMaxMin = `<span style="display:inline-flex;align-items:center;gap:3px;background:rgba(255,60,0,0.18);color:#ff3c00;font-size:9px;font-weight:900;padding:2px 7px;border-radius:6px;margin-top:3px;border:1px solid rgba(255,60,0,0.4);">🔴 MÁX 24H <span style="color:${colorRiesgo};margin-left:2px;">⚠️${scoreTecho}%</span><span style="color:#f3ba2f;margin-left:4px;">🎯 Falta ${faltaParaMax}% p/ máx</span></span>`;
         } else if (enMinimo24h && !subEtiqueta) {
             badgeMaxMin = `<span style="display:inline-flex;align-items:center;gap:3px;background:rgba(14,203,129,0.15);color:#0ecb81;font-size:9px;font-weight:900;padding:2px 7px;border-radius:6px;margin-top:3px;border:1px solid rgba(14,203,129,0.4);">🟢 MÍN 24H · ZONA REBOTE</span>`;
         }
@@ -4846,9 +4886,13 @@ function actualizarTablaIzquierda() {
         let colorCambio = c.change > 0 ? "var(--accent-green)" : "var(--accent-glow)";
         // Calcular % de su máximo y % de su mínimo
         const pctDelMax = c.posicionPorcentaje.toFixed(0); // 100% = en el maximo exacto
-        const pctDelMin = (100 - c.posicionPorcentaje).toFixed(0); // 0% = en el minimo exacto
+        const pctDelMin = (100 - c.posicionPorcentaje).toFixed(0); // 0% = en el minimo exacto / también = % que falta para el máximo
         const colorPctMax = c.posicionPorcentaje >= 90 ? '#ff3c00' : c.posicionPorcentaje >= 75 ? '#f3ba2f' : '#94a3b8';
         const colorPctMin = c.posicionPorcentaje <= 10 ? '#0ecb81' : c.posicionPorcentaje <= 25 ? '#00b4d8' : '#94a3b8';
+        // En zona de máximo, la segunda pastilla se etiqueta como "FALTA p/ MÁX" (mismo número,
+        // pero dejando claro que es lo que falta para llegar al 100% del máximo de 24h).
+        const etiquetaSegundaPastilla = enMaximo24h ? 'FALTA p/ MÁX' : 'MIN';
+        const tituloSegundaPastilla = enMaximo24h ? '% que falta para llegar al máximo de 24h' : '% del mínimo 24h';
 
         tr.innerHTML = `
             <td style="font-weight:700;">
@@ -4858,7 +4902,7 @@ function actualizarTablaIzquierda() {
                 ${barraRango}
                 <div style="display:flex;gap:4px;margin-top:3px;">
                     <span style="font-size:9px;background:rgba(255,60,0,0.12);color:${colorPctMax};padding:1px 5px;border-radius:5px;font-weight:900;" title="% del maximo 24h">MAX: ${pctDelMax}%</span>
-                    <span style="font-size:9px;background:rgba(14,203,129,0.10);color:${colorPctMin};padding:1px 5px;border-radius:5px;font-weight:900;" title="% del minimo 24h">MIN: ${pctDelMin}%</span>
+                    <span style="font-size:9px;background:rgba(14,203,129,0.10);color:${colorPctMin};padding:1px 5px;border-radius:5px;font-weight:900;" title="${tituloSegundaPastilla}">${etiquetaSegundaPastilla}: ${pctDelMin}%</span>
                 </div>
             </td>
             <td style="text-align:right; font-weight:700; color:${colorCambio};">
