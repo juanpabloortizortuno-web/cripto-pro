@@ -1035,6 +1035,7 @@
                             <div style="font-size:9px; font-weight:900; color:#ff2a3b; letter-spacing:1px; margin-bottom:4px;">▼ VENTA · SHORT</div>
                             <div id="iaShortNombre" style="font-size:17px; font-weight:900; color:#fff; line-height:1;">—</div>
                             <div id="iaShortSub" style="font-size:9px; color:#fca5a5; margin-top:3px; font-weight:700;">—</div>
+                            <div id="iaShortScan" style="font-size:8px; color:#7f1d1d; margin-top:2px; font-weight:600;">—</div>
                         </div>
                     </div>
                 </div>
@@ -2066,6 +2067,17 @@ let minimo24hValor = {};      // symbol -> precio del mínimo 24h detectado
 let minimo24hTimestamp = {};  // symbol -> cuándo se vio ese mínimo (Date.now())
 let btcEthInfluencia = {}; // symbol -> { btcCorr, ethCorr }
 let techoScoreHistorial = {}; // historial de score de techo
+// ── VENTANA DE GRACIA "TOCÓ EL 100%" ──
+// El instante exacto en el que una moneda está en el 100% de su rango dura
+// muy pocos segundos (justo cuando explota, como en el ejemplo de TLM: tocó
+// 0,003450 y al segundo siguiente ya venía bajando a 0,003399). Si exigimos
+// el 100% en el ciclo EXACTO en el que el usuario mira la pantalla, casi
+// siempre se la pierde. Por eso guardamos CUÁNDO tocó el 100% por última vez,
+// y la dejamos aparecer en SHORT durante una ventana de gracia después de
+// tocarlo, mientras siga cerca del techo (no que ya se haya desplomado del
+// todo, porque ahí ya sería otra cosa).
+let techoTocado100Ts = {}; // symbol -> Date.now() de la última vez que tocó >=99.5%
+const VENTANA_GRACIA_TECHO_MS = 90 * 1000; // 90 segundos de gracia tras tocar el 100%
         let contadorAvisosMismoEstado = 0;
         let ultimaAlertaVoz = "";
 
@@ -4273,13 +4285,16 @@ async function obtenerDatosBinance() {
             
             let rango24h = high - low;
             let rangoPct24h = low > 0 ? ((high - low) / low) * 100 : 0; // rango relativo % del día
-            let posicionPorcentaje = rango24h > 0 ? ((precio - low) / rango24h) * 100 : 0;
+            let posicionPorcentaje = rango24h > 0 ? Math.min(100, ((precio - low) / rango24h) * 100) : 0; // tope duro en 100% (techo)
             let caidaDesdeMaximo = rango24h > 0 ? ((high - precio) / high) * 100 : 0;
 
             // ── ESTUDIO DE CICLO 24H (independiente por moneda) ──
             // Detecta cuándo cambió el máximo/mínimo de la ventana de 24h que reporta
             // Binance para estimar hace cuánto ocurrió y cuánto falta para que "expire".
             const ahoraTs = Date.now();
+            if (posicionPorcentaje >= 99.5) {
+                techoTocado100Ts[item.symbol] = ahoraTs; // marca el instante exacto del toque de techo
+            }
             if (maximo24hValor[item.symbol] === undefined || high !== maximo24hValor[item.symbol]) {
                 // El máximo reportado cambió: o se hizo un máximo nuevo ahora mismo,
                 // o el máximo anterior salió de la ventana de 24h y aparece otro "techo".
@@ -7102,75 +7117,92 @@ function _actualizarCarruselIA(listaPrioridadesActual) {
         return true;
     });
 
-    _carruselShortList = listaPrioridadesActual.filter(p => {
-        if (!_TIPO_SHORT.has(p.tipo)) return false;
-        const c = cachedData[p.symbol];
-        if (!c) return false;
+    // ── TARJETA "VENTA · SHORT" — UNIVERSO COMPLETO DE BINANCE ──
+    // Ya no se limita a listaPrioridadesActual ni a un "score" de memoria.
+    // Se escanea el UNIVERSO COMPLETO de contratos de Futuros USDT-M de
+    // Binance: primero se usa la lista oficial (simbolosFuturosUSDTM, que
+    // viene de /fapi/v1/exchangeInfo y tiene TODOS los pares, aunque en
+    // este momento no tengan un precio en cachedData todavía), y si esa
+    // lista aún no cargó, se cae a las monedas ya presentes en cachedData.
+    // Requisito DURO (obligatorio, sin excepción):
+    //   1) estar en el 100% de su rango AHORA MISMO, o haberlo tocado hace
+    //      menos de 90 segundos y seguir todavía cerca del techo (>=80%) —
+    //      esta ventana de gracia es clave: el instante exacto del 100% dura
+    //      muy pocos segundos (la moneda explota y al toque empieza a bajar
+    //      un poco, como en el ejemplo real: tocó el techo y ya venía
+    //      retrocediendo). Sin esta ventana, casi nunca se alcanza a ver.
+    //   2) tener un cambio de 24h de al menos 10% (en valor absoluto).
+    // Prioridad interna por tramos de explosividad (para decidir el orden
+    // en el que rotan dentro del carrusel — las más explosivas primero):
+    //   Tramo 3 (máxima prioridad): cambio 24h >= 40%  → "que exploten"
+    //   Tramo 2:                    cambio 24h >= 20% y < 40%
+    //   Tramo 1:                    cambio 24h >= 10% y < 20%
+    const _UMBRAL_TECHO_SHORT = 99.5; // 99.5%+ = "100%" redondeado (techo exacto)
+    function _tramoExplosividadShort(cambioAbs) {
+        if (cambioAbs >= 40) return 3;
+        if (cambioAbs >= 20) return 2;
+        if (cambioAbs >= 10) return 1;
+        return 0;
+    }
+    // Universo a escanear: TODOS los contratos reales de Futuros USDT-M
+    // (cientos de pares) si ya se cargó exchangeInfo; si no, todo lo que
+    // haya en cachedData por ahora.
+    const _universoShort = simbolosFuturosUSDTM
+        ? Array.from(simbolosFuturosUSDTM)
+        : Object.keys(cachedData);
 
-        const mov2m  = Math.abs(c.cambioReal2Min || 0);
-        const mscore = momentumScore(p.symbol);
-        const señalFuerte = ['DERRUMBE','AGOTADO'].includes(p.tipo);
-        const enMovimiento = mov2m >= _UMBRAL_MOV_2M && mscore >= _UMBRAL_MOMENTUM;
-        if (!enMovimiento && !señalFuerte) return false;
-
-        const hist = _histMoneda(p.symbol);
-        const n = hist.length;
-        if (n < _MEM_MIN_BASICA) return false;
-
-        const ms = _memoriaScoreMoneda(p.symbol);
-        if (!ms) return false;
-
-        // SOLO pasan las GANADORAS: veredicto VALE ✅ (score >= 65)
-        if (ms.scoreShort < 65) return false;
-
-        return true;
-    });
-
-    // ── SHORT DE REVERSIÓN: buscar en TODO cachedData (no solo en listaPrioridades) ──
-    // Una moneda que históricamente sube y revierta puede estar en lista LONG o sin lista,
-    // pero su scoreShortRev puede ser alto. Las añadimos aquí si no están ya.
-    const _yaEnShortList = new Set(_carruselShortList.map(p => p.symbol));
-    const _reversionCandidatas = Object.keys(cachedData).filter(sym => {
-        if (_yaEnShortList.has(sym)) return false;
-        const hist = _histMoneda(sym);
-        if (hist.length < _MEM_MIN_BASICA) return false;
-        const ms = _memoriaScoreMoneda(sym);
-        if (!ms) return false;
-        // Solo pasan las de reversión con score alto
-        if (ms.scoreShortRev === undefined || ms.scoreShortRev < 65) return false;
-        // Necesita al menos algo de movimiento (no queremos monedas muertas)
+    const _shortMatches = [];
+    _universoShort.forEach(sym => {
         const c = cachedData[sym];
-        if (!c) return false;
-        const mov2m = Math.abs(c.cambioReal2Min || 0);
-        if (mov2m < 0.03) return false;
-        return true;
-    }).map(sym => ({ symbol: sym, tipo: 'REVERSION_SHORT' }));
+        if (!c) return; // aún sin datos de precio en este ciclo
+        const posTecho = c.posicionPorcentaje || 0;
+        const tocoTechoTs = techoTocado100Ts[sym] || 0;
+        const dentroDeGracia = (Date.now() - tocoTechoTs) <= VENTANA_GRACIA_TECHO_MS;
+        // Pasa si: está EN el 100% ahora mismo, O tocó el 100% hace poco y
+        // todavía sigue cerca del techo (no se desplomó del todo, sigue >=80%).
+        const cumpleTecho = posTecho >= _UMBRAL_TECHO_SHORT || (dentroDeGracia && posTecho >= 80);
+        if (!cumpleTecho) return;                        // requisito duro: techo 100% (o recién tocado)
+        const cambioAbs = Math.abs(c.change || 0);
+        if (cambioAbs < 10) return;                       // requisito duro: cambio 24h >= 10%
+        _shortMatches.push({ symbol: sym, tipo: 'EXPLOSIVO_TECHO', tramo: _tramoExplosividadShort(cambioAbs), cambioAbs, posTecho });
+    });
+    // Las más explosivas (mayor tramo y mayor % de cambio) van primero
+    _shortMatches.sort((a,b) => (b.tramo - a.tramo) || (b.cambioAbs - a.cambioAbs));
 
-    // ── SHORT DE TECHO: monedas en posición ≥ 85% con suficiente historial ──
-    const _yaEnShortFinal = new Set(_carruselShortList.map(p => p.symbol));
-    const _techoCandidatas = Object.keys(cachedData).filter(sym => {
-        if (_yaEnShortFinal.has(sym)) return false;
-        const c2 = cachedData[sym];
-        if (!c2) return false;
-        const pos = c2.posicionPorcentaje || 0;
-        if (pos < 85) return false;                          // solo zona alta
-        const hist = _histMoneda(sym);
-        if (hist.length < _MEM_MIN_BASICA) return false;
-        const ms = _memoriaScoreMoneda(sym);
-        if (!ms) return false;
-        if (ms.scoreShort < 40) return false;               // mínimo algo de score
-        const mov2m = Math.abs(c2.cambioReal2Min || 0);
-        if (mov2m < 0.03) return false;                     // necesita moverse
-        return true;
-    // Ordenar: primero las más cerca del techo
-    }).sort((a,b) => (cachedData[b].posicionPorcentaje||0) - (cachedData[a].posicionPorcentaje||0))
-      .map(sym => ({ symbol: sym, tipo: 'TECHO_ALTO' }));
+    // ── RESPALDO "MEJOR CERCANA" ──
+    // Si en este ciclo NINGUNA moneda tocó el 100% (ni siquiera con la
+    // ventana de gracia), no dejamos la tarjeta vacía: mostramos la mejor
+    // candidata disponible entre las que ya tienen cambio de 24h >= 10%,
+    // eligiendo la que esté MÁS CERCA de su 100% (mayor posicionPorcentaje).
+    // Se marca con tipo distinto ('CERCA_DEL_TECHO') para diferenciarla
+    // visualmente de una que ya está confirmada en el techo exacto.
+    if (_shortMatches.length === 0) {
+        let mejorCercana = null;
+        _universoShort.forEach(sym => {
+            const c = cachedData[sym];
+            if (!c) return;
+            const cambioAbs = Math.abs(c.change || 0);
+            if (cambioAbs < 10) return; // sigue siendo obligatorio el cambio >= 10%
+            const posTecho = c.posicionPorcentaje || 0;
+            if (!mejorCercana || posTecho > mejorCercana.posTecho) {
+                mejorCercana = { symbol: sym, tipo: 'CERCA_DEL_TECHO', tramo: _tramoExplosividadShort(cambioAbs), cambioAbs, posTecho };
+            }
+        });
+        if (mejorCercana) _shortMatches.push(mejorCercana);
+    }
 
-    _carruselShortList = [..._carruselShortList, ..._reversionCandidatas, ..._techoCandidatas];
+    _carruselShortList = _shortMatches;
 
-    // NOTA: ya NO hay modo respaldo — solo se muestran monedas GANADORAS
-    // (veredicto VALE ✅, score >= 65). Si no hay ninguna, el panel queda
-    // en "Buscando ganadora..." hasta que aparezca una real.
+    // Contador visible: cuántos pares se escanearon vs cuántos cumplieron
+    const _elScan = document.getElementById('iaShortScan');
+    if (_elScan) {
+        _elScan.textContent = `🔍 ${_universoShort.length} monedas escaneadas · ${_shortMatches.length} en techo+10%`;
+    }
+
+    // NOTA: ya NO hay modo respaldo ni filtro de "score" de memoria — el
+    // único criterio para SHORT es el requisito duro de arriba (techo 100%
+    // + cambio 24h >= 10%). Si ninguna moneda de Binance lo cumple en este
+    // momento, el panel queda en "Buscando ganadora..." hasta que aparezca.
 
     // Rotar índices
     if (_carruselLongList.length  > 1) _carruselLongIdx  = (_carruselLongIdx  + 1) % _carruselLongList.length;
@@ -7254,7 +7286,14 @@ function _iaSubtexto(p) {
         else                  usdtTag = ' · ❌ EVITAR';
     }
 
-    return signo + cambio.toFixed(2) + '% 2m · ' + velTag + usdtTag;
+    // Si es la "mejor cercana" (no confirmada en el 100% exacto), mostrar
+    // en qué % de su rango está para que quede claro que es la más próxima,
+    // no una ya confirmada en el techo.
+    const rangoTag = (p.tipo === 'CERCA_DEL_TECHO' && typeof p.posTecho === 'number')
+        ? ` · 🔶 Rango ${p.posTecho.toFixed(1)}%`
+        : '';
+
+    return signo + cambio.toFixed(2) + '% 2m · ' + velTag + usdtTag + rangoTag;
 }
 
 function actualizarAlertaGanadora(alertaActiva) {
