@@ -827,6 +827,12 @@
         <input type="number" step="1" id="cfg_pesoTendencia" class="input-pro" style="margin:4px 0 10px;">
         <label style="font-size:11px; color:#cbd5e1;">RSI corto plazo</label>
         <input type="number" step="1" id="cfg_pesoRSI" class="input-pro" style="margin:4px 0 10px;">
+        <label style="font-size:11px; color:#cbd5e1;">DMI/ADX — fuerza y dirección de tendencia</label>
+        <input type="number" step="1" id="cfg_pesoDMI" class="input-pro" style="margin:4px 0 10px;">
+        <label style="font-size:11px; color:#cbd5e1;">VWAP — precio vs. promedio ponderado por volumen</label>
+        <input type="number" step="1" id="cfg_pesoVWAP" class="input-pro" style="margin:4px 0 10px;">
+        <label style="font-size:11px; color:#cbd5e1;">SMA 20/50 — confirmación lenta de tendencia</label>
+        <input type="number" step="1" id="cfg_pesoSMA" class="input-pro" style="margin:4px 0 10px;">
 
         <div style="font-size:11px; color:var(--text-dim); font-weight:700; text-transform:uppercase; margin:14px 0 6px;">Umbrales de alertas automáticas</div>
         <label style="font-size:11px; color:#cbd5e1;">🚀 BOMBA — cambio mínimo en 2 min (%)</label>
@@ -2164,6 +2170,9 @@ let CDC_CONFIG = {
     pesoMomentum: 25,    // Momentum de 2 minutos
     pesoTendencia: 20,   // Tendencia sostenida (velocidad promedio + ciclos)
     pesoRSI: 10,         // RSI de corto plazo (sobrecompra/sobreventa)
+    pesoDMI: 15,         // Fuerza y dirección de tendencia (ADX + DI+/DI-)
+    pesoVWAP: 15,        // Precio vs. precio promedio ponderado por volumen (24h)
+    pesoSMA: 8,          // Confirmación lenta de tendencia (SMA20 vs SMA50)
     // Umbrales de disparo de alertas automáticas
     umbralBombaCambio2m: 0.35,      // % mínimo en 2 min para activar BOMBA
     umbralDerrumbeCambio2m: -0.25,  // % máximo (negativo) en 2 min para activar DERRUMBE
@@ -2193,6 +2202,7 @@ function guardarConfigCDC(mostrarAlerta = true) {
 function restaurarConfigCDC() {
     CDC_CONFIG = {
         pesoRango: 30, pesoMomentum: 25, pesoTendencia: 20, pesoRSI: 10,
+        pesoDMI: 15, pesoVWAP: 15, pesoSMA: 8,
         umbralBombaCambio2m: 0.35, umbralDerrumbeCambio2m: -0.25, umbralAgotamientoPos: 94.0,
         autoAprendizaje: true, learningRate: 0.4
     };
@@ -2202,7 +2212,7 @@ function restaurarConfigCDC() {
 }
 
 function rellenarFormularioConfigCDC() {
-    const campos = ["pesoRango","pesoMomentum","pesoTendencia","pesoRSI","umbralBombaCambio2m","umbralDerrumbeCambio2m","umbralAgotamientoPos","learningRate"];
+    const campos = ["pesoRango","pesoMomentum","pesoTendencia","pesoRSI","pesoDMI","pesoVWAP","pesoSMA","umbralBombaCambio2m","umbralDerrumbeCambio2m","umbralAgotamientoPos","learningRate"];
     campos.forEach(id => {
         const el = document.getElementById("cfg_" + id);
         if (el) el.value = CDC_CONFIG[id];
@@ -2213,7 +2223,7 @@ function rellenarFormularioConfigCDC() {
 }
 
 function guardarConfigDesdeFormulario() {
-    const campos = ["pesoRango","pesoMomentum","pesoTendencia","pesoRSI","umbralBombaCambio2m","umbralDerrumbeCambio2m","umbralAgotamientoPos","learningRate"];
+    const campos = ["pesoRango","pesoMomentum","pesoTendencia","pesoRSI","pesoDMI","pesoVWAP","pesoSMA","umbralBombaCambio2m","umbralDerrumbeCambio2m","umbralAgotamientoPos","learningRate"];
     campos.forEach(id => {
         const el = document.getElementById("cfg_" + id);
         if (el) {
@@ -2240,7 +2250,10 @@ const LIMITES_PESOS = {
     pesoRango:     [10, 45],
     pesoMomentum:  [10, 40],
     pesoTendencia: [5, 35],
-    pesoRSI:       [2, 20]
+    pesoRSI:       [2, 20],
+    pesoDMI:       [5, 30],
+    pesoVWAP:      [5, 30],
+    pesoSMA:       [2, 20]
 };
 
 function cargarStatsAprendizajeCDC() {
@@ -2297,7 +2310,7 @@ function evaluarAprendizajeCDC() {
             const lr = CDC_CONFIG.learningRate || 0.4;
             const signoReal = subioReal ? 1 : -1;
 
-            const mapaFactores = { rango: "pesoRango", momentum: "pesoMomentum", tendencia: "pesoTendencia", rsi: "pesoRSI" };
+            const mapaFactores = { rango: "pesoRango", momentum: "pesoMomentum", tendencia: "pesoTendencia", rsi: "pesoRSI", dmi: "pesoDMI", vwap: "pesoVWAP", sma: "pesoSMA" };
 
             Object.keys(p.factores).forEach(factorKey => {
                 const valorFactor = p.factores[factorKey];
@@ -2333,7 +2346,7 @@ function actualizarStatsAprendizajeUI() {
     el.innerHTML = `📊 Señales evaluadas: <b style="color:#fff;">${total}</b> &nbsp;|&nbsp; ✅ Precisión: <b style="color:var(--accent-gold);">${precision}${total > 0 ? '%' : ''}</b>`;
 
     // Refrescar también los valores de pesos en el formulario (pueden haber cambiado solos)
-    ["pesoRango","pesoMomentum","pesoTendencia","pesoRSI"].forEach(id => {
+    ["pesoRango","pesoMomentum","pesoTendencia","pesoRSI","pesoDMI","pesoVWAP","pesoSMA"].forEach(id => {
         const inp = document.getElementById("cfg_" + id);
         if (inp && document.activeElement !== inp) inp.value = CDC_CONFIG[id].toFixed(1);
     });
@@ -4042,6 +4055,107 @@ function calcularEMASerie(valores, periodo) {
     return serie; // serie[serie.length-1] es el valor EMA actual, serie[length-2] el anterior
 }
 
+// ══════════════════════════════════════════════════════════════════
+// 📏 SMA — Media Móvil Simple. A diferencia de la EMA (que pondera más
+// las velas recientes), la SMA pesa todas las velas por igual, por eso
+// sirve como confirmación "más lenta y estable" de la tendencia real.
+// ══════════════════════════════════════════════════════════════════
+function calcularSMASerie(valores, periodo) {
+    if (valores.length < periodo) return null;
+    const serie = [];
+    for (let i = periodo - 1; i < valores.length; i++) {
+        let suma = 0;
+        for (let j = i - periodo + 1; j <= i; j++) suma += valores[j];
+        serie.push(suma / periodo);
+    }
+    return serie; // serie[serie.length-1] = SMA actual, serie[length-2] = anterior
+}
+
+// ══════════════════════════════════════════════════════════════════
+// 🧭 DMI/ADX — Directional Movement Index. Mide la FUERZA de la
+// tendencia (ADX) y su DIRECCIÓN (DI+ vs DI-). Un ADX alto (>25) con
+// DI+ > DI- confirma tendencia alcista fuerte y fiable; ADX bajo (<20)
+// avisa que el mercado está lateral y las señales de otros indicadores
+// son menos confiables (filtro anti falsas señales).
+// ══════════════════════════════════════════════════════════════════
+function calcularDMI(highs, lows, closes, periodo = 14) {
+    const n = highs.length;
+    if (n < periodo + 1) return null;
+
+    const tr = [], dmPlus = [], dmMinus = [];
+    for (let i = 1; i < n; i++) {
+        const altoAlto   = highs[i] - highs[i - 1];
+        const bajoBajo   = lows[i - 1] - lows[i];
+        dmPlus.push((altoAlto > bajoBajo && altoAlto > 0) ? altoAlto : 0);
+        dmMinus.push((bajoBajo > altoAlto && bajoBajo > 0) ? bajoBajo : 0);
+        tr.push(Math.max(
+            highs[i] - lows[i],
+            Math.abs(highs[i] - closes[i - 1]),
+            Math.abs(lows[i] - closes[i - 1])
+        ));
+    }
+
+    // Suavizado tipo Wilder
+    const suavizar = (arr, p) => {
+        let val = arr.slice(0, p).reduce((a, b) => a + b, 0);
+        const serie = [val];
+        for (let i = p; i < arr.length; i++) {
+            val = val - (val / p) + arr[i];
+            serie.push(val);
+        }
+        return serie;
+    };
+
+    const trS = suavizar(tr, periodo);
+    const dmPlusS = suavizar(dmPlus, periodo);
+    const dmMinusS = suavizar(dmMinus, periodo);
+    if (!trS.length) return null;
+
+    const diPlusSerie = trS.map((t, i) => t > 0 ? (dmPlusS[i] / t) * 100 : 0);
+    const diMinusSerie = trS.map((t, i) => t > 0 ? (dmMinusS[i] / t) * 100 : 0);
+
+    const dxSerie = diPlusSerie.map((dp, i) => {
+        const dm = diMinusSerie[i];
+        const suma = dp + dm;
+        return suma > 0 ? (Math.abs(dp - dm) / suma) * 100 : 0;
+    });
+
+    if (dxSerie.length < periodo) return null;
+    // ADX = media móvil (Wilder) del DX
+    let adx = dxSerie.slice(0, periodo).reduce((a, b) => a + b, 0) / periodo;
+    for (let i = periodo; i < dxSerie.length; i++) {
+        adx = (adx * (periodo - 1) + dxSerie[i]) / periodo;
+    }
+
+    return {
+        adx,
+        diPlus: diPlusSerie[diPlusSerie.length - 1],
+        diMinus: diMinusSerie[diMinusSerie.length - 1]
+    };
+}
+
+// ══════════════════════════════════════════════════════════════════
+// 💰 VWAP — Precio Promedio Ponderado por Volumen. Muestra a qué
+// precio "real" se movió el volumen grande. Precio por encima del VWAP
+// = presión compradora dominante (favorable a LONG); por debajo =
+// presión vendedora (favorable a SHORT). Se calcula sobre las últimas
+// 24 velas de 1h (ventana móvil de 24h, equivalente diario en cripto
+// 24/7).
+// ══════════════════════════════════════════════════════════════════
+function calcularVWAP(highs, lows, closes, volumenes, velas = 24) {
+    const n = closes.length;
+    if (n < 2) return null;
+    const desde = Math.max(0, n - velas);
+    let sumaPV = 0, sumaV = 0;
+    for (let i = desde; i < n; i++) {
+        const precioTipico = (highs[i] + lows[i] + closes[i]) / 3;
+        sumaPV += precioTipico * volumenes[i];
+        sumaV  += volumenes[i];
+    }
+    if (sumaV === 0) return null;
+    return sumaPV / sumaV;
+}
+
 async function actualizarEMASimbolo(symbol) {
     try {
         // 150 velas de 1h ≈ 6.25 días, más que suficiente para EMA99 + ver 24-48h de mínimo
@@ -4051,6 +4165,9 @@ async function actualizarEMASimbolo(symbol) {
         if (!Array.isArray(klines) || klines.length < 100) return;
 
         const cierres = klines.map(k => parseFloat(k[4]));
+        const altos   = klines.map(k => parseFloat(k[2]));
+        const bajos   = klines.map(k => parseFloat(k[3]));
+        const volumenes = klines.map(k => parseFloat(k[5]));
         const e7  = calcularEMASerie(cierres, 7);
         const e25 = calcularEMASerie(cierres, 25);
         const e99 = calcularEMASerie(cierres, 99);
@@ -4068,7 +4185,34 @@ async function actualizarEMASimbolo(symbol) {
 
         const alineadasAlcista = ema7 > ema25 && ema25 > ema99 && ema7 > ema7Prev && ema25 > ema25Prev;
 
-        datosEMA[symbol] = { ema7, ema25, ema99, ema7Prev, ema25Prev, ema99Prev, minimo48h, subidaDesdeMinimo, alineadasAlcista, actualizado: Date.now() };
+        // ── SMA 20 y 50 (confirmación de tendencia más lenta/estable) ──
+        const s20 = calcularSMASerie(cierres, 20);
+        const s50 = calcularSMASerie(cierres, 50);
+        const sma20 = s20 ? s20[s20.length - 1] : null;
+        const sma20Prev = s20 && s20.length > 1 ? s20[s20.length - 2] : sma20;
+        const sma50 = s50 ? s50[s50.length - 1] : null;
+        const smaAlcista = (sma20 !== null && sma50 !== null) ? (sma20 > sma50) : null;
+
+        // ── DMI / ADX (fuerza y dirección de la tendencia) ──
+        const dmi = calcularDMI(altos, bajos, cierres, 14);
+        const adx = dmi ? dmi.adx : null;
+        const diPlus = dmi ? dmi.diPlus : null;
+        const diMinus = dmi ? dmi.diMinus : null;
+        const tendenciaFuerte = adx !== null ? adx >= 25 : null;
+        const direccionDMI = (diPlus !== null && diMinus !== null) ? (diPlus > diMinus ? 'ALCISTA' : 'BAJISTA') : null;
+
+        // ── VWAP (últimas 24 velas de 1h ≈ ventana de 24h) ──
+        const vwap = calcularVWAP(altos, bajos, cierres, volumenes, 24);
+        const precioSobreVwap = vwap !== null ? precioActual > vwap : null;
+        const distVwapPct = vwap !== null ? ((precioActual - vwap) / vwap) * 100 : null;
+
+        datosEMA[symbol] = {
+            ema7, ema25, ema99, ema7Prev, ema25Prev, ema99Prev, minimo48h, subidaDesdeMinimo, alineadasAlcista,
+            sma20, sma50, sma20Prev, smaAlcista,
+            adx, diPlus, diMinus, tendenciaFuerte, direccionDMI,
+            vwap, precioSobreVwap, distVwapPct,
+            actualizado: Date.now()
+        };
     } catch (e) {
         // silencioso: si falla un símbolo puntual, simplemente no se actualiza este ciclo
     }
@@ -4367,7 +4511,8 @@ async function obtenerDatosBinance() {
                 esMonedaRapida &&
                 Math.abs(velocidadPrecio) < 0.008 &&
                 cambioReal2Min > 0.3 &&
-                ciclosSubiendo <= 2;
+                ciclosSubiendo <= 2 &&
+                !riesgoSigueSubiendo(item.symbol).riesgo; // 🛡️ no avisar "agotamiento" si la tendencia de 1h sigue fuerte
 
             registrarVolumen(item.symbol, parseFloat(item.quoteVolume));
 
@@ -5063,6 +5208,50 @@ function calcularScoreRebote(c) {
 // DETECTOR DE TECHO + PRÓXIMA CAÍDA — Sistema avanzado CDC
 // ══════════════════════════════════════════════════════════════════
 
+// ══════════════════════════════════════════════════════════════════
+// ⚠️ FILTRO ANTI-SORPRESA PARA SHORT — pensado específicamente para
+// evitar entrar en corto justo cuando la tendencia de FONDO (1h) todavía
+// es fuerte y alcista. El sistema de "techo" original solo mira el corto
+// plazo (2 min, ciclos, RSI), lo cual puede marcar "agotamiento" en una
+// moneda que en realidad sigue en tendencia alcista sólida de 1h y va a
+// romper el máximo en vez de caer. Aquí se usan DMI/ADX (fuerza y
+// dirección real de la tendencia), VWAP (quién domina el volumen) y
+// SMA20/50 (tendencia de fondo) para detectar ese riesgo ANTES de que
+// te agarre parado en un short a 1x.
+// ══════════════════════════════════════════════════════════════════
+function riesgoSigueSubiendo(symbol) {
+    const e = datosEMA[symbol];
+    if (!e) return { riesgo: false, señales: [], motivo: null };
+
+    const señales = [];
+
+    // 1) ADX alto (hay tendencia de verdad) y DI+ claramente dominante = compradores mandan en 1h
+    const tendenciaFuerteAlcista = (e.adx !== null && e.adx !== undefined && e.adx >= 22) &&
+                                     (e.diPlus !== null && e.diMinus !== null && e.diPlus > e.diMinus * 1.15);
+    if (tendenciaFuerteAlcista) señales.push(`ADX ${e.adx.toFixed(0)} con DI+ dominante — tendencia 1h aún fuerte`);
+
+    // 2) Precio todavía bien por encima del VWAP 24h = el volumen grande sigue comprando, no vendiendo
+    const sobreVwapFuerte = e.distVwapPct !== null && e.distVwapPct !== undefined && e.distVwapPct >= 1.5;
+    if (sobreVwapFuerte) señales.push(`+${e.distVwapPct.toFixed(2)}% sobre el VWAP 24h`);
+
+    // 3) SMA20 todavía subiendo por encima de SMA50 = tendencia de fondo intacta, no es un pico aislado
+    const smaAlcistaFirme = e.smaAlcista === true && e.sma20 !== null && e.sma20Prev !== null && e.sma20 > e.sma20Prev;
+    if (smaAlcistaFirme) señales.push(`SMA20 > SMA50 y sigue subiendo`);
+
+    // 4) Las 3 EMAs de 1h siguen perfectamente alineadas alcistas (el mismo criterio del motor de despegue)
+    if (e.alineadasAlcista) señales.push(`EMA7 > EMA25 > EMA99 alineadas alcistas`);
+
+    // Se exigen al menos 2 confirmaciones de fondo para marcar riesgo real
+    // (evita que una sola lectura ruidosa bloquee una señal de short válida)
+    const riesgo = señales.length >= 2;
+
+    return {
+        riesgo, señales,
+        adx: e.adx, diPlus: e.diPlus, diMinus: e.diMinus, distVwapPct: e.distVwapPct,
+        motivo: riesgo ? `⚠️ Puede seguir subiendo: ${señales.length} señales de tendencia alcista de fondo (1h) todavía activas` : null
+    };
+}
+
 // Calcula un score de 0-100 que indica la probabilidad de caída desde el techo
 function calcularScoreTecho(c) {
     let score = 0;
@@ -5109,7 +5298,26 @@ function calcularScoreTecho(c) {
         if (infl.ethCayendo && infl.corrAlta) score += 6;
     }
 
-    return Math.min(score, 100);
+    // 8. DMI/ADX — confirma si la reversión es real o si la tendencia de fondo (1h)
+    //    sigue mandando. Esta es la corrección clave para evitar shorts prematuros.
+    const eTecho = datosEMA[c.symbol];
+    if (eTecho && eTecho.adx !== null && eTecho.adx !== undefined && eTecho.diPlus !== null) {
+        if (eTecho.diMinus > eTecho.diPlus) score += 15;              // DI- ya domina = la reversión ya empezó de verdad
+        else if (eTecho.adx < 20) score += 5;                          // tendencia débil = más fácil que se revierta
+        else if (eTecho.adx >= 25 && eTecho.diPlus > eTecho.diMinus * 1.3) score -= 25; // alarma: tendencia alcista todavía fuerte
+    }
+
+    // 9. VWAP — si el precio ya perdió el VWAP 24h, confirma presión vendedora real
+    if (eTecho && eTecho.vwap !== null && eTecho.vwap !== undefined && eTecho.distVwapPct !== null) {
+        if (eTecho.distVwapPct < 0) score += 10;         // ya cruzó por debajo del VWAP
+        else if (eTecho.distVwapPct > 2) score -= 12;    // todavía muy por encima: compradores dominan el volumen
+    }
+
+    // 10. PENALIZACIÓN FUERTE si el filtro anti-sorpresa detecta tendencia de fondo alcista activa
+    const riesgo = riesgoSigueSubiendo(c.symbol);
+    if (riesgo.riesgo) score -= 30;
+
+    return Math.max(0, Math.min(score, 100));
 }
 
 function detectarEnTechoProximaCaida(c) {
@@ -5129,6 +5337,12 @@ function detectarEnTechoProximaCaida(c) {
 
     const agotamiento = [velFrenando, noSubeEn2min, ciclosBajan].filter(Boolean).length;
     if (agotamiento < 2) return false;
+
+    // 🛡️ FILTRO ANTI-SORPRESA: aunque el corto plazo (2 min) parezca agotado, si la
+    // tendencia de fondo en 1h (ADX/DMI + VWAP + SMA + EMA) sigue siendo alcista fuerte,
+    // NO se marca como "techo listo para caer" — es justo el escenario que te agarra
+    // parado en un short. Se exige que la tendencia de fondo también ceda.
+    if (riesgoSigueSubiendo(c.symbol).riesgo) return false;
 
     return true;
 }
@@ -5150,6 +5364,18 @@ function generarPronosticosCaida(c) {
     if (infl && infl.btcCayendo) señales.push("₿ BTC cayendo — arrastra al mercado");
     if (infl && infl.ethCayendo) señales.push("Ξ ETH cayendo — presión bajista adicional");
     if (c.caidaDesdeMaximo > 0.5 && c.caidaDesdeMaximo < 3) señales.push(`📌 Inicio de caída: -${c.caidaDesdeMaximo.toFixed(2)}% desde el máximo`);
+
+    // Señales del filtro anti-sorpresa (DMI/ADX + VWAP + SMA) — se muestran aunque no
+    // hayan bloqueado la tarjeta, para que sepas exactamente qué vigilar antes de entrar.
+    const riesgo = riesgoSigueSubiendo(c.symbol);
+    riesgo.señales.forEach(s => señales.push(`⚠️ ${s}`));
+    const eProns = datosEMA[c.symbol];
+    if (eProns && eProns.diMinus !== null && eProns.diPlus !== null && eProns.diMinus > eProns.diPlus) {
+        señales.push(`✅ DI- ya domina sobre DI+ — reversión real en marcha`);
+    }
+    if (eProns && eProns.distVwapPct !== null && eProns.distVwapPct < 0) {
+        señales.push(`✅ Precio ya cruzó por debajo del VWAP 24h`);
+    }
 
     return señales.slice(0, 4); // máximo 4 pronósticos por tarjeta
 }
@@ -5469,6 +5695,7 @@ function renderizarRadar() {
             const pred = prediccionCDC[c.symbol];
             const rsiVal = pred && pred.rsi !== null ? pred.rsi : '—';
             const rsiColor = pred && pred.rsi > 70 ? '#ff2a3b' : '#94a3b8';
+            const riesgoCard = riesgoSigueSubiendo(c.symbol);
 
             h += `
             <div class="radar-card tipo-techo ${scoreTecho >= 65 ? 'techo-pulsando' : ''}" onclick="cerrarRadarExplosivo(); seleccionarMoneda('${c.symbol}');" style="min-height:180px;">
@@ -5476,6 +5703,8 @@ function renderizarRadar() {
                     <div class="radar-coin-nombre" style="color:#fff;">${sym} <span style="font-size:10px;color:#475569;">USDT</span></div>
                     <span style="font-size:13px;">${medalla}</span>
                 </div>
+
+                ${riesgoCard.señales.length > 0 ? `<div style="font-size:9px;background:rgba(243,186,47,0.15);color:#f3ba2f;border:1px solid rgba(243,186,47,0.4);border-radius:6px;padding:3px 6px;margin-bottom:4px;">⚠️ ${riesgoCard.señales.length} señal(es) de tendencia 1h aún alcista — vigilar antes de entrar</div>` : ''}
 
                 <!-- Score de riesgo de caída -->
                 <div style="margin:5px 0 3px;display:flex;justify-content:space-between;align-items:center;">
@@ -5766,6 +5995,38 @@ function calcularPrediccionCDC(symbol){
     }
     score += contribRSI;
 
+    // 4b. DMI/ADX — fuerza y dirección real de la tendencia (1h). Un ADX alto
+    //     confirma que hay tendencia de verdad; si además DI+ > DI- es alcista.
+    //     Con ADX bajo (mercado lateral) el factor casi no aporta, para no
+    //     generar señales falsas en rango sin tendencia.
+    const eDMI = datosEMA[symbol];
+    let contribDMI = 0;
+    if (eDMI && eDMI.adx !== null && eDMI.adx !== undefined && eDMI.diPlus !== null) {
+        const fuerza = Math.min(eDMI.adx / 40, 1); // normaliza 0-1 (ADX 40+ = tendencia muy fuerte)
+        const direccion = eDMI.diPlus > eDMI.diMinus ? 1 : -1;
+        contribDMI = direccion * fuerza * w.pesoDMI;
+    }
+    score += contribDMI;
+
+    // 4c. VWAP — precio vs. precio promedio ponderado por volumen (24h).
+    //     Por encima del VWAP = presión compradora dominante (sesgo alcista);
+    //     por debajo = presión vendedora (sesgo bajista).
+    let contribVWAP = 0;
+    if (eDMI && eDMI.vwap !== null && eDMI.vwap !== undefined && eDMI.distVwapPct !== null) {
+        // tope en ±3% de distancia al VWAP para no dejar que un desvío enorme domine el score
+        contribVWAP = Math.max(-w.pesoVWAP, Math.min(w.pesoVWAP, eDMI.distVwapPct * (w.pesoVWAP / 3)));
+    }
+    score += contribVWAP;
+
+    // 4d. SMA20 vs SMA50 — confirmación lenta y estable de la tendencia
+    //     (menos sensible al ruido de corto plazo que la EMA).
+    let contribSMA = 0;
+    if (eDMI && eDMI.sma20 !== null && eDMI.sma50 !== null && eDMI.sma20 !== undefined) {
+        const distSMApct = ((eDMI.sma20 - eDMI.sma50) / eDMI.sma50) * 100;
+        contribSMA = Math.max(-w.pesoSMA, Math.min(w.pesoSMA, distSMApct * (w.pesoSMA / 1.5)));
+    }
+    score += contribSMA;
+
     // 5. CONFIRMACIÓN POR VOLUMEN — amplifica o reduce la confianza de la señal
     if (c.volume > 30000000) {
         score *= 1.20;       // volumen fuerte: más confianza en la dirección detectada
@@ -5811,7 +6072,14 @@ function calcularPrediccionCDC(symbol){
         horasDesdeMaximo24h: c.horasDesdeMaximo24h,
         horasDesdeMinimo24h: c.horasDesdeMinimo24h,
         bloqueEstudio24h: c.bloqueEstudio24h,
-        horasParaRenovarVentana: c.horasParaRenovarVentana
+        horasParaRenovarVentana: c.horasParaRenovarVentana,
+        adx: (eDMI && eDMI.adx !== null && eDMI.adx !== undefined) ? Math.round(eDMI.adx) : null,
+        direccionDMI: eDMI ? eDMI.direccionDMI : null,
+        vwap: eDMI ? eDMI.vwap : null,
+        distVwapPct: eDMI ? eDMI.distVwapPct : null,
+        sma20: eDMI ? eDMI.sma20 : null,
+        sma50: eDMI ? eDMI.sma50 : null,
+        smaAlcista: eDMI ? eDMI.smaAlcista : null
     };
 
     // ─── Registro para el sistema de auto-aprendizaje ───
@@ -5820,6 +6088,9 @@ function calcularPrediccionCDC(symbol){
         momentum: contribMomentum,
         tendencia: contribTendencia,
         rsi: contribRSI,
+        dmi: contribDMI,
+        vwap: contribVWAP,
+        sma: contribSMA,
         tiempo: contribTiempo
     });
 }
@@ -6653,6 +6924,34 @@ function actualizarTacometroDerecho() {
         else { colorRSI = "#f3ba2f"; estadoRSI = "NEUTRAL"; }
     }
 
+    // ── DMI/ADX para el panel visual ──
+    const predPanel = prediccionCDC[selectedCoin] || {};
+    let adxTexto = "—", colorADX = "#94a3b8", estadoADX = "CALCULANDO";
+    if (predPanel.adx !== null && predPanel.adx !== undefined) {
+        adxTexto = predPanel.adx.toFixed(0);
+        const esAlcistaDMI = predPanel.direccionDMI === 'ALCISTA';
+        if (predPanel.adx >= 25) { colorADX = esAlcistaDMI ? "#0ecb81" : "#ff2a3b"; estadoADX = esAlcistaDMI ? "TENDENCIA ALCISTA" : "TENDENCIA BAJISTA"; }
+        else { colorADX = "#64748b"; estadoADX = "MERCADO LATERAL"; }
+    }
+
+    // ── VWAP para el panel visual ──
+    let vwapTexto = "—", colorVWAP = "#94a3b8", estadoVWAP = "CALCULANDO";
+    if (predPanel.vwap !== null && predPanel.vwap !== undefined && predPanel.distVwapPct !== null) {
+        vwapTexto = (predPanel.distVwapPct > 0 ? "+" : "") + predPanel.distVwapPct.toFixed(2) + "%";
+        if (predPanel.distVwapPct > 0.1) { colorVWAP = "#0ecb81"; estadoVWAP = "SOBRE VWAP"; }
+        else if (predPanel.distVwapPct < -0.1) { colorVWAP = "#ff2a3b"; estadoVWAP = "BAJO VWAP"; }
+        else { colorVWAP = "#f3ba2f"; estadoVWAP = "EN VWAP"; }
+    }
+
+    // ── SMA20 vs SMA50 para el panel visual ──
+    let smaTexto = "—", colorSMA = "#94a3b8", estadoSMA = "CALCULANDO";
+    if (predPanel.sma20 !== null && predPanel.sma20 !== undefined && predPanel.sma50 !== null && predPanel.sma50 !== undefined) {
+        const distSMA = ((predPanel.sma20 - predPanel.sma50) / predPanel.sma50) * 100;
+        smaTexto = (distSMA > 0 ? "+" : "") + distSMA.toFixed(2) + "%";
+        if (predPanel.smaAlcista) { colorSMA = "#0ecb81"; estadoSMA = "SMA20 > SMA50"; }
+        else { colorSMA = "#ff2a3b"; estadoSMA = "SMA20 < SMA50"; }
+    }
+
     // Generar destellos eléctricos SVG si la fuerza es extrema
     const lightning = (Math.abs(cdcVal) > 70) ? `
         <g opacity="0.85" style="animation:blinker-glow 0.3s linear infinite;">
@@ -6994,6 +7293,25 @@ function actualizarTacometroDerecho() {
                 <div style="height:4px;background:rgba(255,255,255,0.06);border-radius:4px;margin-top:5px;overflow:hidden;">
                     <div style="height:100%;width:${rsiVal || 50}%;background:${colorRSI};border-radius:4px;"></div>
                 </div>
+            </div>
+        </div>
+
+        <!-- Indicadores nuevos: SMA · DMI/ADX · VWAP -->
+        <div class="grid-indicators" style="grid-template-columns: 1fr 1fr 1fr; margin-top:8px;">
+            <div class="indicator-box" style="text-align:center;">
+                <div class="indicator-label" style="justify-content:center;"><i class="fas fa-chart-line"></i> SMA 20/50</div>
+                <div class="indicator-value" style="color:${colorSMA};">${smaTexto}</div>
+                <div style="font-size:9px; color:${colorSMA}; font-weight:700; text-transform:uppercase;">${estadoSMA}</div>
+            </div>
+            <div class="indicator-box" style="text-align:center;">
+                <div class="indicator-label" style="justify-content:center;"><i class="fas fa-compass"></i> DMI/ADX</div>
+                <div class="indicator-value" style="color:${colorADX};">${adxTexto}</div>
+                <div style="font-size:9px; color:${colorADX}; font-weight:700; text-transform:uppercase;">${estadoADX}</div>
+            </div>
+            <div class="indicator-box" style="text-align:center;">
+                <div class="indicator-label" style="justify-content:center;"><i class="fas fa-balance-scale"></i> VWAP 24H</div>
+                <div class="indicator-value" style="color:${colorVWAP};">${vwapTexto}</div>
+                <div style="font-size:9px; color:${colorVWAP}; font-weight:700; text-transform:uppercase;">${estadoVWAP}</div>
             </div>
         </div>
 
