@@ -2084,6 +2084,25 @@ let techoScoreHistorial = {}; // historial de score de techo
 // todo, porque ahí ya sería otra cosa).
 let techoTocado100Ts = {}; // symbol -> Date.now() de la última vez que tocó >=99.5%
 const VENTANA_GRACIA_TECHO_MS = 90 * 1000; // 90 segundos de gracia tras tocar el 100%
+
+// ── CONTADOR DE TOQUES AL TECHO (DOBLE / TRIPLE TECHO) ──────────────
+// Si una moneda ya tocó su máximo de 24h, se alejó, y VUELVE a acercarse
+// a ese mismo nivel una 2ª o 3ª vez, se considera que ya se formó una
+// resistencia real (techo confirmado) → mucha más probabilidad de una
+// buena bajada que la primera vez que toca el máximo. Aquí llevamos la
+// cuenta de esos toques, por moneda, mientras el máximo de 24h no cambie
+// (si hace un máximo NUEVO más alto, es un techo distinto y se reinicia).
+let techoToques = {}; // symbol -> { toques: [ts,...], nivel: precio de referencia del techo, enZona: bool }
+// Umbrales basados en DISTANCIA REAL DE PRECIO al nivel de referencia (no en el
+// "highPrice" rodante de Binance, que cambia solo con el tiempo aunque el precio
+// no se mueva, y por eso generaba conteos incorrectos).
+const TECHO_TOLERANCIA_PCT = 1.5; // el precio debe estar a <=1.5% del nivel para contar como "toque"
+const TECHO_SALIDA_PCT     = 5;   // debe alejarse a >=5% del nivel para que el próximo acercamiento cuente como nuevo toque
+
+// ── Lo mismo pero sobre la ventana de 48 HORAS ──
+let techoToques48h = {}; // symbol -> { toques: [ts,...], refMax: precio, enZona: bool }
+const UMBRAL_ZONA_TECHO_48H        = 3;  // <=3% de distancia al máximo 48h = "en zona de techo"
+const UMBRAL_SALIDA_ZONA_TECHO_48H = 10; // hay que alejarse a >=10% para que el próximo acercamiento cuente como nuevo toque
         let contadorAvisosMismoEstado = 0;
         let ultimaAlertaVoz = "";
 
@@ -4040,8 +4059,10 @@ function renderizarTickerNoticias() {
 let datosEMA = {};          // { symbol: { ema7, ema25, ema99, ema7Prev, ema25Prev, ema99Prev, minimo48h, alineadasAlcista, subidaDesdeMinimo } }
 let colaSimbolosEMA = [];   // cola de símbolos pendientes de actualizar EMA (rotamos para no saturar la API)
 let indiceEMAActual = 0;
-const EMA_LOTE_POR_CICLO = 15;      // cuántos símbolos actualizamos cada ciclo de refresco EMA
+const EMA_LOTE_POR_CICLO = 35;      // cuántos símbolos actualizamos cada ciclo de refresco EMA (antes 15; ahora se piden en paralelo así que se puede subir sin alargar el ciclo)
 const EMA_INTERVALO_MS = 8 * 1000; // cada 8s actualizamos un lote (rotación completa mucho más rápida)
+const EMA_LOTE_RAFAGA_INICIAL = 60; // lote más grande SOLO en los primeros ciclos al abrir la app, para que el "calculando…" desaparezca rápido
+let ciclosEMARestantesRafaga = 4;   // cuántos ciclos usan el lote grande antes de volver al tamaño normal
 
 function calcularEMASerie(valores, periodo) {
     if (valores.length < periodo) return null;
@@ -4158,11 +4179,35 @@ function calcularVWAP(highs, lows, closes, volumenes, velas = 24) {
 
 async function actualizarEMASimbolo(symbol) {
     try {
-        // 150 velas de 1h ≈ 6.25 días, más que suficiente para EMA99 + ver 24-48h de mínimo
-        const res = await fetch(`https://api.binance.com/api/v3/klines?symbol=${symbol}&interval=1h&limit=150`);
-        if (!res.ok) return;
+        // 150 velas de 1h ≈ 6.25 días, más que suficiente para EMA99 + ver 24-48h de mínimo.
+        // MISMO fallback que usa obtenerDatosBinance() para el ticker en vivo:
+        // fapi.binance.com (Futuros) es el que SÍ funciona en este hosting; si falla,
+        // caemos a data-api.binance.vision y luego a api.binance.com (Spot) como
+        // último recurso. Antes esto solo intentaba api.binance.com directo, por eso
+        // se quedaba "calculando…" para siempre en hostings donde ese dominio está
+        // bloqueado (mismo problema regional/CORS que ya tenían resuelto para el precio).
+        let res;
+        try {
+            res = await fetch(`https://fapi.binance.com/fapi/v1/klines?symbol=${symbol}&interval=1h&limit=150`);
+            if (!res.ok) throw new Error('fapi klines no OK: ' + res.status);
+        } catch (eFapi) {
+            try {
+                res = await fetch(`https://data-api.binance.vision/api/v3/klines?symbol=${symbol}&interval=1h&limit=150`);
+                if (!res.ok) throw new Error('vision klines no OK: ' + res.status);
+            } catch (eVision) {
+                res = await fetch(`https://api.binance.com/api/v3/klines?symbol=${symbol}&interval=1h&limit=150`);
+            }
+        }
+        if (!res.ok) {
+            // Los 3 endpoints fallaron: marcamos error en vez de dejarlo "calculando" para siempre.
+            datosEMA[symbol] = { ...(datosEMA[symbol] || {}), errorCarga72h: true };
+            return;
+        }
         const klines = await res.json();
-        if (!Array.isArray(klines) || klines.length < 100) return;
+        if (!Array.isArray(klines) || klines.length < 100) {
+            datosEMA[symbol] = { ...(datosEMA[symbol] || {}), errorCarga72h: true };
+            return;
+        }
 
         const cierres = klines.map(k => parseFloat(k[4]));
         const altos   = klines.map(k => parseFloat(k[2]));
@@ -4206,27 +4251,151 @@ async function actualizarEMASimbolo(symbol) {
         const precioSobreVwap = vwap !== null ? precioActual > vwap : null;
         const distVwapPct = vwap !== null ? ((precioActual - vwap) / vwap) * 100 : null;
 
+        // ── ESCANEO REAL DE 72 HORAS (3 DÍAS) — CUÁNTAS VECES TOCÓ SU MÁXIMO DE 24H ──
+        // A diferencia del contador "en vivo" (que solo cuenta lo que pasa mientras
+        // la app está abierta), esto analiza las velas HISTÓRICAS REALES de Binance
+        // (ya descargadas arriba: 150 velas de 1h ≈ 6.25 días) y toma exactamente
+        // las últimas 72 (72 horas = 3 días). Da un número con CERTEZA, sin importar
+        // cuándo se abrió la app ni reinicios de sesión.
+        //
+        // NIVEL DE REFERENCIA: el máximo de 24H ACTUAL (el highPrice que reporta el
+        // ticker en vivo de Binance, mismo valor que usa el resto del panel — ver
+        // cachedData[symbol].high). Ese valor se mueve solo, hora a hora, con la
+        // ventana rodante de 24h. ANTES se usaba el máximo fijo de los 3 días
+        // completos como referencia, que casi nunca coincide con el máximo de 24h
+        // real si el pico ocurrió hace más de un día (mezclaba dos cosas distintas).
+        // Si por algún motivo el ticker en vivo todavía no está disponible para este
+        // símbolo, se cae de vuelta al máximo de las últimas 24 velas (fallback local).
+        // ── ESCANEO REAL DE 72 HORAS (3 DÍAS) — CUÁNTAS VECES TOCÓ SU MÁXIMO DE 24H ──
+        // A diferencia del contador "en vivo" (que solo cuenta lo que pasa mientras
+        // la app está abierta), esto analiza las velas HISTÓRICAS REALES de Binance
+        // (ya descargadas arriba: 150 velas de 1h ≈ 6.25 días) y toma exactamente
+        // las últimas 72 (72 horas = 3 días). Da un número con CERTEZA, sin importar
+        // cuándo se abrió la app ni reinicios de sesión.
+        //
+        // NIVEL DE REFERENCIA: el máximo de 24H ACTUAL (el highPrice que reporta el
+        // ticker en vivo de Binance, mismo valor que usa el resto del panel — ver
+        // cachedData[symbol].high). Ese valor se mueve solo, hora a hora, con la
+        // ventana rodante de 24h. ANTES se usaba el máximo fijo de los 3 días
+        // completos como referencia, que casi nunca coincide con el máximo de 24h
+        // real si el pico ocurrió hace más de un día (mezclaba dos cosas distintas).
+        // Si por algún motivo el ticker en vivo todavía no está disponible para este
+        // símbolo, se cae de vuelta al máximo de las últimas 24 velas (fallback local).
+        const velas72h = altos.slice(-72);
+        const bajos72h = bajos.slice(-72);
+        const velas24hFallback = altos.slice(-24);
+        const maximo24hActual = (cachedData[symbol] && cachedData[symbol].high > 0)
+            ? cachedData[symbol].high
+            : (velas24hFallback.length ? Math.max(...velas24hFallback) : null);
+
+        let vecesEnTecho72h = 0;
+        let nivelTecho72h = maximo24hActual;
+        let acercandoseATecho72h = false; // ya tocó antes, se alejó, y está subiendo otra vez hacia el mismo nivel
+        if (velas72h.length >= 8 && maximo24hActual) {
+            // Umbral de "salida de zona" ADAPTATIVO según la volatilidad real de
+            // CADA moneda en sus últimas 72h. ANTES era un 5% fijo para todas: para
+            // una altcoin con un rango de 72h de solo 2-3% el precio NUNCA se alejaba
+            // lo suficiente según ese criterio, así que el contador se quedaba pegado
+            // en 1 toque para siempre, aunque hubiera bajado y vuelto a subir varias
+            // veces de forma bien visible en el gráfico. Ahora el umbral se calcula
+            // como una fracción del rango real de la moneda (con piso y techo para
+            // no quedar ni demasiado sensible al ruido ni demasiado exigente).
+            const minimo72h = bajos72h.length ? Math.min(...bajos72h) : maximo24hActual;
+            const rango72hPct = maximo24hActual > 0 ? ((maximo24hActual - minimo72h) / maximo24hActual) * 100 : 0;
+            const salidaAdaptativa = Math.min(5, Math.max(1.8, rango72hPct * 0.3));
+
+            let _enZona72 = false;
+            velas72h.forEach(h => {
+                const dist = ((maximo24hActual - h) / maximo24hActual) * 100;
+                if (dist <= TECHO_TOLERANCIA_PCT) {
+                    if (!_enZona72) { vecesEnTecho72h++; _enZona72 = true; }
+                } else if (dist >= salidaAdaptativa) {
+                    _enZona72 = false;
+                }
+            });
+
+            // ── ¿ESTÁ A PUNTO DE VOLVER A TOCAR EL TECHO? ──
+            // Ya tocó el máximo al menos 1 vez, ahora mismo NO está en zona (se
+            // alejó lo suficiente), pero las últimas velas muestran que viene
+            // subiendo otra vez hacia ese mismo nivel. Útil para agarrar la moneda
+            // ANTES de que confirme el segundo/tercer toque, no después.
+            if (vecesEnTecho72h >= 1 && !_enZona72) {
+                const distAhora = ((maximo24hActual - velas72h[velas72h.length - 1]) / maximo24hActual) * 100;
+                const cierresRecientes = cierres.slice(-4);
+                const subiendo = cierresRecientes.length >= 2 && cierresRecientes[cierresRecientes.length - 1] > cierresRecientes[0];
+                if (distAhora <= salidaAdaptativa && subiendo) acercandoseATecho72h = true;
+            }
+        }
+
         datosEMA[symbol] = {
             ema7, ema25, ema99, ema7Prev, ema25Prev, ema99Prev, minimo48h, subidaDesdeMinimo, alineadasAlcista,
             sma20, sma50, sma20Prev, smaAlcista,
             adx, diPlus, diMinus, tendenciaFuerte, direccionDMI,
             vwap, precioSobreVwap, distVwapPct,
+            vecesEnTecho72h, nivelTecho72h, acercandoseATecho72h,
             actualizado: Date.now()
         };
     } catch (e) {
-        // silencioso: si falla un símbolo puntual, simplemente no se actualiza este ciclo
+        // Si falla algo (no solo el fetch, cualquier parte del cálculo), marcamos
+        // error en vez de dejarlo "calculando" para siempre en el panel.
+        datosEMA[symbol] = { ...(datosEMA[symbol] || {}), errorCarga72h: true };
     }
 }
+
+// Devuelve cuántas veces (con certeza, según velas históricas reales de 72h) una
+// moneda tocó su máximo. Si todavía no se calculó (recién arrancó la app / le toca
+// esperar su turno en la cola de actualización EMA), devuelve null para que el
+// panel pueda mostrar "calculando…" en vez de un 0 engañoso.
+function obtenerToques72h(symbol) {
+    const e = datosEMA[symbol];
+    if (!e || e.vecesEnTecho72h === undefined) return null;
+    return e.vecesEnTecho72h;
+}
+
+// true si la moneda ya tocó su techo antes, se alejó, y está subiendo otra vez
+// hacia ese mismo nivel ahora mismo (todavía no confirmó el 2º/3er toque, pero
+// va en camino). Sirve para agarrarla ANTES de que el toque se confirme.
+function estaAcercandoseATecho72h(symbol) {
+    const e = datosEMA[symbol];
+    return !!(e && e.acercandoseATecho72h);
+}
+
+// true si el símbolo "cumple los requisitos" que pediste: ya tocó su máximo de
+// 24h dos o más veces en las últimas 72h (techo confirmado con rebote real),
+// O tocó al menos una vez y está subiendo otra vez hacia el mismo nivel ahora.
+function tieneTechoRelevante72h(symbol) {
+    const e = datosEMA[symbol];
+    if (!e || e.vecesEnTecho72h === undefined) return false;
+    return e.vecesEnTecho72h >= 2 || !!e.acercandoseATecho72h;
+}
+
+// true si los 3 endpoints de Binance fallaron al traer las velas de 72h para esta moneda
+function hayErrorEscaneo72h(symbol) {
+    const e = datosEMA[symbol];
+    return !!(e && e.errorCarga72h && e.vecesEnTecho72h === undefined);
+}
+
 
 async function cicloActualizacionEMA() {
     const symbols = Object.keys(cachedData);
     if (symbols.length === 0) return;
     if (colaSimbolosEMA.length === 0) colaSimbolosEMA = [...symbols]; // rellenar cola al vaciarse
 
-    const lote = colaSimbolosEMA.splice(0, EMA_LOTE_POR_CICLO);
-    for (const symbol of lote) {
-        await actualizarEMASimbolo(symbol);
-    }
+    // ── RÁFAGA INICIAL: los primeros ciclos tras abrir la app usan un lote
+    // más grande para que el "calculando…" desaparezca lo antes posible. Después
+    // de esos ciclos se vuelve al tamaño normal para no forzar la API de Binance.
+    const tamanoLote = ciclosEMARestantesRafaga > 0 ? EMA_LOTE_RAFAGA_INICIAL : EMA_LOTE_POR_CICLO;
+    if (ciclosEMARestantesRafaga > 0) ciclosEMARestantesRafaga--;
+
+    const lote = colaSimbolosEMA.splice(0, tamanoLote);
+
+    // ── ANTES: se pedía cada moneda una por una (await dentro del for), así que
+    // un lote de 15 tardaba la SUMA de las 15 peticiones (varios segundos).
+    // AHORA: se piden todas al mismo tiempo con Promise.all → el lote entero
+    // tarda lo mismo que la petición MÁS LENTA, no la suma de todas. Esto es lo
+    // que más acelera que los datos dejen de mostrar "calculando…".
+    await Promise.all(lote.map(symbol => actualizarEMASimbolo(symbol)));
+
     actualizarTablaIzquierda(); // refrescar tabla con los nuevos datos EMA disponibles
 }
 
@@ -4439,6 +4608,37 @@ async function obtenerDatosBinance() {
             if (posicionPorcentaje >= 99.5) {
                 techoTocado100Ts[item.symbol] = ahoraTs; // marca el instante exacto del toque de techo
             }
+
+            // ── Contar toques al mismo techo (doble/triple techo) ──
+            // OJO: NO usamos el "highPrice" que reporta Binance como referencia,
+            // porque es una ventana RODANTE de 24h que cambia sola con el paso del
+            // tiempo (aunque la moneda no haga nada nuevo), y eso reseteaba el
+            // conteo por error aunque el precio siguiera tocando el mismo nivel.
+            // En su lugar usamos un NIVEL FIJO basado en el precio real: solo se
+            // considera "techo nuevo" si el precio realmente ROMPE ese nivel.
+            if (!techoToques[item.symbol]) techoToques[item.symbol] = { toques: [], nivel: high, enZona: false };
+            const _tt = techoToques[item.symbol];
+            // Breakout real: el precio supera el nivel de referencia por más del
+            // margen de tolerancia → ya no es el mismo techo, es una resistencia
+            // nueva y más alta, se reinicia el conteo.
+            if (precio > _tt.nivel * (1 + TECHO_TOLERANCIA_PCT / 100)) {
+                _tt.nivel = precio;
+                _tt.toques = [];
+                _tt.enZona = false;
+            }
+            const _distNivel = _tt.nivel > 0 ? ((_tt.nivel - precio) / _tt.nivel) * 100 : 999;
+            if (_distNivel <= TECHO_TOLERANCIA_PCT) {
+                if (!_tt.enZona) {
+                    // Transición de "lejos del techo" a "en zona de techo" = un toque nuevo
+                    _tt.toques.push(ahoraTs);
+                    _tt.toques = _tt.toques.filter(ts => (ahoraTs - ts) <= 24 * 3600 * 1000); // solo cuentan toques dentro de las últimas 24h
+                    _tt.enZona = true;
+                }
+                if (precio > _tt.nivel) _tt.nivel = precio; // ajusta el nivel levemente hacia arriba sin perder el conteo
+            } else if (_distNivel >= TECHO_SALIDA_PCT) {
+                _tt.enZona = false; // se alejó lo suficiente: el próximo acercamiento contará como nuevo toque
+            }
+            const vecesEnTechoActual = techoToques[item.symbol].toques.length;
             if (maximo24hValor[item.symbol] === undefined || high !== maximo24hValor[item.symbol]) {
                 // El máximo reportado cambió: o se hizo un máximo nuevo ahora mismo,
                 // o el máximo anterior salió de la ventana de 24h y aparece otro "techo".
@@ -4541,7 +4741,8 @@ async function obtenerDatosBinance() {
                 bloqueEstudio24h: bloqueEstudio24h,
                 horasParaRenovarVentana: horasParaRenovarVentana,
                 estaCayendoDesdeMaximo: precio < maximo24hValor[item.symbol],
-                estaSubiendoDesdeMinimo: precio > minimo24hValor[item.symbol]
+                estaSubiendoDesdeMinimo: precio > minimo24hValor[item.symbol],
+                vecesEnTechoActual: vecesEnTechoActual // cuántas veces tocó este mismo techo (2 = doble techo, 3+ = triple techo)
             };
             
             soporteCDC[item.symbol] = low;
@@ -4557,6 +4758,28 @@ async function obtenerDatosBinance() {
             cachedData[item.symbol].caidaDesdeMaximo48h = maximo48h[item.symbol] > 0
                 ? ((maximo48h[item.symbol] - precio) / maximo48h[item.symbol]) * 100
                 : 999;
+
+            // ── Contar toques al techo de 48 HORAS (mismo concepto que el de 24h,
+            // pero sobre la ventana de 48h) ──
+            if (!techoToques48h[item.symbol]) techoToques48h[item.symbol] = { toques: [], refMax: maximo48h[item.symbol], enZona: false };
+            const _tt48 = techoToques48h[item.symbol];
+            if (maximo48h[item.symbol] > _tt48.refMax * 1.0005) {
+                // Nuevo máximo de 48h más alto → techo distinto, se reinicia el conteo
+                _tt48.toques = [];
+                _tt48.refMax = maximo48h[item.symbol];
+                _tt48.enZona = false;
+            }
+            const _caida48 = cachedData[item.symbol].caidaDesdeMaximo48h;
+            if (_caida48 <= UMBRAL_ZONA_TECHO_48H) {
+                if (!_tt48.enZona) {
+                    _tt48.toques.push(ahoraTs);
+                    _tt48.toques = _tt48.toques.filter(ts => (ahoraTs - ts) <= 48 * 3600 * 1000); // solo toques dentro de las últimas 48h
+                    _tt48.enZona = true;
+                }
+            } else if (_caida48 >= UMBRAL_SALIDA_ZONA_TECHO_48H) {
+                _tt48.enZona = false;
+            }
+            cachedData[item.symbol].vecesEnTecho48h = techoToques48h[item.symbol].toques.length;
             
             // Estado del motor alcista (despegue EMA / rebote tras caída) para esta moneda,
             // usado cuando estamos en Modo Alcista, para que el panel de detalle muestre
@@ -5256,6 +5479,17 @@ function riesgoSigueSubiendo(symbol) {
 function calcularScoreTecho(c) {
     let score = 0;
 
+    // 0. TECHO REPETIDO (doble/triple techo) — la señal más valiosa: si la moneda
+    // ya volvió a tocar el MISMO máximo 2 o 3 veces, la resistencia está confirmada
+    // y la probabilidad de una buena bajada es mucho mayor. Esto la manda arriba
+    // de la lista frente a una moneda que apenas toca el techo por primera vez.
+    // Se usa el escaneo REAL de 72h (velas históricas, con certeza) como fuente
+    // principal; si todavía no está calculado, se usa el contador en vivo de respaldo.
+    const toques72h = obtenerToques72h(c.symbol);
+    const vecesTecho = toques72h !== null ? toques72h : (c.vecesEnTechoActual || 0);
+    if (vecesTecho >= 3) score += 45;
+    else if (vecesTecho >= 2) score += 30;
+
     // 1. QUÉ TAN CERCA DEL MÁXIMO — usa el más cercano entre 24h y 48h
     const distMax = Math.min(c.caidaDesdeMaximo, c.caidaDesdeMaximo48h !== undefined ? c.caidaDesdeMaximo48h : 999);
     if (distMax <= 0.2) score += 35;
@@ -5321,6 +5555,25 @@ function calcularScoreTecho(c) {
 }
 
 function detectarEnTechoProximaCaida(c) {
+    // Prioriza el escaneo real de 72h (certeza); si aún no está calculado,
+    // usa el contador en vivo de respaldo.
+    const toques72h = obtenerToques72h(c.symbol);
+    const vecesTecho = toques72h !== null ? toques72h : (c.vecesEnTechoActual || 0);
+    const acercandose = estaAcercandoseATecho72h(c.symbol);
+
+    // ── ATAJO: PATRÓN DE TECHO CONFIRMADO ──
+    // Si la moneda YA tocó su máximo de 24h 2 veces o más en las últimas 72h
+    // (bajó y volvió a subir hasta ahí), O está subiendo otra vez hacia ese
+    // mismo nivel después de haberlo tocado antes, ESO YA ES la señal que se
+    // pidió — entra a la lista directo, sin exigir además que esté "agotada"
+    // en este instante. El único filtro que se mantiene es un mínimo de
+    // volumen, para no mostrar monedas sin liquidez real.
+    if (vecesTecho >= 2 || acercandose) {
+        return (c.volume || 0) >= 3000000;
+    }
+
+    // ── Para monedas SIN historial de techo repetido todavía (posible primer
+    // toque): se mantiene el criterio original, más exigente. ──
     // CRITERIO PRINCIPAL: precio debe estar a <=1.5% del máximo de 24h O del máximo de 48h
     const enMaximo24h = c.caidaDesdeMaximo <= 1.5;
     const enMaximo48h = (c.caidaDesdeMaximo48h !== undefined) && (c.caidaDesdeMaximo48h <= 1.5);
@@ -5353,6 +5606,10 @@ function generarPronosticosCaida(c) {
     const pred = prediccionCDC[c.symbol];
     const infl = btcEthInfluencia[c.symbol];
 
+    const _toques72Pron = obtenerToques72h(c.symbol);
+    const _vecesTechoPron = _toques72Pron !== null ? _toques72Pron : (c.vecesEnTechoActual || 0);
+    if (_vecesTechoPron >= 2) señales.unshift(`🔁 ${_vecesTechoPron}ª vez tocando este techo en 72h${_toques72Pron !== null ? ' (confirmado con velas reales)' : ''} → resistencia confirmada, alta probabilidad de caída`);
+    if (estaAcercandoseATecho72h(c.symbol)) señales.unshift(`🔺 Ya tocó este techo antes, bajó, y está subiendo otra vez hacia el mismo nivel ahora mismo`);
     if (c.caidaDesdeMaximo <= 0.5) señales.push("🎯 A solo " + c.caidaDesdeMaximo.toFixed(2) + "% del máximo 24h");
     if (c.caidaDesdeMaximo48h !== undefined && c.caidaDesdeMaximo48h <= 0.5) señales.push("📌 A solo " + c.caidaDesdeMaximo48h.toFixed(2) + "% del máximo 48h");
     if (c.ciclosBajando >= 3) señales.push(`📉 ${c.ciclosBajando}/5 ciclos recientes son bajistas`);
@@ -5696,13 +5953,26 @@ function renderizarRadar() {
             const rsiVal = pred && pred.rsi !== null ? pred.rsi : '—';
             const rsiColor = pred && pred.rsi > 70 ? '#ff2a3b' : '#94a3b8';
             const riesgoCard = riesgoSigueSubiendo(c.symbol);
+            const toques72Card = obtenerToques72h(c.symbol);
+            const errorT72Card = hayErrorEscaneo72h(c.symbol);
+            const vecesTechoCard = toques72Card !== null ? toques72Card : (c.vecesEnTechoActual || 0);
+            const acercandoseCard = estaAcercandoseATecho72h(c.symbol);
 
             h += `
-            <div class="radar-card tipo-techo ${scoreTecho >= 65 ? 'techo-pulsando' : ''}" onclick="cerrarRadarExplosivo(); seleccionarMoneda('${c.symbol}');" style="min-height:180px;">
+            <div class="radar-card tipo-techo ${scoreTecho >= 65 ? 'techo-pulsando' : ''}" onclick="cerrarRadarExplosivo(); seleccionarMoneda('${c.symbol}');" style="min-height:180px;${vecesTechoCard >= 2 ? 'border-color:#ff2a3b;box-shadow:0 0 14px rgba(255,42,59,0.35);' : ''}">
                 <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px;">
                     <div class="radar-coin-nombre" style="color:#fff;">${sym} <span style="font-size:10px;color:#475569;">USDT</span></div>
                     <span style="font-size:13px;">${medalla}</span>
                 </div>
+
+                <!-- NÚMERO GRANDE: veces que tocó su máximo — ESCANEO REAL DE 72H (con certeza, velas históricas) -->
+                <div style="display:flex;align-items:center;gap:8px;background:rgba(255,60,0,0.08);border:1px solid rgba(255,60,0,0.35);border-radius:8px;padding:6px 10px;margin-bottom:6px;">
+                    <div style="font-size:${errorT72Card ? 18 : 28}px;font-weight:900;line-height:1;color:${errorT72Card ? '#ff2a3b' : vecesTechoCard >= 3 ? '#ff2a3b' : vecesTechoCard >= 2 ? '#ff6b00' : '#f3ba2f'};text-shadow:0 0 10px rgba(255,60,0,0.5);">${errorT72Card ? '⚠️' : (toques72Card !== null ? vecesTechoCard : '…')}</div>
+                    <div style="font-size:9px;color:#94a3b8;line-height:1.3;text-transform:uppercase;letter-spacing:0.5px;">${errorT72Card ? 'sin conexión,<br>toca para reintentar' : (toques72Card !== null ? 'veces tocó su<br>techo · 72h (IA)' : 'calculando<br>escaneo 72h…')}</div>
+                </div>
+
+                ${vecesTechoCard >= 2 ? `<div style="font-size:10px;font-weight:900;background:rgba(255,42,59,0.18);color:#ff5566;border:1px solid rgba(255,42,59,0.5);border-radius:6px;padding:3px 6px;margin-bottom:5px;display:inline-block;">🔁 ${vecesTechoCard}X EN EL TECHO EN 72H — RESISTENCIA CONFIRMADA</div>` : ''}
+                ${acercandoseCard ? `<div style="font-size:10px;font-weight:900;background:rgba(0,212,255,0.15);color:#00d4ff;border:1px solid rgba(0,212,255,0.4);border-radius:6px;padding:3px 6px;margin-bottom:5px;display:inline-block;">🔺 SUBIENDO OTRA VEZ HACIA EL TECHO</div>` : ''}
 
                 ${riesgoCard.señales.length > 0 ? `<div style="font-size:9px;background:rgba(243,186,47,0.15);color:#f3ba2f;border:1px solid rgba(243,186,47,0.4);border-radius:6px;padding:3px 6px;margin-bottom:4px;">⚠️ ${riesgoCard.señales.length} señal(es) de tendencia 1h aún alcista — vigilar antes de entrar</div>` : ''}
 
@@ -6203,6 +6473,31 @@ function actualizarPanelCentral() {
             <div style="font-size:22px; font-weight:900; color:${colorCambio};">
                 ${c.change >= 0 ? '+' : ''}${c.change.toFixed(2)}% <span style="font-size:12px; color:#64748b; font-weight:600;">cambio 24h</span>
             </div>
+            <!-- NÚMERO GRANDE: veces que tocó su máximo — ESCANEO REAL DE 72H (velas
+                 históricas reales de Binance, con certeza; no depende de si la app
+                 estuvo abierta todo ese tiempo ni de si ahora mismo está en el máximo) -->
+            ${(() => {
+                const _t72 = obtenerToques72h(selectedCoin);
+                const _errorT72 = hayErrorEscaneo72h(selectedCoin);
+                const _tEfectivo = _t72 !== null ? _t72 : (c.vecesEnTechoActual || 0);
+                const _color = _errorT72 ? '#ff2a3b' : _tEfectivo >= 3 ? '#ff2a3b' : _tEfectivo >= 2 ? '#ff6b00' : _tEfectivo === 1 ? '#f3ba2f' : '#475569';
+                return `<div style="display:inline-flex; align-items:center; gap:10px; background:rgba(255,60,0,0.08); border:1px solid rgba(255,60,0,0.35); border-radius:12px; padding:8px 16px; margin-top:10px;">
+                    <div style="font-size:${_errorT72 ? 22 : 34}px; font-weight:900; line-height:1; color:${_color}; text-shadow:0 0 10px rgba(255,60,0,0.4);">
+                        ${_errorT72 ? '⚠️' : (_t72 !== null ? _tEfectivo : '…')}
+                    </div>
+                    <div style="font-size:10px; color:#94a3b8; text-align:left; line-height:1.3; text-transform:uppercase; letter-spacing:0.5px;">
+                        ${_errorT72
+                            ? 'no se pudo conectar<br>con Binance · reintentar →'
+                            : (_t72 !== null
+                                ? 'veces tocó su máximo<br>escaneo real 72h (IA) ✅'
+                                : 'calculando escaneo<br>real de 72h…')}
+                    </div>
+                    <button onclick="event.stopPropagation(); actualizarEMASimbolo('${selectedCoin}').then(()=>{ if(selectedCoin==='${selectedCoin}') actualizarPanelCentral(); });"
+                        style="background:rgba(255,255,255,0.06); border:1px solid rgba(255,255,255,0.15); color:#cbd5e1; font-size:9px; font-weight:700; border-radius:8px; padding:5px 8px; cursor:pointer; white-space:nowrap;">
+                        🔍 Re-escanear
+                    </button>
+                </div>`;
+            })()}
             ${(() => {
                 const pos = c.posicionPorcentaje || 0;
                 const pct = Math.min(100, Math.max(0, pos));
@@ -7476,16 +7771,25 @@ function _actualizarCarruselIA(listaPrioridadesActual) {
         const posTecho = c.posicionPorcentaje || 0;
         const tocoTechoTs = techoTocado100Ts[sym] || 0;
         const dentroDeGracia = (Date.now() - tocoTechoTs) <= VENTANA_GRACIA_TECHO_MS;
+        const vecesTecho = obtenerToques72h(sym);
+        const vecesTechoEfectivo = vecesTecho !== null ? vecesTecho : (c.vecesEnTechoActual || 0);
+        // TECHO REPETIDO: si ya tocó este mismo máximo 2 o 3 veces (según el
+        // escaneo real de 72h), es una señal de SHORT confirmada por sí sola —
+        // no hace falta esperar al 100% exacto de nuevo, basta con que siga en
+        // zona de techo (>=90%).
+        const esTechoRepetido = vecesTechoEfectivo >= 2 && posTecho >= 90;
         // Pasa si: está EN el 100% ahora mismo, O tocó el 100% hace poco y
-        // todavía sigue cerca del techo (no se desplomó del todo, sigue >=80%).
-        const cumpleTecho = posTecho >= _UMBRAL_TECHO_SHORT || (dentroDeGracia && posTecho >= 80);
-        if (!cumpleTecho) return;                        // requisito duro: techo 100% (o recién tocado)
+        // todavía sigue cerca del techo (no se desplomó del todo, sigue >=80%),
+        // O ya formó un techo repetido (doble/triple techo).
+        const cumpleTecho = posTecho >= _UMBRAL_TECHO_SHORT || (dentroDeGracia && posTecho >= 80) || esTechoRepetido;
+        if (!cumpleTecho) return;                        // requisito duro: techo 100% (o recién tocado, o techo repetido)
         const cambioAbs = Math.abs(c.change || 0);
         if (cambioAbs < 10) return;                       // requisito duro: cambio 24h >= 10%
-        _shortMatches.push({ symbol: sym, tipo: 'EXPLOSIVO_TECHO', tramo: _tramoExplosividadShort(cambioAbs), cambioAbs, posTecho });
+        _shortMatches.push({ symbol: sym, tipo: esTechoRepetido ? 'TECHO_REPETIDO' : 'EXPLOSIVO_TECHO', tramo: _tramoExplosividadShort(cambioAbs), cambioAbs, posTecho, vecesTecho: vecesTechoEfectivo });
     });
-    // Las más explosivas (mayor tramo y mayor % de cambio) van primero
-    _shortMatches.sort((a,b) => (b.tramo - a.tramo) || (b.cambioAbs - a.cambioAbs));
+    // PRIORIDAD MÁXIMA: primero las de techo repetido (más veces primero),
+    // luego por tramo de explosividad y % de cambio.
+    _shortMatches.sort((a,b) => (b.vecesTecho - a.vecesTecho) || (b.tramo - a.tramo) || (b.cambioAbs - a.cambioAbs));
 
     // ── RESPALDO "MEJOR CERCANA" ──
     // Si en este ciclo NINGUNA moneda tocó el 100% (ni siquiera con la
@@ -7611,7 +7915,12 @@ function _iaSubtexto(p) {
         ? ` · 🔶 Rango ${p.posTecho.toFixed(1)}%`
         : '';
 
-    return signo + cambio.toFixed(2) + '% 2m · ' + velTag + usdtTag + rangoTag;
+    // Si es techo repetido (doble/triple techo), lo marcamos como la señal más fuerte
+    const techoRepetidoTag = (p.tipo === 'TECHO_REPETIDO' && p.vecesTecho >= 2)
+        ? ` · 🔁 ${p.vecesTecho}X TECHO`
+        : '';
+
+    return signo + cambio.toFixed(2) + '% 2m · ' + velTag + usdtTag + rangoTag + techoRepetidoTag;
 }
 
 function actualizarAlertaGanadora(alertaActiva) {
@@ -7951,7 +8260,7 @@ if (!_origActualizarTablaIzq2) {
 
     // Sistema de despegue real (EMA7/25/99 + 15% desde mínimo 48h): arranca tras el primer
     // ciclo de precios (necesita cachedData lleno) y luego rota un lote de monedas cada 20s.
-    setTimeout(() => { cicloActualizacionEMA(); }, 4000);
+    setTimeout(() => { cicloActualizacionEMA(); }, 1200);
     setInterval(() => cicloActualizacionEMA(), EMA_INTERVALO_MS);
     setInterval(() => cargarSimbolosFuturosUSDTM(), 30 * 60 * 1000); // refrescar lista de contratos cada 30 min
 });
