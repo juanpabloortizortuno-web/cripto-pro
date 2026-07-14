@@ -2444,9 +2444,20 @@ function renderizarDeslizador() {
     const UMBRAL_MIN = 10;
     let candidatos;
     if (_deslizadorTab === 'max') {
-        // Sin límite: TODAS las monedas que están llegando a su máximo de 24h,
-        // ordenadas por prioridad (la más pegada al techo primero).
-        candidatos = todas.filter(c => c.posicionPorcentaje >= UMBRAL_MAX).sort((a, b) => b.posicionPorcentaje - a.posicionPorcentaje);
+        // PRIORIDAD: primero las monedas que YA tocaron su máximo de 24h, cayeron,
+        // y volvieron a subir a tocarlo de nuevo en el transcurso del día (doble/
+        // triple techo real — usa vecesEnTechoActual, el contador en vivo que ya
+        // corre para TODAS las monedas sin costo extra, sin pedir velas nuevas).
+        // Estas van ANTES que las que están tocando el máximo por primera vez
+        // (recién subiendo, sin historial de rechazo todavía) — así no se
+        // confunde "está subiendo ahora" con "ya rebotó acá antes y volvió".
+        // Sin límite: TODAS las monedas que están llegando a su máximo de 24h.
+        candidatos = todas.filter(c => c.posicionPorcentaje >= UMBRAL_MAX).sort((a, b) => {
+            const toquesA = a.vecesEnTechoActual || 0;
+            const toquesB = b.vecesEnTechoActual || 0;
+            if (toquesB !== toquesA) return toquesB - toquesA; // más toques repetidos = más prioridad
+            return b.posicionPorcentaje - a.posicionPorcentaje; // empate: la más pegada al techo primero
+        });
     } else {
         candidatos = todas.filter(c => c.posicionPorcentaje <= UMBRAL_MIN).sort((a, b) => a.posicionPorcentaje - b.posicionPorcentaje).slice(0, 30);
     }
@@ -2464,9 +2475,14 @@ function renderizarDeslizador() {
         const colorBar = esMax ? `linear-gradient(90deg,#ff2a3b,#ff6b00)` : `linear-gradient(90deg,#0ecb81,#00d4ff)`;
         const vel = c.cambioReal2Min; const colorVel = vel >= 0 ? '#0ecb81' : '#ff2a3b'; const iconoVel = vel >= 0 ? '▲' : '▼';
         const scoreTecho = esMax ? calcularScoreTecho(c) : null;
-        return `<div onclick="seleccionarMoneda('${c.symbol}')" style="background:#080f1e; border:1px solid ${esMax ? 'rgba(255,60,0,0.3)' : 'rgba(14,203,129,0.25)'}; border-radius:8px; padding:8px 10px; cursor:pointer; margin-bottom:2px;">
+        const toquesLive = c.vecesEnTechoActual || 0;
+        // Badge de prioridad: ya tocó, cayó y volvió a subir a tocar el mismo techo.
+        const badgeToques = (esMax && toquesLive >= 2)
+            ? `<span style="background:rgba(255,42,59,0.18); color:#ff2a3b; font-size:9px; font-weight:900; padding:2px 6px; border-radius:5px; margin-left:6px;">🔁 ${toquesLive >= 3 ? 'TRIPLE' : 'DOBLE'} TECHO</span>`
+            : (esMax ? `<span style="background:rgba(255,255,255,0.05); color:#64748b; font-size:9px; font-weight:700; padding:2px 6px; border-radius:5px; margin-left:6px;">🆕 subiendo</span>` : '');
+        return `<div onclick="seleccionarMoneda('${c.symbol}')" style="background:#080f1e; border:1px solid ${esMax ? (toquesLive >= 2 ? 'rgba(255,42,59,0.55)' : 'rgba(255,60,0,0.3)') : 'rgba(14,203,129,0.25)'}; border-radius:8px; padding:8px 10px; cursor:pointer; margin-bottom:2px;">
             <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:4px;">
-                <span style="font-size:12px; font-weight:900; color:#fff;">${nombre}</span>
+                <span style="font-size:12px; font-weight:900; color:#fff;">${nombre}${badgeToques}</span>
                 <span style="font-size:11px; font-weight:900; color:${color};">${posBar}%</span>
             </div>
             <div style="height:3px; background:rgba(255,255,255,0.07); border-radius:3px; overflow:hidden; margin-bottom:5px;">
