@@ -2444,20 +2444,9 @@ function renderizarDeslizador() {
     const UMBRAL_MIN = 10;
     let candidatos;
     if (_deslizadorTab === 'max') {
-        // PRIORIDAD: primero las monedas que YA tocaron su máximo de 24h, cayeron,
-        // y volvieron a subir a tocarlo de nuevo en el transcurso del día (doble/
-        // triple techo real — usa vecesEnTechoActual, el contador en vivo que ya
-        // corre para TODAS las monedas sin costo extra, sin pedir velas nuevas).
-        // Estas van ANTES que las que están tocando el máximo por primera vez
-        // (recién subiendo, sin historial de rechazo todavía) — así no se
-        // confunde "está subiendo ahora" con "ya rebotó acá antes y volvió".
-        // Sin límite: TODAS las monedas que están llegando a su máximo de 24h.
-        candidatos = todas.filter(c => c.posicionPorcentaje >= UMBRAL_MAX).sort((a, b) => {
-            const toquesA = a.vecesEnTechoActual || 0;
-            const toquesB = b.vecesEnTechoActual || 0;
-            if (toquesB !== toquesA) return toquesB - toquesA; // más toques repetidos = más prioridad
-            return b.posicionPorcentaje - a.posicionPorcentaje; // empate: la más pegada al techo primero
-        });
+        // Sin límite: TODAS las monedas que están llegando a su máximo de 24h,
+        // ordenadas por prioridad (la más pegada al techo primero).
+        candidatos = todas.filter(c => c.posicionPorcentaje >= UMBRAL_MAX).sort((a, b) => b.posicionPorcentaje - a.posicionPorcentaje);
     } else {
         candidatos = todas.filter(c => c.posicionPorcentaje <= UMBRAL_MIN).sort((a, b) => a.posicionPorcentaje - b.posicionPorcentaje).slice(0, 30);
     }
@@ -2475,14 +2464,9 @@ function renderizarDeslizador() {
         const colorBar = esMax ? `linear-gradient(90deg,#ff2a3b,#ff6b00)` : `linear-gradient(90deg,#0ecb81,#00d4ff)`;
         const vel = c.cambioReal2Min; const colorVel = vel >= 0 ? '#0ecb81' : '#ff2a3b'; const iconoVel = vel >= 0 ? '▲' : '▼';
         const scoreTecho = esMax ? calcularScoreTecho(c) : null;
-        const toquesLive = c.vecesEnTechoActual || 0;
-        // Badge de prioridad: ya tocó, cayó y volvió a subir a tocar el mismo techo.
-        const badgeToques = (esMax && toquesLive >= 2)
-            ? `<span style="background:rgba(255,42,59,0.18); color:#ff2a3b; font-size:9px; font-weight:900; padding:2px 6px; border-radius:5px; margin-left:6px;">🔁 ${toquesLive >= 3 ? 'TRIPLE' : 'DOBLE'} TECHO</span>`
-            : (esMax ? `<span style="background:rgba(255,255,255,0.05); color:#64748b; font-size:9px; font-weight:700; padding:2px 6px; border-radius:5px; margin-left:6px;">🆕 subiendo</span>` : '');
-        return `<div onclick="seleccionarMoneda('${c.symbol}')" style="background:#080f1e; border:1px solid ${esMax ? (toquesLive >= 2 ? 'rgba(255,42,59,0.55)' : 'rgba(255,60,0,0.3)') : 'rgba(14,203,129,0.25)'}; border-radius:8px; padding:8px 10px; cursor:pointer; margin-bottom:2px;">
+        return `<div onclick="seleccionarMoneda('${c.symbol}')" style="background:#080f1e; border:1px solid ${esMax ? 'rgba(255,60,0,0.3)' : 'rgba(14,203,129,0.25)'}; border-radius:8px; padding:8px 10px; cursor:pointer; margin-bottom:2px;">
             <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:4px;">
-                <span style="font-size:12px; font-weight:900; color:#fff;">${nombre}${badgeToques}</span>
+                <span style="font-size:12px; font-weight:900; color:#fff;">${nombre}</span>
                 <span style="font-size:11px; font-weight:900; color:${color};">${posBar}%</span>
             </div>
             <div style="height:3px; background:rgba(255,255,255,0.07); border-radius:3px; overflow:hidden; margin-bottom:5px;">
@@ -4340,7 +4324,6 @@ async function actualizarEscaneo72h(symbol) {
         const cierres = klines.map(k => parseFloat(k[4]));
         const altos   = klines.map(k => parseFloat(k[2]));
         const bajos   = klines.map(k => parseFloat(k[3]));
-        const volumenes = klines.map(k => parseFloat(k[5]));
         const e7  = calcularEMASerie(cierres, 7);
         const e25 = calcularEMASerie(cierres, 25);
         if (!e7 || !e25) return;
@@ -4353,8 +4336,6 @@ async function actualizarEscaneo72h(symbol) {
         const altos72h  = usar15m ? klines15m.map(k => parseFloat(k[2])) : altos.slice(-72);
         const bajos72h  = usar15m ? klines15m.map(k => parseFloat(k[3])) : bajos.slice(-72);
         const cierres72h = usar15m ? klines15m.map(k => parseFloat(k[4])) : cierres.slice(-72);
-        const volumenes72h = usar15m ? klines15m.map(k => parseFloat(k[5])) : volumenes.slice(-72);
-        const velasPorHora = usar15m ? 4 : 1; // 15min → 4 velas/hora, 1h → 1 vela/hora
         const velas24hFallback = altos.slice(-24);
         const maximo24hActual = (cachedData[symbol] && cachedData[symbol].high > 0)
             ? cachedData[symbol].high
@@ -4369,7 +4350,6 @@ async function actualizarEscaneo72h(symbol) {
         let vecesEnTecho72h = 0;
         let nivelTecho72h = maximo24hActual;
         let acercandoseATecho72h = false; // ya tocó antes, se alejó, y está subiendo otra vez hacia el mismo nivel
-        const eventosToque72h = []; // detalle de cada toque detectado, para que la IA los revise después
         if (altos72h.length >= 8 && maximo24hActual) {
             // Umbral de "salida de zona" ADAPTATIVO según la volatilidad real de
             // CADA moneda en sus últimas 72h. Para una altcoin con rango chico, el
@@ -4379,52 +4359,22 @@ async function actualizarEscaneo72h(symbol) {
             const minimo72h = bajos72h.length ? Math.min(...bajos72h) : maximo24hActual;
             const rango72hPct = maximo24hActual > 0 ? ((maximo24hActual - minimo72h) / maximo24hActual) * 100 : 0;
             const salidaAdaptativa = Math.min(5, Math.max(1.8, rango72hPct * 0.3));
-            const volPromedio72h = volumenes72h.length ? (volumenes72h.reduce((a,b)=>a+b,0) / volumenes72h.length) : 0;
 
             let _enZona72 = false;
-            let _eventoActual = null; // acumula el pico de la zona en curso, para reportarlo a la IA
             altos72h.forEach((h, i) => {
                 const dist = ((maximo24hActual - h) / maximo24hActual) * 100;
                 if (dist <= TECHO_TOLERANCIA_PCT) {
-                    if (!_enZona72) {
-                        vecesEnTecho72h++;
-                        _enZona72 = true;
-                        _eventoActual = { peakHigh: h, peakIndex: i, distPct: dist };
-                    } else if (h > _eventoActual.peakHigh) {
-                        // Dentro de la misma zona: nos quedamos con el pico más alto real
-                        _eventoActual = { peakHigh: h, peakIndex: i, distPct: dist };
-                    }
+                    if (!_enZona72) { vecesEnTecho72h++; _enZona72 = true; }
                 } else {
                     // Segunda forma de confirmar que REALMENTE salió de la zona: cruce
                     // bajista EMA7/EMA25 en la misma escala del escaneo — no espera a
                     // que el precio se aleje el % completo si la tendencia ya se dio vuelta.
                     const cruceBajistaEMA = (e7Escaneo && e25Escaneo && e7Escaneo[i] !== undefined && e25Escaneo[i] !== undefined) && (e7Escaneo[i] < e25Escaneo[i]);
-                    if ((dist >= salidaAdaptativa || cruceBajistaEMA) && _enZona72) {
+                    if (dist >= salidaAdaptativa || cruceBajistaEMA) {
                         _enZona72 = false;
-                        // Cerramos el evento con el dato de la vela pico de esa zona
-                        const pi = _eventoActual.peakIndex;
-                        eventosToque72h.push({
-                            horasAgo: (altos72h.length - 1 - pi) / velasPorHora,
-                            peakHigh: _eventoActual.peakHigh,
-                            distPct: _eventoActual.distPct,
-                            cierre: cierres72h[pi],
-                            volRelativo: volPromedio72h > 0 ? (volumenes72h[pi] / volPromedio72h) : 1
-                        });
-                        _eventoActual = null;
                     }
                 }
             });
-            // Si terminó el escaneo todavía "en zona" (está tocando el techo ahora mismo), igual lo reportamos
-            if (_enZona72 && _eventoActual) {
-                const pi = _eventoActual.peakIndex;
-                eventosToque72h.push({
-                    horasAgo: (altos72h.length - 1 - pi) / velasPorHora,
-                    peakHigh: _eventoActual.peakHigh,
-                    distPct: _eventoActual.distPct,
-                    cierre: cierres72h[pi],
-                    volRelativo: volPromedio72h > 0 ? (volumenes72h[pi] / volPromedio72h) : 1
-                });
-            }
 
             // ── ¿ESTÁ A PUNTO DE VOLVER A TOCAR EL TECHO? ──
             // Ya tocó el máximo al menos 1 vez, ahora mismo NO está en zona (se
@@ -4439,38 +4389,9 @@ async function actualizarEscaneo72h(symbol) {
             }
         }
 
-        // ── VALIDACIÓN CON IA ──────────────────────────────────────────
-        // El conteo de arriba (vecesEnTecho72h) es 100% determinístico, vela por
-        // vela — ese número siempre es exacto y es la base de todo. Lo que hace la
-        // IA es revisar CADA toque detectado (con su distancia al nivel, mecha vs
-        // cierre, y volumen) y decidir si es un rechazo real de la resistencia o
-        // ruido (mecha aislada sin confirmación, toque duplicado, poco volumen) —
-        // el mismo criterio que aplicarías vos mirando el gráfico a ojo. Si la IA
-        // no responde (sin conexión, error, etc.) el panel sigue mostrando el
-        // conteo determinístico normal, sin romperse.
-        let vecesEnTecho72hIA = null;
-        let acercandoseATecho72hIA = null;
-        let detalleToquesIA = null;
-        let resumenIA72h = null;
-        if (eventosToque72h.length > 0) {
-            const distActualIA = altos72h.length ? ((maximo24hActual - altos72h[altos72h.length - 1]) / maximo24hActual) * 100 : null;
-            const cierresRecientesIA = cierres72h.slice(-4);
-            const subiendoIA = cierresRecientesIA.length >= 2 && cierresRecientesIA[cierresRecientesIA.length - 1] > cierresRecientesIA[0];
-            const validacion = await validarToques72hConIA(symbol, maximo24hActual, eventosToque72h, {
-                distActual: distActualIA, subiendo: subiendoIA
-            });
-            if (validacion && Array.isArray(validacion.toques) && validacion.toques.length === eventosToque72h.length) {
-                detalleToquesIA = eventosToque72h.map((ev, idx) => ({ ...ev, real: !!validacion.toques[idx].real }));
-                vecesEnTecho72hIA = detalleToquesIA.filter(t => t.real).length;
-                acercandoseATecho72hIA = typeof validacion.acercandose === 'boolean' ? validacion.acercandose : null;
-                resumenIA72h = typeof validacion.resumen === 'string' ? validacion.resumen.slice(0, 140) : null;
-            }
-        }
-
         datosEMA[symbol] = {
             ...(datosEMA[symbol] || {}),
             vecesEnTecho72h, nivelTecho72h, acercandoseATecho72h,
-            vecesEnTecho72hIA, acercandoseATecho72hIA, detalleToquesIA, resumenIA72h,
             errorCarga72h: false,
             actualizado72h: Date.now()
         };
@@ -4479,78 +4400,22 @@ async function actualizarEscaneo72h(symbol) {
     }
 }
 
-// ── Le pasa a Claude los toques YA DETECTADOS por el algoritmo (no le pide que
-// cuente velas, eso lo hace mal un modelo de lenguaje) y le pide que juzgue,
-// toque por toque, si es un rechazo real de la resistencia o ruido — igual que
-// haría un trader mirando el gráfico fino. Devuelve null si algo falla, para
-// que el llamador use el conteo determinístico sin romper nada.
-async function validarToques72hConIA(symbol, nivel, eventos, actual) {
-    try {
-        const nombre = symbol.replace('USDT', '');
-        const listaEventos = eventos.map((e, idx) =>
-            `${idx + 1}) hace ${e.horasAgo.toFixed(1)}h — máximo alcanzado a ${e.distPct.toFixed(2)}% del nivel, cerró esa vela ${e.cierre < e.peakHigh ? 'por debajo' : 'en'} (dist. cierre-nivel ${(((nivel - e.cierre) / nivel) * 100).toFixed(2)}%), volumen ${e.volRelativo.toFixed(1)}x el promedio de las 72h`
-        ).join('\n');
-
-        const prompt = `Sos un analista técnico experto en price action de futuros cripto. Un algoritmo detectó estos posibles TOQUES al máximo de 24h de ${nombre} (nivel de referencia: ${nivel}) en las últimas 72 horas.
-
-Revisá CADA toque y decidí si es un TOQUE REAL de resistencia (el precio se acercó de verdad y fue rechazado, con cierre cerca del nivel y/o volumen que lo confirme) o RUIDO (mecha aislada sin confirmación, poco volumen, o básicamente el mismo movimiento que el toque anterior).
-
-TOQUES DETECTADOS:
-${listaEventos}
-
-SITUACIÓN ACTUAL: distancia al máximo ahora mismo: ${actual.distActual !== null ? actual.distActual.toFixed(2) + '%' : 'N/A'}. ¿Viene subiendo en las últimas velas?: ${actual.subiendo ? 'SÍ' : 'NO'}.
-
-Respondé SOLO con JSON válido, sin texto antes ni después ni backticks, con este formato EXACTO:
-{"toques":[{"real":true},{"real":false}],"acercandose":true,"resumen":"frase corta de máximo 15 palabras"}
-
-El array "toques" debe tener EXACTAMENTE ${eventos.length} elementos, en el mismo orden que la lista de arriba.`;
-
-        const resp = await fetch("https://api.anthropic.com/v1/messages", {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({
-                model: "claude-sonnet-4-6",
-                max_tokens: 500,
-                messages: [{ role: "user", content: prompt }]
-            })
-        });
-        const data = await resp.json();
-        const texto = (data.content || []).map(b => b.text || '').join('').trim();
-        const limpio = texto.replace(/```json|```/g, '').trim();
-        const parsed = JSON.parse(limpio);
-        return parsed;
-    } catch (e) {
-        return null;
-    }
-}
-
 // Devuelve cuántas veces (con certeza, según velas históricas reales de 72h) una
-// moneda tocó su máximo. Si la IA validó los toques y descartó ruido, devuelve
-// ese número (más preciso); si la IA no respondió, cae al conteo determinístico
-// crudo. Si todavía no se calculó nada, devuelve null para que el panel pueda
-// mostrar "calculando…" en vez de un 0 engañoso.
+// moneda tocó su máximo. Si todavía no se calculó (recién se seleccionó la
+// moneda y el escaneo 72h está en curso), devuelve null para que el panel
+// pueda mostrar "calculando…" en vez de un 0 engañoso.
 function obtenerToques72h(symbol) {
     const e = datosEMA[symbol];
     if (!e || e.vecesEnTecho72h === undefined) return null;
-    return e.vecesEnTecho72hIA !== null && e.vecesEnTecho72hIA !== undefined ? e.vecesEnTecho72hIA : e.vecesEnTecho72h;
-}
-
-// true si la validación con IA está disponible para esta moneda (para mostrar
-// el badge "✨ validado por IA" en el panel en vez del conteo crudo sin revisar).
-function tieneValidacionIA72h(symbol) {
-    const e = datosEMA[symbol];
-    return !!(e && e.vecesEnTecho72hIA !== null && e.vecesEnTecho72hIA !== undefined);
+    return e.vecesEnTecho72h;
 }
 
 // true si la moneda ya tocó su techo antes, se alejó, y está subiendo otra vez
 // hacia ese mismo nivel ahora mismo (todavía no confirmó el 2º/3er toque, pero
 // va en camino). Sirve para agarrarla ANTES de que el toque se confirme.
-// Prioriza el veredicto de la IA si está disponible.
 function estaAcercandoseATecho72h(symbol) {
     const e = datosEMA[symbol];
-    if (!e) return false;
-    if (e.acercandoseATecho72hIA !== null && e.acercandoseATecho72hIA !== undefined) return !!e.acercandoseATecho72hIA;
-    return !!e.acercandoseATecho72h;
+    return !!(e && e.acercandoseATecho72h);
 }
 
 // true si el símbolo "cumple los requisitos" que pediste: ya tocó su máximo de
@@ -4559,8 +4424,7 @@ function estaAcercandoseATecho72h(symbol) {
 function tieneTechoRelevante72h(symbol) {
     const e = datosEMA[symbol];
     if (!e || e.vecesEnTecho72h === undefined) return false;
-    const veces = obtenerToques72h(symbol);
-    return veces >= 2 || estaAcercandoseATecho72h(symbol);
+    return e.vecesEnTecho72h >= 2 || !!e.acercandoseATecho72h;
 }
 
 // true si los 3 endpoints de Binance fallaron al traer las velas de 72h para esta moneda
@@ -6680,8 +6544,6 @@ function actualizarPanelCentral() {
             ${(() => {
                 const _t72 = obtenerToques72h(selectedCoin);
                 const _errorT72 = hayErrorEscaneo72h(selectedCoin);
-                const _conIA = tieneValidacionIA72h(selectedCoin);
-                const _resumenIA = (datosEMA[selectedCoin] || {}).resumenIA72h;
                 const _tEfectivo = _t72 !== null ? _t72 : (c.vecesEnTechoActual || 0);
                 const _color = _errorT72 ? '#ff2a3b' : _tEfectivo >= 3 ? '#ff2a3b' : _tEfectivo >= 2 ? '#ff6b00' : _tEfectivo === 1 ? '#f3ba2f' : '#475569';
                 return `<div style="display:inline-flex; align-items:center; gap:10px; background:rgba(255,60,0,0.08); border:1px solid rgba(255,60,0,0.35); border-radius:12px; padding:8px 16px; margin-top:10px;">
@@ -6692,11 +6554,8 @@ function actualizarPanelCentral() {
                         ${_errorT72
                             ? 'no se pudo conectar<br>con Binance · reintentar →'
                             : (_t72 !== null
-                                ? (_conIA
-                                    ? 'veces tocó su máximo<br>✨ validado por IA · 72h'
-                                    : 'veces tocó su máximo<br>escaneo real 72h (sin revisar) ✅')
+                                ? 'veces tocó su máximo<br>escaneo real 72h (IA) ✅'
                                 : 'calculando escaneo<br>real de 72h…')}
-                        ${(!_errorT72 && _resumenIA) ? `<div style="color:#f3ba2f; font-weight:700; margin-top:3px; text-transform:none; letter-spacing:0; font-size:10px;">💬 ${_resumenIA}</div>` : ''}
                     </div>
                     <button onclick="event.stopPropagation(); actualizarEscaneo72h('${selectedCoin}').then(()=>{ if(selectedCoin==='${selectedCoin}') actualizarPanelCentral(); });"
                         style="background:rgba(255,255,255,0.06); border:1px solid rgba(255,255,255,0.15); color:#cbd5e1; font-size:9px; font-weight:700; border-radius:8px; padding:5px 8px; cursor:pointer; white-space:nowrap;">
