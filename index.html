@@ -158,6 +158,29 @@
             from { opacity: 0.3; transform: scale(0.9); }
             to   { opacity: 1;   transform: scale(1.1); }
         }
+        /* ── 💎🟡 DIAMANTE DE ORO: la moneda que SI O SI ya viene cayendo desde su
+           máximo, sin fuerza para volver a subir, con movimiento bajista rápido
+           o tremendo confirmado. Es la señal más fuerte de todo el sistema, así
+           que parpadea en dorado con un diamante para que sea imposible no verla,
+           tanto en la lista principal como en el panel central. ── */
+        @keyframes diamante-oro-parpadeo {
+            0%   { box-shadow: 0 0 6px 2px rgba(255,215,0,0.35);  border-color: #ffd700; background-color: rgba(255,215,0,0.06); }
+            50%  { box-shadow: 0 0 26px 10px rgba(255,215,0,0.95); border-color: #fff6c8; background-color: rgba(255,215,0,0.28); }
+            100% { box-shadow: 0 0 6px 2px rgba(255,215,0,0.35);  border-color: #ffd700; background-color: rgba(255,215,0,0.06); }
+        }
+        .diamante-oro-fila {
+            animation: diamante-oro-parpadeo 0.9s ease-in-out infinite !important;
+            border-left: 4px solid #ffd700 !important;
+        }
+        .diamante-oro-badge {
+            display: inline-flex; align-items: center; gap: 5px;
+            background: linear-gradient(90deg,#ffd700,#ffb800);
+            color: #1a1200; font-size: 10px; font-weight: 900;
+            padding: 4px 10px; border-radius: 8px;
+            letter-spacing: 0.3px; margin-top: 3px;
+            animation: diamante-oro-parpadeo 0.9s ease-in-out infinite;
+            border: 1px solid #fff6c8;
+        }
         /* ── BOTÓN DE ALARMA LATERAL (compra/venta directo a Binance) ── */
         @keyframes alarma-parpadeo-verde {
             from { box-shadow: 0 0 8px rgba(14,203,129,0.45); transform: scale(0.99); }
@@ -2434,7 +2457,7 @@ let binanceAlarmaSymbol = null;
 function abrirBinanceAlarma() {
     if (!binanceAlarmaSymbol) return;
     initAudio();
-    window.open(`https://www.binance.com/es/futures/${binanceAlarmaSymbol}`, '_blank');
+    abrirParEnBinance(binanceAlarmaSymbol);
 }
 
 // ── Cache de análisis IA para no llamar en cada tick ──
@@ -2773,30 +2796,36 @@ function _aplicarResultadoIA(btn, txt, nombre, cache, esCompra, esVenta, pred) {
     }
 }
 
-function abrirEnApp() {
-    if (!selectedCoin) return;
-    const par = selectedCoin;
+// ══════════════════════════════════════════════════════════════════
+// Función compartida: abre un par de Binance Futures de la forma más directa
+// posible según la plataforma (Android/iOS/escritorio). La reutilizan tanto
+// el botón "Abrir en app" del panel principal como el botón de alarma lateral,
+// para que ambos abran la app instantáneamente en el celular.
+// ══════════════════════════════════════════════════════════════════
+function abrirParEnBinance(par) {
+    if (!par) return;
     const urlWeb = `https://www.binance.com/es/futures/${par}`;
     const isAndroid = /Android/i.test(navigator.userAgent);
     const isIOS = /iPhone|iPad|iPod/i.test(navigator.userAgent);
 
     if (isAndroid) {
-        // Intentar primero el deep link directo binance:// (funciona si la app está instalada)
-        window.location.href = `binance://futures/trade?symbol=${par}`;
-        // Fallback: si no abre en 1.2s, abrir intent con fallback a web
-        setTimeout(() => {
-            const intentUrl = `intent://app.binance.com/es/futures/${par}#Intent;scheme=bnc;package=com.binance.dev;S.browser_fallback_url=${encodeURIComponent(urlWeb)};end`;
-            window.location.href = intentUrl;
-        }, 1200);
-        // Último fallback a web
-        setTimeout(() => { window.location.href = urlWeb; }, 2500);
+        // Un solo salto vía "intent://" (patrón oficial de Android): declara el
+        // paquete real de Binance y un fallback web integrado. Android abre la
+        // app directo si está instalada, o el navegador si no — sin parpadeos.
+        const intentUrl = `intent://www.binance.com/es/futures/${par}#Intent;scheme=https;package=com.binance.dev;S.browser_fallback_url=${encodeURIComponent(urlWeb)};end`;
+        window.location.href = intentUrl;
     } else if (isIOS) {
-        // iOS: intentar deep link directo primero
-        window.location.href = `binance://futures/trade?symbol=${par}`;
-        setTimeout(() => { window.location.href = urlWeb; }, 1000);
+        // Universal Link: iOS intercepta el https:// y abre la app directo en
+        // esa moneda si está instalada; si no, cae solo a Safari.
+        window.location.href = urlWeb;
     } else {
         window.open(urlWeb, '_blank');
     }
+}
+
+function abrirEnApp() {
+    if (!selectedCoin) return;
+    abrirParEnBinance(selectedCoin);
 }
 
 // Cache de voces separadas por género
@@ -3403,7 +3432,7 @@ function buscarMoneda() {
     } else if (query === 'AGOTADO') {
         saludo.innerText = `⚠️ Mostrando ${encontradas} activos agotándose en máximos`;
     } else if (query === 'CAYENDO24H') {
-        saludo.innerText = `📉 IA v2 escaneando: ${encontradas} candidatas con confluencia técnica (RSI/DMI/VWAP) + pump/volumen — revisa el nivel ALTA/MEDIA/BAJA de cada una`;
+        saludo.innerText = `📉 IA v3 escaneando: ${encontradas} candidatas — techos tras pump 🏔️ y rebotes dentro de tendencia bajista 🔻`;
     } else if (encontradas === 0) { 
         saludo.innerText = `❌ "${query}" no tiene contrato en Futuros USDT-M (o no coincide con ningún filtro) — esta app solo opera pares con perpetuo real en Binance USDT-M`; 
     } else { 
@@ -5305,7 +5334,7 @@ function actualizarTablaIzquierda() {
         });
     }
 
-    let grupoMaximo, grupoMinimo, grupoExplosivo;
+    let grupoMaximo, grupoMinimo, grupoExplosivo, grupoDiamante = [];
 
     if (queryBusqueda !== '') {
         // Con búsqueda activa: mostramos TODAS las coincidencias de TODA la lista,
@@ -5360,7 +5389,18 @@ function actualizarTablaIzquierda() {
         grupoMaximo = porMaximo.filter(c => !grupoExplosivo.includes(c)).slice(0, TOP_N);
         grupoMinimo = porMinimo.slice(0, TOP_N).filter(c => !grupoExplosivo.includes(c) && !grupoMaximo.includes(c)); // evitar duplicados si hay pocas monedas
 
-        ordenadas = [...grupoExplosivo, ...grupoMaximo, ...grupoMinimo];
+        // ── 💎🟡 TODAS las monedas diamante de oro vigentes van SIEMPRE primero
+        // de todo, en los primeros lugares de la lista de máximo 24h, ordenadas
+        // de la más fuerte a la menos fuerte, para que el usuario elija cuál
+        // abrir en el panel central (antes solo se veía/abría la número 1). ──
+        const symbolsDiamante = (window._monedasDiamanteOro || []).filter(s => cachedData[s]);
+        grupoDiamante = symbolsDiamante
+            .map(s => cachedData[s])
+            .filter(c => c && !grupoExplosivo.includes(c));
+        grupoMaximo = grupoMaximo.filter(c => !grupoDiamante.includes(c));
+        grupoMinimo = grupoMinimo.filter(c => !grupoDiamante.includes(c));
+
+        ordenadas = [...grupoDiamante, ...grupoExplosivo, ...grupoMaximo, ...grupoMinimo];
     }
 
     if (ordenadas.length === 0) {
@@ -5373,14 +5413,21 @@ function actualizarTablaIzquierda() {
 
 
     ordenadas.forEach((c, idx) => {
+        // Encabezado separador al inicio del grupo 💎🟡 DIAMANTE DE ORO — va primero
+        // que todo, con TODAS las que califican ahora mismo, para elegir cuál abrir.
+        if (idx === 0 && grupoDiamante && grupoDiamante.length > 0) {
+            const trH = document.createElement('tr');
+            trH.innerHTML = `<td colspan="3" style="background:rgba(255,215,0,0.22); color:#ffd700; font-size:10px; font-weight:900; padding:6px 10px; letter-spacing:0.5px; animation:blinker-glow 0.8s linear infinite;">💎🟡 DIAMANTE DE ORO — ELEGÍ CUÁL ABRIR (${grupoDiamante.length})</td>`;
+            fragmento.appendChild(trH);
+        }
         // Encabezado separador al inicio del grupo EXPLOSIVO (máximo 24h + subida >10%)
-        if (idx === 0 && grupoExplosivo && grupoExplosivo.length > 0) {
+        if (idx === grupoDiamante.length && grupoExplosivo && grupoExplosivo.length > 0) {
             const trH = document.createElement('tr');
             trH.innerHTML = `<td colspan="3" style="background:rgba(255,60,0,0.28); color:#fff; font-size:10px; font-weight:900; padding:6px 10px; letter-spacing:0.5px; animation:blinker-glow 0.8s linear infinite;">🚀🔥 AL MÁXIMO 24H + SUBIDA +10% (${grupoExplosivo.length})</td>`;
             fragmento.appendChild(trH);
         }
         // Encabezado separador al inicio del grupo de MÁXIMO (o de resultados de búsqueda)
-        if (idx === (grupoExplosivo ? grupoExplosivo.length : 0) && grupoMaximo.length > 0) {
+        if (idx === grupoDiamante.length + (grupoExplosivo ? grupoExplosivo.length : 0) && grupoMaximo.length > 0) {
             const trH = document.createElement('tr');
             trH.innerHTML = queryBusqueda !== ''
                 ? `<td colspan="3" style="background:rgba(243,186,47,0.15); color:#f3ba2f; font-size:10px; font-weight:900; padding:6px 10px; letter-spacing:0.5px;">🔍 RESULTADOS PARA "${queryBusqueda}" (${grupoMaximo.length})</td>`
@@ -5388,7 +5435,7 @@ function actualizarTablaIzquierda() {
             fragmento.appendChild(trH);
         }
         // Encabezado separador al inicio del grupo de MÍNIMO
-        if (idx === (grupoExplosivo ? grupoExplosivo.length : 0) + grupoMaximo.length && grupoMinimo.length > 0) {
+        if (idx === grupoDiamante.length + (grupoExplosivo ? grupoExplosivo.length : 0) + grupoMaximo.length && grupoMinimo.length > 0) {
             const trH = document.createElement('tr');
             trH.innerHTML = `<td colspan="3" style="background:rgba(14,203,129,0.15); color:#0ecb81; font-size:10px; font-weight:900; padding:6px 10px; letter-spacing:0.5px;">🟢 ZONA DE MÍNIMO 24H (${grupoMinimo.length})</td>`;
             fragmento.appendChild(trH);
@@ -5496,9 +5543,11 @@ function actualizarTablaIzquierda() {
         // Badge grande de la alarma azul (siempre reemplaza a cualquier otro badge de esa fila)
         const _badgeNivelIcono = alarmaAzul ? (_azul.nivel === 'ALTA' ? '🔵🔥' : _azul.nivel === 'MEDIA' ? '🔵📉' : '🔵👀') : '';
         const _badgeEstado = alarmaAzul ? (_azul.confirmada ? 'CONFIRMADA' : 'VIGILANDO') : '';
+        const _badgeTipo = alarmaAzul ? (_azul.tipo === 'rebote_bajista' ? '🔻 REBOTE EN BAJISTA' : '🏔️ TECHO / AGOTAMIENTO') : '';
         const badgeAlarmaAzul = alarmaAzul
-            ? `<div style="background:linear-gradient(90deg,#0066ff,#00c3ff);color:#fff;font-size:10px;font-weight:900;padding:4px 8px;border-radius:6px;margin-top:3px;display:inline-flex;align-items:center;gap:4px;box-shadow:0 0 12px rgba(0,195,255,0.7);">${_badgeNivelIcono} ${_azul.nivel} · ${_badgeEstado} · ${_azul.motivos[0] || 'A punto de caer'} · IA ${_azul.score}%</div>
-               <div style="font-size:9px;color:#94a3b8;margin-top:2px;">🛑 Invalidación (stop referencia): $${_azul.stopSugerido.toFixed(_azul.stopSugerido < 1 ? 6 : 2)} (+${_azul.distanciaStopPct.toFixed(2)}%)</div>`
+            ? `<div style="background:linear-gradient(90deg,#0066ff,#00c3ff);color:#fff;font-size:10px;font-weight:900;padding:4px 8px;border-radius:6px;margin-top:3px;display:inline-flex;align-items:center;gap:4px;box-shadow:0 0 12px rgba(0,195,255,0.7);">${_badgeNivelIcono} ${_azul.nivel} · ${_badgeEstado} · ${_badgeTipo} · IA ${_azul.score}%</div>
+               <div style="font-size:9px;color:#94a3b8;margin-top:2px;">${_azul.motivos[0] || ''}</div>
+               <div style="font-size:9px;color:#94a3b8;margin-top:1px;">🛑 Invalidación (stop referencia): $${_azul.stopSugerido.toFixed(_azul.stopSugerido < 1 ? 6 : 2)} (+${_azul.distanciaStopPct.toFixed(2)}%)</div>`
             : '';
 
         // Barra visual de posición en rango 24h (siempre visible al fondo de la fila)
@@ -5531,8 +5580,21 @@ function actualizarTablaIzquierda() {
         const etiquetaSegundaPastilla = enMaximo24h ? 'FALTA p/ MÁX' : 'MIN';
         const tituloSegundaPastilla = enMaximo24h ? '% que falta para llegar al máximo de 24h' : '% del mínimo 24h';
 
+        // ── 💎🟡 DIAMANTE DE ORO: máxima prioridad visual — pisa cualquier otro
+        // color/badge de la fila, porque es la señal más fuerte del sistema:
+        // esta moneda SI O SI ya viene cayendo desde su máximo, sin fuerza
+        // para volver a subir, con movimiento bajista rápido/tremendo confirmado.
+        let badgeDiamanteOro = '';
+        if (window._monedasDiamanteOro && window._monedasDiamanteOro.includes(symbol)) {
+            tr.classList.add('diamante-oro-fila');
+            const esLaMejor = symbol === window._monedaDiamanteOro;
+            const puestoDiamante = window._monedasDiamanteOro.indexOf(symbol) + 1;
+            badgeDiamanteOro = `<div class="diamante-oro-badge">💎🟡 ${esLaMejor ? '' : '#' + puestoDiamante + ' '}SE ESTÁ CAYENDO — VENÍA DEL MÁXIMO, YA NO TIENE FUERZA PARA SUBIR</div>`;
+        }
+
         tr.innerHTML = `
             <td style="font-weight:700;">
+                ${badgeDiamanteOro}
                 ${iconoAlarma}${symbol.replace("USDT","")} <span style="font-size:10px; color:var(--text-dim);">USDT</span>${_badgesExtra}
                 ${badgeBreaking ? '<div style="margin-top:2px;">' + badgeBreaking + '</div>' : ''}
                 ${badgeAlarmaAzul || subEtiqueta || badgeMaxMin}
@@ -5930,6 +5992,118 @@ function revisarAlertasTecho4Ema() {
 // Se revisa cada 8 segundos, igual de frecuente que la actualización de EMAs.
 setInterval(revisarAlertasTecho4Ema, 8000);
 
+// ══════════════════════════════════════════════════════════════════
+// 💎🟡 DIAMANTE DE ORO — la moneda que SI O SI ya viene cayendo desde su
+// máximo, con TODAS las opciones agotadas para volver a subir, y con un
+// movimiento bajista rápido o tremendo YA confirmado (no "podría caer":
+// YA está cayendo). Es la señal más fuerte de toda la app: solo puede
+// haber UNA a la vez (la más fuerte de todas las que califican), y se
+// destaca parpadeando en dorado con un diamante tanto en la fila de la
+// lista principal como en el panel central, de forma automática.
+// ══════════════════════════════════════════════════════════════════
+function detectarCaidaTremendaConfirmada(c) {
+    if (!c) return false;
+    const symbol = c.symbol;
+    const e = datosEMA[symbol];
+
+    // 1) "Venía de estar en su máximo": tocó el máximo de 24h o 48h hace poco,
+    //    o ya lo tocó antes (aunque ahora ya se haya alejado un poco cayendo).
+    const toques72h = obtenerToques72h(symbol);
+    const vecesTecho = toques72h !== null ? toques72h : (c.vecesEnTechoActual || 0);
+    const vinoDelMaximo =
+        (c.caidaDesdeMaximo !== undefined && c.caidaDesdeMaximo <= 6) ||
+        (c.caidaDesdeMaximo48h !== undefined && c.caidaDesdeMaximo48h <= 6) ||
+        vecesTecho >= 1;
+    if (!vinoDelMaximo) return false;
+
+    // 2) YA ESTÁ CAYENDO, confirmado (no es una probabilidad): velocidad
+    //    instantánea Y cambio de los últimos 2 min, ambos negativos a la vez,
+    //    o varios ciclos seguidos ya bajistas.
+    const yaCayendoConfirmado =
+        (c.velocidad < 0 && c.cambioReal2Min < 0) || (c.ciclosBajando || 0) >= 2;
+    if (!yaCayendoConfirmado) return false;
+
+    // 3) "Todas sus opciones agotadas para NO subir": el motor de riesgo dice
+    //    que ya no tiene fuerza de fondo para retomar la subida, y las EMAs
+    //    ya no están en formación alcista.
+    const riesgo = (typeof riesgoSigueSubiendo === 'function') ? riesgoSigueSubiendo(symbol) : { riesgo: false };
+    if (riesgo && riesgo.riesgo) return false;
+    if (e && e.alineadasAlcista) return false;
+
+    // 4) Movimiento RÁPIDO o TREMENDO bajista (no un goteo lento):
+    const movimientoFuerte =
+        (c.velocidad <= -0.05) ||
+        (c.cambioReal2Min <= -0.3) ||
+        ((c.ciclosBajando || 0) >= 3) ||
+        (c.caidaDesdeMaximo !== undefined && c.caidaDesdeMaximo >= 1.5);
+    if (!movimientoFuerte) return false;
+
+    // 5) Si la IA del mini-gráfico ya dio una lectura y dice ALCISTA, se
+    //    descarta: no puede ser "SI O SI cayendo" si la IA ve lo contrario.
+    const señalIA = typeof _calcularSeñalIA === 'function' ? _calcularSeñalIA(symbol) : null;
+    if (señalIA && señalIA.tendencia === 'ALCISTA') return false;
+
+    return true;
+}
+
+const _diamanteOroUltimaVezOK = {};
+const DIAMANTE_ORO_PERSISTENCIA_MS = 30000; // se queda 30s en pantalla aunque la señal instantánea oscile (evita parpadeo de aparece/desaparece)
+let _monedaYaAutoAbiertaDiamante = null;
+
+function actualizarMonedaDiamanteOro() {
+    if (!cachedData) return;
+    const ahora = Date.now();
+
+    // Marca cuáles cumplen de verdad AHORA MISMO.
+    for (const symbol in cachedData) {
+        if (detectarCaidaTremendaConfirmada(cachedData[symbol])) {
+            _diamanteOroUltimaVezOK[symbol] = ahora;
+        }
+    }
+
+    // De las que siguen "vigentes" (cumplieron hace ≤30s), se calcula el score
+    // de TODAS (no solo de la más fuerte), para poder mostrarlas todas en la
+    // lista izquierda, en los primeros lugares, y que el usuario elija cuál
+    // abrir en el panel central. La "mejor" se sigue guardando aparte porque
+    // es la única que se auto-abre sola en el panel.
+    let mejor = null, mejorScore = -1;
+    const candidatasDiamante = [];
+    for (const symbol in _diamanteOroUltimaVezOK) {
+        if (ahora - _diamanteOroUltimaVezOK[symbol] > DIAMANTE_ORO_PERSISTENCIA_MS) continue;
+        const c = cachedData[symbol];
+        if (!c) continue;
+        const scoreTecho = (typeof calcularScoreTecho === 'function') ? calcularScoreTecho(c) : 0;
+        const velocidadScore = Math.min(40, Math.abs(c.velocidad || 0) * 200);
+        const ciclosScore = (c.ciclosBajando || 0) * 6;
+        const caidaScore = Math.min(20, (c.caidaDesdeMaximo || 0) * 2);
+        const score = scoreTecho + velocidadScore + ciclosScore + caidaScore;
+        candidatasDiamante.push({ symbol, score });
+        if (score > mejorScore) { mejorScore = score; mejor = symbol; }
+    }
+    candidatasDiamante.sort((a, b) => b.score - a.score);
+
+    window._monedaDiamanteOro = mejor;
+    // Lista completa (ordenada de más fuerte a menos fuerte) de TODAS las
+    // monedas diamante de oro vigentes ahora mismo — no solo la número 1.
+    window._monedasDiamanteOro = candidatasDiamante.map(x => x.symbol);
+
+    // Auto-abrir en el panel central, respetando la misma protección de
+    // selección manual que ya usa el resto del sistema (no le pisa la
+    // moneda al usuario si acaba de elegir una a mano).
+    if (mejor && mejor !== selectedCoin) {
+        const noPisaSeleccionManual = (ahora - _ultimaSeleccionManualTs) >= TECHO_PROTECCION_SELECCION_MANUAL_MS;
+        if (noPisaSeleccionManual && _monedaYaAutoAbiertaDiamante !== mejor) {
+            _monedaYaAutoAbiertaDiamante = mejor;
+            try { if (typeof seleccionarMoneda === 'function') seleccionarMoneda(mejor, true); } catch (e) {}
+        }
+    }
+
+    // Repinta la lista y el panel para que el badge dorado se refleje ya mismo.
+    try { if (typeof actualizarTablaIzquierda === 'function') actualizarTablaIzquierda(); } catch (e) {}
+    try { if (typeof actualizarPanelCentral === 'function' && selectedCoin) actualizarPanelCentral(); } catch (e) {}
+}
+setInterval(actualizarMonedaDiamanteOro, 8000);
+
 function detectarEnTechoProximaCaida(c) {
     // Prioriza el escaneo real de 72h (certeza); si aún no está calculado,
     // usa el contador en vivo de respaldo.
@@ -6085,7 +6259,7 @@ function calcularScoreAzulIA(c) {
 
 const AZUL_IA_SCORE_MINIMO = 40; // umbral de puntaje para entrar en la lista/alarma azul (BAJA confianza)
 
-function esCandidataAzulIA(c) {
+function _esCandidataTechoAgotamiento(c) {
     const { score, motivos, yaCayendo } = calcularScoreAzulIA(c);
 
     // Requisito duro #1: tuvo que haber un movimiento grande de verdad
@@ -6119,7 +6293,110 @@ function esCandidataAzulIA(c) {
     const stopSugerido = refMax * 1.006; // 0.6% de margen arriba del máximo tocado
     const distanciaStopPct = c.price ? ((stopSugerido - c.price) / c.price) * 100 : null;
 
-    return { esCandidata: true, confirmada, nivel, score, motivos, stopSugerido, distanciaStopPct };
+    return { esCandidata: true, confirmada, nivel, score, motivos, stopSugerido, distanciaStopPct, tipo: 'techo_agotamiento' };
+}
+
+// ══════════════════════════════════════════════════════════════════
+// 🔵 PUNTO DE ENTRADA ÚNICO: combina los 2 caminos de señal.
+// Camino A ("techo_agotamiento"): pump grande que tocó su máximo y ya cede.
+// Camino B ("rebote_bajista"): tendencia bajista de fondo con rebote temporal
+// que no rompe esa estructura — el "dead cat bounce" clásico para vender.
+// Si ambos aplican a la vez (raro), se queda con el de mayor puntaje.
+// ══════════════════════════════════════════════════════════════════
+function esCandidataAzulIA(c) {
+    const techo = _esCandidataTechoAgotamiento(c);
+    const rebote = esCandidataReboteBajista(c);
+
+    if (techo.esCandidata && rebote.esCandidata) {
+        return techo.score >= rebote.score ? techo : rebote;
+    }
+    return techo.esCandidata ? techo : (rebote.esCandidata ? rebote : { esCandidata: false });
+}
+
+// ══════════════════════════════════════════════════════════════════
+// 🔵🔻 CAMINO 2: REBOTE TEMPORAL DENTRO DE TENDENCIA BAJISTA
+// Distinto del "techo tras pump" de arriba. Este detecta el patrón clásico
+// de "dead cat bounce": una moneda que YA viene cayendo fuerte en el día
+// (tendencia bajista de fondo confirmada), y que de repente tiene una subida
+// corta y temporal — pero esa subida NO rompe la estructura bajista (sigue
+// por debajo de su EMA25/VWAP). Es decir: el sistema de fondo sigue siendo
+// bajista, solo hubo un respiro momentáneo — justo la oportunidad de vender
+// en el rebote en vez de perseguir la vela roja.
+// ══════════════════════════════════════════════════════════════════
+
+let _historialReboteBajista = {};
+const CAIDA_24H_MINIMA_TENDENCIA_BAJISTA = -5; // % — a partir de aquí se considera "ya viene cayendo en el día"
+
+function _registrarCicloReboteBajista(symbol, cumpleAhora) {
+    if (!_historialReboteBajista[symbol]) _historialReboteBajista[symbol] = [];
+    _historialReboteBajista[symbol].push(cumpleAhora);
+    if (_historialReboteBajista[symbol].length > AZUL_IA_CICLOS_HISTORIAL) _historialReboteBajista[symbol].shift();
+}
+
+function _confirmadaPersistenciaRebote(symbol) {
+    const h = _historialReboteBajista[symbol] || [];
+    return h.filter(Boolean).length >= AZUL_IA_CICLOS_MINIMOS_CONFIRMAR;
+}
+
+function calcularScoreReboteBajista(c) {
+    const e = datosEMA[c.symbol];
+    const motivos = [];
+    let score = 0;
+
+    // 1) Tendencia bajista de fondo — la moneda ya viene cayendo en el día
+    const chg = c.change || 0;
+    if (chg <= -20)      { score += 28; motivos.push(`🔻 Cayendo con fuerza: ${chg.toFixed(0)}% en 24h`); }
+    else if (chg <= -10) { score += 20; motivos.push(`🔻 Tendencia bajista clara: ${chg.toFixed(0)}% en 24h`); }
+    else if (chg <= -5)  { score += 12; motivos.push(`🔻 Ya viene en rojo: ${chg.toFixed(0)}% en el día`); }
+
+    if (e && e.diMinus !== null && e.diPlus !== null && e.diMinus > e.diPlus) {
+        score += 18; motivos.push('✅ DI- domina — la tendencia bajista de fondo sigue mandando');
+    }
+    if (e && e.ema25 != null && e.ema99 != null && e.ema25 < e.ema99) {
+        score += 10; motivos.push('📐 EMA25 debajo de EMA99 — estructura bajista intacta');
+    }
+
+    // 2) Rebote temporal ocurriendo AHORA MISMO (el "respiro" dentro de la caída)
+    const cambio2min = c.cambioReal2Min || 0;
+    let rebotando = false;
+    if (cambio2min > 3)      { score += 20; rebotando = true; motivos.push(`⚡ Rebote fuerte: +${cambio2min.toFixed(1)}% en los últimos 2min`); }
+    else if (cambio2min > 1) { score += 13; rebotando = true; motivos.push(`⚡ Rebote de +${cambio2min.toFixed(1)}% en los últimos 2min`); }
+    else if (c.velocidad > 0){ score += 6;  rebotando = true; motivos.push('⚡ Micro-rebote detectado'); }
+
+    // 3) El rebote NO rompe la estructura bajista (clave: si la rompe, ya no es
+    // un rebote temporal, es un cambio de tendencia real, y no debe entrar aquí)
+    let sigueBajista = true;
+    if (e && e.ema25 != null && c.price > e.ema25 * 1.01) sigueBajista = false;
+    if (e && e.distVwapPct !== null && e.distVwapPct !== undefined && e.distVwapPct > 1.5) sigueBajista = false;
+    if (sigueBajista) motivos.push('🚧 El rebote no rompe la estructura bajista — sigue por debajo de la resistencia clave');
+    if (sigueBajista) score += 14;
+
+    return { score: Math.max(0, Math.min(100, score)), motivos, rebotando, sigueBajista, chg };
+}
+
+function esCandidataReboteBajista(c) {
+    const { score, motivos, rebotando, sigueBajista, chg } = calcularScoreReboteBajista(c);
+
+    const tendenciaBajistaConfirmada = chg <= CAIDA_24H_MINIMA_TENDENCIA_BAJISTA;
+    const cumpleAhora = tendenciaBajistaConfirmada && rebotando && sigueBajista && score >= AZUL_IA_SCORE_MINIMO;
+    _registrarCicloReboteBajista(c.symbol, cumpleAhora);
+
+    if (!cumpleAhora) return { esCandidata: false };
+
+    const confirmada = _confirmadaPersistenciaRebote(c.symbol);
+
+    let nivel = 'BAJA';
+    if (score >= 55 && confirmada) nivel = 'MEDIA';
+    if (score >= 70 && confirmada) nivel = 'ALTA';
+
+    // Nivel de invalidación: si el rebote termina rompiendo la EMA25 (o el precio
+    // actual) con margen, la estructura bajista quedó rota y la señal se descarta.
+    const e = datosEMA[c.symbol];
+    const refInvalidacion = (e && e.ema25 != null) ? Math.max(e.ema25, c.price) : c.price;
+    const stopSugerido = refInvalidacion * 1.01;
+    const distanciaStopPct = c.price ? ((stopSugerido - c.price) / c.price) * 100 : null;
+
+    return { esCandidata: true, confirmada, nivel, score, motivos, stopSugerido, distanciaStopPct, tipo: 'rebote_bajista' };
 }
 
 function esTechoConfirmado4Ema(c) {
@@ -6996,6 +7273,20 @@ function actualizarPanelCentral() {
     const colorCambio = c.change >= 0 ? 'var(--accent-green)' : 'var(--accent-glow)';
     const simbolo = selectedCoin.replace("USDT","");
 
+    // 💎🟡 ¿Es LA moneda diamante de oro? — la que SI O SI ya viene cayendo desde
+    // su máximo, sin fuerza para volver a subir, con movimiento bajista rápido o
+    // tremendo YA confirmado. Tiene prioridad visual sobre cualquier otro aviso.
+    const esDiamanteOro = window._monedaDiamanteOro && selectedCoin === window._monedaDiamanteOro;
+    const btnDiamanteOroHTML = esDiamanteOro ? `
+        <div style="text-align:center; margin-bottom:14px;">
+            <div class="diamante-oro-badge" style="width:100%; justify-content:center; padding:14px; border-radius:12px; font-size:14px; box-sizing:border-box;">
+                💎🟡 ${simbolo} SE ESTÁ CAYENDO — VENÍA DE SU MÁXIMO Y YA NO TIENE FUERZA PARA SUBIR
+                <span style="display:block; font-size:11px; font-weight:700; margin-top:4px;">
+                    Movimiento bajista rápido/tremendo confirmado · Vel: ${c.velocidad.toFixed(2)} · 2m: ${c.cambioReal2Min.toFixed(2)}% · ${c.ciclosBajando||0}/5 ciclos bajando
+                </span>
+            </div>
+        </div>` : '';
+
     // ¿Esta moneda está en su máximo de 24h y perdiendo impulso?
     const enTecho = detectarEnTechoProximaCaida(c);
     const btnTechoHTML = enTecho ? `
@@ -7066,6 +7357,7 @@ function actualizarPanelCentral() {
     }
 
     document.getElementById("detailView").innerHTML = `
+        ${btnDiamanteOroHTML}
         ${btnTechoHTML}
         ${btnMotorAlcistaHTML}
 
