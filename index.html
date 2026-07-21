@@ -751,6 +751,33 @@
             td div, td span { max-width: 100%; overflow-wrap: break-word; word-break: break-word; }
             .floating-buttons { right: 10px; bottom: 10px; }
             #paperBox { display: none !important; }
+
+            /* ══ MENÚ HAMBURGUESA (3 rayitas) EN MÓVIL ══
+               Antes se armaba a mano con JS (sidebar.style.position=...),
+               lo que dejaba estilos "pegados" entre aperturas y generaba
+               el efecto de imagen congelada. Ahora es una sola clase CSS:
+               el navegador la aplica/quita de una sola vez, sin pasos
+               intermedios, así no queda nada a mitad de camino.
+               z-index 8500: por debajo de los paneles 24H / RADAR (9000),
+               ACTIVAR LICENCIA (10000) y los paneles flotantes (999999),
+               para que esos SIEMPRE se vean por ENCIMA del menú y no
+               "por debajo" de él. */
+            .sidebar.sidebar-mobile-hidden { display: none !important; }
+            .sidebar.sidebar-mobile-open {
+                display: flex !important;
+                position: fixed !important;
+                top: 60px; left: 0; right: 0;
+                z-index: 8500;
+                background: #060b16;
+                height: calc(100vh - 125px);
+                overflow: hidden;
+                width: 100%;
+                /* fuerza su propia capa de composición en el navegador del
+                   celular para que no quede pintado a medias al abrir/cerrar */
+                transform: translateZ(0);
+                -webkit-transform: translateZ(0);
+                will-change: transform;
+            }
         }
 
         /* ───────────────────────────────────────────────
@@ -5704,7 +5731,7 @@ function seleccionarMoneda(symbol, _esAutoTecho) {
     // app link manejado por abrirEnApp()
 
     if(window.innerWidth <= 950){
-        document.getElementById("sidebar").style.display = "none";
+        cerrarSidebarMobile();
         window.scrollTo({ top:0, behavior:"smooth" });
     }
 }
@@ -9159,27 +9186,34 @@ async function abrirRadarDespegue() {
 
 
 
+// ── Abre/cierra el menú móvil usando UNA sola clase CSS (sidebar-mobile-open) ──
+// Antes se armaba a mano con muchos estilos inline por separado, lo que podía
+// dejar el panel a mitad de camino (imagen "congelada") y con un z-index tan
+// alto (99999) que tapaba a los paneles de 24H / licencia en vez de al revés.
+function abrirSidebarMobile(){
+    const sidebar = document.getElementById("sidebar");
+    sidebar.classList.remove("sidebar-mobile-hidden");
+    sidebar.classList.add("sidebar-mobile-open");
+    // Fuerza un reflow/repintado real antes de mostrar el scroll interno,
+    // para que el navegador del celular no deje la vista "pegada".
+    void sidebar.offsetHeight;
+    const scrollBox = document.getElementById("sidebarScroll");
+    if (scrollBox) { scrollBox.style.webkitOverflowScrolling = "touch"; scrollBox.style.touchAction = "pan-y"; }
+}
+function cerrarSidebarMobile(){
+    const sidebar = document.getElementById("sidebar");
+    sidebar.classList.remove("sidebar-mobile-open");
+    sidebar.classList.add("sidebar-mobile-hidden");
+}
+
 document.getElementById("menuToggle").onclick = () => {
     initAudio();
     const sidebar = document.getElementById("sidebar");
     if(window.innerWidth <= 950){
-        if(getComputedStyle(sidebar).display === "none"){
-            sidebar.style.display = "flex";
-            sidebar.style.position = "fixed";
-            sidebar.style.top = "60px"; sidebar.style.left = "0"; sidebar.style.right = "0"; sidebar.style.zIndex = "99999";
-            sidebar.style.background = "#060b16"; sidebar.style.height = "calc(100vh - 125px)";
-            // Evita que la lista se "derrame" por debajo y quede tapada por otra pantalla:
-            // el scroll real lo maneja #sidebarScroll adentro.
-            sidebar.style.overflow = "hidden";
-            sidebar.style.width = "100%";
-            const scrollBox = document.getElementById("sidebarScroll");
-            if (scrollBox) { scrollBox.style.webkitOverflowScrolling = "touch"; scrollBox.style.touchAction = "pan-y"; }
+        if(sidebar.classList.contains("sidebar-mobile-open")){
+            cerrarSidebarMobile();
         }else{
-            // Reset completo al cerrar, para que la próxima apertura no arrastre estilos viejos
-            sidebar.style.display = "none";
-            sidebar.style.position = ""; sidebar.style.top = ""; sidebar.style.left = ""; sidebar.style.right = "";
-            sidebar.style.zIndex = ""; sidebar.style.background = ""; sidebar.style.height = "";
-            sidebar.style.overflow = ""; sidebar.style.width = "";
+            abrirSidebarMobile();
         }
     }else{ sidebar.classList.toggle("hidden"); }
 };
