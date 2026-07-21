@@ -102,7 +102,7 @@
         .corr-badge { font-size:9px; font-weight:900; padding:2px 6px; border-radius:8px; }
         @keyframes techo-pulse { 0%,100%{box-shadow:0 0 8px rgba(255,60,0,0.3)} 50%{box-shadow:0 0 20px rgba(255,60,0,0.7)} }
         .techo-pulsando { animation: techo-pulse 1.5s infinite; }
-        @keyframes alarma-azul-pulse { 0%,100%{box-shadow:0 0 10px rgba(0,153,255,0.45)} 50%{box-shadow:0 0 28px rgba(0,195,255,0.95)} }
+        @keyframes alarma-azul-pulse { 0%,100%{box-shadow:0 0 10px rgba(255,215,0,0.45)} 50%{box-shadow:0 0 28px rgba(255,215,0,0.95)} }
         .alarma-azul-pulsando { animation: alarma-azul-pulse 1.1s infinite; }
         .radar-coin-nombre {
             font-size: 14px; font-weight: 900; color: #fff; margin-bottom: 4px;
@@ -707,8 +707,9 @@
             .column-center { width: 100%; min-width: 100%; padding: 10px; border-right: none; box-sizing: border-box; }
             .column-right { width: 100%; min-width: 100%; padding: 10px; box-sizing: border-box; }
             .gauge-box { transform: scale(.85); margin: auto; }
-            table { width: 100%; table-layout: auto; }
-            th, td { font-size: 11px; padding: 8px; }
+            table { width: 100%; table-layout: fixed; }
+            th, td { font-size: 11px; padding: 8px; overflow-wrap: break-word; word-break: break-word; white-space: normal; }
+            td div, td span { max-width: 100%; overflow-wrap: break-word; word-break: break-word; }
             .floating-buttons { right: 10px; bottom: 10px; }
             #paperBox { display: none !important; }
         }
@@ -5396,7 +5397,8 @@ function actualizarTablaIzquierda() {
         const symbolsDiamante = (window._monedasDiamanteOro || []).filter(s => cachedData[s]);
         grupoDiamante = symbolsDiamante
             .map(s => cachedData[s])
-            .filter(c => c && !grupoExplosivo.includes(c));
+            .filter(c => c && !grupoExplosivo.includes(c))
+            .sort((a, b) => b.change - a.change); // 💛 máxima prioridad, de mayor a menor %
         grupoMaximo = grupoMaximo.filter(c => !grupoDiamante.includes(c));
         grupoMinimo = grupoMinimo.filter(c => !grupoDiamante.includes(c));
 
@@ -5523,8 +5525,8 @@ function actualizarTablaIzquierda() {
         const _azul = esAlarmaAzulLista(c);
         const alarmaAzul = _azul.esCandidata;
         if (alarmaAzul) {
-            const _colorNivel = _azul.nivel === 'ALTA' ? '#00c3ff' : _azul.nivel === 'MEDIA' ? '#3b82f6' : '#64748b';
-            tr.style.background = _azul.confirmada ? "rgba(0,153,255,0.18)" : "rgba(0,153,255,0.08)";
+            const _colorNivel = _azul.nivel === 'ALTA' ? '#ffd700' : _azul.nivel === 'MEDIA' ? '#f3ba2f' : '#b8860b';
+            tr.style.background = _azul.confirmada ? "rgba(255,215,0,0.18)" : "rgba(255,215,0,0.08)";
             tr.style.borderLeft = `4px solid ${_colorNivel}`;
             if (_azul.confirmada) tr.classList.add('alarma-azul-pulsando'); // solo pulsa si ya está confirmada (no en el primer parpadeo)
         }
@@ -5541,13 +5543,12 @@ function actualizarTablaIzquierda() {
         }
 
         // Badge grande de la alarma azul (siempre reemplaza a cualquier otro badge de esa fila)
-        const _badgeNivelIcono = alarmaAzul ? (_azul.nivel === 'ALTA' ? '🔵🔥' : _azul.nivel === 'MEDIA' ? '🔵📉' : '🔵👀') : '';
+        const _badgeNivelIcono = alarmaAzul ? (_azul.nivel === 'ALTA' ? '🟡🔥' : _azul.nivel === 'MEDIA' ? '🟡📉' : '🟡👀') : '';
         const _badgeEstado = alarmaAzul ? (_azul.confirmada ? 'CONFIRMADA' : 'VIGILANDO') : '';
-        const _badgeTipo = alarmaAzul ? (_azul.tipo === 'rebote_bajista' ? '🔻 REBOTE EN BAJISTA' : '🏔️ TECHO / AGOTAMIENTO') : '';
+        const _badgeTipo = alarmaAzul ? (_azul.tipo === 'rebote_bajista' ? 'REBOTE BAJISTA' : 'TECHO/AGOTAMIENTO') : '';
         const badgeAlarmaAzul = alarmaAzul
-            ? `<div style="background:linear-gradient(90deg,#0066ff,#00c3ff);color:#fff;font-size:10px;font-weight:900;padding:4px 8px;border-radius:6px;margin-top:3px;display:inline-flex;align-items:center;gap:4px;box-shadow:0 0 12px rgba(0,195,255,0.7);">${_badgeNivelIcono} ${_azul.nivel} · ${_badgeEstado} · ${_badgeTipo} · IA ${_azul.score}%</div>
-               <div style="font-size:9px;color:#94a3b8;margin-top:2px;">${_azul.motivos[0] || ''}</div>
-               <div style="font-size:9px;color:#94a3b8;margin-top:1px;">🛑 Invalidación (stop referencia): $${_azul.stopSugerido.toFixed(_azul.stopSugerido < 1 ? 6 : 2)} (+${_azul.distanciaStopPct.toFixed(2)}%)</div>`
+            ? `<div style="background:linear-gradient(90deg,#ffd700,#ffb800);color:#1a1200;font-size:10px;font-weight:900;padding:4px 8px;border-radius:6px;margin-top:3px;display:inline-flex;align-items:center;gap:4px;box-shadow:0 0 12px rgba(255,215,0,0.7);">${_badgeNivelIcono} ${_azul.nivel} · ${_badgeEstado} · ${_badgeTipo}</div>
+               <div style="font-size:9px;color:#94a3b8;margin-top:1px;">🛑 Stop: $${_azul.stopSugerido.toFixed(_azul.stopSugerido < 1 ? 6 : 2)} (+${_azul.distanciaStopPct.toFixed(2)}%)</div>`
             : '';
 
         // Barra visual de posición en rango 24h (siempre visible al fondo de la fila)
@@ -5589,7 +5590,7 @@ function actualizarTablaIzquierda() {
             tr.classList.add('diamante-oro-fila');
             const esLaMejor = symbol === window._monedaDiamanteOro;
             const puestoDiamante = window._monedasDiamanteOro.indexOf(symbol) + 1;
-            badgeDiamanteOro = `<div class="diamante-oro-badge">💎🟡 ${esLaMejor ? '' : '#' + puestoDiamante + ' '}SE ESTÁ CAYENDO — VENÍA DEL MÁXIMO, YA NO TIENE FUERZA PARA SUBIR</div>`;
+            badgeDiamanteOro = `<div class="diamante-oro-badge">💎🟡 ${esLaMejor ? '' : '#' + puestoDiamante + ' '}CAYENDO — SIN FUERZA P/ SUBIR</div>`;
         }
 
         tr.innerHTML = `
@@ -5604,8 +5605,8 @@ function actualizarTablaIzquierda() {
                     <span style="font-size:9px;background:rgba(14,203,129,0.10);color:${colorPctMin};padding:1px 5px;border-radius:5px;font-weight:900;" title="${tituloSegundaPastilla}">${etiquetaSegundaPastilla}: ${pctDelMin}%</span>
                 </div>
             </td>
-            <td style="text-align:right; font-weight:700; color:${colorCambio};">
-                ${c.change > 0 ? '+' : ''}${c.change.toFixed(2)}%
+            <td style="text-align:right; font-weight:900; color:${colorCambio};">
+                <span style="font-size:19px; line-height:1.1;">${c.change > 0 ? '+' : ''}${c.change.toFixed(2)}%</span>
                 <span style="display:block; font-size:10px; color:${c.velocidad >= 0 ? 'var(--accent-green)' : 'var(--accent-glow)'};">Vel: ${c.velocidad.toFixed(2)}</span>
             </td>
             <td style="text-align:right; font-weight:700; color:#e2e8f0;">
