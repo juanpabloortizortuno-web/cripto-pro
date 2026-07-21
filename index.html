@@ -181,6 +181,45 @@
             animation: diamante-oro-parpadeo 0.9s ease-in-out infinite;
             border: 1px solid #fff6c8;
         }
+        /* ── ⚡ CONFIRMADA PARA SHORT (doble señal 💎 + 🟡 fusionada en 1 solo cuadro) ──
+           Antes se apilaban 2 cuadros distintos (diamante + alarma azul). Ahora arriba
+           va lo esencial a simple vista (nombre + % de cambio más grande) y todo lo
+           demás vive en un único cuadro compacto, más limpio y fácil de leer. ── */
+        .short-confirmado-header {
+            display: flex; align-items: center; justify-content: space-between;
+            gap: 8px; margin-bottom: 5px;
+        }
+        .short-confirmado-name {
+            font-size: 13px; font-weight: 900; color: #fff; letter-spacing: 0.2px;
+            white-space: nowrap;
+        }
+        .short-confirmado-change {
+            font-size: 13px; font-weight: 900; padding: 2px 8px;
+            border-radius: 7px; white-space: nowrap; line-height: 1.3;
+        }
+        @keyframes short-card-glow {
+            0%   { box-shadow: 0 0 6px 1px rgba(255,150,0,0.30); border-color: rgba(255,183,0,0.55); }
+            50%  { box-shadow: 0 0 18px 6px rgba(255,150,0,0.55); border-color: rgba(255,215,0,0.9); }
+            100% { box-shadow: 0 0 6px 1px rgba(255,150,0,0.30); border-color: rgba(255,183,0,0.55); }
+        }
+        .short-confirmado-card {
+            background: linear-gradient(155deg, rgba(255,60,0,0.16), rgba(255,183,0,0.07) 55%, rgba(9,15,28,0.55));
+            border: 1px solid rgba(255,183,0,0.55);
+            border-radius: 10px;
+            padding: 7px 10px 8px;
+            animation: short-card-glow 1.6s ease-in-out infinite;
+        }
+        .short-confirmado-card .scf-titulo {
+            color: #ffe27a; font-size: 10.5px; font-weight: 900; letter-spacing: 0.2px;
+        }
+        .short-confirmado-card .scf-estado {
+            color: #ffd76b; font-size: 9.5px; font-weight: 800; margin-top: 3px;
+            opacity: 0.92;
+        }
+        .short-confirmado-card .scf-stop {
+            color: #cbd5e1; font-size: 9.5px; font-weight: 700; margin-top: 4px;
+            padding-top: 4px; border-top: 1px dashed rgba(255,255,255,0.12);
+        }
         /* ── BOTÓN DE ALARMA LATERAL (compra/venta directo a Binance) ── */
         @keyframes alarma-parpadeo-verde {
             from { box-shadow: 0 0 8px rgba(14,203,129,0.45); transform: scale(0.99); }
@@ -1093,22 +1132,17 @@
                 </div>
             </div>
 
-            <!-- ══ DESLIZADOR MAX/MIN 24H ══ (dentro del scroll unificado) -->
+            <!-- ══ DESLIZADOR 24H (solo porcentajes positivos, un único cuadro dorado) ══ -->
             <div id="deslizadorMaxMin" style="display:none; background:#060b16; border-top:1px solid rgba(255,255,255,0.05); flex-shrink:0;">
-                <div style="display:flex; border-bottom:1px solid rgba(255,255,255,0.06);">
-                    <button id="tabMaxBtn" onclick="mostrarTabMaxMin('max')" style="flex:1; padding:7px 4px; font-size:10px; font-weight:900; border:none; cursor:pointer; letter-spacing:0.5px; background:rgba(255,60,0,0.18); color:#ff3c00; border-bottom:2px solid #ff3c00;">
-                        🔴 EN MÁXIMO
-                    </button>
-                    <button id="tabMinBtn" onclick="mostrarTabMaxMin('min')" style="flex:1; padding:7px 4px; font-size:10px; font-weight:900; border:none; cursor:pointer; letter-spacing:0.5px; background:transparent; color:#475569; border-bottom:2px solid transparent;">
-                        🟢 EN MÍNIMO
-                    </button>
+                <div style="padding:7px 4px; font-size:10px; font-weight:900; letter-spacing:0.5px; background:rgba(243,186,47,0.15); color:#f3ba2f; border-bottom:2px solid #f3ba2f; text-align:center;">
+                    🟡 EN MÁXIMO (POSITIVAS)
                 </div>
-                <div id="deslizadorLista" style="padding:6px 8px; display:flex; flex-direction:column; gap:5px;"></div>
+                <div id="deslizadorLista" style="padding:6px 8px; display:flex; flex-direction:column; gap:5px; -webkit-overflow-scrolling:touch; touch-action:pan-y;"></div>
             </div>
             <!-- Toggle MAX/MIN -->
             <button id="btnToggleDeslizador" onclick="toggleDeslizador()" style="width:100%; padding:6px 12px; background:#07101f; border:none; border-top:1px solid rgba(255,255,255,0.06); border-bottom:1px solid rgba(255,255,255,0.06); color:#475569; font-size:10px; font-weight:900; cursor:pointer; letter-spacing:1px; display:flex; align-items:center; justify-content:center; gap:6px; flex-shrink:0;">
                 <span id="deslizadorToggleIcono">▼</span>
-                <span id="deslizadorToggleTxt">VER MONEDAS EN MÁX/MÍN 24H</span>
+                <span id="deslizadorToggleTxt">VER MONEDAS EN MÁXIMO 24H</span>
                 <span id="deslizadorBadge" style="background:#ff3c00; color:#fff; font-size:9px; font-weight:900; padding:1px 6px; border-radius:8px; display:none;">0</span>
             </button>
 
@@ -2466,27 +2500,9 @@ const _iaCache = {};  // symbol -> { ts, html, esCompra, esVenta }
 const _IA_COOLDOWN_MS = 20000; // 20 segundos entre llamadas IA por moneda
 
 // ══════════════════════════════════════════════════════════════════
-// 🎚️ DESLIZADOR DE MONEDAS EN MÁXIMO / MÍNIMO DE 24H
+// 🎚️ DESLIZADOR DE MONEDAS EN MÁXIMO DE 24H (solo positivas, un cuadro dorado)
 // ══════════════════════════════════════════════════════════════════
 let _deslizadorAbierto = false;
-let _deslizadorTab = 'max';
-
-function mostrarTabMaxMin(tab) {
-    _deslizadorTab = tab;
-    const tabMax = document.getElementById('tabMaxBtn');
-    const tabMin = document.getElementById('tabMinBtn');
-    if (tabMax) {
-        tabMax.style.background = tab === 'max' ? 'rgba(255,60,0,0.18)' : 'transparent';
-        tabMax.style.color      = tab === 'max' ? '#ff3c00' : '#475569';
-        tabMax.style.borderBottom = tab === 'max' ? '2px solid #ff3c00' : '2px solid transparent';
-    }
-    if (tabMin) {
-        tabMin.style.background = tab === 'min' ? 'rgba(14,203,129,0.15)' : 'transparent';
-        tabMin.style.color      = tab === 'min' ? '#0ecb81' : '#475569';
-        tabMin.style.borderBottom = tab === 'min' ? '2px solid #0ecb81' : '2px solid transparent';
-    }
-    renderizarDeslizador();
-}
 
 function renderizarDeslizador() {
     const lista = document.getElementById('deslizadorLista');
@@ -2494,41 +2510,32 @@ function renderizarDeslizador() {
     if (!lista) return;
     const todas = Object.values(cachedData);
     const UMBRAL_MAX = 90;
-    const UMBRAL_MIN = 10;
-    let candidatos;
-    if (_deslizadorTab === 'max') {
-        // Sin límite: TODAS las monedas que están llegando a su máximo de 24h,
-        // ordenadas por prioridad (la más pegada al techo primero).
-        candidatos = todas.filter(c => c.posicionPorcentaje >= UMBRAL_MAX).sort((a, b) => b.posicionPorcentaje - a.posicionPorcentaje);
-    } else {
-        candidatos = todas.filter(c => c.posicionPorcentaje <= UMBRAL_MIN).sort((a, b) => a.posicionPorcentaje - b.posicionPorcentaje).slice(0, 30);
-    }
-    const totalBadge = todas.filter(c => c.posicionPorcentaje >= UMBRAL_MAX || c.posicionPorcentaje <= UMBRAL_MIN).length;
+    // Solo monedas con porcentaje positivo (pegadas a su máximo de 24h),
+    // ordenadas por prioridad (la más pegada al techo primero).
+    const candidatos = todas.filter(c => c.posicionPorcentaje >= UMBRAL_MAX).sort((a, b) => b.posicionPorcentaje - a.posicionPorcentaje);
+    const totalBadge = candidatos.length;
     if (badge) { badge.textContent = totalBadge; badge.style.display = totalBadge > 0 ? 'inline' : 'none'; }
     if (candidatos.length === 0) {
-        lista.innerHTML = `<div style="text-align:center; padding:14px; color:#475569; font-size:11px;">${_deslizadorTab === 'max' ? '🔴' : '🟢'} Sin monedas en ${_deslizadorTab === 'max' ? 'máximo' : 'mínimo'} ahora mismo</div>`;
+        lista.innerHTML = `<div style="text-align:center; padding:14px; color:#475569; font-size:11px;">🟡 Sin monedas en máximo ahora mismo</div>`;
         return;
     }
     lista.innerHTML = candidatos.map(c => {
         const nombre = c.symbol.replace('USDT','');
-        const esMax = _deslizadorTab === 'max';
-        const color = esMax ? '#ff3c00' : '#0ecb81';
         const posBar = Math.min(Math.max(c.posicionPorcentaje, 0), 100).toFixed(0);
-        const colorBar = esMax ? `linear-gradient(90deg,#ff2a3b,#ff6b00)` : `linear-gradient(90deg,#0ecb81,#00d4ff)`;
         const vel = c.cambioReal2Min; const colorVel = vel >= 0 ? '#0ecb81' : '#ff2a3b'; const iconoVel = vel >= 0 ? '▲' : '▼';
-        const scoreTecho = esMax ? calcularScoreTecho(c) : null;
-        return `<div onclick="seleccionarMoneda('${c.symbol}')" style="background:#080f1e; border:1px solid ${esMax ? 'rgba(255,60,0,0.3)' : 'rgba(14,203,129,0.25)'}; border-radius:8px; padding:8px 10px; cursor:pointer; margin-bottom:2px;">
+        const scoreTecho = calcularScoreTecho(c);
+        return `<div onclick="seleccionarMoneda('${c.symbol}')" style="background:#080f1e; border:1px solid rgba(243,186,47,0.3); border-radius:8px; padding:8px 10px; cursor:pointer; margin-bottom:2px;">
             <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:4px;">
                 <span style="font-size:12px; font-weight:900; color:#fff;">${nombre}</span>
-                <span style="font-size:11px; font-weight:900; color:${color};">${posBar}%</span>
+                <span style="font-size:11px; font-weight:900; color:#f3ba2f;">${posBar}%</span>
             </div>
             <div style="height:3px; background:rgba(255,255,255,0.07); border-radius:3px; overflow:hidden; margin-bottom:5px;">
-                <div style="height:100%; width:${posBar}%; background:${colorBar}; border-radius:3px;"></div>
+                <div style="height:100%; width:${posBar}%; background:linear-gradient(90deg,#f3ba2f,#ffd76b); border-radius:3px;"></div>
             </div>
             <div style="display:flex; justify-content:space-between; font-size:9px; color:#475569;">
                 <span>$${c.price.toFixed(4)}</span>
                 <span style="color:${colorVel};">${iconoVel} ${Math.abs(vel).toFixed(2)}% 2m</span>
-                ${esMax && scoreTecho ? `<span style="color:${scoreTecho >= 65 ? '#ff2a3b' : '#f3ba2f'};">⚠️ ${scoreTecho}%</span>` : `<span>${c.change > 0 ? '+' : ''}${c.change.toFixed(1)}% 24h</span>`}
+                ${scoreTecho ? `<span style="color:${scoreTecho >= 65 ? '#ff2a3b' : '#f3ba2f'};">⚠️ ${scoreTecho}%</span>` : `<span>${c.change > 0 ? '+' : ''}${c.change.toFixed(1)}% 24h</span>`}
             </div>
         </div>`;
     }).join('');
@@ -5586,24 +5593,58 @@ function actualizarTablaIzquierda() {
         // esta moneda SI O SI ya viene cayendo desde su máximo, sin fuerza
         // para volver a subir, con movimiento bajista rápido/tremendo confirmado.
         let badgeDiamanteOro = '';
+        let esCandidataDiamante = false;
+        let esLaMejorDiamante = false;
+        let puestoDiamante = 0;
         if (window._monedasDiamanteOro && window._monedasDiamanteOro.includes(symbol)) {
             tr.classList.add('diamante-oro-fila');
-            const esLaMejor = symbol === window._monedaDiamanteOro;
-            const puestoDiamante = window._monedasDiamanteOro.indexOf(symbol) + 1;
-            badgeDiamanteOro = `<div class="diamante-oro-badge">💎🟡 ${esLaMejor ? '' : '#' + puestoDiamante + ' '}CAYENDO — SIN FUERZA P/ SUBIR</div>`;
+            esCandidataDiamante = true;
+            esLaMejorDiamante = symbol === window._monedaDiamanteOro;
+            puestoDiamante = window._monedasDiamanteOro.indexOf(symbol) + 1;
+            badgeDiamanteOro = `<div class="diamante-oro-badge">💎🟡 ${esLaMejorDiamante ? '' : '#' + puestoDiamante + ' '}CAYENDO — SIN FUERZA P/ SUBIR</div>`;
         }
+
+        // ── ⚡ CONFIRMADA PARA SHORT (doble señal): antes acá se apilaban 2 cuadros
+        // (💎 diamante de oro + 🟡 alarma azul confirmada). Se fusionan en 1 solo
+        // cuadro, dejando arriba únicamente lo esencial: nombre + % de cambio más
+        // grande, que es lo primero que hay que ver de un vistazo. ──
+        const esConfirmadoShortDoble = esCandidataDiamante && alarmaAzul && _azul.confirmada;
+        let cuadroUnicoShort = '';
+        if (esConfirmadoShortDoble) {
+            cuadroUnicoShort = `
+                <div class="short-confirmado-card">
+                    <div class="scf-titulo">💎🟡 ${esLaMejorDiamante ? '' : '#' + puestoDiamante + ' '}CAYENDO · SIN FUERZA P/ SUBIR</div>
+                    <div class="scf-estado">${_badgeNivelIcono} ${_azul.nivel} · CONFIRMADA · ${_badgeTipo}</div>
+                    <div class="scf-stop">🛑 Stop: $${_azul.stopSugerido.toFixed(_azul.stopSugerido < 1 ? 6 : 2)} (+${_azul.distanciaStopPct.toFixed(2)}%)</div>
+                </div>`;
+        }
+
+        const pillsMaxMin = `
+                <div style="display:flex;gap:4px;margin-top:3px;">
+                    <span style="font-size:9px;background:rgba(255,60,0,0.12);color:${colorPctMax};padding:1px 5px;border-radius:5px;font-weight:900;" title="% del maximo 24h">MAX: ${pctDelMax}%</span>
+                    <span style="font-size:9px;background:rgba(14,203,129,0.10);color:${colorPctMin};padding:1px 5px;border-radius:5px;font-weight:900;" title="${tituloSegundaPastilla}">${etiquetaSegundaPastilla}: ${pctDelMin}%</span>
+                </div>`;
 
         tr.innerHTML = `
             <td style="font-weight:700;">
+                ${esConfirmadoShortDoble ? `
+                <div class="short-confirmado-header">
+                    <span class="short-confirmado-name">${iconoAlarma}${symbol.replace("USDT","")} <span style="font-size:10px;color:var(--text-dim);font-weight:700;">USDT</span></span>
+                    <span class="short-confirmado-change" style="background:${c.change > 0 ? 'rgba(14,203,129,0.16)' : 'rgba(255,42,59,0.16)'};color:${colorCambio};">${c.change > 0 ? '+' : ''}${c.change.toFixed(2)}%</span>
+                </div>
+                ${_badgesExtra ? `<div style="margin:-2px 0 3px;">${_badgesExtra}</div>` : ''}
+                ${badgeBreaking ? '<div style="margin-bottom:3px;">' + badgeBreaking + '</div>' : ''}
+                ${cuadroUnicoShort}
+                ${barraRango}
+                ${pillsMaxMin}
+                ` : `
                 ${badgeDiamanteOro}
                 ${iconoAlarma}${symbol.replace("USDT","")} <span style="font-size:10px; color:var(--text-dim);">USDT</span>${_badgesExtra}
                 ${badgeBreaking ? '<div style="margin-top:2px;">' + badgeBreaking + '</div>' : ''}
                 ${badgeAlarmaAzul || subEtiqueta || badgeMaxMin}
                 ${barraRango}
-                <div style="display:flex;gap:4px;margin-top:3px;">
-                    <span style="font-size:9px;background:rgba(255,60,0,0.12);color:${colorPctMax};padding:1px 5px;border-radius:5px;font-weight:900;" title="% del maximo 24h">MAX: ${pctDelMax}%</span>
-                    <span style="font-size:9px;background:rgba(14,203,129,0.10);color:${colorPctMin};padding:1px 5px;border-radius:5px;font-weight:900;" title="${tituloSegundaPastilla}">${etiquetaSegundaPastilla}: ${pctDelMin}%</span>
-                </div>
+                ${pillsMaxMin}
+                `}
             </td>
             <td style="text-align:right; font-weight:900; color:${colorCambio};">
                 <span style="font-size:19px; line-height:1.1;">${c.change > 0 ? '+' : ''}${c.change.toFixed(2)}%</span>
@@ -9125,9 +9166,21 @@ document.getElementById("menuToggle").onclick = () => {
         if(getComputedStyle(sidebar).display === "none"){
             sidebar.style.display = "flex";
             sidebar.style.position = "fixed";
-            sidebar.style.top = "60px"; sidebar.style.left = "0"; sidebar.style.zIndex = "99999";
+            sidebar.style.top = "60px"; sidebar.style.left = "0"; sidebar.style.right = "0"; sidebar.style.zIndex = "99999";
             sidebar.style.background = "#060b16"; sidebar.style.height = "calc(100vh - 125px)";
-        }else{ sidebar.style.display = "none"; }
+            // Evita que la lista se "derrame" por debajo y quede tapada por otra pantalla:
+            // el scroll real lo maneja #sidebarScroll adentro.
+            sidebar.style.overflow = "hidden";
+            sidebar.style.width = "100%";
+            const scrollBox = document.getElementById("sidebarScroll");
+            if (scrollBox) { scrollBox.style.webkitOverflowScrolling = "touch"; scrollBox.style.touchAction = "pan-y"; }
+        }else{
+            // Reset completo al cerrar, para que la próxima apertura no arrastre estilos viejos
+            sidebar.style.display = "none";
+            sidebar.style.position = ""; sidebar.style.top = ""; sidebar.style.left = ""; sidebar.style.right = "";
+            sidebar.style.zIndex = ""; sidebar.style.background = ""; sidebar.style.height = "";
+            sidebar.style.overflow = ""; sidebar.style.width = "";
+        }
     }else{ sidebar.classList.toggle("hidden"); }
 };
 document.addEventListener("DOMContentLoaded", () => {
@@ -9175,7 +9228,7 @@ function toggleDeslizador() {
     const txt   = document.getElementById('deslizadorToggleTxt');
     if (panel) panel.style.display = _deslizadorAbierto ? 'block' : 'none';
     if (icono) icono.textContent = _deslizadorAbierto ? '▲' : '▼';
-    if (txt)   txt.textContent   = _deslizadorAbierto ? 'OCULTAR LISTA MÁX/MÍN 24H' : 'VER MONEDAS EN MÁX/MÍN 24H';
+    if (txt)   txt.textContent   = _deslizadorAbierto ? 'OCULTAR LISTA MÁXIMO 24H' : 'VER MONEDAS EN MÁXIMO 24H';
     if (_deslizadorAbierto) renderizarDeslizador();
 }
 
@@ -9190,7 +9243,7 @@ if (!_origActualizarTablaIzq2) {
         const badge = document.getElementById('deslizadorBadge');
         if (badge) {
             const todas = Object.values(cachedData);
-            const n = todas.filter(c => c.posicionPorcentaje >= 90 || c.posicionPorcentaje <= 10).length;
+            const n = todas.filter(c => c.posicionPorcentaje >= 90).length;
             badge.textContent = n; badge.style.display = n > 0 ? 'inline' : 'none';
         }
     };
