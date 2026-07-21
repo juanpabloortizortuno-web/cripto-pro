@@ -394,6 +394,26 @@
         #sidebarScroll::-webkit-scrollbar-track { background: #0a1220; border-radius: 4px; }
         #sidebarScroll::-webkit-scrollbar-thumb { background: rgba(243,186,47,0.7); border-radius: 4px; min-height: 40px; }
         #sidebarScroll::-webkit-scrollbar-thumb:hover { background: rgba(243,186,47,0.95); }
+        /* ── FIX "IMAGEN CONGELADA" EN MÓVIL ──────────────────────────────
+           En celulares, si esta caja (que contiene el cartel LONG/SHORT/24H
+           y el carrusel IA) no tiene su propia capa de composición ni el
+           scroll con inercia activado, WebKit/Chrome a veces no repinta el
+           carrusel al hacer scroll: queda "pegado" arriba, tapando la lista
+           de monedas que en realidad ya se movió por debajo. Forzamos la
+           capa (translateZ) y el scroll con inercia SIEMPRE, no solo cuando
+           se abre por el menú hamburguesa. */
+        #sidebarScroll {
+            -webkit-overflow-scrolling: touch;
+            transform: translateZ(0);
+            -webkit-transform: translateZ(0);
+            will-change: transform;
+        }
+        #btnAlarmaUnificado {
+            transform: translateZ(0);
+            -webkit-transform: translateZ(0);
+            backface-visibility: hidden;
+            -webkit-backface-visibility: hidden;
+        }
 
         
 
