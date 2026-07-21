@@ -402,17 +402,8 @@
            de monedas que en realidad ya se movió por debajo. Forzamos la
            capa (translateZ) y el scroll con inercia SIEMPRE, no solo cuando
            se abre por el menú hamburguesa. */
-        #sidebarScroll {
+   #sidebarScroll {
             -webkit-overflow-scrolling: touch;
-            transform: translateZ(0);
-            -webkit-transform: translateZ(0);
-            will-change: transform;
-        }
-        #btnAlarmaUnificado {
-            transform: translateZ(0);
-            -webkit-transform: translateZ(0);
-            backface-visibility: hidden;
-            -webkit-backface-visibility: hidden;
         }
 
         
@@ -791,12 +782,7 @@
                 background: #060b16;
                 height: calc(100vh - 125px);
                 overflow: hidden;
-                width: 100%;
-                /* fuerza su propia capa de composición en el navegador del
-                   celular para que no quede pintado a medias al abrir/cerrar */
-                transform: translateZ(0);
-                -webkit-transform: translateZ(0);
-                will-change: transform;
+               width: 100%;
             }
         }
 
@@ -2559,8 +2545,7 @@ function renderizarDeslizador() {
     const UMBRAL_MAX = 90;
     // Solo monedas con porcentaje positivo (pegadas a su máximo de 24h),
     // ordenadas por prioridad (la más pegada al techo primero).
-    const candidatos = todas.filter(c => c.posicionPorcentaje >= UMBRAL_MAX).sort((a, b) => b.posicionPorcentaje - a.posicionPorcentaje);
-    const totalBadge = candidatos.length;
+   const candidatos = todas.filter(c => c.posicionPorcentaje >= UMBRAL_MAX && c.change > 0).sort((a, b) => b.change - a.change);
     if (badge) { badge.textContent = totalBadge; badge.style.display = totalBadge > 0 ? 'inline' : 'none'; }
     if (candidatos.length === 0) {
         lista.innerHTML = `<div style="text-align:center; padding:14px; color:#475569; font-size:11px;">🟡 Sin monedas en máximo ahora mismo</div>`;
