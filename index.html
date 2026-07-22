@@ -5382,6 +5382,14 @@ function actualizarTablaIzquierda() {
         // Con búsqueda activa: mostramos TODAS las coincidencias de TODA la lista,
         // sin el límite de 25/25 y sin separar en grupos de máximo/mínimo.
         ordenadas = ordenadas.filter(coincideFiltroBusqueda);
+        // ── Prioridad: positivas y con % alto primero. Dentro de esas, mayor % arriba.
+        //    Las negativas (cayendo en las últimas 24h) quedan siempre al final,
+        //    aunque cumplan el filtro (p.ej. rebote tras caída con change aún negativo). ──
+        ordenadas.sort((a, b) => {
+            const aPos = a.change >= 0, bPos = b.change >= 0;
+            if (aPos !== bPos) return aPos ? -1 : 1;
+            return b.change - a.change;
+        });
         grupoMaximo = ordenadas; // se usa solo para el conteo del encabezado
         grupoMinimo = [];
         grupoExplosivo = [];
@@ -7431,8 +7439,7 @@ function actualizarPanelCentral() {
     }
 
     document.getElementById("detailView").innerHTML = `
-        ${btnDiamanteOroHTML}
-        ${btnTechoHTML}
+        <!-- 🔴 y 🟡 ocultas a pedido del usuario: ya se ven en la lista de 24h de la izquierda -->
         ${btnMotorAlcistaHTML}
 
         <!-- CABECERA: NOMBRE + PRECIO + CAMBIO -->
