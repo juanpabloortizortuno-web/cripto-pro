@@ -1189,7 +1189,6 @@
                         <tr>
                             <th>CRIPTO</th>
                             <th style="text-align:right;">CAMBIO</th>
-                            <th style="text-align:right;">DETALLES</th>
                         </tr>
                     </thead>
                     <tbody id="cryptoList"></tbody>
@@ -5420,11 +5419,13 @@ function actualizarTablaIzquierda() {
         //    MAYOR % DE CAMBIO primero (las que más subieron), y como criterio de desempate
         //    usamos que estén subiendo ahora mismo (cambioReal2Min) y luego la cercanía real
         //    al techo. Así "lo máximo de lo máximo en cambios" queda arriba de todo.
-        let porMaximo = [...poolCercaDelMaximo].sort((a, b) =>
-            (b.change - a.change) ||
-            (b.cambioReal2Min - a.cambioReal2Min) ||
-            (b.posicionPorcentaje - a.posicionPorcentaje)
-        );
+        let porMaximo = [...poolCercaDelMaximo]
+            .filter(c => c.change > 0) // 🚫 nunca mostrar monedas en rojo (negativas) en la sección principal
+            .sort((a, b) =>
+                (b.change - a.change) ||
+                (b.cambioReal2Min - a.cambioReal2Min) ||
+                (b.posicionPorcentaje - a.posicionPorcentaje)
+            );
         let porMinimo = [...ordenadas].sort((a, b) => (a.posicionPorcentaje - b.posicionPorcentaje) || (a.change - b.change));
 
         // Se excluyen del grupo de máximo/mínimo las que ya van en el grupo explosivo,
@@ -5450,8 +5451,8 @@ function actualizarTablaIzquierda() {
     if (ordenadas.length === 0) {
         const trVacio = document.createElement('tr');
         trVacio.innerHTML = queryBusqueda !== ''
-            ? `<td colspan="3" style="text-align:center; padding:16px; color:#64748b; font-size:11px;">❌ No encontré esa cripto o filtro</td>`
-            : `<td colspan="3" style="text-align:center; padding:16px; color:#64748b; font-size:11px;">⏳ Cargando datos de mercado…</td>`;
+            ? `<td colspan="2" style="text-align:center; padding:16px; color:#64748b; font-size:11px;">❌ No encontré esa cripto o filtro</td>`
+            : `<td colspan="2" style="text-align:center; padding:16px; color:#64748b; font-size:11px;">⏳ Cargando datos de mercado…</td>`;
         fragmento.appendChild(trVacio);
     }
 
@@ -5461,27 +5462,27 @@ function actualizarTablaIzquierda() {
         // que todo, con TODAS las que califican ahora mismo, para elegir cuál abrir.
         if (idx === 0 && grupoDiamante && grupoDiamante.length > 0) {
             const trH = document.createElement('tr');
-            trH.innerHTML = `<td colspan="3" style="background:rgba(255,215,0,0.22); color:#ffd700; font-size:10px; font-weight:900; padding:6px 10px; letter-spacing:0.5px; animation:blinker-glow 0.8s linear infinite;">💎🟡 DIAMANTE DE ORO — ELEGÍ CUÁL ABRIR (${grupoDiamante.length})</td>`;
+            trH.innerHTML = `<td colspan="2" style="background:rgba(255,215,0,0.22); color:#ffd700; font-size:10px; font-weight:900; padding:6px 10px; letter-spacing:0.5px; animation:blinker-glow 0.8s linear infinite;">💎🟡 DIAMANTE DE ORO — ELEGÍ CUÁL ABRIR (${grupoDiamante.length})</td>`;
             fragmento.appendChild(trH);
         }
         // Encabezado separador al inicio del grupo EXPLOSIVO (máximo 24h + subida >10%)
         if (idx === grupoDiamante.length && grupoExplosivo && grupoExplosivo.length > 0) {
             const trH = document.createElement('tr');
-            trH.innerHTML = `<td colspan="3" style="background:rgba(255,60,0,0.28); color:#fff; font-size:10px; font-weight:900; padding:6px 10px; letter-spacing:0.5px; animation:blinker-glow 0.8s linear infinite;">🚀🔥 AL MÁXIMO 24H + SUBIDA +10% (${grupoExplosivo.length})</td>`;
+            trH.innerHTML = `<td colspan="2" style="background:rgba(255,60,0,0.28); color:#fff; font-size:10px; font-weight:900; padding:6px 10px; letter-spacing:0.5px; animation:blinker-glow 0.8s linear infinite;">🚀🔥 AL MÁXIMO 24H + SUBIDA +10% (${grupoExplosivo.length})</td>`;
             fragmento.appendChild(trH);
         }
         // Encabezado separador al inicio del grupo de MÁXIMO (o de resultados de búsqueda)
         if (idx === grupoDiamante.length + (grupoExplosivo ? grupoExplosivo.length : 0) && grupoMaximo.length > 0) {
             const trH = document.createElement('tr');
             trH.innerHTML = queryBusqueda !== ''
-                ? `<td colspan="3" style="background:rgba(243,186,47,0.15); color:#f3ba2f; font-size:10px; font-weight:900; padding:6px 10px; letter-spacing:0.5px;">🔍 RESULTADOS PARA "${queryBusqueda}" (${grupoMaximo.length})</td>`
-                : `<td colspan="3" style="background:rgba(255,60,0,0.15); color:#ff3c00; font-size:10px; font-weight:900; padding:6px 10px; letter-spacing:0.5px;">🔴 ZONA DE MÁXIMO 24H (${grupoMaximo.length})</td>`;
+                ? `<td colspan="2" style="background:rgba(243,186,47,0.15); color:#f3ba2f; font-size:10px; font-weight:900; padding:6px 10px; letter-spacing:0.5px;">🔍 RESULTADOS PARA "${queryBusqueda}" (${grupoMaximo.length})</td>`
+                : `<td colspan="2" style="background:rgba(255,60,0,0.15); color:#ff3c00; font-size:10px; font-weight:900; padding:6px 10px; letter-spacing:0.5px;">🔴 ZONA DE MÁXIMO 24H (${grupoMaximo.length})</td>`;
             fragmento.appendChild(trH);
         }
         // Encabezado separador al inicio del grupo de MÍNIMO
         if (idx === grupoDiamante.length + (grupoExplosivo ? grupoExplosivo.length : 0) + grupoMaximo.length && grupoMinimo.length > 0) {
             const trH = document.createElement('tr');
-            trH.innerHTML = `<td colspan="3" style="background:rgba(14,203,129,0.15); color:#0ecb81; font-size:10px; font-weight:900; padding:6px 10px; letter-spacing:0.5px;">🟢 ZONA DE MÍNIMO 24H (${grupoMinimo.length})</td>`;
+            trH.innerHTML = `<td colspan="2" style="background:rgba(14,203,129,0.15); color:#0ecb81; font-size:10px; font-weight:900; padding:6px 10px; letter-spacing:0.5px;">🟢 ZONA DE MÍNIMO 24H (${grupoMinimo.length})</td>`;
             fragmento.appendChild(trH);
         }
         const symbol = c.symbol;
@@ -5670,7 +5671,7 @@ function actualizarTablaIzquierda() {
                 ${pillsMaxMin}
                 ` : `
                 ${badgeDiamanteOro}
-                <span style="font-size:16px; font-weight:900;">${iconoAlarma}${symbol.replace("USDT","")}</span> <span style="font-size:10px; color:var(--text-dim);">USDT</span>${_badgesExtra}
+                <span style="font-size:20px; font-weight:900;">${iconoAlarma}${symbol.replace("USDT","")}</span> <span style="font-size:10px; color:var(--text-dim);">USDT</span>${_badgesExtra}
                 ${badgeBreaking ? '<div style="margin-top:2px;">' + badgeBreaking + '</div>' : ''}
                 ${badgeAlarmaAzul || subEtiqueta || badgeMaxMin}
                 ${barraRango}
@@ -5681,13 +5682,9 @@ function actualizarTablaIzquierda() {
                 <span style="display:flex; align-items:center; justify-content:flex-end; gap:3px; font-size:19px; font-weight:900; line-height:1.1; color:#f3ba2f; text-shadow:0 0 10px rgba(243,186,47,0.55); animation:blinker-glow 0.9s linear infinite;" title="% ya alcanzado de su máximo 24h — se acerca al techo">
                     <span style="font-size:15px;">⚠️</span>${pctDelMax}%
                 </span>
-                <span style="display:block; font-size:9px; font-weight:800; color:#f3ba2f; letter-spacing:0.3px; margin:-1px 0 3px;">A PUNTO DE TOCAR SU MÁXIMO</span>
+                <span style="display:block; font-size:9px; font-weight:800; color:#f3ba2f; letter-spacing:0.3px; margin:-1px 0 3px; white-space:nowrap;">SUBIENDO</span>
                 <span style="font-size:19px; line-height:1.1;">${c.change > 0 ? '+' : ''}${c.change.toFixed(2)}%</span>
                 <span style="display:block; font-size:10px; color:${c.velocidad >= 0 ? 'var(--accent-green)' : 'var(--accent-glow)'};">Vel: ${c.velocidad.toFixed(2)}</span>
-            </td>
-            <td style="text-align:right; font-weight:700; color:#e2e8f0;">
-                2m: ${c.cambioReal2Min > 0 ? '+' : ''}${c.cambioReal2Min.toFixed(2)}%
-                <span style="display:block; font-size:9px; color:${enMaximo24h ? '#ff3c00' : enMinimo24h ? '#0ecb81' : 'var(--text-dim)'}; font-weight:${enMaximo24h||enMinimo24h ? '900' : '600'};">Rango: ${c.posicionPorcentaje.toFixed(0)}%</span>
             </td>
         `;
         fragmento.appendChild(tr);
