@@ -404,6 +404,8 @@
            se abre por el menú hamburguesa. */
    #sidebarScroll {
             -webkit-overflow-scrolling: touch;
+            transform: translateZ(0);
+            will-change: scroll-position;
         }
 
         
@@ -753,6 +755,7 @@
             body { overflow-x: hidden; overflow-y: auto; }
             .container { display: flex; flex-direction: column; height: auto; overflow: visible; }
             .sidebar { width: 100%; min-width: 100%; height: auto; min-height: 100vh; overflow-y: visible; overflow-x: hidden; border-right: none; border-bottom: 1px solid rgba(255,255,255,.05); }
+            .sidebar .table-wrapper { overflow-y: visible !important; }
             .main-workspace { display: flex; flex-direction: column; overflow: visible; }
             .column-center { width: 100%; min-width: 100%; padding: 10px; border-right: none; box-sizing: border-box; }
             .column-right { width: 100%; min-width: 100%; padding: 10px; box-sizing: border-box; }
@@ -5436,7 +5439,7 @@ function actualizarTablaIzquierda() {
         const symbolsDiamante = (window._monedasDiamanteOro || []).filter(s => cachedData[s]);
         grupoDiamante = symbolsDiamante
             .map(s => cachedData[s])
-            .filter(c => c && !grupoExplosivo.includes(c))
+            .filter(c => c && !grupoExplosivo.includes(c) && c.change > 0) // solo cambios positivos
             .sort((a, b) => b.change - a.change); // 💛 máxima prioridad, de mayor a menor %
         grupoMaximo = grupoMaximo.filter(c => !grupoDiamante.includes(c));
         grupoMinimo = grupoMinimo.filter(c => !grupoDiamante.includes(c));
@@ -5651,11 +5654,7 @@ function actualizarTablaIzquierda() {
                 </div>`;
         }
 
-        const pillsMaxMin = `
-                <div style="display:flex;gap:4px;margin-top:3px;">
-                    <span style="font-size:9px;background:rgba(255,60,0,0.12);color:${colorPctMax};padding:1px 5px;border-radius:5px;font-weight:900;" title="% del maximo 24h">MAX: ${pctDelMax}%</span>
-                    <span style="font-size:9px;background:rgba(14,203,129,0.10);color:${colorPctMin};padding:1px 5px;border-radius:5px;font-weight:900;" title="${tituloSegundaPastilla}">${etiquetaSegundaPastilla}: ${pctDelMin}%</span>
-                </div>`;
+        const pillsMaxMin = '';
 
         tr.innerHTML = `
             <td style="font-weight:700;">
@@ -5671,7 +5670,7 @@ function actualizarTablaIzquierda() {
                 ${pillsMaxMin}
                 ` : `
                 ${badgeDiamanteOro}
-                ${iconoAlarma}${symbol.replace("USDT","")} <span style="font-size:10px; color:var(--text-dim);">USDT</span>${_badgesExtra}
+                <span style="font-size:16px; font-weight:900;">${iconoAlarma}${symbol.replace("USDT","")}</span> <span style="font-size:10px; color:var(--text-dim);">USDT</span>${_badgesExtra}
                 ${badgeBreaking ? '<div style="margin-top:2px;">' + badgeBreaking + '</div>' : ''}
                 ${badgeAlarmaAzul || subEtiqueta || badgeMaxMin}
                 ${barraRango}
@@ -5679,6 +5678,10 @@ function actualizarTablaIzquierda() {
                 `}
             </td>
             <td style="text-align:right; font-weight:900; color:${colorCambio};">
+                <span style="display:flex; align-items:center; justify-content:flex-end; gap:3px; font-size:19px; font-weight:900; line-height:1.1; color:#f3ba2f; text-shadow:0 0 10px rgba(243,186,47,0.55); animation:blinker-glow 0.9s linear infinite;" title="% ya alcanzado de su máximo 24h — se acerca al techo">
+                    <span style="font-size:15px;">⚠️</span>${pctDelMax}%
+                </span>
+                <span style="display:block; font-size:9px; font-weight:800; color:#f3ba2f; letter-spacing:0.3px; margin:-1px 0 3px;">A PUNTO DE TOCAR SU MÁXIMO</span>
                 <span style="font-size:19px; line-height:1.1;">${c.change > 0 ? '+' : ''}${c.change.toFixed(2)}%</span>
                 <span style="display:block; font-size:10px; color:${c.velocidad >= 0 ? 'var(--accent-green)' : 'var(--accent-glow)'};">Vel: ${c.velocidad.toFixed(2)}</span>
             </td>
