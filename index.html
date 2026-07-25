@@ -2846,7 +2846,7 @@ function _aplicarResultadoIA(btn, txt, nombre, cache, esCompra, esVenta, pred) {
 // ══════════════════════════════════════════════════════════════════
 function abrirParEnBinance(par) {
     if (!par) return;
-    const urlWeb = `https://www.binance.com/es/futures/${par}`;
+    const urlWeb = `https://www.binance.com/es-LA/futures/${par}`;
     const isAndroid = /Android/i.test(navigator.userAgent);
     const isIOS = /iPhone|iPad|iPod/i.test(navigator.userAgent);
 
@@ -2854,7 +2854,7 @@ function abrirParEnBinance(par) {
         // Un solo salto vía "intent://" (patrón oficial de Android): declara el
         // paquete real de Binance y un fallback web integrado. Android abre la
         // app directo si está instalada, o el navegador si no — sin parpadeos.
-        const intentUrl = `intent://www.binance.com/es/futures/${par}#Intent;scheme=https;package=com.binance.dev;S.browser_fallback_url=${encodeURIComponent(urlWeb)};end`;
+        const intentUrl = `intent://www.binance.com/es-LA/futures/${par}#Intent;scheme=https;package=com.binance.dev;S.browser_fallback_url=${encodeURIComponent(urlWeb)};end`;
         window.location.href = intentUrl;
     } else if (isIOS) {
         // Universal Link: iOS intercepta el https:// y abre la app directo en
@@ -5687,10 +5687,10 @@ function actualizarTablaIzquierda() {
                 `}
             </td>
             <td style="text-align:right; font-weight:900; color:${colorCambio};">
-                <span style="display:flex; align-items:center; justify-content:flex-end; gap:3px; font-size:19px; font-weight:900; line-height:1.1; color:#f3ba2f; text-shadow:0 0 10px rgba(243,186,47,0.55); animation:blinker-glow 0.9s linear infinite;" title="% ya alcanzado de su máximo 24h — se acerca al techo">
+                <span style="display:flex; align-items:center; justify-content:flex-end; gap:3px; font-size:19px; font-weight:900; line-height:1.1; color:${c.posicionPorcentaje >= 90 ? '#ff3c00' : '#f3ba2f'}; text-shadow:${c.posicionPorcentaje >= 90 ? '0 0 10px rgba(255,60,0,0.65)' : '0 0 10px rgba(243,186,47,0.55)'}; animation:blinker-glow 0.9s linear infinite;" title="% ya alcanzado de su máximo 24h — se acerca al techo">
                     <span style="font-size:15px;">⚠️</span>${pctDelMax}%
                 </span>
-                <span style="display:block; font-size:9px; font-weight:800; color:#f3ba2f; letter-spacing:0.3px; margin:-1px 0 3px; white-space:nowrap;">SUBIENDO</span>
+                <span style="display:block; font-size:9px; font-weight:800; color:${c.posicionPorcentaje >= 90 ? '#ff3c00' : '#f3ba2f'}; letter-spacing:0.3px; margin:-1px 0 3px; white-space:nowrap;">SUBIENDO</span>
                 <span style="font-size:19px; line-height:1.1;">${c.change > 0 ? '+' : ''}${c.change.toFixed(2)}%</span>
                 <span style="display:block; font-size:10px; color:${c.velocidad >= 0 ? 'var(--accent-green)' : 'var(--accent-glow)'};">Vel: ${c.velocidad.toFixed(2)}</span>
             </td>
@@ -5739,7 +5739,7 @@ function seleccionarMoneda(symbol, _esAutoTecho) {
     });
 
     document.getElementById("linkBinance").style.display = "flex";
-    document.getElementById("linkBinance").href = `https://www.binance.com/es/futures/${symbol}`;
+    document.getElementById("linkBinance").href = `https://www.binance.com/es-LA/futures/${symbol}`;
     document.getElementById("linkApp").style.display = "flex";
     // app link manejado por abrirEnApp()
 
@@ -8632,7 +8632,7 @@ function actualizarTacometroDerecho() {
 
         <!-- Botones -->
         <div style="display:grid; grid-template-columns:1fr 1fr 1fr; gap:8px; margin-top:15px;">
-            <a href="https://www.binance.com/es/futures/${selectedCoin}" target="_blank" class="btn ${c.alertaBombaSubida ? 'binance-long' : 'binance'}" style="font-size:10px;"><i class="fas fa-chart-line"></i> WEB</a>
+            <a href="https://www.binance.com/es-LA/futures/${selectedCoin}" target="_blank" class="btn ${c.alertaBombaSubida ? 'binance-long' : 'binance'}" style="font-size:10px;"><i class="fas fa-chart-line"></i> WEB</a>
             <button onclick="abrirEnApp()" class="btn" style="font-size:10px;background:linear-gradient(135deg,#f3ba2f,#ff6b00);color:#000;font-weight:900;border:none;cursor:pointer;border-radius:8px;"><i class="fas fa-mobile-alt"></i> APP 📱</button>
             <a href="https://wa.me/59177244375?text=Proyecto%20TecnoMan%20-%20Alerta%20Activa%20${selectedCoin}" target="_blank" class="btn ws" style="font-size:10px;"><i class="fab fa-whatsapp"></i> COMPARTIR</a>
         </div>
