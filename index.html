@@ -1246,7 +1246,7 @@
                 <div style="padding:7px 4px; font-size:10px; font-weight:900; letter-spacing:0.5px; background:rgba(243,186,47,0.15); color:#f3ba2f; border-bottom:2px solid #f3ba2f; text-align:center;">
                     🟡 EN MÁXIMO (POSITIVAS)
                 </div>
-                <div id="deslizadorLista" style="padding:6px 8px; display:flex; flex-direction:column; gap:5px; -webkit-overflow-scrolling:touch; touch-action:pan-y;"></div>
+                <div id="deslizadorLista" style="padding:6px 8px; display:flex; flex-direction:column; gap:5px; max-height:260px; overflow-y:auto; -webkit-overflow-scrolling:touch; touch-action:pan-y;"></div>
             </div>
             <!-- Toggle MAX/MIN -->
             <button id="btnToggleDeslizador" onclick="toggleDeslizador()" style="width:100%; padding:6px 12px; background:#07101f; border:none; border-top:1px solid rgba(255,255,255,0.06); border-bottom:1px solid rgba(255,255,255,0.06); color:#475569; font-size:10px; font-weight:900; cursor:pointer; letter-spacing:1px; display:flex; align-items:center; justify-content:center; gap:6px; flex-shrink:0;">
@@ -2631,7 +2631,7 @@ function renderizarDeslizador() {
     // Solo monedas con porcentaje positivo (pegadas a su máximo de 24h),
     // ordenadas por prioridad (la más pegada al techo primero).
    const candidatos = todas.filter(c => c.posicionPorcentaje >= UMBRAL_MAX && c.change > 0).sort((a, b) => (b.posicionPorcentaje - a.posicionPorcentaje) || (b.change - a.change));
-    if (badge) { badge.textContent = totalBadge; badge.style.display = totalBadge > 0 ? 'inline' : 'none'; }
+    if (badge) { badge.textContent = candidatos.length; badge.style.display = candidatos.length > 0 ? 'inline' : 'none'; }
     if (candidatos.length === 0) {
         lista.innerHTML = `<div style="text-align:center; padding:14px; color:#475569; font-size:11px;">🟡 Sin monedas en máximo ahora mismo</div>`;
         return;
@@ -7690,20 +7690,11 @@ function actualizarPanelCentral() {
     // ── Equivalente, en modo LONG, del botón de "techo" que existe en modo SHORT:
     // manda al RADAR CENTRAL (el grande, 🔭) ya filtrado en la pestaña del motor alcista,
     // en vez de quedarse solo en el panel chiquito ⚡.
+    // ── Botón "DESPEGUE EMA CONFIRMADO / REBOTE TRAS CAÍDA" ELIMINADO a
+    // pedido del usuario (parpadeaba arriba del panel central y molestaba). ──
     const enDespeguePanel = modoMercado === 'alcista' && esDespegueReal(selectedCoin);
     const enRebotePanel = modoMercado === 'alcista' && !enDespeguePanel && esReboteTrasCaida(selectedCoin);
-    const btnMotorAlcistaHTML = (enDespeguePanel || enRebotePanel) ? `
-        <div style="text-align:center; margin-bottom:14px;">
-            <button onclick="abrirRadarExplosivo(); setTimeout(()=>filtrarRadar('motorAlcista'),100);"
-                style="background:${enDespeguePanel ? 'rgba(14,203,129,0.12)' : 'rgba(0,212,255,0.12)'}; border:2px solid ${enDespeguePanel ? '#0ecb81' : '#00d4ff'}; border-radius:12px;
-                       color:${enDespeguePanel ? '#0ecb81' : '#00d4ff'}; font-size:13px; font-weight:900; padding:10px 20px; cursor:pointer;
-                       width:100%; letter-spacing:0.5px; animation:techo-parpadeo 0.8s infinite alternate;">
-                ${enDespeguePanel ? '🚀' : '🔄'} ${simbolo} ${enDespeguePanel ? 'DESPEGUE EMA CONFIRMADO' : 'REBOTE TRAS CAÍDA DE 24H'} — VER EN RADAR CENTRAL
-                <span style="display:block;font-size:10px;font-weight:600;margin-top:3px;color:${enDespeguePanel ? '#6ee7b7' : '#8be9ff'};">
-                    +${(e48 ? e48.subidaDesdeMinimo : 0).toFixed(1)}% desde mínimo 48h
-                </span>
-            </button>
-        </div>` : '';
+    const btnMotorAlcistaHTML = '';
 
     let badgeAlarma = '';
     if (c.alertaBombaSubida) {
