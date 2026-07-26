@@ -106,7 +106,7 @@
         .alarma-azul-pulsando { animation: alarma-azul-pulse 1.1s infinite; }
 
         /* ── 🇧🇴 BANDERA BOLIVIANA: 3 franjas (roja=cercanía 90%+, amarilla=cambio
-           15%+, verde=cumple el filtro completo 90%+cercanía Y 20%+cambio). Vive
+           15%+, verde=cumple el filtro completo 90%+cercanía Y 15%+cambio). Vive
            en cada fila de la lista y se pone completa/pulsante cuando las 3
            condiciones están activas a la vez. ── */
         .bandera-boliviana-wrap {
@@ -149,7 +149,7 @@
         }
 
         /* ── 🚨 ALARMA superior de la lista: avisa que hay al menos una moneda
-           con la Bandera Boliviana completa (90%+ cercanía Y 20%+ cambio real) ── */
+           con la Bandera Boliviana completa (90%+ cercanía Y 15%+ cambio real) ── */
         #banderaBolivianaAlarma {
             display: none;
             padding: 9px 12px;
@@ -1255,7 +1255,7 @@
                 <span id="deslizadorBadge" style="background:#ff3c00; color:#fff; font-size:9px; font-weight:900; padding:1px 6px; border-radius:8px; display:none;">0</span>
             </button>
 
-            <!-- ══ 🇧🇴 ALARMA BANDERA BOLIVIANA (90%+ cercanía Y 20%+ cambio real) ══ -->
+            <!-- ══ 🇧🇴 ALARMA BANDERA BOLIVIANA (90%+ cercanía Y 15%+ cambio real) ══ -->
             <div id="banderaBolivianaAlarma" onclick="_bbAbrirDesdeAlarma()"></div>
 
             <!-- ══ LISTA PRINCIPAL DE MONEDAS ══ -->
@@ -5088,12 +5088,29 @@ async function obtenerDatosBinance() {
                 velPromedio < 0 &&
                 ciclosBajando >= 3;
 
+            // 🟡 CONFIRMACIÓN CON POSICIONES DE LAS EMAs — antes esta alerta (el
+            // parpadeo amarillo "SUBIDA AGOTADA") solo miraba velocidad/posición/ciclos,
+            // así que podía parpadear con la caída todavía sin confirmar del todo.
+            // Ahora exige ADEMÁS que las EMAs realmente estén en posición de techo:
+            //  · emasJuntasTecho: las 4 EMAs (7/25/99/200) ya están comprimidas,
+            //    sin espacio de tendencia para seguir subiendo, O
+            //  · la EMA7 (la más rápida, la primera en reaccionar) ya dejó de subir
+            //    y apunta hacia abajo (ema7 <= ema7Prev) — el giro bajista ya arrancó.
+            // Si NINGUNA de las dos se cumple, las EMAs todavía muestran fuerza
+            // alcista real y no se dispara el parpadeo (evita falsas alarmas).
+            const _eAgot = datosEMA[item.symbol];
+            const _emasConfirmanCaida = !!(_eAgot && (
+                _eAgot.emasJuntasTecho ||
+                (_eAgot.ema7 !== undefined && _eAgot.ema7Prev !== undefined && _eAgot.ema7 <= _eAgot.ema7Prev)
+            ));
+
             let alertaAgotamientoSubida = enModoBajista &&
                 posicionPorcentaje >= CDC_CONFIG.umbralAgotamientoPos &&
                 esMonedaRapida &&
                 Math.abs(velocidadPrecio) < 0.008 &&
                 cambioReal2Min > 0.3 &&
                 ciclosSubiendo <= 2 &&
+                _emasConfirmanCaida &&               // 🆕 posiciones de las EMAs confirman el techo, no solo velocidad
                 !riesgoSigueSubiendo(item.symbol).riesgo; // 🛡️ no avisar "agotamiento" si la tendencia de 1h sigue fuerte
 
             registrarVolumen(item.symbol, parseFloat(item.quoteVolume));
@@ -5416,13 +5433,13 @@ if(document.getElementById("emaRadarPanel").style.display === "block"){
 // ── 🇧🇴 BANDERA BOLIVIANA (nivel global, la usan varias funciones) ─────
 // 🔴 Roja    = ya tocó el 90%+ de su rango 24h (cercanía real al techo)
 // 🟡 Amarilla = tuvo un cambio real de 15%+ (alerta temprana de movimiento fuerte)
-// 🟢 Verde   = cumple el filtro completo de verdad (90%+ cercanía Y 20%+ cambio,
+// 🟢 Verde   = cumple el filtro completo de verdad (90%+ cercanía Y 15%+ cambio,
 //              los mismos valores de siempre, sin tocarlos)
 // Cuando las 3 franjas están activas a la vez ("bandera completa"), la moneda
 // se manda sola al panel central y dispara la alarma arriba de la lista.
 const BB_UMBRAL_ROJA = 90;         // % del rango 24h
 const BB_UMBRAL_AMARILLA = 15;     // % de cambio (alerta temprana)
-const BB_UMBRAL_VERDE_CAMBIO = 20; // % de cambio (filtro completo)
+const BB_UMBRAL_VERDE_CAMBIO = 15; // % de cambio (filtro completo) — antes 20, bajado a 15
 
 function _evaluarBanderaBoliviana(c) {
     const pos = c.posicionPorcentaje || 0;
@@ -5442,18 +5459,18 @@ function actualizarTablaIzquierda() {
     // a mitad de camino (ej. 75-82% de su rango, apenas +4/+20% de cambio) que
     // seguían subiendo y solo generaban confusión. Ahora, en modo bajista, la
     // lista de la izquierda SOLO muestra candidatas que ya llegaron de verdad
-    // al 90%+ de su rango 24h Y que además tuvieron un cambio real de 20%+.
+    // al 90%+ de su rango 24h Y que además tuvieron un cambio real de 15%+.
     // Así solo se ven monedas que están genuinamente cerca del techo, no las
     // que "van en camino". ──
     const UMBRAL_POSICION_LISTA_IZQUIERDA = 90; // % del rango 24h (100 = tocando el máximo)
-    const CAMBIO_MINIMO_LISTA_IZQUIERDA = 20;   // % de cambio en 24h
+    const CAMBIO_MINIMO_LISTA_IZQUIERDA = 15;   // % de cambio en 24h — antes 20, bajado a 15 (mismo umbral que la bandera)
 
     // ── Búsqueda activa: si hay texto en el buscador, ignoramos el TOP_N
     // y filtramos sobre TODAS las monedas disponibles (no solo las 50 visibles) ──
     const queryBusqueda = (document.getElementById('searchCoin')?.value || '').toUpperCase().trim();
 
     let todas = Object.values(cachedData);
-    // El filtro de calidad (90%+ de rango y 20%+ de cambio) solo se aplica a la
+    // El filtro de calidad (90%+ de rango y 15%+ de cambio) solo se aplica a la
     // vista normal en modo SHORT/bajista. Si el usuario está buscando algo
     // puntual (con el buscador), se sigue pudiendo encontrar cualquier moneda.
     if (modoMercado === 'bajista' && queryBusqueda === '') {
@@ -5860,7 +5877,7 @@ function actualizarTablaIzquierda() {
 // ══════════════════════════════════════════════════════════════════
 // 🇧🇴 BANDERA BOLIVIANA — alarma + auto-apertura al panel central
 // Cuando una moneda tiene sus 3 franjas activas (roja=90%+ cercanía,
-// amarilla=15%+ cambio, verde=cumple 90%+cercanía Y 20%+cambio), se
+// amarilla=15%+ cambio, verde=cumple 90%+cercanía Y 15%+cambio), se
 // considera "bandera completa": dispara la alarma arriba de la lista
 // y se abre sola en el panel central (con la misma cortesía de no
 // pisar una elección manual reciente que ya usa autoAbrirMejorCandidataFuerte).
@@ -5893,7 +5910,7 @@ function _actualizarBanderaBolivianaGlobal() {
             <span>🔴 ${bb.pos.toFixed(0)}% · 🟡🟢 +${bb.cambio.toFixed(1)}%</span>
         </div>`).join('');
     banner.innerHTML = `
-        <div class="bb-alarma-titulo">🇧🇴 BANDERA COMPLETA ${filtroActivo ? '✅ FILTRO ACTIVO' : ''} — ${completas.length} moneda${completas.length > 1 ? 's' : ''} con 90%+ cercanía y 20%+ cambio</div>
+        <div class="bb-alarma-titulo">🇧🇴 BANDERA COMPLETA ${filtroActivo ? '✅ FILTRO ACTIVO' : ''} — ${completas.length} moneda${completas.length > 1 ? 's' : ''} con 90%+ cercanía y 15%+ cambio</div>
         ${filas}`;
 
     // Auto-abrir en el panel central la mejor candidata (mismo criterio de
