@@ -104,6 +104,79 @@
         .techo-pulsando { animation: techo-pulse 1.5s infinite; }
         @keyframes alarma-azul-pulse { 0%,100%{box-shadow:0 0 10px rgba(255,215,0,0.45)} 50%{box-shadow:0 0 28px rgba(255,215,0,0.95)} }
         .alarma-azul-pulsando { animation: alarma-azul-pulse 1.1s infinite; }
+
+        /* ── 🇧🇴 BANDERA BOLIVIANA: 3 franjas (roja=cercanía 90%+, amarilla=cambio
+           15%+, verde=cumple el filtro completo 90%+cercanía Y 20%+cambio). Vive
+           en cada fila de la lista y se pone completa/pulsante cuando las 3
+           condiciones están activas a la vez. ── */
+        .bandera-boliviana-wrap {
+            display: inline-flex; align-items: center; gap: 6px;
+            margin-top: 5px; padding: 3px 7px 3px 3px;
+            background: rgba(255,255,255,0.03);
+            border: 1px solid rgba(255,255,255,0.08);
+            border-radius: 7px;
+        }
+        .bandera-boliviana-badge {
+            display: flex; flex-direction: column; width: 26px; height: 20px;
+            border-radius: 4px; overflow: hidden; flex-shrink: 0;
+            border: 1px solid rgba(255,255,255,0.2);
+            box-shadow: 0 1px 3px rgba(0,0,0,0.5);
+        }
+        .bb-franja { flex: 1; opacity: 0.16; transition: opacity 0.35s, box-shadow 0.35s; }
+        .bb-roja { background: #d52b1e; }
+        .bb-amarilla { background: #f9e300; }
+        .bb-verde { background: #007934; }
+        .bb-franja.bb-activa { opacity: 1; }
+        .bb-roja.bb-activa { box-shadow: inset 0 0 5px rgba(255,255,255,0.35), 0 0 7px rgba(213,43,30,0.8); }
+        .bb-amarilla.bb-activa { box-shadow: inset 0 0 5px rgba(255,255,255,0.35), 0 0 7px rgba(249,227,0,0.8); }
+        .bb-verde.bb-activa { box-shadow: inset 0 0 5px rgba(255,255,255,0.35), 0 0 7px rgba(0,121,52,0.8); }
+        .bandera-boliviana-badge.bb-completa {
+            animation: bb-pulse-completa 1.05s infinite;
+            border-color: #fff;
+        }
+        @keyframes bb-pulse-completa {
+            0%,100% { box-shadow: 0 0 7px rgba(255,255,255,0.5); transform: scale(1); }
+            50%     { box-shadow: 0 0 16px rgba(255,255,255,0.95); transform: scale(1.08); }
+        }
+        .bb-lectura {
+            display: flex; flex-direction: column; gap: 1px;
+            font-size: 11px; font-weight: 900; line-height: 1.15; color: #cbd5e1;
+        }
+        .bb-lectura b { font-size: 11px; font-weight: 900; }
+        .bandera-boliviana-wrap.bb-wrap-completa {
+            background: rgba(255,255,255,0.07);
+            border-color: rgba(255,255,255,0.35);
+        }
+
+        /* ── 🚨 ALARMA superior de la lista: avisa que hay al menos una moneda
+           con la Bandera Boliviana completa (90%+ cercanía Y 20%+ cambio real) ── */
+        #banderaBolivianaAlarma {
+            display: none;
+            padding: 9px 12px;
+            background: linear-gradient(90deg, rgba(213,43,30,0.22), rgba(249,227,0,0.18), rgba(0,121,52,0.22));
+            border-top: 2px solid #d52b1e;
+            border-bottom: 2px solid #007934;
+            cursor: pointer;
+            animation: bb-alarma-glow 1.3s infinite;
+            flex-shrink: 0;
+        }
+        @keyframes bb-alarma-glow {
+            0%,100% { box-shadow: inset 0 0 14px rgba(255,255,255,0.05); }
+            50%     { box-shadow: inset 0 0 26px rgba(255,255,255,0.18); }
+        }
+        .bb-alarma-titulo {
+            font-size: 11px; font-weight: 900; letter-spacing: 0.5px;
+            color: #fff; display: flex; align-items: center; gap: 6px; margin-bottom: 4px;
+        }
+        .bb-alarma-fila {
+            display: flex; align-items: center; justify-content: space-between;
+            font-size: 11px; font-weight: 900; color: #fff; padding: 2px 0;
+        }
+        .bb-alarma-fila b { font-size: 11px; font-weight: 900; }
+        #banderaBolivianaAlarma.bb-alarma-activa {
+            border-top-width: 3px; border-bottom-width: 3px;
+            box-shadow: inset 0 0 20px rgba(255,255,255,0.15);
+        }
         .radar-coin-nombre {
             font-size: 14px; font-weight: 900; color: #fff; margin-bottom: 4px;
         }
@@ -1132,7 +1205,7 @@
                     </button>
                     <button id="btnTecho4EmaSide" onclick="abrirListaCayendo24h()"
                         title="Máximo 24h + 4 EMAs juntas + caída ya confirmada"
-                        style="flex:1;padding:10px 6px;border-radius:10px;border:none;cursor:pointer;font-size:12px;font-weight:900;transition:all 0.25s;letter-spacing:0.3px;background:rgba(0,153,255,0.2);color:#00c3ff;box-shadow:inset 0 0 0 1px rgba(0,153,255,0.5);">
+                        style="flex:1;padding:10px 6px;border-radius:10px;border:none;cursor:pointer;font-size:12px;font-weight:900;transition:all 0.25s;letter-spacing:0.3px;background:rgba(243,186,47,0.22);color:#f3ba2f;box-shadow:inset 0 0 0 1px rgba(243,186,47,0.55);">
                         📉 24H<br><span style="font-size:9px;font-weight:700;opacity:0.85;">YA CAYENDO</span>
                     </button>
                 </div>
@@ -1181,6 +1254,9 @@
                 <span id="deslizadorToggleTxt">VER MONEDAS EN MÁXIMO 24H</span>
                 <span id="deslizadorBadge" style="background:#ff3c00; color:#fff; font-size:9px; font-weight:900; padding:1px 6px; border-radius:8px; display:none;">0</span>
             </button>
+
+            <!-- ══ 🇧🇴 ALARMA BANDERA BOLIVIANA (90%+ cercanía Y 20%+ cambio real) ══ -->
+            <div id="banderaBolivianaAlarma" onclick="_bbAbrirDesdeAlarma()"></div>
 
             <!-- ══ LISTA PRINCIPAL DE MONEDAS ══ -->
             <div class="table-wrapper" style="flex:1; min-height:200px;">
@@ -1399,6 +1475,13 @@
 </footer>
 
 <script>
+// ══════════════════════════════════════════════════════════════════
+// 🔒 PROXY DE IA — reemplaza esta URL por la de TU Cloudflare Worker
+// (ver instrucciones que te pasó Claude). NUNCA pongas la API key
+// de Anthropic aquí directamente, siempre a través del proxy.
+// ══════════════════════════════════════════════════════════════════
+const CDC_PROXY_URL = "https://cdc-ia-proxy.TU-SUBDOMINIO.workers.dev";
+
 let cachedData = {};
 
 // ══════════════════════════════════════════════════════════════════
@@ -2547,7 +2630,7 @@ function renderizarDeslizador() {
     const UMBRAL_MAX = 90;
     // Solo monedas con porcentaje positivo (pegadas a su máximo de 24h),
     // ordenadas por prioridad (la más pegada al techo primero).
-   const candidatos = todas.filter(c => c.posicionPorcentaje >= UMBRAL_MAX && c.change > 0).sort((a, b) => b.change - a.change);
+   const candidatos = todas.filter(c => c.posicionPorcentaje >= UMBRAL_MAX && c.change > 0).sort((a, b) => (b.posicionPorcentaje - a.posicionPorcentaje) || (b.change - a.change));
     if (badge) { badge.textContent = totalBadge; badge.style.display = totalBadge > 0 ? 'inline' : 'none'; }
     if (candidatos.length === 0) {
         lista.innerHTML = `<div style="text-align:center; padding:14px; color:#475569; font-size:11px;">🟡 Sin monedas en máximo ahora mismo</div>`;
@@ -2619,7 +2702,7 @@ TEXTO: [una frase corta y directa de máximo 12 palabras que diga qué hacer y p
 Ten en cuenta: si lleva muchas horas cayendo desde su máximo y está cerca del piso (bloque 3 o 4), el movimiento bajista puede estar agotado → favorece LONG. Si lleva muchas horas subiendo desde su mínimo y está cerca del techo, el movimiento alcista puede estar agotado → favorece SHORT.`;
 
     try {
-        const resp = await fetch("https://api.anthropic.com/v1/messages", {
+        const resp = await fetch(CDC_PROXY_URL, {
             method: "POST",
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify({
@@ -5201,30 +5284,35 @@ async function obtenerDatosBinance() {
         const UMBRAL_EXTREMO_IA = 75;
         const todasCached = Object.values(cachedData);
 
+        // OPTIMIZACIÓN: Set para chequear "¿ya está?" en O(1) en vez de recorrer
+        // listaPrioridades entera (.some()) por cada una de las 300+ monedas.
+        const symbolsEnLista = new Set(listaPrioridades.map(p => p.symbol));
+        const agregarPrioridad = (item) => {
+            listaPrioridades.push(item);
+            symbolsEnLista.add(item.symbol);
+        };
+
         // Monedas en zona de máximo 24h (posición ≥75%)
         todasCached.filter(c => c.posicionPorcentaje >= UMBRAL_EXTREMO_IA).forEach(c => {
-            const yaEsta = listaPrioridades.some(p => p.symbol === c.symbol);
-            if (!yaEsta) {
+            if (!symbolsEnLista.has(c.symbol)) {
                 const score = 10 + c.posicionPorcentaje * 0.3 + Math.abs(c.cambioReal2Min) * 5;
-                listaPrioridades.push({ symbol: c.symbol, tipo: "MAXIMO_24H", score });
+                agregarPrioridad({ symbol: c.symbol, tipo: "MAXIMO_24H", score });
             }
         });
 
         // Monedas en zona de mínimo 24h (posición ≤25%)
         todasCached.filter(c => c.posicionPorcentaje <= (100 - UMBRAL_EXTREMO_IA)).forEach(c => {
-            const yaEsta = listaPrioridades.some(p => p.symbol === c.symbol);
-            if (!yaEsta) {
+            if (!symbolsEnLista.has(c.symbol)) {
                 const score = 10 + (100 - UMBRAL_EXTREMO_IA - c.posicionPorcentaje) * 0.5 + Math.abs(c.cambioReal2Min) * 5;
-                listaPrioridades.push({ symbol: c.symbol, tipo: "MINIMO_24H", score });
+                agregarPrioridad({ symbol: c.symbol, tipo: "MINIMO_24H", score });
             }
         });
 
         // Monedas del radar: despegue EMA, rebote, techo, momentum alto
         todasCached.forEach(c => {
-            const yaEsta = listaPrioridades.some(p => p.symbol === c.symbol);
-            if (yaEsta) return;
+            if (symbolsEnLista.has(c.symbol)) return;
             if (esDespegueReal(c.symbol)) {
-                listaPrioridades.push({ symbol: c.symbol, tipo: "DESPEGUE", score: 80 + momentumScore(c.symbol) });
+                agregarPrioridad({ symbol: c.symbol, tipo: "DESPEGUE", score: 80 + momentumScore(c.symbol) });
             } else if (esReboteTrasCaida(c.symbol)) {
                 listaPrioridades.push({ symbol: c.symbol, tipo: "REBOTE_RADAR", score: 60 + momentumScore(c.symbol) });
             } else if (detectarEnTechoProximaCaida(c)) {
@@ -5325,16 +5413,55 @@ if(document.getElementById("emaRadarPanel").style.display === "block"){
     }
 }
 
+// ── 🇧🇴 BANDERA BOLIVIANA (nivel global, la usan varias funciones) ─────
+// 🔴 Roja    = ya tocó el 90%+ de su rango 24h (cercanía real al techo)
+// 🟡 Amarilla = tuvo un cambio real de 15%+ (alerta temprana de movimiento fuerte)
+// 🟢 Verde   = cumple el filtro completo de verdad (90%+ cercanía Y 20%+ cambio,
+//              los mismos valores de siempre, sin tocarlos)
+// Cuando las 3 franjas están activas a la vez ("bandera completa"), la moneda
+// se manda sola al panel central y dispara la alarma arriba de la lista.
+const BB_UMBRAL_ROJA = 90;         // % del rango 24h
+const BB_UMBRAL_AMARILLA = 15;     // % de cambio (alerta temprana)
+const BB_UMBRAL_VERDE_CAMBIO = 20; // % de cambio (filtro completo)
+
+function _evaluarBanderaBoliviana(c) {
+    const pos = c.posicionPorcentaje || 0;
+    const cambio = c.change || 0;
+    const roja = pos >= BB_UMBRAL_ROJA;
+    const amarilla = cambio >= BB_UMBRAL_AMARILLA;
+    const verde = roja && cambio >= BB_UMBRAL_VERDE_CAMBIO;
+    return { roja, amarilla, verde, completa: roja && amarilla && verde, pos, cambio };
+}
+
 function actualizarTablaIzquierda() {
     const tbody = document.getElementById("cryptoList");
     if (!tbody) return;
     const fragmento = document.createDocumentFragment();
 
-    const todas = Object.values(cachedData);
+    // ── 🎯 FILTRO DE CALIDAD (modo SHORT / bajista): antes se mostraban monedas
+    // a mitad de camino (ej. 75-82% de su rango, apenas +4/+20% de cambio) que
+    // seguían subiendo y solo generaban confusión. Ahora, en modo bajista, la
+    // lista de la izquierda SOLO muestra candidatas que ya llegaron de verdad
+    // al 90%+ de su rango 24h Y que además tuvieron un cambio real de 20%+.
+    // Así solo se ven monedas que están genuinamente cerca del techo, no las
+    // que "van en camino". ──
+    const UMBRAL_POSICION_LISTA_IZQUIERDA = 90; // % del rango 24h (100 = tocando el máximo)
+    const CAMBIO_MINIMO_LISTA_IZQUIERDA = 20;   // % de cambio en 24h
 
     // ── Búsqueda activa: si hay texto en el buscador, ignoramos el TOP_N
     // y filtramos sobre TODAS las monedas disponibles (no solo las 50 visibles) ──
     const queryBusqueda = (document.getElementById('searchCoin')?.value || '').toUpperCase().trim();
+
+    let todas = Object.values(cachedData);
+    // El filtro de calidad (90%+ de rango y 20%+ de cambio) solo se aplica a la
+    // vista normal en modo SHORT/bajista. Si el usuario está buscando algo
+    // puntual (con el buscador), se sigue pudiendo encontrar cualquier moneda.
+    if (modoMercado === 'bajista' && queryBusqueda === '') {
+        todas = todas.filter(c =>
+            (c.posicionPorcentaje || 0) >= UMBRAL_POSICION_LISTA_IZQUIERDA &&
+            (c.change || 0) >= CAMBIO_MINIMO_LISTA_IZQUIERDA
+        );
+    }
     const coincideFiltroBusqueda = (c) => {
         if (queryBusqueda === '') return true;
         if (c.symbol.includes(queryBusqueda)) return true;
@@ -5344,6 +5471,7 @@ function actualizarTablaIzquierda() {
         if (queryBusqueda === 'BOMBA' || queryBusqueda === 'LONG') return !!c.alertaBombaSubida;
         if (queryBusqueda === 'AGOTADO') return !!c.alertaAgotamientoSubida;
         if (queryBusqueda === 'CAYENDO24H') return esTechoConfirmado4Ema(c);
+        if (queryBusqueda === 'BANDERA' || queryBusqueda === 'BOLIVIANA') return _evaluarBanderaBoliviana(c).completa;
         return false;
     };
 
@@ -5423,16 +5551,17 @@ function actualizarTablaIzquierda() {
         //    máximo de 24h (esto NO cambia: sigue siendo el filtro por cercanía al techo).
         let poolCercaDelMaximo = [...ordenadas].sort((a, b) => b.posicionPorcentaje - a.posicionPorcentaje).slice(0, TOP_N);
 
-        // 2) Pero dentro de ese pool, ya NO ordenamos por cercanía al máximo: ordenamos por
-        //    MAYOR % DE CAMBIO primero (las que más subieron), y como criterio de desempate
-        //    usamos que estén subiendo ahora mismo (cambioReal2Min) y luego la cercanía real
-        //    al techo. Así "lo máximo de lo máximo en cambios" queda arriba de todo.
+        // 2) Dentro de ese pool, ordenamos por CERCANÍA REAL AL TECHO primero
+        //    (posicionPorcentaje: 95% siempre le gana a 76%, sin importar el
+        //    % de cambio de cada una); el % de cambio y el cambio en vivo de
+        //    2min quedan como desempate para cuando dos monedas están
+        //    igual de pegadas al máximo.
         let porMaximo = [...poolCercaDelMaximo]
             .filter(c => c.change > 0) // 🚫 nunca mostrar monedas en rojo (negativas) en la sección principal
             .sort((a, b) =>
+                (b.posicionPorcentaje - a.posicionPorcentaje) ||
                 (b.change - a.change) ||
-                (b.cambioReal2Min - a.cambioReal2Min) ||
-                (b.posicionPorcentaje - a.posicionPorcentaje)
+                (b.cambioReal2Min - a.cambioReal2Min)
             );
         let porMinimo = [...ordenadas].sort((a, b) => (a.posicionPorcentaje - b.posicionPorcentaje) || (a.change - b.change));
 
@@ -5449,7 +5578,7 @@ function actualizarTablaIzquierda() {
         grupoDiamante = symbolsDiamante
             .map(s => cachedData[s])
             .filter(c => c && !grupoExplosivo.includes(c) && c.change > 0) // solo cambios positivos
-            .sort((a, b) => b.change - a.change); // 💛 máxima prioridad, de mayor a menor %
+            .sort((a, b) => (b.posicionPorcentaje - a.posicionPorcentaje) || (b.change - a.change)); // 💛 máxima prioridad: más pegada al techo primero
         grupoMaximo = grupoMaximo.filter(c => !grupoDiamante.includes(c));
         grupoMinimo = grupoMinimo.filter(c => !grupoDiamante.includes(c));
 
@@ -5563,6 +5692,18 @@ function actualizarTablaIzquierda() {
         // Solo aplica si la fila aún no tiene color asignado por otra señal más urgente
         const enMaximo24h = c.posicionPorcentaje >= 90;
         const enMinimo24h = c.posicionPorcentaje <= 10;
+
+        // ── 🇧🇴 Badge de la Bandera Boliviana para esta fila ──
+        const _bb = _evaluarBanderaBoliviana(c);
+        const badgeBanderaBoliviana = (_bb.roja || _bb.amarilla)
+            ? `<div class="bandera-boliviana-wrap ${_bb.completa ? 'bb-wrap-completa' : ''}" title="🔴 Cercanía al máximo ${_bb.pos.toFixed(0)}% (necesita ${BB_UMBRAL_ROJA}%+) · 🟡 Cambio ${_bb.cambio.toFixed(1)}% (necesita ${BB_UMBRAL_AMARILLA}%+) · 🟢 Filtro completo (necesita ${BB_UMBRAL_ROJA}%+ y ${BB_UMBRAL_VERDE_CAMBIO}%+)">
+                <div class="bandera-boliviana-badge ${_bb.completa ? 'bb-completa' : ''}">
+                    <div class="bb-franja bb-roja ${_bb.roja ? 'bb-activa' : ''}"></div>
+                    <div class="bb-franja bb-amarilla ${_bb.amarilla ? 'bb-activa' : ''}"></div>
+                    <div class="bb-franja bb-verde ${_bb.verde ? 'bb-activa' : ''}"></div>
+                </div>
+                <div class="bb-lectura"><b>${_bb.pos.toFixed(0)}%</b><b>${_bb.cambio > 0 ? '+' : ''}${_bb.cambio.toFixed(1)}%</b></div>
+            </div>` : '';
         if (enMaximo24h && !tr.style.borderLeft) {
             tr.style.background = "rgba(255,60,0,0.13)";
             tr.style.borderLeft = "4px solid #ff3c00";
@@ -5675,6 +5816,7 @@ function actualizarTablaIzquierda() {
                 ${_badgesExtra ? `<div style="margin:-2px 0 3px;">${_badgesExtra}</div>` : ''}
                 ${badgeBreaking ? '<div style="margin-bottom:3px;">' + badgeBreaking + '</div>' : ''}
                 ${cuadroUnicoShort}
+                ${badgeBanderaBoliviana}
                 ${barraRango}
                 ${pillsMaxMin}
                 ` : `
@@ -5682,6 +5824,7 @@ function actualizarTablaIzquierda() {
                 <span style="font-size:20px; font-weight:900;">${iconoAlarma}${symbol.replace("USDT","")}</span> <span style="font-size:10px; color:var(--text-dim);">USDT</span>${_badgesExtra}
                 ${badgeBreaking ? '<div style="margin-top:2px;">' + badgeBreaking + '</div>' : ''}
                 ${badgeAlarmaAzul || subEtiqueta || badgeMaxMin}
+                ${badgeBanderaBoliviana}
                 ${barraRango}
                 ${pillsMaxMin}
                 `}
@@ -5701,6 +5844,123 @@ function actualizarTablaIzquierda() {
     tbody.innerHTML = "";
     tbody.appendChild(fragmento);
     actualizarContadorRadar(); // mantiene el botón 🔭 y sus contadores siempre al día, esté abierto o no el panel
+
+    // Solo en modo SHORT/bajista tiene sentido: si aparece una candidata MUY
+    // fuerte (90%+ de su rango Y 50%+ de cambio) la mandamos sola al panel
+    // principal, igual que si hubieras tocado el botón amarillo 24H.
+    if (modoMercado === 'bajista') autoAbrirMejorCandidataFuerte();
+
+    // 🇧🇴 Bandera Boliviana: escanea TODAS las monedas (no solo las visibles en
+    // esta lista) para no perderse ninguna que la haya completado.
+    // (en try/catch a propósito: si esto llegara a fallar, nunca debe cortar
+    // la actualización del panel central ni del termómetro)
+    try { _actualizarBanderaBolivianaGlobal(); } catch (err) { console.error('Bandera Boliviana:', err); }
+}
+
+// ══════════════════════════════════════════════════════════════════
+// 🇧🇴 BANDERA BOLIVIANA — alarma + auto-apertura al panel central
+// Cuando una moneda tiene sus 3 franjas activas (roja=90%+ cercanía,
+// amarilla=15%+ cambio, verde=cumple 90%+cercanía Y 20%+cambio), se
+// considera "bandera completa": dispara la alarma arriba de la lista
+// y se abre sola en el panel central (con la misma cortesía de no
+// pisar una elección manual reciente que ya usa autoAbrirMejorCandidataFuerte).
+// ══════════════════════════════════════════════════════════════════
+let _ultimoBanderaBolivianaSymbol = null;
+
+function _actualizarBanderaBolivianaGlobal() {
+    if (!cachedData) return;
+    const completas = Object.values(cachedData)
+        .map(c => ({ c, bb: _evaluarBanderaBoliviana(c) }))
+        .filter(x => x.bb.completa)
+        .sort((a, b) => (b.bb.pos - a.bb.pos) || (b.bb.cambio - a.bb.cambio));
+
+    const banner = document.getElementById('banderaBolivianaAlarma');
+    if (!banner) return;
+
+    if (completas.length === 0) {
+        banner.style.display = 'none';
+        banner.innerHTML = '';
+        _ultimoBanderaBolivianaSymbol = null;
+        return;
+    }
+
+    banner.style.display = 'block';
+    const filtroActivo = (document.getElementById('searchCoin')?.value || '').toUpperCase().trim() === 'BANDERA';
+    banner.classList.toggle('bb-alarma-activa', filtroActivo);
+    const filas = completas.slice(0, 4).map(({ c, bb }) => `
+        <div class="bb-alarma-fila">
+            <span>🇧🇴 <b>${c.symbol.replace('USDT', '')}</b></span>
+            <span>🔴 ${bb.pos.toFixed(0)}% · 🟡🟢 +${bb.cambio.toFixed(1)}%</span>
+        </div>`).join('');
+    banner.innerHTML = `
+        <div class="bb-alarma-titulo">🇧🇴 BANDERA COMPLETA ${filtroActivo ? '✅ FILTRO ACTIVO' : ''} — ${completas.length} moneda${completas.length > 1 ? 's' : ''} con 90%+ cercanía y 20%+ cambio</div>
+        ${filas}`;
+
+    // Auto-abrir en el panel central la mejor candidata (mismo criterio de
+    // cortesía: no pisar una selección manual hecha hace menos de 15s).
+    const mejor = completas[0].c;
+    if (mejor.symbol === selectedCoin) { _ultimoBanderaBolivianaSymbol = mejor.symbol; return; }
+    if (mejor.symbol === _ultimoBanderaBolivianaSymbol) return;
+    if (Date.now() - _ultimaSeleccionManualTs < 15000) return;
+
+    _ultimoBanderaBolivianaSymbol = mejor.symbol;
+    seleccionarMoneda(mejor.symbol, true);
+}
+
+function _bbAbrirDesdeAlarma() {
+    if (!cachedData) return;
+
+    // 1) Filtrar la lista de la izquierda para que las monedas con bandera
+    //    completa aparezcan primero (mismo mecanismo que buscar "BOMBA",
+    //    "CAYENDO24H", etc.) — usa el buscador existente con la palabra
+    //    clave BANDERA, así el usuario ve el mismo encabezado "RESULTADOS
+    //    PARA..." con el conteo, y puede tocar la ✕ para volver a la vista normal.
+    const input = document.getElementById('searchCoin');
+    if (input) {
+        input.value = 'BANDERA';
+        buscarMoneda();
+        const btnLimpiar = document.getElementById('btnLimpiarBusqueda');
+        if (btnLimpiar) btnLimpiar.style.display = 'flex';
+    }
+
+    // 2) Además, abrir la mejor candidata en el panel central (la más cerca
+    //    del 100% de rango, y si empatan, la de mayor cambio).
+    const completas = Object.values(cachedData)
+        .map(c => ({ c, bb: _evaluarBanderaBoliviana(c) }))
+        .filter(x => x.bb.completa)
+        .sort((a, b) => (b.bb.pos - a.bb.pos) || (b.bb.cambio - a.bb.cambio));
+    if (completas.length > 0) seleccionarMoneda(completas[0].c.symbol);
+}
+
+// ══════════════════════════════════════════════════════════════════
+// 🟡 AUTO-APERTURA DE SUPER CANDIDATA (90%+ de rango + 50%+ de cambio)
+// Igual que el botón amarillo 24H, pero sin necesidad de hacer click:
+// si una moneda cumple los dos requisitos fuertes a la vez, se abre
+// sola en el panel principal — salvo que ya esté seleccionada, o que
+// el usuario haya elegido otra moneda a mano hace menos de 15s (así
+// nunca le "roba" el panel justo cuando la está mirando a propósito).
+// ══════════════════════════════════════════════════════════════════
+const UMBRAL_POSICION_AUTO_PANEL = 90; // % del rango 24h
+const CAMBIO_MINIMO_AUTO_PANEL = 50;   // % de cambio en 24h
+let _ultimoAutoPanelSymbol = null;
+
+function autoAbrirMejorCandidataFuerte() {
+    const candidatas = Object.values(cachedData).filter(c =>
+        (c.posicionPorcentaje || 0) >= UMBRAL_POSICION_AUTO_PANEL &&
+        (c.change || 0) >= CAMBIO_MINIMO_AUTO_PANEL
+    );
+    if (candidatas.length === 0) { _ultimoAutoPanelSymbol = null; return; }
+
+    // La mejor: la más cerca del 100% del rango, y si empatan, la de mayor cambio
+    candidatas.sort((a, b) => (b.posicionPorcentaje - a.posicionPorcentaje) || (b.change - a.change));
+    const mejor = candidatas[0];
+
+    if (mejor.symbol === selectedCoin) { _ultimoAutoPanelSymbol = mejor.symbol; return; } // ya está abierta
+    if (mejor.symbol === _ultimoAutoPanelSymbol) return; // ya se abrió sola antes, no repetir
+    if (Date.now() - _ultimaSeleccionManualTs < 15000) return; // no pisar una elección manual reciente
+
+    _ultimoAutoPanelSymbol = mejor.symbol;
+    seleccionarMoneda(mejor.symbol, true);
 }
 
 let _ultimaSeleccionManualTs = 0; // se actualiza SOLO con clicks reales del usuario, no con el auto-cambio por techo
@@ -6020,6 +6280,15 @@ function revisarAlertasTecho4Ema() {
     if (!cachedData) return;
     const ahora = Date.now();
 
+    // ANTES: se auto-abría la PRIMERA moneda que cumplía la condición según
+    // el orden de iteración del objeto cachedData — una candidata más débil
+    // (ej. ESP al 73%) le podía "ganar" el panel a una más fuerte (ej. CROSS
+    // al 91%) solo por casualidad de orden. AHORA: se juntan TODAS las que
+    // confirman en este ciclo y se abre la MÁS FUERTE (más pegada al techo,
+    // luego mayor % de cambio) — mismo criterio que usa la lista de la
+    // izquierda y el diamante de oro.
+    const candidatasConfirmadas = [];
+
     for (const symbol in cachedData) {
         const c = cachedData[symbol];
         if (!detectarTecho4EmaInstantaneo(c)) continue;
@@ -6054,19 +6323,26 @@ function revisarAlertasTecho4Ema() {
             binanceAlarmaSymbol = symbol;
         } catch (e) {}
 
-        // ── AUTO-CAMBIO DE PANEL — única excepción a la regla de que el
-        // panel central nunca cambia solo (ver nota más abajo): se pidió
-        // explícitamente que cuando el techo Y la IA coincidan, la app
-        // salte sola al panel de esa moneda, para verla caer en vivo.
         if (confirmadoIA) {
-            const ultimoAutoCambio = _monedasYaAutoAbiertasTecho[symbol] || 0;
-            const espacioLibre = ahora - _ultimoAutoCambioTechoTs >= TECHO_AUTOCAMBIO_MIN_ESPACIADO_MS;
-            const noPisaSeleccionManual = (ahora - _ultimaSeleccionManualTs) >= TECHO_PROTECCION_SELECCION_MANUAL_MS;
-            if (ahora - ultimoAutoCambio >= TECHO_AUTOCAMBIO_COOLDOWN_MS && espacioLibre && noPisaSeleccionManual) {
-                _monedasYaAutoAbiertasTecho[symbol] = ahora;
-                _ultimoAutoCambioTechoTs = ahora;
-                try { if (typeof seleccionarMoneda === 'function') seleccionarMoneda(symbol, true); } catch (e) {}
-            }
+            candidatasConfirmadas.push({ symbol, posicionPorcentaje: c.posicionPorcentaje || 0, change: c.change || 0 });
+        }
+    }
+
+    // ── AUTO-CAMBIO DE PANEL — única excepción a la regla de que el
+    // panel central nunca cambia solo (ver nota más abajo): se pidió
+    // explícitamente que cuando el techo Y la IA coincidan, la app
+    // salte sola al panel de esa moneda, para verla caer en vivo.
+    // Se abre SOLO la más fuerte de las confirmadas en este ciclo.
+    if (candidatasConfirmadas.length > 0) {
+        candidatasConfirmadas.sort((a, b) => (b.posicionPorcentaje - a.posicionPorcentaje) || (b.change - a.change));
+        const symbol = candidatasConfirmadas[0].symbol;
+        const ultimoAutoCambio = _monedasYaAutoAbiertasTecho[symbol] || 0;
+        const espacioLibre = ahora - _ultimoAutoCambioTechoTs >= TECHO_AUTOCAMBIO_MIN_ESPACIADO_MS;
+        const noPisaSeleccionManual = (ahora - _ultimaSeleccionManualTs) >= TECHO_PROTECCION_SELECCION_MANUAL_MS;
+        if (ahora - ultimoAutoCambio >= TECHO_AUTOCAMBIO_COOLDOWN_MS && espacioLibre && noPisaSeleccionManual) {
+            _monedasYaAutoAbiertasTecho[symbol] = ahora;
+            _ultimoAutoCambioTechoTs = ahora;
+            try { if (typeof seleccionarMoneda === 'function') seleccionarMoneda(symbol, true); } catch (e) {}
         }
     }
 }
@@ -7452,12 +7728,25 @@ function actualizarPanelCentral() {
                 <div style="font-size:26px; font-weight:900; color:#fff; letter-spacing:1px; display:flex; align-items:center; justify-content:center; gap:8px; flex-wrap:wrap;">
                     ${simbolo} <span style="font-size:14px; color:#64748b; font-weight:600;">USDT</span>${badgeAlarma}
                 </div>
-                <div style="font-size:52px; font-weight:900; color:#0ecb81; line-height:1.1; margin:6px 0;">
-                    $${c.price.toLocaleString(undefined,{minimumFractionDigits:2,maximumFractionDigits:4})}
-                </div>
-                <div style="font-size:22px; font-weight:900; color:${colorCambio};">
-                    ${c.change >= 0 ? '+' : ''}${c.change.toFixed(2)}% <span style="font-size:12px; color:#64748b; font-weight:600;">cambio 24h</span>
-                </div>
+                <!-- 🔴 % de techo · 🟡 cambio 24h · 🟢 valor de la moneda — orden BANDERA BOLIVIANA (rojo, amarillo, verde), los 3 juntos, mismo tamaño, sin repetir en ningún otro lado del panel -->
+                ${(() => {
+                    const pctHeader = Math.min(100, Math.max(0, c.posicionPorcentaje || 0));
+                    const colorTecho = pctHeader >= 90 ? '#ff2a3b' : '#f3ba2f';
+                    return `<div style="display:flex; align-items:baseline; justify-content:center; gap:18px; flex-wrap:wrap; margin:10px 0 4px;">
+                        <div style="text-align:center;">
+                            <div style="font-size:34px; font-weight:900; color:${colorTecho}; line-height:1.1;">${pctHeader.toFixed(0)}%</div>
+                            <div style="font-size:10px; color:#64748b; font-weight:700; letter-spacing:0.5px;">% DE TECHO</div>
+                        </div>
+                        <div style="text-align:center;">
+                            <div style="font-size:34px; font-weight:900; color:#f3ba2f; line-height:1.1;">${c.change >= 0 ? '+' : ''}${c.change.toFixed(2)}%</div>
+                            <div style="font-size:10px; color:#64748b; font-weight:700; letter-spacing:0.5px;">CAMBIO 24H</div>
+                        </div>
+                        <div style="text-align:center;">
+                            <div style="font-size:34px; font-weight:900; color:#0ecb81; line-height:1.1;">$${c.price.toLocaleString(undefined,{minimumFractionDigits:2,maximumFractionDigits:4})}</div>
+                            <div style="font-size:10px; color:#64748b; font-weight:700; letter-spacing:0.5px;">VALOR MONEDA</div>
+                        </div>
+                    </div>`;
+                })()}
             </div>
             <!-- 🎯 COLUMNA DERECHA: badge Techo 4-EMA + mini gráfico en tiempo real -->
             ${(() => {
@@ -9279,6 +9568,7 @@ function toggleDeslizador() {
 }
 
 // Hook para actualizar badge en cada ciclo
+let _bbAutoAplicadoInicio = false; // 🇧🇴 solo se aplica una vez, al arrancar
 const _origActualizarTablaIzq2 = window._hookActualizarTablaHecho;
 if (!_origActualizarTablaIzq2) {
     window._hookActualizarTablaHecho = true;
@@ -9291,6 +9581,20 @@ if (!_origActualizarTablaIzq2) {
             const todas = Object.values(cachedData);
             const n = todas.filter(c => c.posicionPorcentaje >= 90).length;
             badge.textContent = n; badge.style.display = n > 0 ? 'inline' : 'none';
+        }
+
+        // ── 🇧🇴 BANDERA BOLIVIANA COMO FILTRO PREDETERMINADO ──────────────
+        // Apenas llegan los primeros datos reales, se activa sola (como si el
+        // usuario hubiera tocado el banner) para no tener que elegir modo SHORT
+        // + botón amarillo 24H a mano cada vez que se abre la app. Solo pasa
+        // una vez al inicio, y solo si el buscador está vacío (si el usuario
+        // ya estaba buscando algo, no se lo pisamos).
+        if (!_bbAutoAplicadoInicio && cachedData && Object.keys(cachedData).length > 0) {
+            _bbAutoAplicadoInicio = true;
+            const inputBB = document.getElementById('searchCoin');
+            if (inputBB && inputBB.value.trim() === '' && typeof _bbAbrirDesdeAlarma === 'function') {
+                _bbAbrirDesdeAlarma();
+            }
         }
     };
 }
@@ -9935,7 +10239,7 @@ function _iaTomarSnapshot(symbol) {
 async function _iaConsultarClaude(motor, snap) {
     const prompt = _iaConstruirPrompt(motor, snap);
 
-    const resp = await fetch('https://api.anthropic.com/v1/messages', {
+    const resp = await fetch(CDC_PROXY_URL, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
