@@ -106,7 +106,7 @@
         .alarma-azul-pulsando { animation: alarma-azul-pulse 1.1s infinite; }
 
         /* ── 🇧🇴 BANDERA BOLIVIANA: 3 franjas (roja=cercanía 90%+, amarilla=cambio
-           15%+, verde=cumple el filtro completo 90%+cercanía Y 15%+cambio). Vive
+           10%+, verde=cumple el filtro completo 90%+cercanía Y 10%+cambio). Vive
            en cada fila de la lista y se pone completa/pulsante cuando las 3
            condiciones están activas a la vez. ── */
         .bandera-boliviana-wrap {
@@ -149,7 +149,7 @@
         }
 
         /* ── 🚨 ALARMA superior de la lista: avisa que hay al menos una moneda
-           con la Bandera Boliviana completa (90%+ cercanía Y 15%+ cambio real) ── */
+           con la Bandera Boliviana completa (90%+ cercanía Y 10%+ cambio real) ── */
         #banderaBolivianaAlarma {
             display: none;
             padding: 9px 12px;
@@ -1255,7 +1255,7 @@
                 <span id="deslizadorBadge" style="background:#ff3c00; color:#fff; font-size:9px; font-weight:900; padding:1px 6px; border-radius:8px; display:none;">0</span>
             </button>
 
-            <!-- ══ 🇧🇴 ALARMA BANDERA BOLIVIANA (90%+ cercanía Y 15%+ cambio real) ══ -->
+            <!-- ══ 🇧🇴 ALARMA BANDERA BOLIVIANA (90%+ cercanía Y 10%+ cambio real) ══ -->
             <div id="banderaBolivianaAlarma" onclick="_bbAbrirDesdeAlarma()"></div>
 
             <!-- ══ LISTA PRINCIPAL DE MONEDAS ══ -->
@@ -2426,7 +2426,7 @@ function guardarConfigCDC(mostrarAlerta = true) {
 function restaurarConfigCDC() {
     CDC_CONFIG = {
         pesoRango: 30, pesoMomentum: 25, pesoTendencia: 20, pesoRSI: 10,
-        pesoDMI: 15, pesoVWAP: 15, pesoSMA: 8,
+        pesoDMI: 15, pesoVWAP: 15, pesoSMA: 8, pesoEmaConvergencia: 12,
         umbralBombaCambio2m: 0.35, umbralDerrumbeCambio2m: -0.25, umbralAgotamientoPos: 94.0,
         autoAprendizaje: true, learningRate: 0.4
     };
@@ -2477,7 +2477,8 @@ const LIMITES_PESOS = {
     pesoRSI:       [2, 20],
     pesoDMI:       [5, 30],
     pesoVWAP:      [5, 30],
-    pesoSMA:       [2, 20]
+    pesoSMA:       [2, 20],
+    pesoEmaConvergencia: [3, 25]
 };
 
 function cargarStatsAprendizajeCDC() {
@@ -2534,7 +2535,7 @@ function evaluarAprendizajeCDC() {
             const lr = CDC_CONFIG.learningRate || 0.4;
             const signoReal = subioReal ? 1 : -1;
 
-            const mapaFactores = { rango: "pesoRango", momentum: "pesoMomentum", tendencia: "pesoTendencia", rsi: "pesoRSI", dmi: "pesoDMI", vwap: "pesoVWAP", sma: "pesoSMA" };
+            const mapaFactores = { rango: "pesoRango", momentum: "pesoMomentum", tendencia: "pesoTendencia", rsi: "pesoRSI", dmi: "pesoDMI", vwap: "pesoVWAP", sma: "pesoSMA", emaConvergencia: "pesoEmaConvergencia" };
 
             Object.keys(p.factores).forEach(factorKey => {
                 const valorFactor = p.factores[factorKey];
@@ -4543,6 +4544,10 @@ async function actualizarEMASimbolo(symbol) {
         // temprana que se pidió (sin esperar a ver la vela ya cayendo).
         let emasJuntasTecho = false;
         let emaSpreadPct = null;
+        let emaSpreadPctPrev = null;
+        let emasConvergiendo = false;       // el espacio entre las 4 EMAs se está achicando YA (a punto de chocar)
+        let emaVelocidadConvergencia = 0;   // puntos % que se achicó el spread vs. la vela anterior (positivo = converge)
+        let emaDireccionOrden = null;       // 1 = EMA7 arriba de EMA25 (orden todavía alcista), -1 = ya cruzó abajo
         if (ema200) {
             const maxEma = Math.max(ema7, ema25, ema99, ema200);
             const minEma = Math.min(ema7, ema25, ema99, ema200);
@@ -4550,6 +4555,25 @@ async function actualizarEMASimbolo(symbol) {
             // Umbral: si las 4 EMAs están dentro de un rango de 1.5% entre sí,
             // se consideran "juntas" (mercado sin tendencia clara, agotado).
             emasJuntasTecho = emaSpreadPct !== null && emaSpreadPct <= 1.5;
+
+            // ── "A PUNTO DE CHOCAR" — mejora pedida: detectar la CONVERGENCIA
+            // antes de que las 4 EMAs terminen de juntarse del todo. Se compara
+            // el spread actual contra el de la vela anterior (usando los
+            // *Prev ya calculados arriba, misma serie de klines). Si el espacio
+            // entre las EMAs se está achicando de verdad (no ruido) y ya está
+            // razonablemente ajustado (≤3.5%), es la señal más temprana posible
+            // de que el cruce (y una caída) se viene, sin esperar a que ya
+            // estén pegadas ni a que el cruce ya haya ocurrido.
+            if (ema200Prev !== null && ema200Prev !== undefined) {
+                const maxEmaPrev = Math.max(ema7Prev, ema25Prev, ema99Prev, ema200Prev);
+                const minEmaPrev = Math.min(ema7Prev, ema25Prev, ema99Prev, ema200Prev);
+                emaSpreadPctPrev = maxEmaPrev > 0 ? ((maxEmaPrev - minEmaPrev) / maxEmaPrev) * 100 : null;
+                if (emaSpreadPct !== null && emaSpreadPctPrev !== null) {
+                    emaVelocidadConvergencia = emaSpreadPctPrev - emaSpreadPct; // positivo = se achica (convergen)
+                    emasConvergiendo = emaVelocidadConvergencia > 0.03 && emaSpreadPct <= 3.5;
+                }
+            }
+            emaDireccionOrden = ema7 > ema25 ? 1 : (ema7 < ema25 ? -1 : 0);
         }
 
         // ── SMA 20 y 50 (confirmación de tendencia más lenta/estable) ──
@@ -4579,7 +4603,8 @@ async function actualizarEMASimbolo(symbol) {
         datosEMA[symbol] = {
             ...(datosEMA[symbol] || {}),
             ema7, ema25, ema99, ema200, ema7Prev, ema25Prev, ema99Prev, ema200Prev,
-            minimo48h, subidaDesdeMinimo, alineadasAlcista, emasJuntasTecho, emaSpreadPct, historialGrafico,
+            minimo48h, subidaDesdeMinimo, alineadasAlcista, emasJuntasTecho, emaSpreadPct, emaSpreadPctPrev,
+            emasConvergiendo, emaVelocidadConvergencia, emaDireccionOrden, historialGrafico,
             sma20, sma50, sma20Prev, smaAlcista,
             adx, diPlus, diMinus, tendenciaFuerte, direccionDMI,
             vwap, precioSobreVwap, distVwapPct,
@@ -5432,14 +5457,14 @@ if(document.getElementById("emaRadarPanel").style.display === "block"){
 
 // ── 🇧🇴 BANDERA BOLIVIANA (nivel global, la usan varias funciones) ─────
 // 🔴 Roja    = ya tocó el 90%+ de su rango 24h (cercanía real al techo)
-// 🟡 Amarilla = tuvo un cambio real de 15%+ (alerta temprana de movimiento fuerte)
-// 🟢 Verde   = cumple el filtro completo de verdad (90%+ cercanía Y 15%+ cambio,
+// 🟡 Amarilla = tuvo un cambio real de 10%+ (alerta temprana de movimiento fuerte)
+// 🟢 Verde   = cumple el filtro completo de verdad (90%+ cercanía Y 10%+ cambio,
 //              los mismos valores de siempre, sin tocarlos)
 // Cuando las 3 franjas están activas a la vez ("bandera completa"), la moneda
 // se manda sola al panel central y dispara la alarma arriba de la lista.
 const BB_UMBRAL_ROJA = 90;         // % del rango 24h
-const BB_UMBRAL_AMARILLA = 15;     // % de cambio (alerta temprana)
-const BB_UMBRAL_VERDE_CAMBIO = 15; // % de cambio (filtro completo) — antes 20, bajado a 15
+const BB_UMBRAL_AMARILLA = 10;     // % de cambio (alerta temprana) — antes 20, luego 15, bajado a 10
+const BB_UMBRAL_VERDE_CAMBIO = 10; // % de cambio (filtro completo) — antes 20, luego 15, bajado a 10
 
 function _evaluarBanderaBoliviana(c) {
     const pos = c.posicionPorcentaje || 0;
@@ -5459,18 +5484,18 @@ function actualizarTablaIzquierda() {
     // a mitad de camino (ej. 75-82% de su rango, apenas +4/+20% de cambio) que
     // seguían subiendo y solo generaban confusión. Ahora, en modo bajista, la
     // lista de la izquierda SOLO muestra candidatas que ya llegaron de verdad
-    // al 90%+ de su rango 24h Y que además tuvieron un cambio real de 15%+.
+    // al 90%+ de su rango 24h Y que además tuvieron un cambio real de 10%+.
     // Así solo se ven monedas que están genuinamente cerca del techo, no las
     // que "van en camino". ──
     const UMBRAL_POSICION_LISTA_IZQUIERDA = 90; // % del rango 24h (100 = tocando el máximo)
-    const CAMBIO_MINIMO_LISTA_IZQUIERDA = 15;   // % de cambio en 24h — antes 20, bajado a 15 (mismo umbral que la bandera)
+    const CAMBIO_MINIMO_LISTA_IZQUIERDA = 10;   // % de cambio en 24h — antes 20, luego 15, bajado a 10 (mismo umbral que la bandera)
 
     // ── Búsqueda activa: si hay texto en el buscador, ignoramos el TOP_N
     // y filtramos sobre TODAS las monedas disponibles (no solo las 50 visibles) ──
     const queryBusqueda = (document.getElementById('searchCoin')?.value || '').toUpperCase().trim();
 
     let todas = Object.values(cachedData);
-    // El filtro de calidad (90%+ de rango y 15%+ de cambio) solo se aplica a la
+    // El filtro de calidad (90%+ de rango y 10%+ de cambio) solo se aplica a la
     // vista normal en modo SHORT/bajista. Si el usuario está buscando algo
     // puntual (con el buscador), se sigue pudiendo encontrar cualquier moneda.
     if (modoMercado === 'bajista' && queryBusqueda === '') {
@@ -5877,7 +5902,7 @@ function actualizarTablaIzquierda() {
 // ══════════════════════════════════════════════════════════════════
 // 🇧🇴 BANDERA BOLIVIANA — alarma + auto-apertura al panel central
 // Cuando una moneda tiene sus 3 franjas activas (roja=90%+ cercanía,
-// amarilla=15%+ cambio, verde=cumple 90%+cercanía Y 15%+cambio), se
+// amarilla=10%+ cambio, verde=cumple 90%+cercanía Y 10%+cambio), se
 // considera "bandera completa": dispara la alarma arriba de la lista
 // y se abre sola en el panel central (con la misma cortesía de no
 // pisar una elección manual reciente que ya usa autoAbrirMejorCandidataFuerte).
@@ -5910,7 +5935,7 @@ function _actualizarBanderaBolivianaGlobal() {
             <span>🔴 ${bb.pos.toFixed(0)}% · 🟡🟢 +${bb.cambio.toFixed(1)}%</span>
         </div>`).join('');
     banner.innerHTML = `
-        <div class="bb-alarma-titulo">🇧🇴 BANDERA COMPLETA ${filtroActivo ? '✅ FILTRO ACTIVO' : ''} — ${completas.length} moneda${completas.length > 1 ? 's' : ''} con 90%+ cercanía y 15%+ cambio</div>
+        <div class="bb-alarma-titulo">🇧🇴 BANDERA COMPLETA ${filtroActivo ? '✅ FILTRO ACTIVO' : ''} — ${completas.length} moneda${completas.length > 1 ? 's' : ''} con 90%+ cercanía y 10%+ cambio</div>
         ${filas}`;
 
     // Auto-abrir en el panel central la mejor candidata (mismo criterio de
@@ -6247,7 +6272,17 @@ function calcularScoreTecho(c) {
     // si la moneda está tocando su máximo de 24h Y las 4 EMAs están comprimidas
     // (sin espacio de tendencia para seguir subiendo), es la señal más fuerte
     // de que la caída está por comenzar, SIN esperar a verla ya en el gráfico.
-    if (eTecho && eTecho.emasJuntasTecho) score += 20;
+    if (eTecho && eTecho.emasJuntasTecho) {
+        score += 20;
+    } else if (eTecho && eTecho.emasConvergiendo && eTecho.emaDireccionOrden >= 0) {
+        // 11b. "A PUNTO DE CHOCAR" — mejora pedida: todavía no están juntas
+        // del todo, pero el espacio entre las 4 EMAs se está achicando rápido
+        // y el orden sigue siendo alcista (EMA7 encima) → el cruce bajista
+        // está por venir. Bonus graduado según qué tan rápido converge, para
+        // adelantar la predicción de caída sin esperar al cruce ya consumado.
+        const fuerza = Math.min(1, eTecho.emaVelocidadConvergencia / 0.4);
+        score += Math.round(8 + 10 * fuerza); // entre +8 y +18 según velocidad de convergencia
+    }
 
     return Math.max(0, Math.min(score, 100));
 }
@@ -7559,6 +7594,28 @@ function calcularPrediccionCDC(symbol){
     }
     score += contribSMA;
 
+    // 4e. CONVERGENCIA DE LAS 4 EMAs — mejora pedida: anticipa la caída
+    //     detectando cuando las EMAs (7/25/99/200) están A PUNTO DE CHOCAR,
+    //     ANTES de que el cruce ya haya ocurrido. Si el orden actual todavía
+    //     es alcista (EMA7 por encima) y el espacio entre las 4 se está
+    //     achicando rápido, es señal temprana de que viene un cruce bajista
+    //     (presión de venta). Si el orden ya es bajista y se están achicando,
+    //     es señal temprana de rebote. La intensidad crece cuanto más
+    //     ajustado y más rápida sea la convergencia.
+    let contribEmaConvergencia = 0;
+    if (eDMI && eDMI.emaSpreadPct !== null && eDMI.emaSpreadPct !== undefined && eDMI.emaDireccionOrden) {
+        const tightness = eDMI.emaSpreadPct <= 1.5 ? 1
+            : eDMI.emaSpreadPct <= 3.5 ? (3.5 - eDMI.emaSpreadPct) / (3.5 - 1.5)
+            : 0;
+        if (tightness > 0) {
+            const velocidad = Math.max(0, eDMI.emaVelocidadConvergencia || 0);
+            const fuerzaVelocidad = Math.min(1, velocidad / 0.4);
+            const intensidad = tightness * (0.5 + 0.5 * fuerzaVelocidad); // 0..1
+            contribEmaConvergencia = -eDMI.emaDireccionOrden * intensidad * w.pesoEmaConvergencia;
+        }
+    }
+    score += contribEmaConvergencia;
+
     // 5. CONFIRMACIÓN POR VOLUMEN — amplifica o reduce la confianza de la señal
     if (c.volume > 30000000) {
         score *= 1.20;       // volumen fuerte: más confianza en la dirección detectada
@@ -7611,7 +7668,10 @@ function calcularPrediccionCDC(symbol){
         distVwapPct: eDMI ? eDMI.distVwapPct : null,
         sma20: eDMI ? eDMI.sma20 : null,
         sma50: eDMI ? eDMI.sma50 : null,
-        smaAlcista: eDMI ? eDMI.smaAlcista : null
+        smaAlcista: eDMI ? eDMI.smaAlcista : null,
+        emaSpreadPct: eDMI ? eDMI.emaSpreadPct : null,
+        emasConvergiendo: eDMI ? eDMI.emasConvergiendo : false,
+        emaVelocidadConvergencia: eDMI ? eDMI.emaVelocidadConvergencia : 0
     };
 
     // ─── Registro para el sistema de auto-aprendizaje ───
@@ -7623,6 +7683,7 @@ function calcularPrediccionCDC(symbol){
         dmi: contribDMI,
         vwap: contribVWAP,
         sma: contribSMA,
+        emaConvergencia: contribEmaConvergencia,
         tiempo: contribTiempo
     });
 }
