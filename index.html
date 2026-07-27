@@ -594,6 +594,19 @@
             50% { opacity: 0.3; text-shadow: 0 0 15px rgba(255, 42, 59, 1); transform: scale(1.05); }
         }
 
+        /* 🔔⚪ Fila "AGOTÁNDOSE" (subida agotada, a punto de caer): antes se
+           pintaba en amarillo fijo y se perdía entre el resto de elementos
+           amarillos de la interfaz. Ahora parpadea en blanco para que sea
+           imposible confundirla con las demás alertas. */
+        @keyframes fila-agotamiento-parpadeo-blanco {
+            0%, 100% { background: rgba(243,186,47,0.18); border-left-color: #f3ba2f; }
+            50%      { background: rgba(255,255,255,0.55); border-left-color: #ffffff; box-shadow: inset 0 0 14px rgba(255,255,255,0.65); }
+        }
+        .fila-agotamiento-blanca {
+            animation: fila-agotamiento-parpadeo-blanco 0.8s infinite;
+            border-left: 4px solid #f3ba2f;
+        }
+
         .barra-contenedor { height: 6px; background: #111827; border-radius: 4px; overflow: hidden; margin: 6px 0; }
         .barra-progreso { height: 100%; transition: width 0.4s; }
 
@@ -3544,6 +3557,7 @@ function buscarMoneda() {
             if (query === 'BOMBA' || query === 'LONG') return !!c.alertaBombaSubida;
             if (query === 'AGOTADO') return !!c.alertaAgotamientoSubida;
             if (query === 'CAYENDO24H') return esTechoConfirmado4Ema(c);
+            if (query === 'BANDERA' || query === 'BOLIVIANA') return _evaluarBanderaBoliviana(c).completa;
             return false;
         }).length;
     }
@@ -3559,6 +3573,8 @@ function buscarMoneda() {
         saludo.innerText = `⚠️ Mostrando ${encontradas} activos agotándose en máximos`;
     } else if (query === 'CAYENDO24H') {
         saludo.innerText = `📉 IA v3 escaneando: ${encontradas} candidatas — techos tras pump 🏔️ y rebotes dentro de tendencia bajista 🔻`;
+    } else if (query === 'BANDERA' || query === 'BOLIVIANA') {
+        saludo.innerText = `🇧🇴 Bandera Boliviana completa: ${encontradas} moneda(s) con 90%+ de cercanía Y 10%+ de cambio real`;
     } else if (encontradas === 0) { 
         saludo.innerText = `❌ "${query}" no tiene contrato en Futuros USDT-M (o no coincide con ningún filtro) — esta app solo opera pares con perpetuo real en Binance USDT-M`; 
     } else { 
@@ -5703,9 +5719,8 @@ function actualizarTablaIzquierda() {
                 subEtiqueta = '<span style="color:#fff; background:linear-gradient(90deg,#ff2a3b,#cc0000); font-size:10px; font-weight:900; display:inline-block; padding:2px 8px; border-radius:6px; margin-top:3px; letter-spacing:0.5px;">🔴 SHORT · VENDER AHORA</span>';
                 iconoAlarma = '<span style="font-size:12px; animation:blinker-glow 0.5s linear infinite;">🔔</span> ';
             } else if (c.alertaAgotamientoSubida) {
-                tr.style.background = "rgba(243, 186, 47, 0.2)";
-                tr.style.borderLeft = "4px solid #f3ba2f";
-                subEtiqueta = '<span style="color:#000; background:#f3ba2f; font-size:10px; font-weight:900; display:inline-block; padding:2px 8px; border-radius:6px; margin-top:3px;">⚠️ SHORT · AGOTÁNDOSE</span>';
+                tr.classList.add('fila-agotamiento-blanca');
+                subEtiqueta = '<span style="color:#000; background:#fff; font-size:10px; font-weight:900; display:inline-block; padding:2px 8px; border-radius:6px; margin-top:3px; box-shadow:0 0 8px rgba(255,255,255,0.6);">⚠️ SHORT · AGOTÁNDOSE</span>';
                 iconoAlarma = '<span style="font-size:12px; animation:blinker-glow 0.7s linear infinite;">🔔</span> ';
             } else if (c.caidaDesdeMaximo >= 2.0 && c.caidaDesdeMaximo <= 5.0 && c.velocidad < 0) {
                 tr.style.background = "rgba(255, 42, 59, 0.1)";
