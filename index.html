@@ -4592,6 +4592,20 @@ async function actualizarEMASimbolo(symbol) {
             emaDireccionOrden = ema7 > ema25 ? 1 : (ema7 < ema25 ? -1 : 0);
         }
 
+        // ── 🔻 CRUCE BAJISTA REAL (pedido por el usuario: no basta con "juntas") ──
+        // "emasJuntasTecho" solo dice que están comprimidas (podría ser un lateral
+        // sin dirección). Esto exige que el cruce YA haya ocurrido de verdad:
+        // EMA7 ya está por debajo de EMA25 (la rápida perdió a la media), y la
+        // estructura más amplia (EMA25 vs EMA99) ya no es alcista. Es la condición
+        // más estricta y confiable de que las EMAs están "en posición de caída".
+        const emaCruceBajistaReal = (ema7 !== null && ema25 !== null && ema99 !== null)
+            ? (ema7 < ema25 && ema25 <= ema99)
+            : false;
+        // Bonus de frescura: el cruce de EMA7/EMA25 ocurrió recién (vela anterior
+        // todavía tenía EMA7 arriba o igual) — señal más temprana/confiable que
+        // un cruce viejo que ya se agotó.
+        const emaCruceBajistaFresco = emaCruceBajistaReal && (ema7Prev >= ema25Prev);
+
         // ── SMA 20 y 50 (confirmación de tendencia más lenta/estable) ──
         const s20 = calcularSMASerie(cierres, 20);
         const s50 = calcularSMASerie(cierres, 50);
@@ -4620,7 +4634,7 @@ async function actualizarEMASimbolo(symbol) {
             ...(datosEMA[symbol] || {}),
             ema7, ema25, ema99, ema200, ema7Prev, ema25Prev, ema99Prev, ema200Prev,
             minimo48h, subidaDesdeMinimo, alineadasAlcista, emasJuntasTecho, emaSpreadPct, emaSpreadPctPrev,
-            emasConvergiendo, emaVelocidadConvergencia, emaDireccionOrden, historialGrafico,
+            emasConvergiendo, emaVelocidadConvergencia, emaDireccionOrden, emaCruceBajistaReal, emaCruceBajistaFresco, historialGrafico,
             sma20, sma50, sma20Prev, smaAlcista,
             adx, diPlus, diMinus, tendenciaFuerte, direccionDMI,
             vwap, precioSobreVwap, distVwapPct,
@@ -6287,8 +6301,13 @@ function calcularScoreTecho(c) {
     // si la moneda está tocando su máximo de 24h Y las 4 EMAs están comprimidas
     // (sin espacio de tendencia para seguir subiendo), es la señal más fuerte
     // de que la caída está por comenzar, SIN esperar a verla ya en el gráfico.
-    if (eTecho && eTecho.emasJuntasTecho) {
-        score += 20;
+    if (eTecho && eTecho.emaCruceBajistaReal) {
+        // Cruce bajista YA confirmado (EMA7 < EMA25 <= EMA99): la señal más
+        // fuerte y estricta — no es solo compresión, es dirección de caída real.
+        score += eTecho.emaCruceBajistaFresco ? 30 : 24;
+    } else if (eTecho && eTecho.emasJuntasTecho) {
+        // Solo comprimidas (todavía sin cruce confirmado): señal más débil.
+        score += 12;
     } else if (eTecho && eTecho.emasConvergiendo && eTecho.emaDireccionOrden >= 0) {
         // 11b. "A PUNTO DE CHOCAR" — mejora pedida: todavía no están juntas
         // del todo, pero el espacio entre las 4 EMAs se está achicando rápido
@@ -6328,7 +6347,11 @@ let _ultimoAutoCambioTechoTs = 0;
 function detectarTecho4EmaInstantaneo(c) {
     if (!c) return false;
     const e = datosEMA[c.symbol];
-    if (!e || !e.emasJuntasTecho) return false;
+    // ANTES: bastaba con "emasJuntasTecho" (EMAs comprimidas, podía ser solo un
+    // lateral sin dirección clara). AHORA (pedido explícito): se exige el cruce
+    // bajista REAL — EMA7 ya cruzó debajo de EMA25 y la estructura 25 vs 99
+    // confirma — para que cuente como "EMAs en posición de caída" de verdad.
+    if (!e || !e.emaCruceBajistaReal) return false;
 
     // "Tocando el máximo de 24h" = está a 0.3% o menos de distancia de su high24h.
     const distMax = Math.min(
@@ -6696,7 +6719,13 @@ function _esCandidataTechoAgotamiento(c) {
     // demasiado, dejó de ser "está a punto de caer" para ser "ya cayó").
     const cercaDelTecho = c.caidaDesdeMaximo !== undefined && c.caidaDesdeMaximo <= 8;
 
-    const cumpleAhora = tuvoMovimientoFuerte && yaCayendo && cercaDelTecho && score >= AZUL_IA_SCORE_MINIMO;
+    // Requisito duro #3 (PEDIDO): las EMAs tienen que mostrar un cruce bajista
+    // REAL (EMA7 ya cruzó debajo de EMA25, y EMA25 <= EMA99), no solo estar
+    // "juntas". Esto hace la señal mucho más estricta y confiable.
+    const eAgot = datosEMA[c.symbol];
+    const emasEnCaidaReal = !!(eAgot && eAgot.emaCruceBajistaReal);
+
+    const cumpleAhora = tuvoMovimientoFuerte && yaCayendo && cercaDelTecho && emasEnCaidaReal && score >= AZUL_IA_SCORE_MINIMO;
     _registrarCicloAzulIA(c.symbol, cumpleAhora);
 
     if (!cumpleAhora) return { esCandidata: false };
@@ -7283,7 +7312,7 @@ function renderizarRadar() {
         </div>`;
 
         if (grupos.techo4ema.length === 0) {
-            h += `<div class="radar-vacio" style="padding:16px;">Ninguna moneda tocó su máximo de 24h y ya está cayendo de verdad ahora mismo.</div>`;
+            h += `<div class="radar-vacio" style="padding:16px;">Ninguna moneda tocó su máximo de 24h con un cruce bajista REAL de EMAs (EMA7 ya debajo de EMA25) ahora mismo.</div>`;
             return h;
         }
 
@@ -11525,13 +11554,13 @@ function _iaInyectarVentanitaTecho4Ema() {
     wrap.id = 'ventanitaTecho4Ema';
     wrap.style.cssText = 'margin-top:10px;border:1px solid rgba(255,255,255,0.08);border-radius:10px;padding:10px 12px;font-family:Inter,sans-serif;background:rgba(255,255,255,0.02);';
     wrap.innerHTML = `
-        <div style="font-size:11px;font-weight:900;letter-spacing:0.5px;color:#cbd5e1;margin-bottom:8px;">🎯 ¿EN POSICIÓN DE TECHO? (Máx 24h + 4 EMAs)</div>
+        <div style="font-size:11px;font-weight:900;letter-spacing:0.5px;color:#cbd5e1;margin-bottom:8px;">🎯 ¿EN POSICIÓN DE TECHO? (Máx 24h + cruce bajista real)</div>
         <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;">
             <span style="font-size:10.5px;color:#94a3b8;">Tocando máximo 24h</span>
             <span id="ventTechoMax" style="font-size:11px;font-weight:900;">—</span>
         </div>
         <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;">
-            <span style="font-size:10.5px;color:#94a3b8;">4 EMAs juntas (agotamiento)</span>
+            <span style="font-size:10.5px;color:#94a3b8;">EMA7 cruzó debajo de EMA25 (real)</span>
             <span id="ventTechoEmas" style="font-size:11px;font-weight:900;">—</span>
         </div>
         <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;">
@@ -11574,19 +11603,19 @@ function _actualizarVentanitaTecho4Ema() {
 
     if (e.emaSpreadPct !== null && e.emaSpreadPct !== undefined) {
         elSpread.textContent = `${e.emaSpreadPct.toFixed(2)}%`;
-        elEmas.textContent = e.emasJuntasTecho ? 'SÍ' : 'No';
-        elEmas.style.color = e.emasJuntasTecho ? '#ff2a3b' : '#94a3b8';
+        elEmas.textContent = e.emaCruceBajistaReal ? (e.emaCruceBajistaFresco ? 'SÍ (recién)' : 'SÍ') : 'No';
+        elEmas.style.color = e.emaCruceBajistaReal ? '#ff2a3b' : '#94a3b8';
     } else {
         elSpread.textContent = 'Calculando...';
         elEmas.textContent = '—';
         elEmas.style.color = '#94a3b8';
     }
 
-    if (tocandoMax && e.emasJuntasTecho) {
+    if (tocandoMax && e.emaCruceBajistaReal) {
         elVeredicto.textContent = '🚨 SÍ, ESTÁ EN POSICIÓN DE TECHO';
         elVeredicto.style.background = 'rgba(255,42,59,0.18)';
         elVeredicto.style.color = '#ff2a3b';
-    } else if (tocandoMax || e.emasJuntasTecho) {
+    } else if (tocandoMax || e.emaCruceBajistaReal) {
         elVeredicto.textContent = '⚠️ Cumple solo una condición, todavía no';
         elVeredicto.style.background = 'rgba(243,186,47,0.15)';
         elVeredicto.style.color = '#f3ba2f';
