@@ -148,6 +148,25 @@
             border-color: rgba(255,255,255,0.35);
         }
 
+        /* ── 💥 REVENTÓN DE ABAJO ARRIBA: badge para monedas que ya vienen
+           cayendo desde su máximo de 24h pero metieron una subida repentina
+           y explosiva desde un mínimo reciente (mecha vertical hacia arriba
+           en medio de la caída, como en el ejemplo con explosiones). ── */
+        .revento-badge {
+            display: inline-flex; align-items: center; gap: 5px;
+            margin-top: 5px; padding: 3px 8px;
+            background: linear-gradient(90deg, rgba(255,107,0,0.25), rgba(255,196,0,0.18));
+            border: 1px solid rgba(255,153,0,0.55);
+            border-radius: 7px;
+            font-size: 10px; font-weight: 900; color: #ffd08a;
+            letter-spacing: 0.3px;
+            animation: revento-pulse 1s infinite;
+        }
+        @keyframes revento-pulse {
+            0%,100% { box-shadow: 0 0 6px rgba(255,153,0,0.35); }
+            50%     { box-shadow: 0 0 15px rgba(255,153,0,0.85); }
+        }
+
         /* ── 🚨 ALARMA superior de la lista: avisa que hay al menos una moneda
            con la Bandera Boliviana completa (90%+ cercanía Y 10%+ cambio real) ── */
         #banderaBolivianaAlarma {
@@ -3558,6 +3577,7 @@ function buscarMoneda() {
             if (query === 'AGOTADO') return !!c.alertaAgotamientoSubida;
             if (query === 'CAYENDO24H') return esTechoConfirmado4Ema(c);
             if (query === 'BANDERA' || query === 'BOLIVIANA') return _evaluarBanderaBoliviana(c).completa;
+            if (query === 'REVENTO' || query === 'REVENTON' || query === 'REVENTÓN') return _evaluarReventoAbajoArriba(c).activo;
             return false;
         }).length;
     }
@@ -3575,6 +3595,8 @@ function buscarMoneda() {
         saludo.innerText = `📉 IA v3 escaneando: ${encontradas} candidatas — techos tras pump 🏔️ y rebotes dentro de tendencia bajista 🔻`;
     } else if (query === 'BANDERA' || query === 'BOLIVIANA') {
         saludo.innerText = `🇧🇴 Bandera Boliviana completa: ${encontradas} moneda(s) con 90%+ de cercanía Y 10%+ de cambio real`;
+    } else if (query === 'REVENTO' || query === 'REVENTON' || query === 'REVENTÓN') {
+        saludo.innerText = `💥 REVENTÓN DE ABAJO ARRIBA: ${encontradas} moneda(s) cayendo desde su máximo 24h con un rebote explosivo reciente desde abajo`;
     } else if (encontradas === 0) { 
         saludo.innerText = `❌ "${query}" no tiene contrato en Futuros USDT-M (o no coincide con ningún filtro) — esta app solo opera pares con perpetuo real en Binance USDT-M`; 
     } else { 
@@ -5505,6 +5527,52 @@ function _evaluarBanderaBoliviana(c) {
     return { roja, amarilla, verde, completa: roja && amarilla && verde, pos, cambio };
 }
 
+// ── 💥 REVENTÓN DE ABAJO ARRIBA (nueva clase del sistema de bandera) ────
+// Patrón: la moneda ya tocó su máximo de 24h y viene cayendo desde ahí,
+// PERO en medio de esa caída mete una subida repentina y explosiva desde
+// un mínimo reciente — la "mecha" vertical hacia arriba que se ve en medio
+// de una tendencia roja (a veces varias explosiones mientras sigue cayendo).
+// Usa el historial de precios cada 2 min (historialPrecios2Min) para ubicar
+// el mínimo reciente y medir qué tan fuerte y reciente fue el rebote desde ahí.
+const REVENTO_CAIDA_MINIMA_DESDE_MAXIMO = 3.0;   // % mínimo ya caído desde el máximo 24h
+const REVENTO_SUBIDA_MINIMA_DESDE_MINIMO = 1.5;  // % mínimo del rebote explosivo desde el mínimo reciente
+const REVENTO_VENTANA_CICLOS = 20;               // ciclos de ~2 min (≈40 min) — la explosión debe ser reciente
+
+function _evaluarReventoAbajoArriba(c) {
+    const symbol = c.symbol;
+    const hist = historialPrecios2Min[symbol];
+    const vacio = { activo: false, subida: 0, caida: c.caidaDesdeMaximo || 0 };
+    if (!hist || hist.length < 4) return vacio;
+
+    // 1) Ya tocó su techo de 24h y está en caída real desde ahí (igual criterio
+    //    base que el resto del sistema de techo/derrumbe de este panel)
+    const caida = c.caidaDesdeMaximo || 0;
+    if (caida < REVENTO_CAIDA_MINIMA_DESDE_MAXIMO) return vacio;
+
+    // 2) Ubicamos el mínimo más reciente dentro de la ventana de historial y
+    //    medimos si desde ahí hubo un rebote explosivo hacia arriba
+    let minReciente = hist[0];
+    let idxMin = 0;
+    for (let i = 1; i < hist.length; i++) {
+        if (hist[i] <= minReciente) { minReciente = hist[i]; idxMin = i; }
+    }
+    const precioActual = hist[hist.length - 1];
+    const velasDesdeMin = (hist.length - 1) - idxMin;
+
+    // El mínimo debe quedar en medio del historial (no ser el primer NI el
+    // último dato): así confirmamos que hubo caída ANTES y rebote confirmado
+    // DESPUÉS — la forma de "V" del reventón, no un simple mínimo del momento.
+    const formaValida = idxMin > 0 && velasDesdeMin > 0 && velasDesdeMin <= REVENTO_VENTANA_CICLOS;
+    if (!formaValida || minReciente <= 0) return vacio;
+
+    const subida = ((precioActual - minReciente) / minReciente) * 100;
+    // Todavía no debe haber vuelto a hacer un máximo nuevo (sigue siendo un
+    // reventón "desde abajo", no una reversión completa de tendencia)
+    const activo = subida >= REVENTO_SUBIDA_MINIMA_DESDE_MINIMO && (c.posicionPorcentaje || 0) < 95;
+
+    return { activo, subida, caida, minReciente, precioActual, velasDesdeMin };
+}
+
 function actualizarTablaIzquierda() {
     const tbody = document.getElementById("cryptoList");
     if (!tbody) return;
@@ -5544,6 +5612,7 @@ function actualizarTablaIzquierda() {
         if (queryBusqueda === 'AGOTADO') return !!c.alertaAgotamientoSubida;
         if (queryBusqueda === 'CAYENDO24H') return esTechoConfirmado4Ema(c);
         if (queryBusqueda === 'BANDERA' || queryBusqueda === 'BOLIVIANA') return _evaluarBanderaBoliviana(c).completa;
+        if (queryBusqueda === 'REVENTO' || queryBusqueda === 'REVENTON' || queryBusqueda === 'REVENTÓN') return _evaluarReventoAbajoArriba(c).activo;
         return false;
     };
 
@@ -5775,6 +5844,12 @@ function actualizarTablaIzquierda() {
                 </div>
                 <div class="bb-lectura"><b>${_bb.pos.toFixed(0)}%</b><b>${_bb.cambio > 0 ? '+' : ''}${_bb.cambio.toFixed(1)}%</b></div>
             </div>` : '';
+
+        // ── 💥 Badge de REVENTÓN DE ABAJO ARRIBA para esta fila ──
+        const _rv = _evaluarReventoAbajoArriba(c);
+        const badgeReventoAbajoArriba = _rv.activo
+            ? `<div class="revento-badge" title="Cayó ${_rv.caida.toFixed(1)}% desde el máximo 24h y ya rebotó +${_rv.subida.toFixed(1)}% desde un mínimo reciente (hace ${_rv.velasDesdeMin * 2} min)">💥 REVENTÓN DE ABAJO ARRIBA · +${_rv.subida.toFixed(1)}%</div>`
+            : '';
         if (enMaximo24h && !tr.style.borderLeft) {
             tr.style.background = "rgba(255,60,0,0.13)";
             tr.style.borderLeft = "4px solid #ff3c00";
@@ -5888,6 +5963,7 @@ function actualizarTablaIzquierda() {
                 ${badgeBreaking ? '<div style="margin-bottom:3px;">' + badgeBreaking + '</div>' : ''}
                 ${cuadroUnicoShort}
                 ${badgeBanderaBoliviana}
+                ${badgeReventoAbajoArriba}
                 ${barraRango}
                 ${pillsMaxMin}
                 ` : `
@@ -5896,6 +5972,7 @@ function actualizarTablaIzquierda() {
                 ${badgeBreaking ? '<div style="margin-top:2px;">' + badgeBreaking + '</div>' : ''}
                 ${badgeAlarmaAzul || subEtiqueta || badgeMaxMin}
                 ${badgeBanderaBoliviana}
+                ${badgeReventoAbajoArriba}
                 ${barraRango}
                 ${pillsMaxMin}
                 `}
