@@ -167,6 +167,18 @@
             50%     { box-shadow: 0 0 15px rgba(255,153,0,0.85); }
         }
 
+        /* ── 💥🔵 Fila entera parpadeando en AZUL para monedas en REVENTÓN
+           DE ABAJO ARRIBA: así se distinguen a simple vista dentro de la
+           lista bandera, sin tener que leer el badge. ── */
+        @keyframes revento-fila-azul-parpadeo {
+            0%,100% { background-color: rgba(0,153,255,0.10); box-shadow: inset 0 0 10px rgba(0,153,255,0.25); }
+            50%     { background-color: rgba(0,153,255,0.28); box-shadow: inset 0 0 20px rgba(0,153,255,0.6); }
+        }
+        .revento-fila-azul {
+            animation: revento-fila-azul-parpadeo 0.9s infinite;
+            border-left: 4px solid #00aaff !important;
+        }
+
         /* ── 🚨 ALARMA superior de la lista: avisa que hay al menos una moneda
            con la Bandera Boliviana completa (90%+ cercanía Y 10%+ cambio real) ── */
         #banderaBolivianaAlarma {
@@ -1225,20 +1237,25 @@
             <!-- Controles superiores -->
             <div class="sidebar-header" style="flex-shrink:0; overflow:visible; max-height:none; overflow-y:visible;">
                 <button onclick="document.getElementById('activationPanel').style.display='flex'" class="btn vip" style="width:100%; font-size:11px; padding:8px;"><i class="fas fa-crown"></i> ACTIVAR LICENCIA</button>
-                <!-- LONG / SHORT en el sidebar -->
-                <div style="display:flex;gap:6px;">
+                <!-- LONG / SHORT / 24H / REVENTÓN en el sidebar -->
+                <div style="display:flex;flex-wrap:wrap;gap:6px;">
                     <button id="btnModoAlcistaSide" onclick="cambiarModoMercado('alcista')"
-                        style="flex:1;padding:10px 6px;border-radius:10px;border:none;cursor:pointer;font-size:12px;font-weight:900;transition:all 0.25s;letter-spacing:0.3px;">
+                        style="flex:1 1 calc(50% - 6px);padding:10px 6px;border-radius:10px;border:none;cursor:pointer;font-size:12px;font-weight:900;transition:all 0.25s;letter-spacing:0.3px;">
                         🟢 LONG<br><span style="font-size:9px;font-weight:700;opacity:0.85;">COMPRA · PISO</span>
                     </button>
                     <button id="btnModoBajistaSide" onclick="cambiarModoMercado('bajista')"
-                        style="flex:1;padding:10px 6px;border-radius:10px;border:none;cursor:pointer;font-size:12px;font-weight:900;transition:all 0.25s;letter-spacing:0.3px;">
+                        style="flex:1 1 calc(50% - 6px);padding:10px 6px;border-radius:10px;border:none;cursor:pointer;font-size:12px;font-weight:900;transition:all 0.25s;letter-spacing:0.3px;">
                         🔴 SHORT<br><span style="font-size:9px;font-weight:700;opacity:0.85;">VENTA · TECHO</span>
                     </button>
                     <button id="btnTecho4EmaSide" onclick="abrirListaCayendo24h()"
                         title="Máximo 24h + 4 EMAs juntas + caída ya confirmada"
-                        style="flex:1;padding:10px 6px;border-radius:10px;border:none;cursor:pointer;font-size:12px;font-weight:900;transition:all 0.25s;letter-spacing:0.3px;background:rgba(243,186,47,0.22);color:#f3ba2f;box-shadow:inset 0 0 0 1px rgba(243,186,47,0.55);">
+                        style="flex:1 1 calc(50% - 6px);padding:10px 6px;border-radius:10px;border:none;cursor:pointer;font-size:12px;font-weight:900;transition:all 0.25s;letter-spacing:0.3px;background:rgba(243,186,47,0.22);color:#f3ba2f;box-shadow:inset 0 0 0 1px rgba(243,186,47,0.55);">
                         📉 24H<br><span style="font-size:9px;font-weight:700;opacity:0.85;">YA CAYENDO</span>
+                    </button>
+                    <button id="btnReventonSide" onclick="abrirListaReventon()"
+                        title="Monedas que ya tocaron su máximo 24h y vienen cayendo, pero metieron un rebote temporal (reventón) sin romper la tendencia bajista"
+                        style="flex:1 1 calc(50% - 6px);padding:10px 6px;border-radius:10px;border:none;cursor:pointer;font-size:12px;font-weight:900;transition:all 0.25s;letter-spacing:0.3px;background:rgba(33,150,243,0.22);color:#4fc3f7;box-shadow:inset 0 0 0 1px rgba(33,150,243,0.55);">
+                        ✅ REVENTÓN<br><span style="font-size:9px;font-weight:700;opacity:0.85;">CAE · REBOTE TEMP.</span>
                     </button>
                 </div>
                 <!-- 🚨 CARRUSEL IA: LONG + SHORT rotando -->
@@ -3629,6 +3646,31 @@ function abrirListaCayendo24h() {
     }
 }
 
+// Se llama desde el botón azul REVENTÓN del sidebar. Filtra automáticamente
+// (sin que el usuario escriba nada en el buscador) las monedas que ya tocaron
+// su máximo de 24h y vienen cayendo, pero en medio de esa caída metieron una
+// subida repentina/explosiva (reventón) sin que eso rompa la tendencia
+// bajista general. Reutiliza el mismo motor que el filtro "REVENTO" del
+// buscador (_evaluarReventoAbajoArriba) y además selecciona automáticamente
+// la mejor candidata (rebote más fuerte) para abrir el panel central de una.
+function abrirListaReventon() {
+    const _sc = document.getElementById('searchCoin');
+    _sc.value = 'REVENTO';
+    buscarMoneda();
+    const _limpiar = document.getElementById('btnLimpiarBusqueda');
+    if (_limpiar) _limpiar.style.display = 'flex';
+    _sc.scrollIntoView({ behavior: 'smooth', block: 'start' });
+
+    const todas = Object.values(cachedData).filter(c => _evaluarReventoAbajoArriba(c).activo);
+    if (todas.length > 0) {
+        const yaSeleccionadaSigueValida = selectedCoin && todas.some(c => c.symbol === selectedCoin);
+        if (!yaSeleccionadaSigueValida) {
+            todas.sort((a, b) => _evaluarReventoAbajoArriba(b).subida - _evaluarReventoAbajoArriba(a).subida);
+            seleccionarMoneda(todas[0].symbol);
+        }
+    }
+}
+
 async function analizarReversionCDC(symbol){
 
     const c = cachedData[symbol];
@@ -5534,9 +5576,9 @@ function _evaluarBanderaBoliviana(c) {
 // de una tendencia roja (a veces varias explosiones mientras sigue cayendo).
 // Usa el historial de precios cada 2 min (historialPrecios2Min) para ubicar
 // el mínimo reciente y medir qué tan fuerte y reciente fue el rebote desde ahí.
-const REVENTO_CAIDA_MINIMA_DESDE_MAXIMO = 3.0;   // % mínimo ya caído desde el máximo 24h
-const REVENTO_SUBIDA_MINIMA_DESDE_MINIMO = 1.5;  // % mínimo del rebote explosivo desde el mínimo reciente
-const REVENTO_VENTANA_CICLOS = 20;               // ciclos de ~2 min (≈40 min) — la explosión debe ser reciente
+const REVENTO_CAIDA_MINIMA_DESDE_MAXIMO = 2.0;   // % mínimo ya caído desde el máximo 24h (antes 3.0 — relajado para agarrar más monedas)
+const REVENTO_SUBIDA_MINIMA_DESDE_MINIMO = 1.0;  // % mínimo del rebote explosivo desde el mínimo reciente (antes 1.5 — relajado)
+const REVENTO_VENTANA_CICLOS = 30;               // ciclos de ~2 min (≈60 min) — antes 20 (≈40 min), se amplió la ventana
 
 function _evaluarReventoAbajoArriba(c) {
     const symbol = c.symbol;
@@ -5598,8 +5640,17 @@ function actualizarTablaIzquierda() {
     // puntual (con el buscador), se sigue pudiendo encontrar cualquier moneda.
     if (modoMercado === 'bajista' && queryBusqueda === '') {
         todas = todas.filter(c =>
-            (c.posicionPorcentaje || 0) >= UMBRAL_POSICION_LISTA_IZQUIERDA &&
-            (c.change || 0) >= CAMBIO_MINIMO_LISTA_IZQUIERDA
+            ((c.posicionPorcentaje || 0) >= UMBRAL_POSICION_LISTA_IZQUIERDA &&
+            (c.change || 0) >= CAMBIO_MINIMO_LISTA_IZQUIERDA)
+            // ── 💥 También entran las que ya tocaron su máximo 24h y vienen
+            // cayendo (sentido bajista), aunque ya se hayan alejado del 90%+
+            // de cercanía, SIEMPRE que mientras caen hayan tenido una subida
+            // repentina/explosiva (reventón) que no rompió el sentido bajista
+            // general (_evaluarReventoAbajoArriba exige posicionPorcentaje<95,
+            // o sea que no cuenta si ya se dio vuelta del todo). Antes esta
+            // clase de moneda quedaba afuera de la lista principal y solo se
+            // veía buscando "REVENTO" a mano. ──
+            || _evaluarReventoAbajoArriba(c).activo
         );
     }
     const coincideFiltroBusqueda = (c) => {
@@ -5858,6 +5909,14 @@ function actualizarTablaIzquierda() {
             tr.style.borderLeft = "4px solid #0ecb81";
         }
 
+        // ── 💥🔵 REVENTÓN DE ABAJO ARRIBA: la fila entera parpadea en azul
+        // para que salte a la vista dentro de la lista bandera, sin tapar la
+        // alarma azul IA (esa sigue siendo la señal de más prioridad si
+        // también está activa en la misma moneda). ──
+        if (_rv.activo) {
+            tr.classList.add('revento-fila-azul');
+        }
+
         // ── 🔵 ALARMA AZUL (IA v2): confluencia técnica + pump/volumen + confirmación por persistencia ──
         // Tiene prioridad visual sobre el color rojo de "máximo 24h": es la señal más urgente.
         const _azul = esAlarmaAzulLista(c);
@@ -5866,6 +5925,7 @@ function actualizarTablaIzquierda() {
             const _colorNivel = _azul.nivel === 'ALTA' ? '#ffd700' : _azul.nivel === 'MEDIA' ? '#f3ba2f' : '#b8860b';
             tr.style.background = _azul.confirmada ? "rgba(255,215,0,0.18)" : "rgba(255,215,0,0.08)";
             tr.style.borderLeft = `4px solid ${_colorNivel}`;
+            tr.classList.remove('revento-fila-azul'); // la alarma azul IA manda si coincide con la misma moneda
             if (_azul.confirmada) tr.classList.add('alarma-azul-pulsando'); // solo pulsa si ya está confirmada (no en el primer parpadeo)
         }
 
@@ -6794,7 +6854,7 @@ function _esCandidataTechoAgotamiento(c) {
 
     // Requisito duro #2: no puede estar ya muy lejos de su máximo (si ya cayó
     // demasiado, dejó de ser "está a punto de caer" para ser "ya cayó").
-    const cercaDelTecho = c.caidaDesdeMaximo !== undefined && c.caidaDesdeMaximo <= 8;
+    const cercaDelTecho = c.caidaDesdeMaximo !== undefined && c.caidaDesdeMaximo <= 12;
 
     // Requisito duro #3 (PEDIDO): las EMAs tienen que mostrar un cruce bajista
     // REAL (EMA7 ya cruzó debajo de EMA25, y EMA25 <= EMA99), no solo estar
@@ -6887,12 +6947,22 @@ function calcularScoreReboteBajista(c) {
         score += 10; motivos.push('📐 EMA25 debajo de EMA99 — estructura bajista intacta');
     }
 
-    // 2) Rebote temporal ocurriendo AHORA MISMO (el "respiro" dentro de la caída)
+    // 2) Rebote temporal ocurriendo AHORA MISMO (el "respiro" dentro de la caída).
+    // Se detecta de 2 formas: salto puntual en los últimos 2min, o subida
+    // sostenida y más lenta desde el mínimo reciente (ver 2b más abajo).
     const cambio2min = c.cambioReal2Min || 0;
     let rebotando = false;
     if (cambio2min > 3)      { score += 20; rebotando = true; motivos.push(`⚡ Rebote fuerte: +${cambio2min.toFixed(1)}% en los últimos 2min`); }
     else if (cambio2min > 1) { score += 13; rebotando = true; motivos.push(`⚡ Rebote de +${cambio2min.toFixed(1)}% en los últimos 2min`); }
     else if (c.velocidad > 0){ score += 6;  rebotando = true; motivos.push('⚡ Micro-rebote detectado'); }
+
+    // 2b) Rebote FUERTE que se arma en varios minutos (no solo en la ventana
+    // de 2min): usa la subida desde el mínimo reciente (48h). Esto captura
+    // rebotes como el del ejemplo del gráfico, que suben de forma sostenida
+    // durante varios minutos en vez de un salto brusco puntual.
+    const subidaMin = (e && e.subidaDesdeMinimo) || 0;
+    if (subidaMin >= 6)      { score += 22; rebotando = true; motivos.push(`⚡ Rebote fuerte sostenido: +${subidaMin.toFixed(1)}% desde el mínimo reciente`); }
+    else if (subidaMin >= 3) { score += 14; rebotando = true; motivos.push(`⚡ Rebote sostenido: +${subidaMin.toFixed(1)}% desde el mínimo reciente`); }
 
     // 3) El rebote NO rompe la estructura bajista (clave: si la rompe, ya no es
     // un rebote temporal, es un cambio de tendencia real, y no debe entrar aquí)
