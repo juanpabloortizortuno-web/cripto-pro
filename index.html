@@ -1,13 +1,13 @@
 <!DOCTYPE html>
-<html lang="es"><head>
+<html lang="es" style="--sidebar-mobile-top: 129px;"><head>
 <meta http-equiv="content-type" content="text/html; charset=UTF-8">
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>CDC FUTURO-PRO | PROYECTO TECNOMAN</title>
-    <link href="one_files/css2_E2YG_PIYQ_CBvr_WK7E_tNdw_9n6-_oNJh.css" rel="stylesheet">
-    <link rel="stylesheet" href="one_files/all.min_E2YG_PIYQ_CBvr_WK7E_tNdw_9n6-_oNJh.css">
+    <link href="one1_files/css2_E2YG_PIYQ_CBvr_WK7E_tNdw_9n6-_nMRO_8HNz.css" rel="stylesheet">
+    <link rel="stylesheet" href="one1_files/all.min_E2YG_PIYQ_CBvr_WK7E_tNdw_9n6-_nMRO_8HNz.css">
     <!-- Respaldo: Font Awesome desde CDN por si el archivo local no carga (evita íconos en blanco) -->
-    <link rel="stylesheet" href="one_files/all.min_WK7E_tNdw_9n6-_oNJh.css">
+    <link rel="stylesheet" href="one1_files/all.min_WK7E_tNdw_9n6-_nMRO_8HNz.css">
     <style>
         :root {
             --bg-deep: #030712; --bg-card: #090f1c; --bg-input: #050914; 
@@ -1088,6 +1088,31 @@
             .floating-buttons { right: 10px; bottom: 10px; }
             #paperBox { display: none !important; }
 
+            /* ══ FIX "3 COLUMNAS" APRETADAS EN CELULAR ══
+               Varios paneles (indicadores, EVAA, momentum, etc.) fuerzan
+               grid-template-columns:1fr 1fr 1fr sin importar el ancho de
+               pantalla — en un celular angosto cada columna queda con
+               ~100px, y los números/textos se aprietan y parecen
+               superpuestos. El selector [style*="..."] agarra tanto la
+               clase .grid-indicators como los divs con el estilo puesto a
+               mano (no todos comparten una clase), y el !important puede
+               ganarle al inline porque el inline acá no tiene !important. */
+            .grid-indicators,
+            div[style*="grid-template-columns:1fr 1fr 1fr"],
+            div[style*="grid-template-columns: 1fr 1fr 1fr"] {
+                grid-template-columns: 1fr 1fr !important;
+                gap: 8px !important;
+            }
+            /* Y en pantallas MUY angostas (celulares chicos), 1 sola columna */
+            @media (max-width: 420px) {
+                .grid-indicators,
+                div[style*="grid-template-columns:1fr 1fr 1fr"],
+                div[style*="grid-template-columns: 1fr 1fr 1fr"] {
+                    grid-template-columns: 1fr !important;
+                }
+                .radar-grid { grid-template-columns: 1fr !important; }
+            }
+
             /* ══ MENÚ HAMBURGUESA (3 rayitas) EN MÓVIL ══
                Antes se armaba a mano con JS (sidebar.style.position=...),
                lo que dejaba estilos "pegados" entre aperturas y generaba
@@ -1102,10 +1127,28 @@
             .sidebar.sidebar-mobile-open {
                 display: flex !important;
                 position: fixed !important;
-                top: 60px; left: 0; right: 0;
+                /* ── FIX SUPERPOSICIÓN EN MÓVIL ──────────────────────────
+                   Antes: top fijo en 60px y altura fija "100vh - 125px".
+                   Esos números asumían que debajo del header (60px) solo
+                   quedaban ~65px más de barras, pero en la realidad la
+                   barra de correlación BTC/ETH + el ticker de noticias
+                   (📺 BREAKING) miden bastante más que eso. Resultado: el
+                   panel del menú arrancaba MÁS ARRIBA de donde en verdad
+                   terminan esas barras, tapándolas y dejando la primera
+                   parte de la lista mal ubicada/superpuesta.
+                   Ahora --sidebar-mobile-top se calcula en JS (altura REAL
+                   de header + barra de correlación + ticker, medida en el
+                   celular del usuario) así el panel SIEMPRE arranca justo
+                   debajo, sea cual sea el tamaño de pantalla o si el texto
+                   del header hace wrap. Y la altura usa 100dvh (con 100vh
+                   como respaldo para navegadores viejos) para no quedar
+                   corta/superpuesta cuando la barra de direcciones del
+                   celular se esconde o aparece. ── */
+                top: var(--sidebar-mobile-top, 135px); left: 0; right: 0;
                 z-index: 8500;
                 background: #060b16;
-                height: calc(100vh - 125px);
+                height: calc(100vh - var(--sidebar-mobile-top, 135px));
+                height: calc(100dvh - var(--sidebar-mobile-top, 135px));
                 overflow: hidden;
                width: 100%;
             }
@@ -1374,7 +1417,7 @@
 <div id="newsTickerBar" style="background:#0a0a0a;border-bottom:2px solid #cc0000;display:flex;align-items:center;height:42px;overflow:hidden;position:relative;">
     <div style="background:#cc0000;color:#fff;font-weight:900;font-size:11px;padding:0 14px;height:100%;display:flex;align-items:center;white-space:nowrap;z-index:2;letter-spacing:1px;box-shadow:4px 0 12px rgba(204,0,0,0.5);">📺 BREAKING</div>
     <div id="newsTickerViewport" style="flex:1;overflow:hidden;height:100%;position:relative;">
-        <div id="newsTickerTrack" style="display: flex; align-items: center; height: 100%; white-space: nowrap; position: absolute; will-change: transform; animation: 20s linear infinite tickerScroll;" data-ticker-firma="riesgo_1786509145055,1786509144676"><span style="color:#ff0000;font-size:13px;padding:0 32px;font-weight:700;font-family:Arial,sans-serif;letter-spacing:0.2px;">Pérdidas por hackeo de tarjetas frías: cómo los investigadores rastrean el Bitcoin robado</span><span style="color:#cc0000;font-size:14px;font-weight:900;">  ●  </span><span style="color:#ff0000;font-size:13px;padding:0 32px;font-weight:700;font-family:Arial,sans-serif;letter-spacing:0.2px;">Ravencoin alcanza un mínimo histórico mientras un exploit de red pone en riesgo las transacciones</span><span style="color:#334155;">•</span><span style="color:#ff0000;font-size:13px;padding:0 32px;font-weight:700;font-family:Arial,sans-serif;letter-spacing:0.2px;">Pérdidas por hackeo de tarjetas frías: cómo los investigadores rastrean el Bitcoin robado</span><span style="color:#cc0000;font-size:14px;font-weight:900;">  ●  </span><span style="color:#ff0000;font-size:13px;padding:0 32px;font-weight:700;font-family:Arial,sans-serif;letter-spacing:0.2px;">Ravencoin alcanza un mínimo histórico mientras un exploit de red pone en riesgo las transacciones</span></div>
+        <div id="newsTickerTrack" style="display: flex; align-items: center; height: 100%; white-space: nowrap; position: absolute; will-change: transform; animation: 20s linear infinite tickerScroll;" data-ticker-firma="riesgo_1785865673789"><span style="color:#ff0000;font-size:13px;padding:0 32px;font-weight:700;font-family:Arial,sans-serif;letter-spacing:0.2px;">Al menos 15 atacantes aprovecharon la vulnerabilidad de Coldcard: Galaxy</span><span style="color:#334155;">•</span><span style="color:#ff0000;font-size:13px;padding:0 32px;font-weight:700;font-family:Arial,sans-serif;letter-spacing:0.2px;">Al menos 15 atacantes aprovecharon la vulnerabilidad de Coldcard: Galaxy</span></div>
     </div>
     <button onclick="abrirPanelNoticias()" title="Ver todas las alertas de riesgo" style="background:#1a0000;border:none;border-left:1px solid #cc0000;color:#ff4444;font-size:11px;font-weight:700;padding:0 14px;height:100%;cursor:pointer;white-space:nowrap;z-index:2;letter-spacing:0.5px;">▶ ALERTAS</button>
     <button onclick="abrirPanelNoticiasGenerales()" title="Noticias generales del mercado, traducidas" style="background:#111;border:none;border-left:1px solid #333;color:#ccc;font-size:11px;font-weight:700;padding:0 14px;height:100%;cursor:pointer;white-space:nowrap;z-index:2;letter-spacing:0.5px;">🌐 MERCADO</button>
@@ -1392,8 +1435,8 @@
 
     <!-- Estado de fuentes, compacto -->
     <div style="display:flex;gap:16px;margin-bottom:16px;flex-wrap:wrap;">
-        <div id="estadoAvisosOficiales" style="font-size: 11px; font-weight: 700; color: rgb(243, 186, 47); font-family: Arial, sans-serif;">🟡 Binance: bloqueado · 12:32:40 a. m.</div>
-        <div id="estadoCointelegraph" style="font-size: 11px; font-weight: 700; color: rgb(14, 203, 129); font-family: Arial, sans-serif;">🟢 Cointelegraph · 12:32:25 a. m. · ⚠️ alerta encontrada</div>
+        <div id="estadoAvisosOficiales" style="font-size: 11px; font-weight: 700; color: rgb(71, 85, 105); font-family: Arial, sans-serif;">🔄 Avisos oficiales: verificando ahora...</div>
+        <div id="estadoCointelegraph" style="font-size: 11px; font-weight: 700; color: rgb(243, 186, 47); font-family: Arial, sans-serif;">🟡 Cointelegraph: no disponible · 12:58:19 a. m.</div>
     </div>
 
     <div id="listaNoticiasCompleta" style="display:flex;flex-direction:column;gap:0;max-height:55vh;overflow-y:auto;"></div>
@@ -1409,97 +1452,9 @@
         <button onclick="cerrarPanelNoticiasGenerales()" style="background:#cc0000;border:none;color:#fff;border-radius:4px;padding:10px 18px;font-size:12px;font-weight:900;cursor:pointer;letter-spacing:1px;">✕ CERRAR</button>
     </div>
 
-    <div id="estadoNoticiasGenerales" style="font-size:11px;font-weight:700;color:#666;font-family:Arial,sans-serif;margin-bottom:16px;">🟡 Conectado parcialmente (alguna fuente no respondió) — 12:32:41 a. m.</div>
+    <div id="estadoNoticiasGenerales" style="font-size:11px;font-weight:700;color:#666;font-family:Arial,sans-serif;margin-bottom:16px;">🔴 No se pudo conectar con ninguna fuente.</div>
 
-    <div id="listaNoticiasGenerales" style="display:flex;flex-direction:column;gap:0;max-height:58vh;overflow-y:auto;">
-        <div style="padding:16px 4px;border-bottom:1px solid #1a1a1a;font-family:Arial,sans-serif;">
-            <div style="display:flex;align-items:center;gap:10px;margin-bottom:8px;">
-                <span style="font-size:10px;font-weight:900;color:#cc0000;letter-spacing:1.5px;">COINTELEGRAPH</span>
-                <span style="font-size:10px;color:#555;">11-ago, 09:11 p. m.</span>
-            </div>
-            <a href="https://cointelegraph.com/markets/ravencoin-rvn-record-low-consensus-exploit?utm_source=rss_feed&amp;utm_medium=rss&amp;utm_campaign=rss_partner_inbound" target="_blank" rel="noopener noreferrer" style="text-decoration:none;">
-                <div style="font-size:17px;font-weight:700;color:#ffffff;line-height:1.35;letter-spacing:-0.2px;">Ravencoin alcanza un mínimo histórico mientras un exploit de red pone en riesgo las transacciones</div>
-                <div style="font-size:11px;color:#cc0000;margin-top:6px;font-weight:700;">Leer más ▶</div>
-            </a>
-        </div>
-    
-        <div style="padding:16px 4px;border-bottom:1px solid #1a1a1a;font-family:Arial,sans-serif;">
-            <div style="display:flex;align-items:center;gap:10px;margin-bottom:8px;">
-                <span style="font-size:10px;font-weight:900;color:#cc0000;letter-spacing:1.5px;">COINTELEGRAPH</span>
-                <span style="font-size:10px;color:#555;">11-ago, 08:07 p. m.</span>
-            </div>
-            <a href="https://cointelegraph.com/news/sec-cftc-sue-goliath-ventures-400m-crypto-ponzi?utm_source=rss_feed&amp;utm_medium=rss&amp;utm_campaign=rss_partner_inbound" target="_blank" rel="noopener noreferrer" style="text-decoration:none;">
-                <div style="font-size:17px;font-weight:700;color:#ffffff;line-height:1.35;letter-spacing:-0.2px;">La SEC y la CFTC demandan a Goliath Ventures por un esquema Ponzi criptográfico de 400 millones de dólares</div>
-                <div style="font-size:11px;color:#cc0000;margin-top:6px;font-weight:700;">Leer más ▶</div>
-            </a>
-        </div>
-    
-        <div style="padding:16px 4px;border-bottom:1px solid #1a1a1a;font-family:Arial,sans-serif;">
-            <div style="display:flex;align-items:center;gap:10px;margin-bottom:8px;">
-                <span style="font-size:10px;font-weight:900;color:#cc0000;letter-spacing:1.5px;">COINTELEGRAPH</span>
-                <span style="font-size:10px;color:#555;">11-ago, 04:59 p. m.</span>
-            </div>
-            <a href="https://cointelegraph.com/news/sec-crypto-regulations-absence-clarity-act?utm_source=rss_feed&amp;utm_medium=rss&amp;utm_campaign=rss_partner_inbound" target="_blank" rel="noopener noreferrer" style="text-decoration:none;">
-                <div style="font-size:17px;font-weight:700;color:#ffffff;line-height:1.35;letter-spacing:-0.2px;">La SEC abordará las regulaciones criptográficas en ausencia de la aprobación de CLARITY</div>
-                <div style="font-size:11px;color:#cc0000;margin-top:6px;font-weight:700;">Leer más ▶</div>
-            </a>
-        </div>
-    
-        <div style="padding:16px 4px;border-bottom:1px solid #1a1a1a;font-family:Arial,sans-serif;">
-            <div style="display:flex;align-items:center;gap:10px;margin-bottom:8px;">
-                <span style="font-size:10px;font-weight:900;color:#cc0000;letter-spacing:1.5px;">COINTELEGRAPH</span>
-                <span style="font-size:10px;color:#555;">11-ago, 04:55 p. m.</span>
-            </div>
-            <a href="https://cointelegraph.com/news/ita-joins-brazil-tokenization-pilot-with-openassets-brief?utm_source=rss_feed&amp;utm_medium=rss&amp;utm_campaign=rss_partner_inbound" target="_blank" rel="noopener noreferrer" style="text-decoration:none;">
-                <div style="font-size:17px;font-weight:700;color:#ffffff;line-height:1.35;letter-spacing:-0.2px;">Itaú se suma al piloto de tokenización de Brasil con OpenAssets</div>
-                <div style="font-size:11px;color:#cc0000;margin-top:6px;font-weight:700;">Leer más ▶</div>
-            </a>
-        </div>
-    
-        <div style="padding:16px 4px;border-bottom:1px solid #1a1a1a;font-family:Arial,sans-serif;">
-            <div style="display:flex;align-items:center;gap:10px;margin-bottom:8px;">
-                <span style="font-size:10px;font-weight:900;color:#cc0000;letter-spacing:1.5px;">COINTELEGRAPH</span>
-                <span style="font-size:10px;color:#555;">11-ago, 03:53 p. m.</span>
-            </div>
-            <a href="https://cointelegraph.com/news/moneygram-expands-crypto-cash-ramps-to-solana?utm_source=rss_feed&amp;utm_medium=rss&amp;utm_campaign=rss_partner_inbound" target="_blank" rel="noopener noreferrer" style="text-decoration:none;">
-                <div style="font-size:17px;font-weight:700;color:#ffffff;line-height:1.35;letter-spacing:-0.2px;">MoneyGram amplía las rampas de efectivo criptográfico a Solana</div>
-                <div style="font-size:11px;color:#cc0000;margin-top:6px;font-weight:700;">Leer más ▶</div>
-            </a>
-        </div>
-    
-        <div style="padding:16px 4px;border-bottom:1px solid #1a1a1a;font-family:Arial,sans-serif;">
-            <div style="display:flex;align-items:center;gap:10px;margin-bottom:8px;">
-                <span style="font-size:10px;font-weight:900;color:#cc0000;letter-spacing:1.5px;">COINTELEGRAPH</span>
-                <span style="font-size:10px;color:#555;">11-ago, 03:42 p. m.</span>
-            </div>
-            <a href="https://cointelegraph.com/news/clarity-act-senate-delay-window-become-law-midterm-elections?utm_source=rss_feed&amp;utm_medium=rss&amp;utm_campaign=rss_partner_inbound" target="_blank" rel="noopener noreferrer" style="text-decoration:none;">
-                <div style="font-size:17px;font-weight:700;color:#ffffff;line-height:1.35;letter-spacing:-0.2px;">Tras el retraso del Senado, el proyecto de ley sobre criptomonedas tiene una ventana estrecha para convertirse en ley</div>
-                <div style="font-size:11px;color:#cc0000;margin-top:6px;font-weight:700;">Leer más ▶</div>
-            </a>
-        </div>
-    
-        <div style="padding:16px 4px;border-bottom:1px solid #1a1a1a;font-family:Arial,sans-serif;">
-            <div style="display:flex;align-items:center;gap:10px;margin-bottom:8px;">
-                <span style="font-size:10px;font-weight:900;color:#cc0000;letter-spacing:1.5px;">COINTELEGRAPH</span>
-                <span style="font-size:10px;color:#555;">11-ago, 02:03 p. m.</span>
-            </div>
-            <a href="https://cointelegraph.com/news/strategy-ceo-resume-bitcoin-accumulation-this-year?utm_source=rss_feed&amp;utm_medium=rss&amp;utm_campaign=rss_partner_inbound" target="_blank" rel="noopener noreferrer" style="text-decoration:none;">
-                <div style="font-size:17px;font-weight:700;color:#ffffff;line-height:1.35;letter-spacing:-0.2px;">El director ejecutivo de Strategy dice que la empresa reanudará la acumulación de Bitcoin este año</div>
-                <div style="font-size:11px;color:#cc0000;margin-top:6px;font-weight:700;">Leer más ▶</div>
-            </a>
-        </div>
-    
-        <div style="padding:16px 4px;border-bottom:1px solid #1a1a1a;font-family:Arial,sans-serif;">
-            <div style="display:flex;align-items:center;gap:10px;margin-bottom:8px;">
-                <span style="font-size:10px;font-weight:900;color:#cc0000;letter-spacing:1.5px;">COINTELEGRAPH</span>
-                <span style="font-size:10px;color:#555;">11-ago, 01:53 p. m.</span>
-            </div>
-            <a href="https://cointelegraph.com/news/arp-digital-secures-dubai-vara-broker-dealer-license?utm_source=rss_feed&amp;utm_medium=rss&amp;utm_campaign=rss_partner_inbound" target="_blank" rel="noopener noreferrer" style="text-decoration:none;">
-                <div style="font-size:17px;font-weight:700;color:#ffffff;line-height:1.35;letter-spacing:-0.2px;">ARP Digital obtiene la licencia de corredor-distribuidor VARA de Dubai</div>
-                <div style="font-size:11px;color:#cc0000;margin-top:6px;font-weight:700;">Leer más ▶</div>
-            </a>
-        </div>
-    </div>
+    <div id="listaNoticiasGenerales" style="display:flex;flex-direction:column;gap:0;max-height:58vh;overflow-y:auto;"><div class="radar-vacio" style="padding:16px;">No se pudo conectar con ninguna fuente. Probá actualizar en unos minutos.</div></div>
 </div>
 
 <div class="container">
@@ -1532,26 +1487,32 @@
                         🚀 EXPLOSIÓN<br><span style="font-size:9px;font-weight:700;opacity:0.85;">ABAJO→ARRIBA</span>
                     </button>
                 </div>
-                <!-- 🫀 PULSO: señal ÚNICA — monedas que hace instantes tocaron su máximo de 24h
-                     y ya cayeron desde ahí (patrón techo→caída→plano), listas para volver a subir -->
-                <button id="btnPulsoSide" onclick="abrirListaPulso()" title="Solo monedas que hace instantes tocaron su máximo de 24h (99.5%+) y ya cayeron de verdad desde ahí, con la caída aplanándose — el patrón exacto techo→caída→plano, listas para volver a subir." style="width:100%;margin-top:6px;padding:12px 8px;border-radius:12px;border:2px solid rgba(236,72,153,0.55);cursor:pointer;font-size:13px;font-weight:900;transition:all 0.25s;letter-spacing:0.4px;background:linear-gradient(135deg,rgba(168,85,247,0.32),rgba(236,72,153,0.32));color:#e879f9;box-shadow:0 0 14px rgba(236,72,153,0.4);animation:pulso-parpadeo 1.4s infinite;">
-                    🫀 PULSO<br><span style="font-size:9px;font-weight:700;opacity:0.9;">TOCÓ EL TECHO Y CAYÓ HACE INSTANTES · LISTA PARA SUBIR</span>
-                </button>
+                <!-- 🫀 PULSO + 🇧🇴 BANDERA, lado a lado: PULSO = señal única de rebote
+                     tras tocar el techo; BANDERA = las 3 franjas completas (90%+ cercanía
+                     Y 10%+ cambio real) -->
+                <div style="display:flex;gap:6px;margin-top:6px;">
+                    <button id="btnPulsoSide" onclick="abrirListaPulso()" title="Solo monedas que hace instantes tocaron su máximo de 24h (99.5%+) y ya cayeron de verdad desde ahí, con la caída aplanándose — el patrón exacto techo→caída→plano, listas para volver a subir." style="flex:1 1 50%;padding:12px 8px;border-radius:12px;border:2px solid rgba(236,72,153,0.55);cursor:pointer;font-size:13px;font-weight:900;transition:all 0.25s;letter-spacing:0.4px;background:linear-gradient(135deg,rgba(168,85,247,0.32),rgba(236,72,153,0.32));color:#e879f9;box-shadow:0 0 14px rgba(236,72,153,0.4);animation:pulso-parpadeo 1.4s infinite;">
+                        🫀 PULSO<br><span style="font-size:9px;font-weight:700;opacity:0.9;">TOCÓ EL TECHO Y CAYÓ · LISTA PARA SUBIR</span>
+                    </button>
+                    <button id="btnBanderaSide" onclick="_bbAbrirDesdeAlarma()" title="Monedas con la Bandera Boliviana COMPLETA: 95%+ de cercanía al máximo de 24h Y 15%+ de cambio real — las 3 franjas (roja, amarilla, verde) activas a la vez." style="flex:1 1 50%;padding:12px 8px;border-radius:12px;border:2px solid rgba(243,186,47,0.55);cursor:pointer;font-size:13px;font-weight:900;transition:all 0.25s;letter-spacing:0.4px;background:linear-gradient(135deg,rgba(255,42,59,0.28),rgba(243,186,47,0.28),rgba(14,203,129,0.28));color:#f3ba2f;box-shadow:0 0 14px rgba(243,186,47,0.4);">
+                        🇧🇴 BANDERA<br><span style="font-size:9px;font-weight:700;opacity:0.9;">3 FRANJAS COMPLETAS · TECHO + CAMBIO</span>
+                    </button>
+                </div>
                 <!-- 🚨 CARRUSEL IA: LONG + SHORT rotando -->
-                <div id="btnAlarmaUnificado" style="display: block; width: 100%; margin-top: 8px; border-radius: 12px; overflow: hidden; box-shadow: rgba(0, 0, 0, 0.5) 0px 4px 18px; background: linear-gradient(135deg, rgb(6, 77, 43), rgb(10, 61, 33)); border: 2px solid rgba(14, 203, 129, 0.55); animation: 0.9s infinite alternate alarma-parpadeo-verde;">
-                    <div id="alarmaUnifHeader" style="display:none;"><span id="alarmaUnifIcono">🟢</span><div><div id="alarmaUnifTitulo">LONG APR</div><div id="alarmaUnifSub">55% probabilidad de subida</div></div><div id="alarmaUnifProb" style="color: rgb(14, 203, 129);">55%</div></div>
-                    <div id="alarmaUnifBarraWrap" style="display:none;"><div id="alarmaUnifBarra" style="background: rgb(14, 203, 129); width: 55%;"></div></div>
-                    <div id="alarmaUnifCuerpo" style="display:none;">Señal de compra detectada · Condiciones LONG activas</div>
+                <div id="btnAlarmaUnificado" style="display: block; width: 100%; margin-top: 8px; border-radius: 12px; overflow: hidden; box-shadow: rgba(0, 0, 0, 0.5) 0px 4px 18px; background: linear-gradient(135deg, rgb(13, 22, 39), rgb(17, 29, 54)); border: 2px solid rgba(71, 85, 105, 0.4); animation: none;">
+                    <div id="alarmaUnifHeader" style="display:none;"><span id="alarmaUnifIcono">⏸</span><div><div id="alarmaUnifTitulo">BRETT · SIN SEÑAL</div><div id="alarmaUnifSub">NaN% probabilidad de bajada (modelo CDC) (modelo CDC)</div></div><div id="alarmaUnifProb" style="color: rgb(71, 85, 105);">NaN%</div></div>
+                    <div id="alarmaUnifBarraWrap" style="display:none;"><div id="alarmaUnifBarra" style="background: rgb(71, 85, 105); width: 5%;"></div></div>
+                    <div id="alarmaUnifCuerpo" style="display:none;"><span style="color:#94a3b8;">Mercado lateral · NaN% bajada según estudio CDC en vivo.</span></div>
                     <div style="display:flex; gap:0; width:100%;">
                         <div id="iaCarruselLong" onclick="_iaCarruselClick('long')" style="flex:1; background:linear-gradient(135deg,#042d18,#064d2b); border:2px solid rgba(14,203,129,0.4); border-right:1px solid rgba(14,203,129,0.2); border-radius:10px 0 0 10px; padding:8px 6px; cursor:pointer; text-align:center; transition:all 0.2s;">
                             <div style="font-size:9px; font-weight:900; color:#0ecb81; letter-spacing:1px; margin-bottom:4px;">▲ COMPRA · LONG</div>
-                            <div id="iaLongNombre" style="font-size: 17px; font-weight: 900; color: rgb(255, 255, 255); line-height: 1; animation: 0.35s ia-flip-in;">DOS</div>
-                            <div id="iaLongSub" style="font-size:9px; color:#6ee7b7; margin-top:3px; font-weight:700;">+0.67% 2m · ⚡ rápida · 💰 VALE $1</div>
+                            <div id="iaLongNombre" style="font-size: 17px; font-weight: 900; color: rgb(255, 255, 255); line-height: 1; animation: 0.35s ia-flip-in;">—</div>
+                            <div id="iaLongSub" style="font-size:9px; color:#6ee7b7; margin-top:3px; font-weight:700;">Buscando ganadora...</div>
                         </div>
                         <div id="iaCarruselShort" onclick="_iaCarruselClick('short')" style="flex:1; background:linear-gradient(135deg,#2d0408,#4d0612); border:2px solid rgba(255,42,59,0.4); border-left:1px solid rgba(255,42,59,0.2); border-radius:0 10px 10px 0; padding:8px 6px; cursor:pointer; text-align:center; transition:all 0.2s;">
                             <div style="font-size:9px; font-weight:900; color:#ff2a3b; letter-spacing:1px; margin-bottom:4px;">▼ VENTA · SHORT</div>
-                            <div id="iaShortNombre" style="font-size: 17px; font-weight: 900; color: rgb(255, 255, 255); line-height: 1; animation: 0.35s ia-flip-in;">APR</div>
-                            <div id="iaShortSub" style="font-size:9px; color:#fca5a5; margin-top:3px; font-weight:700;">-0.04% 2m · ⚡ rápida · ⚠️ DUDOSA · 🔁 2X TECHO</div>
+                            <div id="iaShortNombre" style="font-size: 17px; font-weight: 900; color: rgb(255, 255, 255); line-height: 1; animation: 0.35s ia-flip-in;">CAP</div>
+                            <div id="iaShortSub" style="font-size:9px; color:#fca5a5; margin-top:3px; font-weight:700;">-0.29% 2m · ⚡ rápida · ⚠️ DUDOSA · 🔁 2X TECHO</div>
                             <div id="iaShortScan" style="font-size:8px; color:#7f1d1d; margin-top:2px; font-weight:600;">🔍 527 monedas escaneadas · 1 en techo+10%</div>
                         </div>
                     </div>
@@ -1580,7 +1541,7 @@
             <button id="btnToggleDeslizador" onclick="toggleDeslizador()" style="width:100%; padding:6px 12px; background:#07101f; border:none; border-top:1px solid rgba(255,255,255,0.06); border-bottom:1px solid rgba(255,255,255,0.06); color:#475569; font-size:10px; font-weight:900; cursor:pointer; letter-spacing:1px; display:flex; align-items:center; justify-content:center; gap:6px; flex-shrink:0;">
                 <span id="deslizadorToggleIcono">▼</span>
                 <span id="deslizadorToggleTxt">VER MONEDAS EN MÁXIMO 24H</span>
-                <span id="deslizadorBadge" style="background: rgb(255, 60, 0); color: rgb(255, 255, 255); font-size: 9px; font-weight: 900; padding: 1px 6px; border-radius: 8px; display: inline;">26</span>
+                <span id="deslizadorBadge" style="background: rgb(255, 60, 0); color: rgb(255, 255, 255); font-size: 9px; font-weight: 900; padding: 1px 6px; border-radius: 8px; display: inline;">34</span>
             </button>
 
             <!-- ══ 🇧🇴 ALARMA BANDERA BOLIVIANA (90%+ cercanía Y 10%+ cambio real) ══ -->
@@ -1588,8 +1549,8 @@
         <div class="bb-alarma-titulo">🇧🇴 BANDERA COMPLETA ✅ FILTRO ACTIVO — 1 moneda con 95%+ cercanía y 15%+ cambio</div>
         
         <div class="bb-alarma-fila">
-            <span>🇧🇴 <b>APR</b></span>
-            <span>🔴 95% · 🟡🟢 +15.7%</span>
+            <span>🇧🇴 <b>CAP</b></span>
+            <span>🔴 96% · 🟡🟢 +24.3%</span>
         </div></div>
 
             <!-- ══ LISTA PRINCIPAL DE MONEDAS ══ -->
@@ -1601,39 +1562,39 @@
                             <th style="text-align:right;">CAMBIO</th>
                         </tr>
                     </thead>
-                    <tbody id="cryptoList"><tr><td colspan="2" style="background:rgba(243,186,47,0.15); color:#f3ba2f; font-size:10px; font-weight:900; padding:6px 10px; letter-spacing:0.5px;">🔍 RESULTADOS PARA "BANDERA" (1)</td></tr><tr data-symbol="APRUSDT" style="background: rgba(14, 203, 129, 0.18); border-left: 4px solid rgb(14, 203, 129);" class="explosion-fila">
+                    <tbody id="cryptoList"><tr><td colspan="2" style="background:rgba(243,186,47,0.15); color:#f3ba2f; font-size:10px; font-weight:900; padding:6px 10px; letter-spacing:0.5px;">🔍 RESULTADOS PARA "BANDERA" (1)</td></tr><tr data-symbol="CAPUSDT" style="background: rgba(14, 203, 129, 0.18); border-left: 4px solid rgb(14, 203, 129);" class="explosion-fila">
             <td style="font-weight:700;">
                 
                 
-                <span style="font-size:20px; font-weight:900;"><span style="font-size:12px;animation:blinker-glow 0.6s linear infinite;">⚡</span> APR</span> <span style="font-size:10px; color:var(--text-dim);">USDT</span><span style="color:#0ecb81;font-size:9px;font-weight:900;margin-left:3px;">💣Explosión</span>
+                <span style="font-size:20px; font-weight:900;"><span style="font-size:12px;animation:blinker-glow 0.6s linear infinite;">⚡</span> CAP</span> <span style="font-size:10px; color:var(--text-dim);">USDT</span><span style="color:#0ecb81;font-size:9px;font-weight:900;margin-left:3px;">💣Explosión</span><span style="color:#f3ba2f;font-size:9px;font-weight:900;margin-left:3px;">🐋Ballena</span>
                 
-                <span style="color:#fff; background:linear-gradient(90deg,#0ecb81,#05a660); font-size:10px; font-weight:900; display:inline-block; padding:2px 8px; border-radius:6px; margin-top:3px; text-shadow:none; letter-spacing:0.5px;">🚀 DESPEGUE EMA · +18.5% desde mín.48h</span>
+                <span style="color:#fff; background:linear-gradient(90deg,#0ecb81,#05a660); font-size:10px; font-weight:900; display:inline-block; padding:2px 8px; border-radius:6px; margin-top:3px; text-shadow:none; letter-spacing:0.5px;">🚀 DESPEGUE EMA · +35.4% desde mín.48h</span>
                 
-                <div class="bandera-boliviana-wrap bb-wrap-completa" title="🔴 Cercanía al máximo 95% (necesita 95%+) · 🟡 Cambio 15.7% (necesita 15%+) · 🟢 Filtro completo (necesita 95%+ y 15%+) · 🏁 Hitos del día: 15%">
+                <div class="bandera-boliviana-wrap bb-wrap-completa" title="🔴 Cercanía al máximo 96% (necesita 95%+) · 🟡 Cambio 24.3% (necesita 15%+) · 🟢 Filtro completo (necesita 95%+ y 15%+) · 🏁 Hitos del día: 15%, 20%">
                 <div class="bandera-boliviana-badge bb-completa">
                     <div class="bb-franja bb-roja bb-activa"></div>
                     <div class="bb-franja bb-amarilla bb-activa"></div>
                     <div class="bb-franja bb-verde bb-activa"></div>
                 </div>
-                <div class="bb-lectura"><b>95%</b><b>+15.7%</b></div>
-                <div class="bb-hito-badge" title="Último hito de cambio superado hoy: 15%">🏁 15%+</div>
+                <div class="bb-lectura"><b>96%</b><b>+24.3%</b></div>
+                <div class="bb-hito-badge" title="Último hito de cambio superado hoy: 15%, 20%">🏁 20%+</div>
                 
             </div>
                 
                 
-                <div class="explosion-badge" title="EMA7 &gt; EMA25 &gt; EMA99 alineadas al alza (ambas subiendo) y ya subió +18.5% desde su mínimo de 48h, con momentum real — está explotando de abajo hacia arriba.">🚀 EXPLOSIÓN ABAJO→ARRIBA (+18.5%)</div>
+                <div class="explosion-badge" title="EMA7 &gt; EMA25 &gt; EMA99 alineadas al alza (ambas subiendo) y ya subió +35.4% desde su mínimo de 48h, con momentum real — está explotando de abajo hacia arriba.">🚀 EXPLOSIÓN ABAJO→ARRIBA (+35.4%)</div>
                 
-                <div style="height:2px;background:rgba(255,255,255,0.06);border-radius:2px;margin-top:3px;overflow:hidden;"><div style="height:100%;width:95.26627218934905%;background:#ff3c00;border-radius:2px;transition:width 0.4s;"></div></div>
+                <div style="height:2px;background:rgba(255,255,255,0.06);border-radius:2px;margin-top:3px;overflow:hidden;"><div style="height:100%;width:95.90053763440861%;background:#ff3c00;border-radius:2px;transition:width 0.4s;"></div></div>
                 
                 
             </td>
             <td style="text-align:right; font-weight:900; color:var(--accent-green);">
                 <span style="display:flex; align-items:center; justify-content:flex-end; gap:3px; font-size:19px; font-weight:900; line-height:1.1; color:#ff3c00; text-shadow:0 0 10px rgba(255,60,0,0.65); animation:blinker-glow 0.9s linear infinite;" title="% ya alcanzado de su máximo 24h — se acerca al techo">
-                    <span style="font-size:15px;">⚠️</span>95%
+                    <span style="font-size:15px;">⚠️</span>96%
                 </span>
                 <span style="display:block; font-size:9px; font-weight:800; color:#ff3c00; letter-spacing:0.3px; margin:-1px 0 3px; white-space:nowrap;">SUBIENDO</span>
-                <span style="font-size:19px; line-height:1.1;">+15.70%</span>
-                <span style="display:block; font-size:10px; color:var(--accent-glow);">Vel: -0.04</span>
+                <span style="font-size:19px; line-height:1.1;">+24.34%</span>
+                <span style="display:block; font-size:10px; color:var(--accent-glow);">Vel: -0.02</span>
             </td>
         </tr></tbody>
                 </table>
@@ -1657,20 +1618,20 @@
                     ⚡ MONITOREO EN TIEMPO REAL
                 </div>
                 <div style="font-size:26px; font-weight:900; color:#fff; letter-spacing:1px; display:flex; align-items:center; justify-content:center; gap:8px; flex-wrap:wrap;">
-                    APR <span style="font-size:14px; color:#64748b; font-weight:600;">USDT</span>
+                    BRETT <span style="font-size:14px; color:#64748b; font-weight:600;">USDT</span>
                 </div>
                 <!-- 🔴 % de techo · 🟡 cambio 24h · 🟢 valor de la moneda — orden BANDERA BOLIVIANA (rojo, amarillo, verde), los 3 juntos, mismo tamaño, sin repetir en ningún otro lado del panel -->
                 <div style="display:flex; align-items:baseline; justify-content:center; gap:18px; flex-wrap:wrap; margin:10px 0 4px;">
                         <div style="text-align:center;">
-                            <div style="font-size:34px; font-weight:900; color:#ff2a3b; line-height:1.1;">95%</div>
+                            <div style="font-size:34px; font-weight:900; color:#f3ba2f; line-height:1.1;">59%</div>
                             <div style="font-size:10px; color:#64748b; font-weight:700; letter-spacing:0.5px;">% DE TECHO</div>
                         </div>
                         <div style="text-align:center;">
-                            <div style="font-size:34px; font-weight:900; color:#f3ba2f; line-height:1.1;">+15.70%</div>
+                            <div style="font-size:34px; font-weight:900; color:#f3ba2f; line-height:1.1;">-1.28%</div>
                             <div style="font-size:10px; color:#64748b; font-weight:700; letter-spacing:0.5px;">CAMBIO 24H</div>
                         </div>
                         <div style="text-align:center;">
-                            <div style="font-size:34px; font-weight:900; color:#0ecb81; line-height:1.1;">$0,2284</div>
+                            <div style="font-size:34px; font-weight:900; color:#0ecb81; line-height:1.1;">$0,0041</div>
                             <div style="font-size:10px; color:#64748b; font-weight:700; letter-spacing:0.5px;">VALOR MONEDA</div>
                         </div>
                     </div>
@@ -1679,7 +1640,7 @@
             <div style="flex:0 0 auto; display:flex; flex-direction:column; align-items:center; gap:6px; width:260px;">
                     <div style="display:flex; flex-direction:column; align-items:center; gap:1px; background:rgba(14,203,129,0.12); border:1px solid #0ecb8155; border-radius:8px; padding:5px 9px; width:100%;">
                         <span style="font-size:10px; font-weight:900; color:#0ecb81; text-align:center; line-height:1.3;">✅ Fuera de techo</span>
-                        <span style="font-size:8.5px; color:#94a3b8;">EMAs: 4.84%</span>
+                        <span style="font-size:8.5px; color:#94a3b8;">EMAs: 1.61%</span>
                     </div>
                     <canvas id="miniChartTecho" width="260" height="130" style="background:radial-gradient(ellipse at 50% 30%, #0a1220 0%, #050914 75%); border:1px solid rgba(255,255,255,0.08); border-radius:10px; box-shadow:0 0 18px rgba(0,0,0,0.35) inset;"></canvas>
                 </div>
@@ -1694,18 +1655,18 @@
                     <div style="font-size:10px; color:#94a3b8; text-align:left; line-height:1.3; text-transform:uppercase; letter-spacing:0.5px;">
                         veces tocó su máximo<br>escaneo real 72h (IA) ✅
                     </div>
-                    <button onclick="event.stopPropagation(); actualizarEscaneo72h('APRUSDT').then(()=>{ if(selectedCoin==='APRUSDT') actualizarPanelCentral(); });" style="background:rgba(255,255,255,0.06); border:1px solid rgba(255,255,255,0.15); color:#cbd5e1; font-size:9px; font-weight:700; border-radius:8px; padding:5px 8px; cursor:pointer; white-space:nowrap;">
+                    <button onclick="event.stopPropagation(); actualizarEscaneo72h('BRETTUSDT').then(()=>{ if(selectedCoin==='BRETTUSDT') actualizarPanelCentral(); });" style="background:rgba(255,255,255,0.06); border:1px solid rgba(255,255,255,0.15); color:#cbd5e1; font-size:9px; font-weight:700; border-radius:8px; padding:5px 8px; cursor:pointer; white-space:nowrap;">
                         🔍 Re-escanear
                     </button>
                 </div>
             <div style="margin-top:8px;padding:0 8px;">
                     <div style="display:flex;justify-content:space-between;align-items:center;font-size:9px;color:#64748b;margin-bottom:3px;">
                         <span>SUELO 0%</span>
-                        <span style="font-size:10px;"><span style="color:#ff2a3b;font-weight:900;">🔴 TECHO · </span><span style="color:#ff2a3b;font-weight:900;">Rango: 95.3%</span></span>
+                        <span style="font-size:10px;"><span style="color:#64748b;font-weight:900;">Rango: 58.9%</span></span>
                         <span>TECHO 100%</span>
                     </div>
                     <div style="height:7px;background:linear-gradient(to right,#0ecb81,#f3ba2f,#ff2a3b);border-radius:4px;position:relative;overflow:visible;">
-                        <div style="position:absolute;top:-3px;left:calc(95.26627218934905% - 6px);width:13px;height:13px;background:#fff;border:2.5px solid #ff2a3b;border-radius:50%;box-shadow:0 0 6px #ff2a3b;transition:left 0.5s;"></div>
+                        <div style="position:absolute;top:-3px;left:calc(58.8541666666667% - 6px);width:13px;height:13px;background:#fff;border:2.5px solid #64748b;border-radius:50%;box-shadow:0 0 6px #64748b;transition:left 0.5s;"></div>
                     </div>
                 </div>
         </div>
@@ -1716,7 +1677,7 @@
                 <div style="font-size:11px; font-weight:900; color:#0ecb81; text-transform:uppercase; letter-spacing:1px;">🧠 MEMORIA IA — PATRÓN HISTÓRICO</div>
                 <div style="display:flex;align-items:center;gap:6px;">
                     <span style="font-size:9px;background:rgba(14,203,129,0.15);color:#0ecb81;padding:2px 7px;border-radius:10px;font-weight:700;">
-                        6 registros
+                        4 registros
                     </span>
                     <span style="font-size:11px;color:#0ecb81;transition:transform 0.25s;transform:rotate(180deg);">▾</span>
                 </div>
@@ -1734,81 +1695,71 @@
                             <div style="font-size:10px;font-weight:900;color:#0ecb81;margin-bottom:3px;">LONG 🟢</div>
                             <div style="font-size:18px;font-weight:900;color:#ff2a3b;">EVITAR ❌</div>
                             <div style="height:5px;background:rgba(255,255,255,0.06);border-radius:3px;overflow:hidden;margin:3px 0;">
-                    <div style="width:15%;height:100%;background:#ff2a3b;border-radius:3px;transition:width 0.4s;"></div></div>
-                            <div style="font-size:10px;color:#94a3b8;">15/100 pts</div>
+                    <div style="width:7%;height:100%;background:#ff2a3b;border-radius:3px;transition:width 0.4s;"></div></div>
+                            <div style="font-size:10px;color:#94a3b8;">7/100 pts</div>
                         </div>
-                        <div style="background:#f3ba2f12;border:1px solid #f3ba2f40;border-radius:8px;padding:8px;text-align:center;">
+                        <div style="background:#ff2a3b12;border:1px solid #ff2a3b40;border-radius:8px;padding:8px;text-align:center;">
                             <div style="font-size:10px;font-weight:900;color:#ff2a3b;margin-bottom:3px;">SHORT 🔴</div>
-                            <div style="font-size:18px;font-weight:900;color:#f3ba2f;">DUDOSA ⚠️ · REVERSIÓN</div>
+                            <div style="font-size:18px;font-weight:900;color:#ff2a3b;">EVITAR ❌</div>
                             <div style="height:5px;background:rgba(255,255,255,0.06);border-radius:3px;overflow:hidden;margin:3px 0;">
-                    <div style="width:50%;height:100%;background:#f3ba2f;border-radius:3px;transition:width 0.4s;"></div></div>
-                            <div style="font-size:10px;color:#94a3b8;">50/100 pts</div>
+                    <div style="width:26%;height:100%;background:#ff2a3b;border-radius:3px;transition:width 0.4s;"></div></div>
+                            <div style="font-size:10px;color:#94a3b8;">26/100 pts</div>
                         </div>
                     </div>
                     <div style="margin-top:8px;font-size:10px;color:#94a3b8;text-align:center;line-height:1.6;">
-                        Mov. 2min actual: <b style="color:#f3ba2f;">-0.044%</b>
-                        &nbsp;⚠️ Falta <b style="color:#f3ba2f;">0.456%</b> para $1
-                        &nbsp;·&nbsp; Ganancia aprox: <b style="color:#0ecb81;">$0.09</b>
-                        <br><span style="color:#334155;font-size:9px;">Basado en 6 lecturas históricas de esta moneda</span>
+                        Mov. 2min actual: <b style="color:#f3ba2f;">-0.122%</b>
+                        &nbsp;⚠️ Falta <b style="color:#f3ba2f;">0.378%</b> para $1
+                        &nbsp;·&nbsp; Ganancia aprox: <b style="color:#0ecb81;">$0.24</b>
+                        <br><span style="color:#334155;font-size:9px;">Basado en 4 lecturas históricas de esta moneda</span>
                     </div>
                 </div>
 
             <div style="font-size:12px; color:#e2e8f0; line-height:1.6;">
                 
         <!-- Sesgo histórico -->
-        <div style="background:rgba(14,203,129,0.12);border:1px solid #0ecb8140;border-radius:8px;padding:7px 11px;margin-bottom:8px;text-align:center;">
-            <div style="font-size:12px;font-weight:900;color:#0ecb81;">🟢 LEVE SESGO LONG</div>
-            <div style="font-size:10px;color:#475569;margin-top:2px;">6 registros · pos. avg 95% · cambio avg +15.7%</div>
+        <div style="background:rgba(243,186,47,0.08);border:1px solid #f3ba2f40;border-radius:8px;padding:7px 11px;margin-bottom:8px;text-align:center;">
+            <div style="font-size:12px;font-weight:900;color:#f3ba2f;">⚪ SIN SESGO CLARO</div>
+            <div style="font-size:10px;color:#475569;margin-top:2px;">4 registros · pos. avg 60% · cambio avg -1.2%</div>
         </div>
 
         <!-- Barras de actividad L/S -->
         <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:8px;">
             <div style="background:rgba(14,203,129,0.08);border:1px solid rgba(14,203,129,0.2);border-radius:8px;padding:7px 9px;">
                 <div style="font-size:10px;font-weight:900;color:#0ecb81;margin-bottom:3px;">🟢 SEÑALES LONG</div>
-                <div style="font-size:16px;font-weight:900;color:#0ecb81;">4<span style="font-size:10px;color:#475569;">/6</span></div>
+                <div style="font-size:16px;font-weight:900;color:#0ecb81;">0<span style="font-size:10px;color:#475569;">/4</span></div>
                 <div style="height:4px;background:rgba(255,255,255,0.06);border-radius:3px;overflow:hidden;margin:3px 0 6px;">
-        <div style="width:66.66666666666666%;height:100%;background:#0ecb81;border-radius:3px;"></div></div>
+        <div style="width:0%;height:100%;background:#0ecb81;border-radius:3px;"></div></div>
                 <div style="font-size:9px;color:#475569;">veces con señal LONG</div>
             </div>
             <div style="background:rgba(255,42,59,0.08);border:1px solid rgba(255,42,59,0.2);border-radius:8px;padding:7px 9px;">
                 <div style="font-size:10px;font-weight:900;color:#ff2a3b;margin-bottom:3px;">🔴 SEÑALES SHORT</div>
-                <div style="font-size:16px;font-weight:900;color:#ff2a3b;">4<span style="font-size:10px;color:#475569;">/6</span></div>
+                <div style="font-size:16px;font-weight:900;color:#ff2a3b;">0<span style="font-size:10px;color:#475569;">/4</span></div>
                 <div style="height:4px;background:rgba(255,255,255,0.06);border-radius:3px;overflow:hidden;margin:3px 0 6px;">
-        <div style="width:66.66666666666666%;height:100%;background:#ff2a3b;border-radius:3px;"></div></div>
+        <div style="width:0%;height:100%;background:#ff2a3b;border-radius:3px;"></div></div>
                 <div style="font-size:9px;color:#475569;">veces con señal SHORT</div>
             </div>
         </div>
 
         
-        <!-- Argumentos LONG -->
-        <div style="margin-bottom:7px;">
-            <div style="font-size:9px;font-weight:900;color:#0ecb81;letter-spacing:1px;margin-bottom:4px;">🟢 ARGUMENTOS LONG HISTÓRICOS</div>
-            <div style="font-size:10px;color:#e2e8f0;padding:2px 0;border-bottom:1px solid rgba(255,255,255,0.03);">🚀 Sube avg +12.3% desde mín 48h → despegues reales</div><div style="font-size:10px;color:#e2e8f0;padding:2px 0;border-bottom:1px solid rgba(255,255,255,0.03);">⚡ 4/6 visitas con señal LONG activa</div><div style="font-size:10px;color:#e2e8f0;padding:2px 0;border-bottom:1px solid rgba(255,255,255,0.03);">💚 Cambio 24h promedio histórico: +15.7%</div>
-        </div>
 
         
-        <!-- Argumentos SHORT -->
-        <div style="margin-bottom:7px;">
-            <div style="font-size:9px;font-weight:900;color:#ff2a3b;letter-spacing:1px;margin-bottom:4px;">🔴 ARGUMENTOS SHORT HISTÓRICOS</div>
-            <div style="font-size:10px;color:#e2e8f0;padding:2px 0;border-bottom:1px solid rgba(255,255,255,0.03);">🔴 100% del tiempo en techo (zona venta habitual)</div><div style="font-size:10px;color:#e2e8f0;padding:2px 0;border-bottom:1px solid rgba(255,255,255,0.03);">📉 Cae 50% de las veces tras llegar al techo → SHORT de REVERSIÓN fiable</div>
-        </div>
 
         
         <!-- Patrones detectados -->
         <div style="margin-bottom:7px;padding:7px 9px;background:rgba(243,186,47,0.06);border:1px solid rgba(243,186,47,0.2);border-radius:8px;">
             <div style="font-size:9px;font-weight:900;color:#f3ba2f;letter-spacing:1px;margin-bottom:4px;">🔍 PATRONES DETECTADOS</div>
-            <div style="font-size:10px;color:#e2e8f0;margin-bottom:2px;">🎲 Movimiento errático — señales poco confiables, evitar entradas grandes</div>
+            <div style="font-size:10px;color:#e2e8f0;margin-bottom:2px;">🔻 Distribuye en zona alta y cae → patrón distribución</div>
         </div>
 
         <!-- Stats técnicos -->
         <div style="font-size:9px;color:#334155;display:flex;flex-wrap:wrap;gap:6px;margin-top:4px;">
             
             <span>Hora pico: <b style="color:#94a3b8;">0:00h</b></span>
-            <span>Vol avg: <b style="color:#94a3b8;">$3.3M</b></span>
+            <span>Vol avg: <b style="color:#94a3b8;">$0.7M</b></span>
             <span>Vol actual: <b style="color:#94a3b8;">1.0x normal</b></span>
-            <span>Pos reciente: <b style="color:#ff2a3b;">95%</b></span>
+            <span>Pos reciente: <b style="color:#f3ba2f;">60%</b></span>
             <span>Score CDC avg: <b style="color:#f3ba2f;">0</b></span>
-            <span>Consistencia: <b style="color:#ff2a3b;">0.6</b></span>
+            <span>Consistencia: <b style="color:#94a3b8;">1.2</b></span>
         </div>
 
         
@@ -1816,16 +1767,16 @@
         <div style="background:rgba(243,186,47,0.06);border:1px solid rgba(243,186,47,0.2);border-radius:8px;padding:8px 10px;margin-top:8px;">
             <div style="font-size:9px;font-weight:900;color:#f3ba2f;letter-spacing:1px;margin-bottom:5px;">📐 FIBONACCI RANGO 24H</div>
             <div style="display:grid;grid-template-columns:1fr 1fr;gap:4px;font-size:9px;color:#94a3b8;">
-                <span>Soporte 78.6%: <b style="color:#0ecb81;">$0.2034332</b></span>
-                <span>Soporte 61.8%: <b style="color:#0ecb81;">$0.2091116</b></span>
-                <span>Soporte 38.2%: <b style="color:#6ee7b7;">$0.2170884</b></span>
-                <span>Soporte 23.6%: <b style="color:#6ee7b7;">$0.2220232</b></span>
-                <span>Obj. LONG 127%: <b style="color:#0ecb81;">$0.2391936</b></span>
-                <span>Obj. LONG 161%: <b style="color:#0ecb81;">$0.2508884</b></span>
-                <span>Obj. SHORT 127%: <b style="color:#ff2a3b;">$0.1870064</b></span>
-                <span>Obj. SHORT 161%: <b style="color:#ff2a3b;">$0.1753116</b></span>
+                <span>Soporte 78.6%: <b style="color:#0ecb81;">$0.00400509</b></span>
+                <span>Soporte 61.8%: <b style="color:#0ecb81;">$0.00403734</b></span>
+                <span>Soporte 38.2%: <b style="color:#6ee7b7;">$0.00408266</b></span>
+                <span>Soporte 23.6%: <b style="color:#6ee7b7;">$0.00411069</b></span>
+                <span>Obj. LONG 127%: <b style="color:#0ecb81;">$0.00420822</b></span>
+                <span>Obj. LONG 161%: <b style="color:#0ecb81;">$0.00427466</b></span>
+                <span>Obj. SHORT 127%: <b style="color:#ff2a3b;">$0.00391178</b></span>
+                <span>Obj. SHORT 161%: <b style="color:#ff2a3b;">$0.00384534</b></span>
                 <span style="grid-column:1/-1;border-top:1px solid rgba(255,255,255,0.05);padding-top:4px;margin-top:2px;color:#475569;">
-                    Rango 24h: <b style="color:#fff;">$0.1962</b> (mín) — <b style="color:#fff;">$0.23</b> (máx)
+                    Rango 24h: <b style="color:#fff;">$0.003964</b> (mín) — <b style="color:#fff;">$0.004156</b> (máx)
                 </span>
             </div>
         </div>
@@ -1850,59 +1801,59 @@
             <div class="intel-title">🧠 EVALUACIÓN DE VOLUMEN Y MOMENTUM</div>
             <div class="intel-row">
                 <span class="intel-label">📍 Posición en Rango 24h</span>
-                <span class="intel-value" style="color:#fff;">95.3%</span>
+                <span class="intel-value" style="color:#fff;">58.9%</span>
             </div>
             <div class="intel-row">
                 <span class="intel-label">⏱️ Rendimiento últimos 2 min</span>
-                <span class="intel-value" style="color:var(--accent-glow); font-size:15px; font-weight:bold;">-0.044%</span>
+                <span class="intel-value" style="color:var(--accent-glow); font-size:15px; font-weight:bold;">-0.122%</span>
             </div>
             <div class="intel-row">
                 <span class="intel-label">⚡ Velocidad instantánea (2s)</span>
-                <span class="intel-value" style="color:var(--accent-glow);">-0.0438%</span>
+                <span class="intel-value" style="color:var(--accent-glow);">-0.0735%</span>
             </div>
             <div class="intel-row">
                 <span class="intel-label">🎯 Distancia al TechoMax</span>
-                <span class="intel-value" style="color:var(--accent-gold); font-size:15px;">-0.70%</span>
+                <span class="intel-value" style="color:var(--accent-gold); font-size:15px;">-1.90%</span>
             </div>
             <!-- Barra de posición de rango -->
             <div style="margin-top:10px;">
                 <div style="display:flex; justify-content:space-between; font-size:11px; color:#64748b; margin-bottom:4px;">
                     <span>SUELO 0%</span>
-                    <span style="color:var(--accent-gold); font-weight:700;">Rango: 95.3%</span>
+                    <span style="color:var(--accent-gold); font-weight:700;">Rango: 58.9%</span>
                     <span>TECHO 100%</span>
                 </div>
                 <div class="barra-contenedor">
-                    <div class="barra-progreso" style="width:95.26627218934905%; background:linear-gradient(90deg, var(--accent-glow), var(--accent-gold), var(--accent-green));"></div>
+                    <div class="barra-progreso" style="width:58.8541666666667%; background:linear-gradient(90deg, var(--accent-glow), var(--accent-gold), var(--accent-green));"></div>
                 </div>
             </div>
         </div>
 
         <!-- BLOQUE NUEVO: ESTUDIO DE CICLO 24H (independiente por moneda) -->
         <div class="intel-box">
-            <div class="intel-title">⏳ ESTUDIO DE CICLO 24H — APR</div>
+            <div class="intel-title">⏳ ESTUDIO DE CICLO 24H — BRETT</div>
             
             
             <!-- Fase del ciclo (destacada) -->
-            <div style="background:#ff2a3b12;border:1px solid #ff2a3b45;
+            <div style="background:#f3ba2f12;border:1px solid #f3ba2f45;
                         border-radius:10px;padding:11px 14px;margin-bottom:10px;text-align:center;
-                        animation:techo-pulse 1.8s infinite;">
-                <div style="font-size:20px;margin-bottom:4px;">🪤</div>
-                <div style="font-size:12px;font-weight:900;color:#ff2a3b;letter-spacing:1px;">⚠️ TRAMPA ALCISTA — PELIGRO</div>
-                <div style="font-size:10px;color:#94a3b8;margin-top:5px;line-height:1.5;">En techo (95%) con 3/5 ciclos bajistas y cayendo -0.04%/2min. Subida previa puede ser fake. CUIDADO.</div>
+                        ">
+                <div style="font-size:20px;margin-bottom:4px;">↔️</div>
+                <div style="font-size:12px;font-weight:900;color:#f3ba2f;letter-spacing:1px;">↔️ CONSOLIDACIÓN</div>
+                <div style="font-size:10px;color:#94a3b8;margin-top:5px;line-height:1.5;">Zona media del rango (59%). Sin señal de ciclo dominante. Esperar ruptura hacia extremos.</div>
             </div>
 
             <!-- Recomendación directa del ciclo -->
-            <div style="background:rgba(14,203,129,0.12);border:1px solid #0ecb8140;border-radius:8px;padding:8px 12px;margin-bottom:10px;text-align:center;">
-                <div style="font-size:11px;font-weight:900;color:#0ecb81;letter-spacing:0.5px;">🟢 CICLO FAVORABLE PARA COMPRAR</div>
+            <div style="background:rgba(243,186,47,0.08);border:1px solid #f3ba2f40;border-radius:8px;padding:8px 12px;margin-bottom:10px;text-align:center;">
+                <div style="font-size:11px;font-weight:900;color:#f3ba2f;letter-spacing:0.5px;">⚪ CICLO NEUTRAL — ESPERAR SEÑAL</div>
             </div>
 
             <!-- Probabilidad de giro -->
             <div class="intel-row">
                 <span class="intel-label">🎯 Prob. giro/reversión estimada</span>
-                <span class="intel-value" style="color:#0ecb81;font-size:14px;font-weight:900;">80% <span style="font-size:10px;">🔥 ALTA</span></span>
+                <span class="intel-value" style="color:#ff2a3b;font-size:14px;font-weight:900;">22% <span style="font-size:10px;">😴 BAJA</span></span>
             </div>
             <div style="height:7px;background:rgba(255,255,255,0.05);border-radius:4px;overflow:hidden;margin:-2px 0 8px;">
-                <div style="width:80%;height:100%;background:linear-gradient(90deg,#0ecb8166,#0ecb81);border-radius:4px;transition:width 0.4s;"></div>
+                <div style="width:22%;height:100%;background:linear-gradient(90deg,#ff2a3b66,#ff2a3b);border-radius:4px;transition:width 0.4s;"></div>
             </div>
 
             <!-- Ciclos visuales -->
@@ -1911,7 +1862,7 @@
                 <span style="font-size:11px;">
                     <span style="color:#0ecb81;font-weight:900;">▲····</span>
                     &nbsp;
-                    <span style="color:#ff2a3b;font-weight:900;">▼▼▼··</span>
+                    <span style="color:#ff2a3b;font-weight:900;">▼▼···</span>
                 </span>
             </div>
 
@@ -1943,39 +1894,37 @@
                 <div style="font-size:9px;font-weight:900;color:#475569;letter-spacing:1px;margin-bottom:6px;">📡 CONTEXTO 48 HORAS</div>
                 <div class="intel-row">
                     <span class="intel-label">📉 Mínimo 48h</span>
-                    <span class="intel-value" style="color:#ff2a3b;">$0.192500</span>
+                    <span class="intel-value" style="color:#ff2a3b;">$0.003998</span>
                 </div>
                 
                 <div class="intel-row">
                     <span class="intel-label">↕️ Subida desde mín 48h</span>
-                    <span class="intel-value" style="color:#0ecb81;">
-                        +18.55% 🚀 DESPEGUE
+                    <span class="intel-value" style="color:#94a3b8;">
+                        +2.05% 
                     </span>
                 </div>
                 <div class="intel-row">
                     <span class="intel-label">📐 EMA 7&gt;25&gt;99 alcistas</span>
-                    <span class="intel-value" style="color:#0ecb81;">
-                        ✅ SÍ — señal LONG
+                    <span class="intel-value" style="color:#ff2a3b;">
+                        ❌ NO — sin despegue EMA
                     </span>
                 </div>
             </div>
 
             
-            <!-- Señales de sospecha detectadas -->
-            <div style="margin-top:10px;padding:9px 11px;background:rgba(243,186,47,0.07);border:1px solid rgba(243,186,47,0.25);border-radius:8px;">
-                <div style="font-size:9px;font-weight:900;color:#f3ba2f;letter-spacing:1px;margin-bottom:6px;">🔍 SEÑALES DE SOSPECHA DETECTADAS</div>
-                <div style="font-size:10px;color:#e2e8f0;margin-bottom:3px;line-height:1.4;">🪤 TRAMPA ALCISTA: subió pero ahora cae con 3/5 ciclos bajistas</div><div style="font-size:10px;color:#e2e8f0;margin-bottom:3px;line-height:1.4;">🚀 EMA 7&gt;25&gt;99 alcistas + +18.5% mín48h = DESPEGUE REAL</div><div style="font-size:10px;color:#e2e8f0;margin-bottom:3px;line-height:1.4;">📉 Velocidad negativa fuerte en techo = caída iniciada</div>
+            <div style="margin-top:8px;padding:7px 10px;background:rgba(14,203,129,0.05);border:1px solid rgba(14,203,129,0.15);border-radius:8px;font-size:10px;color:#475569;">
+                ✅ Sin señales de sospecha detectadas en este momento.
             </div>
                 
         </div>
 
         <div class="intel-box">
-            <div class="intel-title"><i class="fas fa-chart-bar"></i> NIVELES Y SEÑAL CDC — APR</div>
+            <div class="intel-title"><i class="fas fa-chart-bar"></i> NIVELES Y SEÑAL CDC — BRETT</div>
 
             
             <!-- Sesgo actual -->
-            <div style="background:rgba(14,203,129,0.12);border:1px solid #0ecb8140;border-radius:8px;padding:8px 12px;margin-bottom:10px;text-align:center;">
-                <div style="font-size:11px;font-weight:900;color:#0ecb81;">🟢 SESGO LONG — zonas de compra activas</div>
+            <div style="background:rgba(243,186,47,0.08);border:1px solid #f3ba2f40;border-radius:8px;padding:8px 12px;margin-bottom:10px;text-align:center;">
+                <div style="font-size:11px;font-weight:900;color:#f3ba2f;">⚪ NEUTRAL — sin sesgo dominante</div>
             </div>
 
             <!-- Niveles de precio clave -->
@@ -1983,30 +1932,30 @@
 
             <div class="intel-row">
                 <span class="intel-label">🔴 Techo 24h (MAX)</span>
-                <span class="intel-value" style="color:#ff3c00;">$0.2300 <span style="font-size:10px;color:#475569;">(-0.70%)</span></span>
+                <span class="intel-value" style="color:#ff3c00;">$0.004156 <span style="font-size:10px;color:#475569;">(-1.90%)</span></span>
             </div>
             <div class="intel-row">
                 <span class="intel-label">🟠 Resistencia 75%</span>
-                <span class="intel-value" style="color:#f3ba2f;">$0.2216</span>
+                <span class="intel-value" style="color:#f3ba2f;">$0.004108</span>
             </div>
             <div class="intel-row">
                 <span class="intel-label">⚪ Zona media 50%</span>
-                <span class="intel-value" style="color:#0ecb81;">$0.2131 <span style="font-size:10px;color:#475569;">(+7.18%)</span></span>
+                <span class="intel-value" style="color:#0ecb81;">$0.004060 <span style="font-size:10px;color:#475569;">(+0.42%)</span></span>
             </div>
             <div class="intel-row">
                 <span class="intel-label">🟡 Soporte 25%</span>
-                <span class="intel-value" style="color:#f3ba2f;">$0.2046</span>
+                <span class="intel-value" style="color:#f3ba2f;">$0.004012</span>
             </div>
             <div class="intel-row">
                 <span class="intel-label">🟢 Suelo 24h (MIN)</span>
-                <span class="intel-value" style="color:#0ecb81;">$0.1962 <span style="font-size:10px;color:#475569;">(+16.41%)</span></span>
+                <span class="intel-value" style="color:#0ecb81;">$0.003964 <span style="font-size:10px;color:#475569;">(+2.85%)</span></span>
             </div>
 
             
             <div class="intel-row">
                 <span class="intel-label">📐 EMA7 / EMA25 / EMA99</span>
-                <span class="intel-value" style="font-size:10px;color:#0ecb81;">
-                    $0.2128 / $0.2056 / $0.2025
+                <span class="intel-value" style="font-size:10px;color:#ff2a3b;">
+                    $0.004081 / $0.004094 / $0.004148
                 </span>
             </div>
 
@@ -2015,15 +1964,15 @@
                 <div style="font-size:9px;font-weight:900;color:#0ecb81;letter-spacing:1px;margin-bottom:6px;">🟢 LONG — OBJETIVOS Y STOP</div>
                 <div class="intel-row">
                     <span class="intel-label">🎯 TP1 LONG (+0.5%)</span>
-                    <span class="intel-value" style="color:#0ecb81;">$0.2295</span>
+                    <span class="intel-value" style="color:#0ecb81;">$0.004097</span>
                 </div>
                 <div class="intel-row">
                     <span class="intel-label">🎯 TP2 LONG (+1.5%)</span>
-                    <span class="intel-value" style="color:#0ecb81;">$0.2318</span>
+                    <span class="intel-value" style="color:#0ecb81;">$0.004138</span>
                 </div>
                 <div class="intel-row">
                     <span class="intel-label">🛑 STOP LONG (-0.8%)</span>
-                    <span class="intel-value" style="color:#ff2a3b;">$0.2266</span>
+                    <span class="intel-value" style="color:#ff2a3b;">$0.004044</span>
                 </div>
             </div>
 
@@ -2032,15 +1981,15 @@
                 <div style="font-size:9px;font-weight:900;color:#ff2a3b;letter-spacing:1px;margin-bottom:6px;">🔴 SHORT — OBJETIVOS Y STOP</div>
                 <div class="intel-row">
                     <span class="intel-label">🎯 TP1 SHORT (-0.5%)</span>
-                    <span class="intel-value" style="color:#ff2a3b;">$0.2273</span>
+                    <span class="intel-value" style="color:#ff2a3b;">$0.004057</span>
                 </div>
                 <div class="intel-row">
                     <span class="intel-label">🎯 TP2 SHORT (-1.5%)</span>
-                    <span class="intel-value" style="color:#ff2a3b;">$0.2250</span>
+                    <span class="intel-value" style="color:#ff2a3b;">$0.004016</span>
                 </div>
                 <div class="intel-row">
                     <span class="intel-label">🛑 STOP SHORT (+0.8%)</span>
-                    <span class="intel-value" style="color:#0ecb81;">$0.2300</span>
+                    <span class="intel-value" style="color:#0ecb81;">$0.004110</span>
                 </div>
             </div>
 
@@ -2048,18 +1997,18 @@
             <div style="margin-top:8px;padding-top:8px;border-top:1px solid rgba(255,255,255,0.05);">
                 <div class="intel-row">
                     <span class="intel-label">🤖 Motor CDC</span>
-                    <span class="intel-value" style="font-weight:bold;">🚀 DESPEGUE EMA CONFIRMADO</span>
+                    <span class="intel-value" style="font-weight:bold;">👀 Motor alcista observando (sin señal aún)</span>
                 </div>
                 <div class="intel-row">
                     <span class="intel-label">📡 Señal Activa</span>
-                    <span class="intel-value" style="background:#0ecb81;color:#000;padding:3px 10px;border-radius:6px;font-size:11px;">
-                        LONG CONFIRMADO
+                    <span class="intel-value" style="background:#334155;color:#fff;padding:3px 10px;border-radius:6px;font-size:11px;">
+                        ESPERAR SEÑAL
                     </span>
                 </div>
                 <div class="intel-row">
                     <span class="intel-label">📊 Posición rango 24h</span>
-                    <span class="intel-value" style="color:#ff2a3b;font-weight:900;">
-                        95.3% 🔴 TECHO EXTREMO
+                    <span class="intel-value" style="color:#f3ba2f;font-weight:900;">
+                        58.9% ⚪ MEDIA
                     </span>
                 </div>
                 
@@ -2087,7 +2036,7 @@
                 <button id="btnRadarExplosivo" onclick="abrirRadarExplosivo()" title="RADAR EXPLOSIVO" class="techo-activo">
                     <span style="position:relative;">
                         🔭
-                        <span class="radar-contador" id="radarContador" style="background: rgb(255, 42, 59);">79</span>
+                        <span class="radar-contador" id="radarContador" style="background: rgb(255, 42, 59);">70</span>
                     </span>
                 </button>
             </div>
@@ -2175,268 +2124,181 @@
                 
 
                 <!-- ── AGUJA — se mueve como velocímetro de auto ── -->
-                <g transform="translate(200,200) rotate(24.754062020119818)" filter="url(#needleGlow)">
+                <g transform="translate(200,200) rotate(-11.251586423628329)" filter="url(#needleGlow)">
                     <!-- Cola de la aguja (abajo) -->
-                    <line x1="0" y1="0" x2="0" y2="18" stroke="#0ecb8166" stroke-width="4" stroke-linecap="round"></line>
+                    <line x1="0" y1="0" x2="0" y2="18" stroke="#ff333366" stroke-width="4" stroke-linecap="round"></line>
                     <!-- Cuerpo principal -->
-                    <line x1="0" y1="0" x2="0" y2="-138" stroke="#0ecb81" stroke-width="4" stroke-linecap="round"></line>
+                    <line x1="0" y1="0" x2="0" y2="-138" stroke="#ff3333" stroke-width="4" stroke-linecap="round"></line>
                     <!-- Punta de flecha -->
-                    <polygon points="0,-138 -5,-115 5,-115" fill="#0ecb81"></polygon>
+                    <polygon points="0,-138 -5,-115 5,-115" fill="#ff3333"></polygon>
                     <!-- Línea central blanca de la aguja (detalle de auto) -->
                     <line x1="0" y1="5" x2="0" y2="-110" stroke="rgba(255,255,255,0.25)" stroke-width="1" stroke-linecap="round"></line>
                 </g>
                 <!-- Centro/pivote de la aguja -->
-                <circle cx="200" cy="200" r="13" fill="#1a2640" stroke="#0ecb81" stroke-width="2"></circle>
-                <circle cx="200" cy="200" r="6" fill="#0ecb81" filter="url(#needleGlow)"></circle>
+                <circle cx="200" cy="200" r="13" fill="#1a2640" stroke="#ff3333" stroke-width="2"></circle>
+                <circle cx="200" cy="200" r="6" fill="#ff3333" filter="url(#needleGlow)"></circle>
 
                 <!-- ── VALOR NUMÉRICO grande en el centro ── -->
-                <text x="200" y="155" fill="#0ecb81" font-size="46" font-weight="900" text-anchor="middle" filter="url(#glowFilter)">+18</text>
+                <text x="200" y="155" fill="#ff3333" font-size="46" font-weight="900" text-anchor="middle" filter="url(#glowFilter)">-8</text>
                 <text x="200" y="174" fill="rgba(255,255,255,0.4)" font-size="10" font-weight="700" text-anchor="middle">VELOCIDAD CDC</text>
 
                 <!-- ── INDICADORES MINI abajo del número ── -->
-                <text x="130" y="220" fill="#ff2a3b" font-size="9" font-weight="700" text-anchor="middle">VEL -0.044%</text>
-                <text x="200" y="220" fill="#ff2a3b" font-size="9" font-weight="700" text-anchor="middle">2M -0.04%</text>
-                <text x="270" y="220" fill="#94a3b8" font-size="9" font-weight="700" text-anchor="middle">↑1 ↓3</text>
+                <text x="130" y="220" fill="#ff2a3b" font-size="9" font-weight="700" text-anchor="middle">VEL -0.074%</text>
+                <text x="200" y="220" fill="#ff2a3b" font-size="9" font-weight="700" text-anchor="middle">2M -0.12%</text>
+                <text x="270" y="220" fill="#94a3b8" font-size="9" font-weight="700" text-anchor="middle">↑1 ↓2</text>
             </svg>
             </div>
 
             <!-- Estado con badge -->
             <div style="text-align:center; margin:-4px 0 6px 0;">
-                <div class="blink-status" style="font-size:22px; font-weight:900; color:#0ecb81; text-shadow:0 0 20px #0ecb8180; letter-spacing:1px;">DESPEGANDO</div>
-                <div style="margin:6px auto;background:#0ecb81;color:#000;font-size:12px;font-weight:900;padding:5px 18px;border-radius:6px;display:inline-block;animation:blinker-glow 0.5s linear infinite;letter-spacing:1px;">🚀 DESPEGUE EMA · +18.5%</div>
+                <div class="blink-status" style="font-size:22px; font-weight:900; color:#ff3333; text-shadow:0 0 20px #ff333380; letter-spacing:1px;">ULTRA VOLÁTIL</div>
+                <div style="margin:6px auto;background:rgba(255,51,51,0.15);color:#ff3333;font-size:13px;font-weight:900;padding:5px 18px;border-radius:6px;display:inline-block;border:1px solid #ff3333;animation:techo-pulse 1.2s infinite;letter-spacing:1px;">🔥 ULTRA VOLÁTIL · APAL. MÁX 0x</div>
             </div>
 
             <!-- Flechas de momentum + dirección de capital -->
-            <div style="text-align:center; font-size:22px; color:#f3ba2f; letter-spacing:2px; margin:4px 0; font-weight:900; opacity:0.8;">›››››››</div>
+            <div style="text-align:center; font-size:22px; color:#f3ba2f; letter-spacing:2px; margin:4px 0; font-weight:900; opacity:0.8;">‹‹‹‹‹‹‹</div>
             <div style="text-align:center; font-size:10px; color:#64748b; margin-bottom:8px;">
-                🟢 Compradores acelerando
-                • ▶ Movimiento activo
+                ⚖️ Presión equilibrada
+                • ⏸ Motor en ralentí
                  • 🔥 Motor turbo ×1.7
             </div>
 
-            <div style="margin-top:6px;padding:0 4px;"><div style="font-size:10px;font-weight:900;color:#f3ba2f;letter-spacing:1px;text-align:center;margin-bottom:8px;padding:4px 0;border-top:1px solid rgba(243,186,47,0.2);">── DATOS DE APR ──</div><div style="display:grid;grid-template-columns:1fr 1fr;gap:6px;margin-bottom:6px;"><div style="background:rgba(255,255,255,0.03);border-radius:8px;padding:8px 10px;border-left:3px solid #0ecb81;"><div style="font-size:9px;color:#64748b;font-weight:700;margin-bottom:2px;">📈 TENDENCIA 24H</div><div style="font-size:16px;font-weight:900;color:#0ecb81;">+15.70%</div><div style="font-size:9px;color:#475569;">En alza hoy</div></div><div style="background:rgba(255,255,255,0.03);border-radius:8px;padding:8px 10px;border-left:3px solid #ff2a3b;"><div style="font-size:9px;color:#64748b;font-weight:700;margin-bottom:2px;">⚡ ÚLTIMOS 2 MIN</div><div style="font-size:16px;font-weight:900;color:#ff2a3b;">-0.04%</div><div style="font-size:9px;color:#475569;">Sin fuerza</div></div></div><div style="background:rgba(255,255,255,0.03);border-radius:8px;padding:8px 10px;margin-bottom:6px;"><div style="font-size:9px;color:#64748b;font-weight:700;margin-bottom:5px;">🏋️ COMPRA vs VENTA</div><div style="display:flex;align-items:center;gap:6px;margin-bottom:4px;"><span style="font-size:10px;color:#0ecb81;font-weight:900;min-width:44px;">C:25%</span><div style="flex:1;height:7px;background:rgba(255,255,255,0.06);border-radius:4px;overflow:hidden;"><div style="height:100%;width:25%;background:linear-gradient(90deg,#0ecb81,#05a660);border-radius:4px;"></div></div><span style="font-size:10px;color:#ff2a3b;font-weight:900;min-width:44px;text-align:right;">V:75%</span></div><div style="text-align:center;font-size:11px;font-weight:900;color:#ff2a3b;">🔴 MUCHA VENTA</div><div style="font-size:9px;color:#334155;text-align:center;margin-top:2px;">4 ciclos — ↑1 ↓3</div></div><div style="background:rgba(255,255,255,0.03);border-radius:8px;padding:8px 10px;margin-bottom:6px;"><div style="font-size:9px;color:#64748b;font-weight:700;margin-bottom:5px;">📍 POSICIÓN EN RANGO 24H</div><div style="display:flex;align-items:center;gap:5px;margin-bottom:3px;"><span style="font-size:8px;color:#0ecb81;">MIN</span><div style="flex:1;height:8px;background:rgba(255,255,255,0.06);border-radius:4px;position:relative;"><div style="height:100%;background:linear-gradient(90deg,#0ecb81,#f3ba2f,#ff2a3b);border-radius:4px;opacity:0.4;"></div><div style="position:absolute;top:50%;left:calc(95.26627218934905% - 6px);transform:translateY(-50%);width:12px;height:12px;background:#ff2a3b;border-radius:50%;border:2px solid #fff;box-shadow:0 0 5px #ff2a3b;"></div></div><span style="font-size:8px;color:#ff3c00;">MAX</span></div><div style="font-size:10px;font-weight:700;color:#ff2a3b;text-align:center;">🔴 TECHO — riesgo caída</div><div style="display:flex;justify-content:space-between;margin-top:3px;font-size:9px;"><span style="color:#ff6b00;">-0.7% al max</span><span style="font-weight:900;color:#fff;font-size:12px;">$0.2284</span><span style="color:#0ecb81;">+16.4% del min</span></div></div><div style="background:#ff2a3b18;border:1px solid #ff2a3b40;border-radius:8px;padding:7px 10px;font-size:10px;color:#ff2a3b;font-weight:600;line-height:1.7;">📈 Subió +15.7% hoy — momentum positivo. 🔴 Vendedores dominan (75%). ⚠️ Cerca del máximo — posible corrección.</div></div>
+            <div style="margin-top:6px;padding:0 4px;"><div style="font-size:10px;font-weight:900;color:#f3ba2f;letter-spacing:1px;text-align:center;margin-bottom:8px;padding:4px 0;border-top:1px solid rgba(243,186,47,0.2);">── DATOS DE BRETT ──</div><div style="display:grid;grid-template-columns:1fr 1fr;gap:6px;margin-bottom:6px;"><div style="background:rgba(255,255,255,0.03);border-radius:8px;padding:8px 10px;border-left:3px solid #ff2a3b;"><div style="font-size:9px;color:#64748b;font-weight:700;margin-bottom:2px;">📉 TENDENCIA 24H</div><div style="font-size:16px;font-weight:900;color:#ff2a3b;">-1.28%</div><div style="font-size:9px;color:#475569;">En baja hoy</div></div><div style="background:rgba(255,255,255,0.03);border-radius:8px;padding:8px 10px;border-left:3px solid #ff2a3b;"><div style="font-size:9px;color:#64748b;font-weight:700;margin-bottom:2px;">⚡ ÚLTIMOS 2 MIN</div><div style="font-size:16px;font-weight:900;color:#ff2a3b;">-0.12%</div><div style="font-size:9px;color:#475569;">Sin fuerza</div></div></div><div style="background:rgba(255,255,255,0.03);border-radius:8px;padding:8px 10px;margin-bottom:6px;"><div style="font-size:9px;color:#64748b;font-weight:700;margin-bottom:5px;">🏋️ COMPRA vs VENTA</div><div style="display:flex;align-items:center;gap:6px;margin-bottom:4px;"><span style="font-size:10px;color:#0ecb81;font-weight:900;min-width:44px;">C:33%</span><div style="flex:1;height:7px;background:rgba(255,255,255,0.06);border-radius:4px;overflow:hidden;"><div style="height:100%;width:33%;background:linear-gradient(90deg,#0ecb81,#05a660);border-radius:4px;"></div></div><span style="font-size:10px;color:#ff2a3b;font-weight:900;min-width:44px;text-align:right;">V:67%</span></div><div style="text-align:center;font-size:11px;font-weight:900;color:#ff2a3b;">🔴 MUCHA VENTA</div><div style="font-size:9px;color:#334155;text-align:center;margin-top:2px;">3 ciclos — ↑1 ↓2</div></div><div style="background:rgba(255,255,255,0.03);border-radius:8px;padding:8px 10px;margin-bottom:6px;"><div style="font-size:9px;color:#64748b;font-weight:700;margin-bottom:5px;">📍 POSICIÓN EN RANGO 24H</div><div style="display:flex;align-items:center;gap:5px;margin-bottom:3px;"><span style="font-size:8px;color:#0ecb81;">MIN</span><div style="flex:1;height:8px;background:rgba(255,255,255,0.06);border-radius:4px;position:relative;"><div style="height:100%;background:linear-gradient(90deg,#0ecb81,#f3ba2f,#ff2a3b);border-radius:4px;opacity:0.4;"></div><div style="position:absolute;top:50%;left:calc(58.8541666666667% - 6px);transform:translateY(-50%);width:12px;height:12px;background:#64748b;border-radius:50%;border:2px solid #fff;box-shadow:0 0 5px #64748b;"></div></div><span style="font-size:8px;color:#ff3c00;">MAX</span></div><div style="font-size:10px;font-weight:700;color:#64748b;text-align:center;">⚪ ZONA MEDIA</div><div style="display:flex;justify-content:space-between;margin-top:3px;font-size:9px;"><span style="color:#ff6b00;">-1.9% al max</span><span style="font-weight:900;color:#fff;font-size:12px;">$0.004077</span><span style="color:#0ecb81;">+2.9% del min</span></div></div><div style="background:#ff2a3b18;border:1px solid #ff2a3b40;border-radius:8px;padding:7px 10px;font-size:10px;color:#ff2a3b;font-weight:600;line-height:1.7;">📉 Baja leve -1.3% en 24h. 🔴 Vendedores dominan (67%). </div></div>
         </div>
 
                 <!-- ── MOTOR LONG/SHORT: señales activas de mercado ── -->
         <div id="motorLongShortBlockCentral" style="background:#060b16;border:1px solid rgba(255,255,255,0.05);border-radius:10px;padding:10px;margin-bottom:12px;">
                 <div onclick="_toggleMotorLongShort()" style="display:flex;align-items:center;justify-content:space-between;cursor:pointer;margin-bottom:4px;">
-                <div style="font-size:11px;font-weight:900;color:#f3ba2f;">⚡ MOTOR LONG — SEÑALES IA (71)</div>
+                <div style="font-size:11px;font-weight:900;color:#f3ba2f;">⚡ MOTOR LONG — SEÑALES IA (42)</div>
                 <span style="font-size:11px;color:#f3ba2f;transition:transform 0.25s;transform:rotate(180deg);">▾</span>
             </div>
                 <div style="display:block;">
                     <div style="font-size:9px;color:#475569;text-align:center;margin-bottom:6px;">👆 Tocá una moneda para llevarla al panel</div>
-                    <div onclick="seleccionarMoneda('IOTXUSDT')" style="display:flex;align-items:center;justify-content:space-between;padding:5px 8px;border-radius:7px;background:rgba(14,203,129,0.1);border-left:3px solid #0ecb81;margin-bottom:4px;cursor:pointer;" title="Llevar IOTX al panel central">
-                        <span style="font-size:12px;font-weight:900;color:#0ecb81;">🚀 IOTX</span>
-                        <span style="font-size:10px;color:#0ecb81;font-weight:700;">DESPEGUE EMA +10.6%</span>
-                    </div><div onclick="seleccionarMoneda('SKYAIUSDT')" style="display:flex;align-items:center;justify-content:space-between;padding:5px 8px;border-radius:7px;background:rgba(0,212,255,0.08);border-left:3px solid #00d4ff;margin-bottom:4px;cursor:pointer;" title="Llevar SKYAI al panel central">
-                        <span style="font-size:12px;font-weight:900;color:#00d4ff;">🔄 SKYAI</span>
+                    <div onclick="seleccionarMoneda('TUTUSDT')" style="display:flex;align-items:center;justify-content:space-between;padding:5px 8px;border-radius:7px;background:rgba(0,212,255,0.08);border-left:3px solid #00d4ff;margin-bottom:4px;cursor:pointer;" title="Llevar TUT al panel central">
+                        <span style="font-size:12px;font-weight:900;color:#00d4ff;">🔄 TUT</span>
                         <span style="font-size:10px;color:#00d4ff;font-weight:700;">REBOTE +?%</span>
-                    </div><div onclick="seleccionarMoneda('TSTUSDT')" style="display:flex;align-items:center;justify-content:space-between;padding:5px 8px;border-radius:7px;background:rgba(0,212,255,0.08);border-left:3px solid #00d4ff;margin-bottom:4px;cursor:pointer;" title="Llevar TST al panel central">
-                        <span style="font-size:12px;font-weight:900;color:#00d4ff;">🔄 TST</span>
+                    </div><div onclick="seleccionarMoneda('COOKIEUSDT')" style="display:flex;align-items:center;justify-content:space-between;padding:5px 8px;border-radius:7px;background:rgba(0,212,255,0.08);border-left:3px solid #00d4ff;margin-bottom:4px;cursor:pointer;" title="Llevar COOKIE al panel central">
+                        <span style="font-size:12px;font-weight:900;color:#00d4ff;">🔄 COOKIE</span>
                         <span style="font-size:10px;color:#00d4ff;font-weight:700;">REBOTE +?%</span>
-                    </div><div onclick="seleccionarMoneda('GMXUSDT')" style="display:flex;align-items:center;justify-content:space-between;padding:5px 8px;border-radius:7px;background:rgba(0,212,255,0.08);border-left:3px solid #00d4ff;margin-bottom:4px;cursor:pointer;" title="Llevar GMX al panel central">
-                        <span style="font-size:12px;font-weight:900;color:#00d4ff;">🔄 GMX</span>
-                        <span style="font-size:10px;color:#00d4ff;font-weight:700;">REBOTE +?%</span>
-                    </div><div onclick="seleccionarMoneda('COTIUSDT')" style="display:flex;align-items:center;justify-content:space-between;padding:5px 8px;border-radius:7px;background:rgba(0,212,255,0.08);border-left:3px solid #00d4ff;margin-bottom:4px;cursor:pointer;" title="Llevar COTI al panel central">
-                        <span style="font-size:12px;font-weight:900;color:#00d4ff;">🔄 COTI</span>
-                        <span style="font-size:10px;color:#00d4ff;font-weight:700;">REBOTE +?%</span>
-                    </div><div onclick="seleccionarMoneda('EULUSDT')" style="display:flex;align-items:center;justify-content:space-between;padding:5px 8px;border-radius:7px;background:rgba(0,212,255,0.08);border-left:3px solid #00d4ff;margin-bottom:4px;cursor:pointer;" title="Llevar EUL al panel central">
-                        <span style="font-size:12px;font-weight:900;color:#00d4ff;">🔄 EUL</span>
-                        <span style="font-size:10px;color:#00d4ff;font-weight:700;">REBOTE +0.0%</span>
-                    </div><div onclick="seleccionarMoneda('ELSAUSDT')" style="display:flex;align-items:center;justify-content:space-between;padding:5px 8px;border-radius:7px;background:rgba(0,212,255,0.08);border-left:3px solid #00d4ff;margin-bottom:4px;cursor:pointer;" title="Llevar ELSA al panel central">
-                        <span style="font-size:12px;font-weight:900;color:#00d4ff;">🔄 ELSA</span>
-                        <span style="font-size:10px;color:#00d4ff;font-weight:700;">REBOTE +0.2%</span>
-                    </div><div onclick="seleccionarMoneda('我踏马来了USDT')" style="display:flex;align-items:center;justify-content:space-between;padding:5px 8px;border-radius:7px;background:rgba(0,212,255,0.08);border-left:3px solid #00d4ff;margin-bottom:4px;cursor:pointer;" title="Llevar 我踏马来了 al panel central">
-                        <span style="font-size:12px;font-weight:900;color:#00d4ff;">🔄 我踏马来了</span>
-                        <span style="font-size:10px;color:#00d4ff;font-weight:700;">REBOTE +?%</span>
-                    </div><div onclick="seleccionarMoneda('MAVUSDT')" style="display:flex;align-items:center;justify-content:space-between;padding:5px 8px;border-radius:7px;background:rgba(0,212,255,0.08);border-left:3px solid #00d4ff;margin-bottom:4px;cursor:pointer;" title="Llevar MAV al panel central">
-                        <span style="font-size:12px;font-weight:900;color:#00d4ff;">🔄 MAV</span>
-                        <span style="font-size:10px;color:#00d4ff;font-weight:700;">REBOTE +2.2%</span>
-                    </div><div onclick="seleccionarMoneda('USUSDT')" style="display:flex;align-items:center;justify-content:space-between;padding:5px 8px;border-radius:7px;background:rgba(0,212,255,0.08);border-left:3px solid #00d4ff;margin-bottom:4px;cursor:pointer;" title="Llevar US al panel central">
-                        <span style="font-size:12px;font-weight:900;color:#00d4ff;">🔄 US</span>
-                        <span style="font-size:10px;color:#00d4ff;font-weight:700;">REBOTE +?%</span>
-                    </div><div onclick="seleccionarMoneda('PHAROSUSDT')" style="display:flex;align-items:center;justify-content:space-between;padding:5px 8px;border-radius:7px;background:rgba(0,212,255,0.08);border-left:3px solid #00d4ff;margin-bottom:4px;cursor:pointer;" title="Llevar PHAROS al panel central">
-                        <span style="font-size:12px;font-weight:900;color:#00d4ff;">🔄 PHAROS</span>
-                        <span style="font-size:10px;color:#00d4ff;font-weight:700;">REBOTE +0.0%</span>
                     </div><div onclick="seleccionarMoneda('RVNUSDT')" style="display:flex;align-items:center;justify-content:space-between;padding:5px 8px;border-radius:7px;background:rgba(0,212,255,0.08);border-left:3px solid #00d4ff;margin-bottom:4px;cursor:pointer;" title="Llevar RVN al panel central">
                         <span style="font-size:12px;font-weight:900;color:#00d4ff;">🔄 RVN</span>
                         <span style="font-size:10px;color:#00d4ff;font-weight:700;">REBOTE +?%</span>
-                    </div><div onclick="seleccionarMoneda('HEIUSDT')" style="display:flex;align-items:center;justify-content:space-between;padding:5px 8px;border-radius:7px;background:rgba(0,212,255,0.08);border-left:3px solid #00d4ff;margin-bottom:4px;cursor:pointer;" title="Llevar HEI al panel central">
-                        <span style="font-size:12px;font-weight:900;color:#00d4ff;">🔄 HEI</span>
+                    </div><div onclick="seleccionarMoneda('BMTUSDT')" style="display:flex;align-items:center;justify-content:space-between;padding:5px 8px;border-radius:7px;background:rgba(0,212,255,0.08);border-left:3px solid #00d4ff;margin-bottom:4px;cursor:pointer;" title="Llevar BMT al panel central">
+                        <span style="font-size:12px;font-weight:900;color:#00d4ff;">🔄 BMT</span>
                         <span style="font-size:10px;color:#00d4ff;font-weight:700;">REBOTE +?%</span>
-                    </div><div onclick="seleccionarMoneda('PYTHUSDT')" style="display:flex;align-items:center;justify-content:space-between;padding:5px 8px;border-radius:7px;background:rgba(0,212,255,0.08);border-left:3px solid #00d4ff;margin-bottom:4px;cursor:pointer;" title="Llevar PYTH al panel central">
-                        <span style="font-size:12px;font-weight:900;color:#00d4ff;">🔄 PYTH</span>
+                    </div><div onclick="seleccionarMoneda('UBUSDT')" style="display:flex;align-items:center;justify-content:space-between;padding:5px 8px;border-radius:7px;background:rgba(0,212,255,0.08);border-left:3px solid #00d4ff;margin-bottom:4px;cursor:pointer;" title="Llevar UB al panel central">
+                        <span style="font-size:12px;font-weight:900;color:#00d4ff;">🔄 UB</span>
                         <span style="font-size:10px;color:#00d4ff;font-weight:700;">REBOTE +?%</span>
-                    </div><div onclick="seleccionarMoneda('PIEVERSEUSDT')" style="display:flex;align-items:center;justify-content:space-between;padding:5px 8px;border-radius:7px;background:rgba(0,212,255,0.08);border-left:3px solid #00d4ff;margin-bottom:4px;cursor:pointer;" title="Llevar PIEVERSE al panel central">
-                        <span style="font-size:12px;font-weight:900;color:#00d4ff;">🔄 PIEVERSE</span>
+                    </div><div onclick="seleccionarMoneda('SKYAIUSDT')" style="display:flex;align-items:center;justify-content:space-between;padding:5px 8px;border-radius:7px;background:rgba(0,212,255,0.08);border-left:3px solid #00d4ff;margin-bottom:4px;cursor:pointer;" title="Llevar SKYAI al panel central">
+                        <span style="font-size:12px;font-weight:900;color:#00d4ff;">🔄 SKYAI</span>
+                        <span style="font-size:10px;color:#00d4ff;font-weight:700;">REBOTE +?%</span>
+                    </div><div onclick="seleccionarMoneda('BICOUSDT')" style="display:flex;align-items:center;justify-content:space-between;padding:5px 8px;border-radius:7px;background:rgba(0,212,255,0.08);border-left:3px solid #00d4ff;margin-bottom:4px;cursor:pointer;" title="Llevar BICO al panel central">
+                        <span style="font-size:12px;font-weight:900;color:#00d4ff;">🔄 BICO</span>
                         <span style="font-size:10px;color:#00d4ff;font-weight:700;">REBOTE +?%</span>
                     </div><div onclick="seleccionarMoneda('KOMAUSDT')" style="display:flex;align-items:center;justify-content:space-between;padding:5px 8px;border-radius:7px;background:rgba(0,212,255,0.08);border-left:3px solid #00d4ff;margin-bottom:4px;cursor:pointer;" title="Llevar KOMA al panel central">
                         <span style="font-size:12px;font-weight:900;color:#00d4ff;">🔄 KOMA</span>
                         <span style="font-size:10px;color:#00d4ff;font-weight:700;">REBOTE +?%</span>
-                    </div><div onclick="seleccionarMoneda('ERAUSDT')" style="display:flex;align-items:center;justify-content:space-between;padding:5px 8px;border-radius:7px;background:rgba(0,212,255,0.08);border-left:3px solid #00d4ff;margin-bottom:4px;cursor:pointer;" title="Llevar ERA al panel central">
-                        <span style="font-size:12px;font-weight:900;color:#00d4ff;">🔄 ERA</span>
+                    </div><div onclick="seleccionarMoneda('PIEVERSEUSDT')" style="display:flex;align-items:center;justify-content:space-between;padding:5px 8px;border-radius:7px;background:rgba(0,212,255,0.08);border-left:3px solid #00d4ff;margin-bottom:4px;cursor:pointer;" title="Llevar PIEVERSE al panel central">
+                        <span style="font-size:12px;font-weight:900;color:#00d4ff;">🔄 PIEVERSE</span>
                         <span style="font-size:10px;color:#00d4ff;font-weight:700;">REBOTE +?%</span>
-                    </div><div onclick="seleccionarMoneda('MERLUSDT')" style="display:flex;align-items:center;justify-content:space-between;padding:5px 8px;border-radius:7px;background:rgba(0,212,255,0.08);border-left:3px solid #00d4ff;margin-bottom:4px;cursor:pointer;" title="Llevar MERL al panel central">
-                        <span style="font-size:12px;font-weight:900;color:#00d4ff;">🔄 MERL</span>
-                        <span style="font-size:10px;color:#00d4ff;font-weight:700;">REBOTE +?%</span>
-                    </div><div onclick="seleccionarMoneda('LAUSDT')" style="display:flex;align-items:center;justify-content:space-between;padding:5px 8px;border-radius:7px;background:rgba(0,212,255,0.08);border-left:3px solid #00d4ff;margin-bottom:4px;cursor:pointer;" title="Llevar LA al panel central">
-                        <span style="font-size:12px;font-weight:900;color:#00d4ff;">🔄 LA</span>
+                    </div><div onclick="seleccionarMoneda('AMZNUSDT')" style="display:flex;align-items:center;justify-content:space-between;padding:5px 8px;border-radius:7px;background:rgba(0,212,255,0.08);border-left:3px solid #00d4ff;margin-bottom:4px;cursor:pointer;" title="Llevar AMZN al panel central">
+                        <span style="font-size:12px;font-weight:900;color:#00d4ff;">🔄 AMZN</span>
                         <span style="font-size:10px;color:#00d4ff;font-weight:700;">REBOTE +?%</span>
                     </div><div onclick="seleccionarMoneda('ACEUSDT')" style="display:flex;align-items:center;justify-content:space-between;padding:5px 8px;border-radius:7px;background:rgba(0,212,255,0.08);border-left:3px solid #00d4ff;margin-bottom:4px;cursor:pointer;" title="Llevar ACE al panel central">
                         <span style="font-size:12px;font-weight:900;color:#00d4ff;">🔄 ACE</span>
                         <span style="font-size:10px;color:#00d4ff;font-weight:700;">REBOTE +?%</span>
-                    </div><div onclick="seleccionarMoneda('BSBUSDT')" style="display:flex;align-items:center;justify-content:space-between;padding:5px 8px;border-radius:7px;background:rgba(0,212,255,0.08);border-left:3px solid #00d4ff;margin-bottom:4px;cursor:pointer;" title="Llevar BSB al panel central">
-                        <span style="font-size:12px;font-weight:900;color:#00d4ff;">🔄 BSB</span>
+                    </div><div onclick="seleccionarMoneda('USUSDT')" style="display:flex;align-items:center;justify-content:space-between;padding:5px 8px;border-radius:7px;background:rgba(0,212,255,0.08);border-left:3px solid #00d4ff;margin-bottom:4px;cursor:pointer;" title="Llevar US al panel central">
+                        <span style="font-size:12px;font-weight:900;color:#00d4ff;">🔄 US</span>
                         <span style="font-size:10px;color:#00d4ff;font-weight:700;">REBOTE +?%</span>
-                    </div><div onclick="seleccionarMoneda('ARXUSDT')" style="display:flex;align-items:center;justify-content:space-between;padding:5px 8px;border-radius:7px;background:rgba(0,212,255,0.08);border-left:3px solid #00d4ff;margin-bottom:4px;cursor:pointer;" title="Llevar ARX al panel central">
-                        <span style="font-size:12px;font-weight:900;color:#00d4ff;">🔄 ARX</span>
+                    </div><div onclick="seleccionarMoneda('FLUIDUSDT')" style="display:flex;align-items:center;justify-content:space-between;padding:5px 8px;border-radius:7px;background:rgba(0,212,255,0.08);border-left:3px solid #00d4ff;margin-bottom:4px;cursor:pointer;" title="Llevar FLUID al panel central">
+                        <span style="font-size:12px;font-weight:900;color:#00d4ff;">🔄 FLUID</span>
                         <span style="font-size:10px;color:#00d4ff;font-weight:700;">REBOTE +?%</span>
-                    </div><div onclick="seleccionarMoneda('EPICUSDT')" style="display:flex;align-items:center;justify-content:space-between;padding:5px 8px;border-radius:7px;background:rgba(0,212,255,0.08);border-left:3px solid #00d4ff;margin-bottom:4px;cursor:pointer;" title="Llevar EPIC al panel central">
-                        <span style="font-size:12px;font-weight:900;color:#00d4ff;">🔄 EPIC</span>
+                    </div><div onclick="seleccionarMoneda('SPORTFUNUSDT')" style="display:flex;align-items:center;justify-content:space-between;padding:5px 8px;border-radius:7px;background:rgba(0,212,255,0.08);border-left:3px solid #00d4ff;margin-bottom:4px;cursor:pointer;" title="Llevar SPORTFUN al panel central">
+                        <span style="font-size:12px;font-weight:900;color:#00d4ff;">🔄 SPORTFUN</span>
                         <span style="font-size:10px;color:#00d4ff;font-weight:700;">REBOTE +?%</span>
-                    </div><div onclick="seleccionarMoneda('龙虾USDT')" style="display:flex;align-items:center;justify-content:space-between;padding:5px 8px;border-radius:7px;background:rgba(0,212,255,0.08);border-left:3px solid #00d4ff;margin-bottom:4px;cursor:pointer;" title="Llevar 龙虾 al panel central">
-                        <span style="font-size:12px;font-weight:900;color:#00d4ff;">🔄 龙虾</span>
+                    </div><div onclick="seleccionarMoneda('COTIUSDT')" style="display:flex;align-items:center;justify-content:space-between;padding:5px 8px;border-radius:7px;background:rgba(0,212,255,0.08);border-left:3px solid #00d4ff;margin-bottom:4px;cursor:pointer;" title="Llevar COTI al panel central">
+                        <span style="font-size:12px;font-weight:900;color:#00d4ff;">🔄 COTI</span>
                         <span style="font-size:10px;color:#00d4ff;font-weight:700;">REBOTE +?%</span>
-                    </div><div onclick="seleccionarMoneda('ZROUSDT')" style="display:flex;align-items:center;justify-content:space-between;padding:5px 8px;border-radius:7px;background:rgba(0,212,255,0.08);border-left:3px solid #00d4ff;margin-bottom:4px;cursor:pointer;" title="Llevar ZRO al panel central">
-                        <span style="font-size:12px;font-weight:900;color:#00d4ff;">🔄 ZRO</span>
-                        <span style="font-size:10px;color:#00d4ff;font-weight:700;">REBOTE +?%</span>
-                    </div><div onclick="seleccionarMoneda('DATAIPUSDT')" style="display:flex;align-items:center;justify-content:space-between;padding:5px 8px;border-radius:7px;background:rgba(0,212,255,0.08);border-left:3px solid #00d4ff;margin-bottom:4px;cursor:pointer;" title="Llevar DATAIP al panel central">
-                        <span style="font-size:12px;font-weight:900;color:#00d4ff;">🔄 DATAIP</span>
-                        <span style="font-size:10px;color:#00d4ff;font-weight:700;">REBOTE +0.0%</span>
                     </div><div onclick="seleccionarMoneda('INXUSDT')" style="display:flex;align-items:center;justify-content:space-between;padding:5px 8px;border-radius:7px;background:rgba(0,212,255,0.08);border-left:3px solid #00d4ff;margin-bottom:4px;cursor:pointer;" title="Llevar INX al panel central">
                         <span style="font-size:12px;font-weight:900;color:#00d4ff;">🔄 INX</span>
+                        <span style="font-size:10px;color:#00d4ff;font-weight:700;">REBOTE +?%</span>
+                    </div><div onclick="seleccionarMoneda('PUMPBTCUSDT')" style="display:flex;align-items:center;justify-content:space-between;padding:5px 8px;border-radius:7px;background:rgba(0,212,255,0.08);border-left:3px solid #00d4ff;margin-bottom:4px;cursor:pointer;" title="Llevar PUMPBTC al panel central">
+                        <span style="font-size:12px;font-weight:900;color:#00d4ff;">🔄 PUMPBTC</span>
+                        <span style="font-size:10px;color:#00d4ff;font-weight:700;">REBOTE +?%</span>
+                    </div><div onclick="seleccionarMoneda('MOVRUSDT')" style="display:flex;align-items:center;justify-content:space-between;padding:5px 8px;border-radius:7px;background:rgba(0,212,255,0.08);border-left:3px solid #00d4ff;margin-bottom:4px;cursor:pointer;" title="Llevar MOVR al panel central">
+                        <span style="font-size:12px;font-weight:900;color:#00d4ff;">🔄 MOVR</span>
+                        <span style="font-size:10px;color:#00d4ff;font-weight:700;">REBOTE +?%</span>
+                    </div><div onclick="seleccionarMoneda('GRVTUSDT')" style="display:flex;align-items:center;justify-content:space-between;padding:5px 8px;border-radius:7px;background:rgba(0,212,255,0.08);border-left:3px solid #00d4ff;margin-bottom:4px;cursor:pointer;" title="Llevar GRVT al panel central">
+                        <span style="font-size:12px;font-weight:900;color:#00d4ff;">🔄 GRVT</span>
+                        <span style="font-size:10px;color:#00d4ff;font-weight:700;">REBOTE +?%</span>
+                    </div><div onclick="seleccionarMoneda('BLUAIUSDT')" style="display:flex;align-items:center;justify-content:space-between;padding:5px 8px;border-radius:7px;background:rgba(0,212,255,0.08);border-left:3px solid #00d4ff;margin-bottom:4px;cursor:pointer;" title="Llevar BLUAI al panel central">
+                        <span style="font-size:12px;font-weight:900;color:#00d4ff;">🔄 BLUAI</span>
                         <span style="font-size:10px;color:#00d4ff;font-weight:700;">REBOTE +?%</span>
                     </div><div onclick="seleccionarMoneda('KAITOUSDT')" style="display:flex;align-items:center;justify-content:space-between;padding:5px 8px;border-radius:7px;background:rgba(0,212,255,0.08);border-left:3px solid #00d4ff;margin-bottom:4px;cursor:pointer;" title="Llevar KAITO al panel central">
                         <span style="font-size:12px;font-weight:900;color:#00d4ff;">🔄 KAITO</span>
                         <span style="font-size:10px;color:#00d4ff;font-weight:700;">REBOTE +?%</span>
+                    </div><div onclick="seleccionarMoneda('SOLVUSDT')" style="display:flex;align-items:center;justify-content:space-between;padding:5px 8px;border-radius:7px;background:rgba(0,212,255,0.08);border-left:3px solid #00d4ff;margin-bottom:4px;cursor:pointer;" title="Llevar SOLV al panel central">
+                        <span style="font-size:12px;font-weight:900;color:#00d4ff;">🔄 SOLV</span>
+                        <span style="font-size:10px;color:#00d4ff;font-weight:700;">REBOTE +?%</span>
+                    </div><div onclick="seleccionarMoneda('BABAUSDT')" style="display:flex;align-items:center;justify-content:space-between;padding:5px 8px;border-radius:7px;background:rgba(0,212,255,0.08);border-left:3px solid #00d4ff;margin-bottom:4px;cursor:pointer;" title="Llevar BABA al panel central">
+                        <span style="font-size:12px;font-weight:900;color:#00d4ff;">🔄 BABA</span>
+                        <span style="font-size:10px;color:#00d4ff;font-weight:700;">REBOTE +?%</span>
                     </div><div onclick="seleccionarMoneda('DOSUSDT')" style="display:flex;align-items:center;justify-content:space-between;padding:5px 8px;border-radius:7px;background:rgba(0,212,255,0.08);border-left:3px solid #00d4ff;margin-bottom:4px;cursor:pointer;" title="Llevar DOS al panel central">
                         <span style="font-size:12px;font-weight:900;color:#00d4ff;">🔄 DOS</span>
                         <span style="font-size:10px;color:#00d4ff;font-weight:700;">REBOTE +?%</span>
-                    </div><div onclick="seleccionarMoneda('MMTUSDT')" style="display:flex;align-items:center;justify-content:space-between;padding:5px 8px;border-radius:7px;background:rgba(0,212,255,0.08);border-left:3px solid #00d4ff;margin-bottom:4px;cursor:pointer;" title="Llevar MMT al panel central">
-                        <span style="font-size:12px;font-weight:900;color:#00d4ff;">🔄 MMT</span>
+                    </div><div onclick="seleccionarMoneda('GLMUSDT')" style="display:flex;align-items:center;justify-content:space-between;padding:5px 8px;border-radius:7px;background:rgba(0,212,255,0.08);border-left:3px solid #00d4ff;margin-bottom:4px;cursor:pointer;" title="Llevar GLM al panel central">
+                        <span style="font-size:12px;font-weight:900;color:#00d4ff;">🔄 GLM</span>
                         <span style="font-size:10px;color:#00d4ff;font-weight:700;">REBOTE +?%</span>
-                    </div><div onclick="seleccionarMoneda('BARDUSDT')" style="display:flex;align-items:center;justify-content:space-between;padding:5px 8px;border-radius:7px;background:rgba(0,212,255,0.08);border-left:3px solid #00d4ff;margin-bottom:4px;cursor:pointer;" title="Llevar BARD al panel central">
-                        <span style="font-size:12px;font-weight:900;color:#00d4ff;">🔄 BARD</span>
+                    </div><div onclick="seleccionarMoneda('TENCENTUSDT')" style="display:flex;align-items:center;justify-content:space-between;padding:5px 8px;border-radius:7px;background:rgba(0,212,255,0.08);border-left:3px solid #00d4ff;margin-bottom:4px;cursor:pointer;" title="Llevar TENCENT al panel central">
+                        <span style="font-size:12px;font-weight:900;color:#00d4ff;">🔄 TENCENT</span>
                         <span style="font-size:10px;color:#00d4ff;font-weight:700;">REBOTE +?%</span>
-                    </div><div onclick="seleccionarMoneda('1000RATSUSDT')" style="display:flex;align-items:center;justify-content:space-between;padding:5px 8px;border-radius:7px;background:rgba(0,212,255,0.08);border-left:3px solid #00d4ff;margin-bottom:4px;cursor:pointer;" title="Llevar 1000RATS al panel central">
-                        <span style="font-size:12px;font-weight:900;color:#00d4ff;">🔄 1000RATS</span>
-                        <span style="font-size:10px;color:#00d4ff;font-weight:700;">REBOTE +0.3%</span>
-                    </div><div onclick="seleccionarMoneda('BRUSDT')" style="display:flex;align-items:center;justify-content:space-between;padding:5px 8px;border-radius:7px;background:rgba(0,212,255,0.08);border-left:3px solid #00d4ff;margin-bottom:4px;cursor:pointer;" title="Llevar BR al panel central">
-                        <span style="font-size:12px;font-weight:900;color:#00d4ff;">🔄 BR</span>
-                        <span style="font-size:10px;color:#00d4ff;font-weight:700;">REBOTE +?%</span>
-                    </div><div onclick="seleccionarMoneda('THEUSDT')" style="display:flex;align-items:center;justify-content:space-between;padding:5px 8px;border-radius:7px;background:rgba(0,212,255,0.08);border-left:3px solid #00d4ff;margin-bottom:4px;cursor:pointer;" title="Llevar THE al panel central">
-                        <span style="font-size:12px;font-weight:900;color:#00d4ff;">🔄 THE</span>
-                        <span style="font-size:10px;color:#00d4ff;font-weight:700;">REBOTE +?%</span>
-                    </div><div onclick="seleccionarMoneda('IDUSDT')" style="display:flex;align-items:center;justify-content:space-between;padding:5px 8px;border-radius:7px;background:rgba(0,212,255,0.08);border-left:3px solid #00d4ff;margin-bottom:4px;cursor:pointer;" title="Llevar ID al panel central">
-                        <span style="font-size:12px;font-weight:900;color:#00d4ff;">🔄 ID</span>
-                        <span style="font-size:10px;color:#00d4ff;font-weight:700;">REBOTE +?%</span>
-                    </div><div onclick="seleccionarMoneda('PARTIUSDT')" style="display:flex;align-items:center;justify-content:space-between;padding:5px 8px;border-radius:7px;background:rgba(0,212,255,0.08);border-left:3px solid #00d4ff;margin-bottom:4px;cursor:pointer;" title="Llevar PARTI al panel central">
-                        <span style="font-size:12px;font-weight:900;color:#00d4ff;">🔄 PARTI</span>
-                        <span style="font-size:10px;color:#00d4ff;font-weight:700;">REBOTE +?%</span>
-                    </div><div onclick="seleccionarMoneda('BSVUSDT')" style="display:flex;align-items:center;justify-content:space-between;padding:5px 8px;border-radius:7px;background:rgba(0,212,255,0.08);border-left:3px solid #00d4ff;margin-bottom:4px;cursor:pointer;" title="Llevar BSV al panel central">
-                        <span style="font-size:12px;font-weight:900;color:#00d4ff;">🔄 BSV</span>
-                        <span style="font-size:10px;color:#00d4ff;font-weight:700;">REBOTE +?%</span>
-                    </div><div onclick="seleccionarMoneda('SANTOSUSDT')" style="display:flex;align-items:center;justify-content:space-between;padding:5px 8px;border-radius:7px;background:rgba(0,212,255,0.08);border-left:3px solid #00d4ff;margin-bottom:4px;cursor:pointer;" title="Llevar SANTOS al panel central">
-                        <span style="font-size:12px;font-weight:900;color:#00d4ff;">🔄 SANTOS</span>
-                        <span style="font-size:10px;color:#00d4ff;font-weight:700;">REBOTE +0.2%</span>
-                    </div><div onclick="seleccionarMoneda('MOVRUSDT')" style="display:flex;align-items:center;justify-content:space-between;padding:5px 8px;border-radius:7px;background:rgba(0,212,255,0.08);border-left:3px solid #00d4ff;margin-bottom:4px;cursor:pointer;" title="Llevar MOVR al panel central">
-                        <span style="font-size:12px;font-weight:900;color:#00d4ff;">🔄 MOVR</span>
-                        <span style="font-size:10px;color:#00d4ff;font-weight:700;">REBOTE +2.0%</span>
-                    </div><div onclick="seleccionarMoneda('MITOUSDT')" style="display:flex;align-items:center;justify-content:space-between;padding:5px 8px;border-radius:7px;background:rgba(0,212,255,0.08);border-left:3px solid #00d4ff;margin-bottom:4px;cursor:pointer;" title="Llevar MITO al panel central">
-                        <span style="font-size:12px;font-weight:900;color:#00d4ff;">🔄 MITO</span>
-                        <span style="font-size:10px;color:#00d4ff;font-weight:700;">REBOTE +?%</span>
-                    </div><div onclick="seleccionarMoneda('PROMPTUSDT')" style="display:flex;align-items:center;justify-content:space-between;padding:5px 8px;border-radius:7px;background:rgba(0,212,255,0.08);border-left:3px solid #00d4ff;margin-bottom:4px;cursor:pointer;" title="Llevar PROMPT al panel central">
-                        <span style="font-size:12px;font-weight:900;color:#00d4ff;">🔄 PROMPT</span>
-                        <span style="font-size:10px;color:#00d4ff;font-weight:700;">REBOTE +?%</span>
-                    </div><div onclick="seleccionarMoneda('GOOGLUSDT')" style="display:flex;align-items:center;justify-content:space-between;padding:5px 8px;border-radius:7px;background:rgba(0,212,255,0.08);border-left:3px solid #00d4ff;margin-bottom:4px;cursor:pointer;" title="Llevar GOOGL al panel central">
-                        <span style="font-size:12px;font-weight:900;color:#00d4ff;">🔄 GOOGL</span>
-                        <span style="font-size:10px;color:#00d4ff;font-weight:700;">REBOTE +?%</span>
-                    </div><div onclick="seleccionarMoneda('TLMUSDT')" style="display:flex;align-items:center;justify-content:space-between;padding:5px 8px;border-radius:7px;background:rgba(0,212,255,0.08);border-left:3px solid #00d4ff;margin-bottom:4px;cursor:pointer;" title="Llevar TLM al panel central">
-                        <span style="font-size:12px;font-weight:900;color:#00d4ff;">🔄 TLM</span>
-                        <span style="font-size:10px;color:#00d4ff;font-weight:700;">REBOTE +?%</span>
-                    </div><div onclick="seleccionarMoneda('PIXELUSDT')" style="display:flex;align-items:center;justify-content:space-between;padding:5px 8px;border-radius:7px;background:rgba(0,212,255,0.08);border-left:3px solid #00d4ff;margin-bottom:4px;cursor:pointer;" title="Llevar PIXEL al panel central">
-                        <span style="font-size:12px;font-weight:900;color:#00d4ff;">🔄 PIXEL</span>
-                        <span style="font-size:10px;color:#00d4ff;font-weight:700;">REBOTE +?%</span>
-                    </div><div onclick="seleccionarMoneda('SOXSUSDT')" style="display:flex;align-items:center;justify-content:space-between;padding:5px 8px;border-radius:7px;background:rgba(0,212,255,0.08);border-left:3px solid #00d4ff;margin-bottom:4px;cursor:pointer;" title="Llevar SOXS al panel central">
-                        <span style="font-size:12px;font-weight:900;color:#00d4ff;">🔄 SOXS</span>
-                        <span style="font-size:10px;color:#00d4ff;font-weight:700;">REBOTE +?%</span>
-                    </div><div onclick="seleccionarMoneda('HUMAUSDT')" style="display:flex;align-items:center;justify-content:space-between;padding:5px 8px;border-radius:7px;background:rgba(0,212,255,0.08);border-left:3px solid #00d4ff;margin-bottom:4px;cursor:pointer;" title="Llevar HUMA al panel central">
-                        <span style="font-size:12px;font-weight:900;color:#00d4ff;">🔄 HUMA</span>
-                        <span style="font-size:10px;color:#00d4ff;font-weight:700;">REBOTE +?%</span>
-                    </div><div onclick="seleccionarMoneda('ARPAUSDT')" style="display:flex;align-items:center;justify-content:space-between;padding:5px 8px;border-radius:7px;background:rgba(0,212,255,0.08);border-left:3px solid #00d4ff;margin-bottom:4px;cursor:pointer;" title="Llevar ARPA al panel central">
-                        <span style="font-size:12px;font-weight:900;color:#00d4ff;">🔄 ARPA</span>
-                        <span style="font-size:10px;color:#00d4ff;font-weight:700;">REBOTE +?%</span>
-                    </div><div onclick="seleccionarMoneda('PLAYUSDT')" style="display:flex;align-items:center;justify-content:space-between;padding:5px 8px;border-radius:7px;background:rgba(0,212,255,0.08);border-left:3px solid #00d4ff;margin-bottom:4px;cursor:pointer;" title="Llevar PLAY al panel central">
-                        <span style="font-size:12px;font-weight:900;color:#00d4ff;">🔄 PLAY</span>
-                        <span style="font-size:10px;color:#00d4ff;font-weight:700;">REBOTE +?%</span>
-                    </div><div onclick="seleccionarMoneda('NFLXUSDT')" style="display:flex;align-items:center;justify-content:space-between;padding:5px 8px;border-radius:7px;background:rgba(0,212,255,0.08);border-left:3px solid #00d4ff;margin-bottom:4px;cursor:pointer;" title="Llevar NFLX al panel central">
-                        <span style="font-size:12px;font-weight:900;color:#00d4ff;">🔄 NFLX</span>
-                        <span style="font-size:10px;color:#00d4ff;font-weight:700;">REBOTE +?%</span>
-                    </div><div onclick="seleccionarMoneda('MUBARAKUSDT')" style="display:flex;align-items:center;justify-content:space-between;padding:5px 8px;border-radius:7px;background:rgba(0,212,255,0.08);border-left:3px solid #00d4ff;margin-bottom:4px;cursor:pointer;" title="Llevar MUBARAK al panel central">
-                        <span style="font-size:12px;font-weight:900;color:#00d4ff;">🔄 MUBARAK</span>
-                        <span style="font-size:10px;color:#00d4ff;font-weight:700;">REBOTE +?%</span>
-                    </div><div onclick="seleccionarMoneda('WAXPUSDT')" style="display:flex;align-items:center;justify-content:space-between;padding:5px 8px;border-radius:7px;background:rgba(0,212,255,0.08);border-left:3px solid #00d4ff;margin-bottom:4px;cursor:pointer;" title="Llevar WAXP al panel central">
-                        <span style="font-size:12px;font-weight:900;color:#00d4ff;">🔄 WAXP</span>
-                        <span style="font-size:10px;color:#00d4ff;font-weight:700;">REBOTE +?%</span>
-                    </div><div onclick="seleccionarMoneda('ICNTUSDT')" style="display:flex;align-items:center;justify-content:space-between;padding:5px 8px;border-radius:7px;background:rgba(0,212,255,0.08);border-left:3px solid #00d4ff;margin-bottom:4px;cursor:pointer;" title="Llevar ICNT al panel central">
-                        <span style="font-size:12px;font-weight:900;color:#00d4ff;">🔄 ICNT</span>
-                        <span style="font-size:10px;color:#00d4ff;font-weight:700;">REBOTE +?%</span>
-                    </div><div onclick="seleccionarMoneda('PHAUSDT')" style="display:flex;align-items:center;justify-content:space-between;padding:5px 8px;border-radius:7px;background:rgba(0,212,255,0.08);border-left:3px solid #00d4ff;margin-bottom:4px;cursor:pointer;" title="Llevar PHA al panel central">
-                        <span style="font-size:12px;font-weight:900;color:#00d4ff;">🔄 PHA</span>
-                        <span style="font-size:10px;color:#00d4ff;font-weight:700;">REBOTE +?%</span>
-                    </div><div onclick="seleccionarMoneda('DOLOUSDT')" style="display:flex;align-items:center;justify-content:space-between;padding:5px 8px;border-radius:7px;background:rgba(0,212,255,0.08);border-left:3px solid #00d4ff;margin-bottom:4px;cursor:pointer;" title="Llevar DOLO al panel central">
-                        <span style="font-size:12px;font-weight:900;color:#00d4ff;">🔄 DOLO</span>
-                        <span style="font-size:10px;color:#00d4ff;font-weight:700;">REBOTE +?%</span>
-                    </div><div onclick="seleccionarMoneda('GALAUSDT')" style="display:flex;align-items:center;justify-content:space-between;padding:5px 8px;border-radius:7px;background:rgba(0,212,255,0.08);border-left:3px solid #00d4ff;margin-bottom:4px;cursor:pointer;" title="Llevar GALA al panel central">
-                        <span style="font-size:12px;font-weight:900;color:#00d4ff;">🔄 GALA</span>
-                        <span style="font-size:10px;color:#00d4ff;font-weight:700;">REBOTE +0.9%</span>
-                    </div><div onclick="seleccionarMoneda('VANAUSDT')" style="display:flex;align-items:center;justify-content:space-between;padding:5px 8px;border-radius:7px;background:rgba(0,212,255,0.08);border-left:3px solid #00d4ff;margin-bottom:4px;cursor:pointer;" title="Llevar VANA al panel central">
-                        <span style="font-size:12px;font-weight:900;color:#00d4ff;">🔄 VANA</span>
-                        <span style="font-size:10px;color:#00d4ff;font-weight:700;">REBOTE +?%</span>
-                    </div><div onclick="seleccionarMoneda('BIGTIMEUSDT')" style="display:flex;align-items:center;justify-content:space-between;padding:5px 8px;border-radius:7px;background:rgba(0,212,255,0.08);border-left:3px solid #00d4ff;margin-bottom:4px;cursor:pointer;" title="Llevar BIGTIME al panel central">
-                        <span style="font-size:12px;font-weight:900;color:#00d4ff;">🔄 BIGTIME</span>
-                        <span style="font-size:10px;color:#00d4ff;font-weight:700;">REBOTE +?%</span>
-                    </div><div onclick="seleccionarMoneda('AIOUSDT')" style="display:flex;align-items:center;justify-content:space-between;padding:5px 8px;border-radius:7px;background:rgba(0,212,255,0.08);border-left:3px solid #00d4ff;margin-bottom:4px;cursor:pointer;" title="Llevar AIO al panel central">
-                        <span style="font-size:12px;font-weight:900;color:#00d4ff;">🔄 AIO</span>
-                        <span style="font-size:10px;color:#00d4ff;font-weight:700;">REBOTE +?%</span>
-                    </div><div onclick="seleccionarMoneda('QTUMUSDT')" style="display:flex;align-items:center;justify-content:space-between;padding:5px 8px;border-radius:7px;background:rgba(0,212,255,0.08);border-left:3px solid #00d4ff;margin-bottom:4px;cursor:pointer;" title="Llevar QTUM al panel central">
-                        <span style="font-size:12px;font-weight:900;color:#00d4ff;">🔄 QTUM</span>
-                        <span style="font-size:10px;color:#00d4ff;font-weight:700;">REBOTE +?%</span>
-                    </div><div onclick="seleccionarMoneda('TAKEUSDT')" style="display:flex;align-items:center;justify-content:space-between;padding:5px 8px;border-radius:7px;background:rgba(0,212,255,0.08);border-left:3px solid #00d4ff;margin-bottom:4px;cursor:pointer;" title="Llevar TAKE al panel central">
-                        <span style="font-size:12px;font-weight:900;color:#00d4ff;">🔄 TAKE</span>
-                        <span style="font-size:10px;color:#00d4ff;font-weight:700;">REBOTE +?%</span>
-                    </div><div onclick="seleccionarMoneda('THETAUSDT')" style="display:flex;align-items:center;justify-content:space-between;padding:5px 8px;border-radius:7px;background:rgba(0,212,255,0.08);border-left:3px solid #00d4ff;margin-bottom:4px;cursor:pointer;" title="Llevar THETA al panel central">
-                        <span style="font-size:12px;font-weight:900;color:#00d4ff;">🔄 THETA</span>
-                        <span style="font-size:10px;color:#00d4ff;font-weight:700;">REBOTE +?%</span>
-                    </div><div onclick="seleccionarMoneda('SPCXUSDT')" style="display:flex;align-items:center;justify-content:space-between;padding:5px 8px;border-radius:7px;background:rgba(0,212,255,0.08);border-left:3px solid #00d4ff;margin-bottom:4px;cursor:pointer;" title="Llevar SPCX al panel central">
-                        <span style="font-size:12px;font-weight:900;color:#00d4ff;">🔄 SPCX</span>
+                    </div><div onclick="seleccionarMoneda('PLTRUSDT')" style="display:flex;align-items:center;justify-content:space-between;padding:5px 8px;border-radius:7px;background:rgba(0,212,255,0.08);border-left:3px solid #00d4ff;margin-bottom:4px;cursor:pointer;" title="Llevar PLTR al panel central">
+                        <span style="font-size:12px;font-weight:900;color:#00d4ff;">🔄 PLTR</span>
                         <span style="font-size:10px;color:#00d4ff;font-weight:700;">REBOTE +?%</span>
                     </div><div onclick="seleccionarMoneda('XANUSDT')" style="display:flex;align-items:center;justify-content:space-between;padding:5px 8px;border-radius:7px;background:rgba(0,212,255,0.08);border-left:3px solid #00d4ff;margin-bottom:4px;cursor:pointer;" title="Llevar XAN al panel central">
                         <span style="font-size:12px;font-weight:900;color:#00d4ff;">🔄 XAN</span>
                         <span style="font-size:10px;color:#00d4ff;font-weight:700;">REBOTE +?%</span>
+                    </div><div onclick="seleccionarMoneda('VTHOUSDT')" style="display:flex;align-items:center;justify-content:space-between;padding:5px 8px;border-radius:7px;background:rgba(0,212,255,0.08);border-left:3px solid #00d4ff;margin-bottom:4px;cursor:pointer;" title="Llevar VTHO al panel central">
+                        <span style="font-size:12px;font-weight:900;color:#00d4ff;">🔄 VTHO</span>
+                        <span style="font-size:10px;color:#00d4ff;font-weight:700;">REBOTE +?%</span>
+                    </div><div onclick="seleccionarMoneda('币安人生USDT')" style="display:flex;align-items:center;justify-content:space-between;padding:5px 8px;border-radius:7px;background:rgba(0,212,255,0.08);border-left:3px solid #00d4ff;margin-bottom:4px;cursor:pointer;" title="Llevar 币安人生 al panel central">
+                        <span style="font-size:12px;font-weight:900;color:#00d4ff;">🔄 币安人生</span>
+                        <span style="font-size:10px;color:#00d4ff;font-weight:700;">REBOTE +?%</span>
+                    </div><div onclick="seleccionarMoneda('RESOLVUSDT')" style="display:flex;align-items:center;justify-content:space-between;padding:5px 8px;border-radius:7px;background:rgba(0,212,255,0.08);border-left:3px solid #00d4ff;margin-bottom:4px;cursor:pointer;" title="Llevar RESOLV al panel central">
+                        <span style="font-size:12px;font-weight:900;color:#00d4ff;">🔄 RESOLV</span>
+                        <span style="font-size:10px;color:#00d4ff;font-weight:700;">REBOTE +?%</span>
+                    </div><div onclick="seleccionarMoneda('CYSUSDT')" style="display:flex;align-items:center;justify-content:space-between;padding:5px 8px;border-radius:7px;background:rgba(0,212,255,0.08);border-left:3px solid #00d4ff;margin-bottom:4px;cursor:pointer;" title="Llevar CYS al panel central">
+                        <span style="font-size:12px;font-weight:900;color:#00d4ff;">🔄 CYS</span>
+                        <span style="font-size:10px;color:#00d4ff;font-weight:700;">REBOTE +?%</span>
                     </div><div onclick="seleccionarMoneda('SAGAUSDT')" style="display:flex;align-items:center;justify-content:space-between;padding:5px 8px;border-radius:7px;background:rgba(0,212,255,0.08);border-left:3px solid #00d4ff;margin-bottom:4px;cursor:pointer;" title="Llevar SAGA al panel central">
                         <span style="font-size:12px;font-weight:900;color:#00d4ff;">🔄 SAGA</span>
                         <span style="font-size:10px;color:#00d4ff;font-weight:700;">REBOTE +?%</span>
-                    </div><div onclick="seleccionarMoneda('BROCCOLI714USDT')" style="display:flex;align-items:center;justify-content:space-between;padding:5px 8px;border-radius:7px;background:rgba(0,212,255,0.08);border-left:3px solid #00d4ff;margin-bottom:4px;cursor:pointer;" title="Llevar BROCCOLI714 al panel central">
-                        <span style="font-size:12px;font-weight:900;color:#00d4ff;">🔄 BROCCOLI714</span>
+                    </div><div onclick="seleccionarMoneda('ACUUSDT')" style="display:flex;align-items:center;justify-content:space-between;padding:5px 8px;border-radius:7px;background:rgba(0,212,255,0.08);border-left:3px solid #00d4ff;margin-bottom:4px;cursor:pointer;" title="Llevar ACU al panel central">
+                        <span style="font-size:12px;font-weight:900;color:#00d4ff;">🔄 ACU</span>
                         <span style="font-size:10px;color:#00d4ff;font-weight:700;">REBOTE +?%</span>
-                    </div><div onclick="seleccionarMoneda('DEEPUSDT')" style="display:flex;align-items:center;justify-content:space-between;padding:5px 8px;border-radius:7px;background:rgba(0,212,255,0.08);border-left:3px solid #00d4ff;margin-bottom:4px;cursor:pointer;" title="Llevar DEEP al panel central">
-                        <span style="font-size:12px;font-weight:900;color:#00d4ff;">🔄 DEEP</span>
+                    </div><div onclick="seleccionarMoneda('SIRENUSDT')" style="display:flex;align-items:center;justify-content:space-between;padding:5px 8px;border-radius:7px;background:rgba(0,212,255,0.08);border-left:3px solid #00d4ff;margin-bottom:4px;cursor:pointer;" title="Llevar SIREN al panel central">
+                        <span style="font-size:12px;font-weight:900;color:#00d4ff;">🔄 SIREN</span>
                         <span style="font-size:10px;color:#00d4ff;font-weight:700;">REBOTE +?%</span>
-                    </div><div onclick="seleccionarMoneda('4USDT')" style="display:flex;align-items:center;justify-content:space-between;padding:5px 8px;border-radius:7px;background:rgba(0,212,255,0.08);border-left:3px solid #00d4ff;margin-bottom:4px;cursor:pointer;" title="Llevar 4 al panel central">
-                        <span style="font-size:12px;font-weight:900;color:#00d4ff;">🔄 4</span>
+                    </div><div onclick="seleccionarMoneda('DOLOUSDT')" style="display:flex;align-items:center;justify-content:space-between;padding:5px 8px;border-radius:7px;background:rgba(0,212,255,0.08);border-left:3px solid #00d4ff;margin-bottom:4px;cursor:pointer;" title="Llevar DOLO al panel central">
+                        <span style="font-size:12px;font-weight:900;color:#00d4ff;">🔄 DOLO</span>
                         <span style="font-size:10px;color:#00d4ff;font-weight:700;">REBOTE +?%</span>
-                    </div><div onclick="seleccionarMoneda('OPNUSDT')" style="display:flex;align-items:center;justify-content:space-between;padding:5px 8px;border-radius:7px;background:rgba(0,212,255,0.08);border-left:3px solid #00d4ff;margin-bottom:4px;cursor:pointer;" title="Llevar OPN al panel central">
-                        <span style="font-size:12px;font-weight:900;color:#00d4ff;">🔄 OPN</span>
+                    </div><div onclick="seleccionarMoneda('HK1810USDT')" style="display:flex;align-items:center;justify-content:space-between;padding:5px 8px;border-radius:7px;background:rgba(0,212,255,0.08);border-left:3px solid #00d4ff;margin-bottom:4px;cursor:pointer;" title="Llevar HK1810 al panel central">
+                        <span style="font-size:12px;font-weight:900;color:#00d4ff;">🔄 HK1810</span>
                         <span style="font-size:10px;color:#00d4ff;font-weight:700;">REBOTE +?%</span>
-                    </div><div onclick="seleccionarMoneda('ONUSDT')" style="display:flex;align-items:center;justify-content:space-between;padding:5px 8px;border-radius:7px;background:rgba(0,212,255,0.08);border-left:3px solid #00d4ff;margin-bottom:4px;cursor:pointer;" title="Llevar ON al panel central">
-                        <span style="font-size:12px;font-weight:900;color:#00d4ff;">🔄 ON</span>
+                    </div><div onclick="seleccionarMoneda('OGNUSDT')" style="display:flex;align-items:center;justify-content:space-between;padding:5px 8px;border-radius:7px;background:rgba(0,212,255,0.08);border-left:3px solid #00d4ff;margin-bottom:4px;cursor:pointer;" title="Llevar OGN al panel central">
+                        <span style="font-size:12px;font-weight:900;color:#00d4ff;">🔄 OGN</span>
                         <span style="font-size:10px;color:#00d4ff;font-weight:700;">REBOTE +?%</span>
-                    </div><div onclick="seleccionarMoneda('BANKUSDT')" style="display:flex;align-items:center;justify-content:space-between;padding:5px 8px;border-radius:7px;background:rgba(0,212,255,0.08);border-left:3px solid #00d4ff;margin-bottom:4px;cursor:pointer;" title="Llevar BANK al panel central">
-                        <span style="font-size:12px;font-weight:900;color:#00d4ff;">🔄 BANK</span>
+                    </div><div onclick="seleccionarMoneda('AVGOUSDT')" style="display:flex;align-items:center;justify-content:space-between;padding:5px 8px;border-radius:7px;background:rgba(0,212,255,0.08);border-left:3px solid #00d4ff;margin-bottom:4px;cursor:pointer;" title="Llevar AVGO al panel central">
+                        <span style="font-size:12px;font-weight:900;color:#00d4ff;">🔄 AVGO</span>
                         <span style="font-size:10px;color:#00d4ff;font-weight:700;">REBOTE +?%</span>
-                    </div><div onclick="seleccionarMoneda('LYNUSDT')" style="display:flex;align-items:center;justify-content:space-between;padding:5px 8px;border-radius:7px;background:rgba(0,212,255,0.08);border-left:3px solid #00d4ff;margin-bottom:4px;cursor:pointer;" title="Llevar LYN al panel central">
-                        <span style="font-size:12px;font-weight:900;color:#00d4ff;">🔄 LYN</span>
+                    </div><div onclick="seleccionarMoneda('JUPUSDT')" style="display:flex;align-items:center;justify-content:space-between;padding:5px 8px;border-radius:7px;background:rgba(0,212,255,0.08);border-left:3px solid #00d4ff;margin-bottom:4px;cursor:pointer;" title="Llevar JUP al panel central">
+                        <span style="font-size:12px;font-weight:900;color:#00d4ff;">🔄 JUP</span>
+                        <span style="font-size:10px;color:#00d4ff;font-weight:700;">REBOTE +?%</span>
+                    </div><div onclick="seleccionarMoneda('GALAUSDT')" style="display:flex;align-items:center;justify-content:space-between;padding:5px 8px;border-radius:7px;background:rgba(0,212,255,0.08);border-left:3px solid #00d4ff;margin-bottom:4px;cursor:pointer;" title="Llevar GALA al panel central">
+                        <span style="font-size:12px;font-weight:900;color:#00d4ff;">🔄 GALA</span>
+                        <span style="font-size:10px;color:#00d4ff;font-weight:700;">REBOTE +?%</span>
+                    </div><div onclick="seleccionarMoneda('NEIROUSDT')" style="display:flex;align-items:center;justify-content:space-between;padding:5px 8px;border-radius:7px;background:rgba(0,212,255,0.08);border-left:3px solid #00d4ff;margin-bottom:4px;cursor:pointer;" title="Llevar NEIRO al panel central">
+                        <span style="font-size:12px;font-weight:900;color:#00d4ff;">🔄 NEIRO</span>
                         <span style="font-size:10px;color:#00d4ff;font-weight:700;">REBOTE +?%</span>
                     </div>
                 </div>
@@ -2445,11 +2307,11 @@
         <!-- Proyección dinámica -->
         <div style="background:#060b16; border:1px solid rgba(243,186,47,.25); border-radius:10px; padding:10px; margin-bottom:12px;">
             <div style="font-size:11px; font-weight:900; color:#f3ba2f; margin-bottom:8px; text-align:center;">🔮 PROYECCIÓN DINÁMICA DEL ALGORITMO</div>
-            <div style="font-size:11px; margin-bottom:4px;">🚀 Probabilidad Alcista: <b style="color:#0ecb81;">55%</b>
-                <div class="barra-contenedor"><div class="barra-progreso" style="width:55%; background:#0ecb81;"></div></div>
+            <div style="font-size:11px; margin-bottom:4px;">🚀 Probabilidad Alcista: <b style="color:#0ecb81;">NaN%</b>
+                <div class="barra-contenedor"><div class="barra-progreso" style="width:NaN%; background:#0ecb81;"></div></div>
             </div>
-            <div style="font-size:11px;">📉 Probabilidad Bajista: <b style="color:#ff2a3b;">45%</b>
-                <div class="barra-contenedor"><div class="barra-progreso" style="width:45%; background:#ff2a3b;"></div></div>
+            <div style="font-size:11px;">📉 Probabilidad Bajista: <b style="color:#ff2a3b;">NaN%</b>
+                <div class="barra-contenedor"><div class="barra-progreso" style="width:NaN%; background:#ff2a3b;"></div></div>
             </div>
             <div style="font-size:10px; color:#64748b; text-align:center; margin-top:8px; border-top:1px solid rgba(255,255,255,0.04); padding-top:6px;">
                 🧠 Auto-aprendizaje activo · recopilando señales...
@@ -2460,23 +2322,23 @@
         <div class="grid-indicators" style="grid-template-columns: 1fr 1fr 1fr;">
             <div class="indicator-box" style="text-align:center;">
                 <div class="indicator-label" style="justify-content:center;"><i class="fas fa-bolt"></i> IMPULSO 2M</div>
-                <div class="indicator-value" style="color:#ff2a3b;">-0.04%</div>
+                <div class="indicator-value" style="color:#ff2a3b;">-0.12%</div>
                 <div style="font-size:9px;font-weight:700;color:#64748b;">
                     ↔ LATERAL
                 </div>
                 <!-- mini barra impulso -->
                 <div style="height:4px;background:rgba(255,255,255,0.06);border-radius:4px;margin-top:5px;overflow:hidden;">
-                    <div style="height:100%;width:1.4442013129105262%;background:#ff2a3b;border-radius:4px;transition:width 0.3s;margin:0 0 0 auto;"></div>
+                    <div style="height:100%;width:4.042136207741139%;background:#ff2a3b;border-radius:4px;transition:width 0.3s;margin:0 0 0 auto;"></div>
                 </div>
             </div>
             <div class="indicator-box" style="text-align:center;">
                 <div class="indicator-label" style="justify-content:center;"><i class="fas fa-compress-alt"></i> DIST. AL MÁX</div>
-                <div class="indicator-value" style="color:#f3ba2f;">-0.7%</div>
+                <div class="indicator-value" style="color:#f3ba2f;">-1.9%</div>
                 <div style="font-size:9px;font-weight:700;color:#f3ba2f;">
                     ⚠️ CERCA MAX
                 </div>
                 <div style="height:4px;background:rgba(255,255,255,0.06);border-radius:4px;margin-top:5px;overflow:hidden;">
-                    <div style="height:100%;width:98.60869565217389%;background:#ff2a3b;border-radius:4px;"></div>
+                    <div style="height:100%;width:96.19826756496632%;background:#ff2a3b;border-radius:4px;"></div>
                 </div>
             </div>
             <div class="indicator-box" style="text-align:center;">
@@ -2493,17 +2355,17 @@
         <div class="grid-indicators" style="grid-template-columns: 1fr 1fr 1fr; margin-top:8px;">
             <div class="indicator-box" style="text-align:center;">
                 <div class="indicator-label" style="justify-content:center;"><i class="fas fa-chart-line"></i> SMA 20/50</div>
-                <div class="indicator-value" style="color:#0ecb81;">+2.04%</div>
-                <div style="font-size:9px; color:#0ecb81; font-weight:700; text-transform:uppercase;">SMA20 &gt; SMA50</div>
+                <div class="indicator-value" style="color:#ff2a3b;">-1.83%</div>
+                <div style="font-size:9px; color:#ff2a3b; font-weight:700; text-transform:uppercase;">SMA20 &lt; SMA50</div>
             </div>
             <div class="indicator-box" style="text-align:center;">
                 <div class="indicator-label" style="justify-content:center;"><i class="fas fa-compass"></i> DMI/ADX</div>
-                <div class="indicator-value" style="color:#0ecb81;">45</div>
-                <div style="font-size:9px; color:#0ecb81; font-weight:700; text-transform:uppercase;">TENDENCIA ALCISTA</div>
+                <div class="indicator-value" style="color:#64748b;">21</div>
+                <div style="font-size:9px; color:#64748b; font-weight:700; text-transform:uppercase;">MERCADO LATERAL</div>
             </div>
             <div class="indicator-box" style="text-align:center;">
                 <div class="indicator-label" style="justify-content:center;"><i class="fas fa-balance-scale"></i> VWAP 24H</div>
-                <div class="indicator-value" style="color:#0ecb81;">+8.99%</div>
+                <div class="indicator-value" style="color:#0ecb81;">+0.21%</div>
                 <div style="font-size:9px; color:#0ecb81; font-weight:700; text-transform:uppercase;">SOBRE VWAP</div>
             </div>
         </div>
@@ -2512,9 +2374,9 @@
 
         <!-- Botones -->
         <div style="display:grid; grid-template-columns:1fr 1fr 1fr; gap:8px; margin-top:15px;">
-            <a href="https://www.binance.com/es-LA/futures/APRUSDT" onclick="event.preventDefault(); abrirParEnBinance(selectedCoin);" target="_blank" class="btn binance" style="font-size:10px;"><i class="fas fa-chart-line"></i> WEB</a>
+            <a href="https://www.binance.com/es-LA/futures/BRETTUSDT" onclick="event.preventDefault(); abrirParEnBinance(selectedCoin);" target="_blank" class="btn binance" style="font-size:10px;"><i class="fas fa-chart-line"></i> WEB</a>
             <button onclick="abrirEnApp()" class="btn" style="font-size:10px;background:linear-gradient(135deg,#f3ba2f,#ff6b00);color:#000;font-weight:900;border:none;cursor:pointer;border-radius:8px;"><i class="fas fa-mobile-alt"></i> APP 📱</button>
-            <a href="https://wa.me/59177244375?text=Proyecto%20TecnoMan%20-%20Alerta%20Activa%20APRUSDT" target="_blank" class="btn ws" style="font-size:10px;"><i class="fab fa-whatsapp"></i> COMPARTIR</a>
+            <a href="https://wa.me/59177244375?text=Proyecto%20TecnoMan%20-%20Alerta%20Activa%20BRETTUSDT" target="_blank" class="btn ws" style="font-size:10px;"><i class="fab fa-whatsapp"></i> COMPARTIR</a>
         </div>
     </div>
         </div>
@@ -2548,7 +2410,7 @@
         </button>
         <button class="radar-tab" id="tabMotorAlcista" onclick="filtrarRadar('motorAlcista')" style="background:rgba(14,203,129,0.22);color:#0ecb81;border-color:rgba(14,203,129,0.6);position:relative;font-weight:900;">
             🚀 MOTOR ALCISTA (EMA)
-            <span style="position: absolute; top: -6px; right: -6px; background: rgb(14, 203, 129); color: rgb(0, 0, 0); font-size: 9px; font-weight: 900; padding: 1px 5px; border-radius: 8px; display: inline;" id="contMotorAlcista">5</span>
+            <span style="position: absolute; top: -6px; right: -6px; background: rgb(14, 203, 129); color: rgb(0, 0, 0); font-size: 9px; font-weight: 900; padding: 1px 5px; border-radius: 8px; display: inline;" id="contMotorAlcista">3</span>
         </button>
         <button class="radar-tab" id="tabCrashReversion" onclick="filtrarRadar('crashReversion')" style="background:rgba(168,85,247,0.22);color:#c084fc;border-color:rgba(168,85,247,0.6);position:relative;font-weight:900;">
             💎 REVERSIÓN EXTREMA
@@ -2560,11 +2422,11 @@
         </button>
         <button class="radar-tab" id="tabTecho" onclick="filtrarRadar('techo')" style="background:rgba(255,60,0,0.2);color:#ff3c00;border-color:rgba(255,60,0,0.4);position:relative;">
             🔴 EN MÁXIMO → CAE
-            <span style="position: absolute; top: -6px; right: -6px; background: rgb(255, 60, 0); color: rgb(255, 255, 255); font-size: 9px; font-weight: 900; padding: 1px 5px; border-radius: 8px; display: inline;" id="contTecho">70</span>
+            <span style="position: absolute; top: -6px; right: -6px; background: rgb(255, 60, 0); color: rgb(255, 255, 255); font-size: 9px; font-weight: 900; padding: 1px 5px; border-radius: 8px; display: inline;" id="contTecho">63</span>
         </button>
         <button class="radar-tab" id="tabMomentum" onclick="filtrarRadar('momentum')" style="background:rgba(255,165,0,0.15);color:#ffa500;border-color:transparent;position:relative;">
             ⭐ MOMENTUM ALTO
-            <span style="position: absolute; top: -6px; right: -6px; background: rgb(255, 165, 0); color: rgb(0, 0, 0); font-size: 9px; font-weight: 900; padding: 1px 5px; border-radius: 8px; display: inline;" id="contMomentum">1</span>
+            <span style="position: absolute; top: -6px; right: -6px; background: rgb(255, 165, 0); color: rgb(0, 0, 0); font-size: 9px; font-weight: 900; padding: 1px 5px; border-radius: 8px; display: none;" id="contMomentum">0</span>
         </button>
         <button class="radar-tab" id="tabBomba" onclick="filtrarRadar('bomba')" style="background:rgba(14,203,129,0.1);color:#0ecb81;border-color:transparent;">
             🚀 EXPLOTANDO
@@ -2590,7 +2452,7 @@
 <div id="floatingButtons" class="floating-buttons">
     <button id="simuladorBtn" class="float-btn float-sim" onclick="abrirSimulador()">🧪</button>
     <button id="emaRadarBtn" class="float-btn" onclick="abrirRadarDespegue()" style="background:#0ecb81; color:#fff; font-weight:900;">⚡</button>
-    <a id="linkBinance" class="float-btn float-binance" target="_blank" style="display: flex;" title="Abrir en web Binance" onclick="event.preventDefault(); abrirParEnBinance(selectedCoin || 'AAOIUSDT');" href="https://www.binance.com/es-LA/futures/APRUSDT"><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M3 17l5-6 4 4 4-6 5 7"></path></svg></a>
+    <a id="linkBinance" class="float-btn float-binance" target="_blank" style="display: flex;" title="Abrir en web Binance" onclick="event.preventDefault(); abrirParEnBinance(selectedCoin || 'AAOIUSDT');" href="https://www.binance.com/es-LA/futures/BRETTUSDT"><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M3 17l5-6 4 4 4-6 5 7"></path></svg></a>
     <button id="linkApp" class="float-btn" onclick="abrirEnApp()" style="display: flex; background: linear-gradient(135deg, rgb(243, 186, 47), rgb(255, 107, 0)); color: rgb(0, 0, 0); font-size: 13px; font-weight: 900; border: medium; cursor: pointer; animation: 1.5s infinite pulse-app; box-shadow: rgba(243, 186, 47, 0.6) 0px 4px 16px;" title="Abrir en App Binance">📱</button>
     <style>@keyframes pulse-app{0%,100%{box-shadow:0 4px 16px rgba(243,186,47,0.5)}50%{box-shadow:0 4px 28px rgba(243,186,47,0.95)}}</style>
 </div>
@@ -2632,7 +2494,7 @@
     <div class="footer-bottom">
         <div class="footer-status">
             <span><span class="footer-dot"></span> EN VIVO</span>
-            <span id="footerTime"><i class="far fa-clock"></i> Seguimiento activo desde: 12:32:23 a. m.</span>
+            <span id="footerTime"><i class="far fa-clock"></i> Seguimiento activo desde: 12:58:02 a. m.</span>
             <span><i class="fas fa-wave-square" style="color:var(--accent-glow);"></i> Actualización cada 2s</span>
         </div>
         <div class="footer-copy">© 2025 CDC FUTURO-PRO · PROYECTO TECNOMAN · 🇧🇴</div>
@@ -11338,7 +11200,39 @@ async function abrirRadarDespegue() {
 // Antes se armaba a mano con muchos estilos inline por separado, lo que podía
 // dejar el panel a mitad de camino (imagen "congelada") y con un z-index tan
 // alto (99999) que tapaba a los paneles de 24H / licencia en vez de al revés.
+
+// ── 📐 FIX SUPERPOSICIÓN EN MÓVIL: mide la altura REAL de las barras de
+// arriba (header + correlación BTC/ETH + ticker de noticias) y la guarda en
+// la variable CSS --sidebar-mobile-top. Antes ese número estaba fijo en el
+// CSS (60px) y no coincidía con la altura real de esas 3 barras juntas, así
+// que el panel de la izquierda arrancaba más arriba de la cuenta y quedaba
+// superpuesto con esas barras / con el inicio de la lista. Al medirlo en
+// vivo, funciona igual sin importar el celular, el tamaño de letra del
+// navegador, o si algún texto del header hace wrap a 2 líneas.
+function _actualizarOffsetSidebarMobile() {
+    try {
+        const header = document.querySelector('header');
+        const btcEthBar = document.getElementById('btcEthBar');
+        const newsTickerBar = document.getElementById('newsTickerBar');
+        let total = 0;
+        [header, btcEthBar, newsTickerBar].forEach(el => {
+            if (el && el.offsetParent !== null) total += el.offsetHeight;
+        });
+        if (total > 0) {
+            document.documentElement.style.setProperty('--sidebar-mobile-top', total + 'px');
+        }
+    } catch (e) { /* si algo falla, se usa el respaldo fijo (135px) del CSS */ }
+}
+window.addEventListener('resize', _actualizarOffsetSidebarMobile);
+window.addEventListener('orientationchange', () => setTimeout(_actualizarOffsetSidebarMobile, 200));
+document.addEventListener('DOMContentLoaded', _actualizarOffsetSidebarMobile);
+// Por si este script corre después de que el DOM ya cargó (splash screen, etc.)
+if (document.readyState === 'complete' || document.readyState === 'interactive') {
+    setTimeout(_actualizarOffsetSidebarMobile, 0);
+}
+
 function abrirSidebarMobile(){
+    _actualizarOffsetSidebarMobile(); // recalcula justo antes de abrir, por si el header cambió (ej. wrap de texto)
     const sidebar = document.getElementById("sidebar");
     sidebar.classList.remove("sidebar-mobile-hidden");
     sidebar.classList.add("sidebar-mobile-open");
