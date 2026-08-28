@@ -4804,10 +4804,11 @@ function _categoriasActivasDeMoneda(c) {
     return activas;
 }
 
-function _origenListaBannerHTML(simbolo) {
-    const c = cachedData[simbolo];
+function _origenListaBannerHTML(simboloCompleto) {
+    const c = cachedData[simboloCompleto];
     const categorias = _categoriasActivasDeMoneda(c);
     if (categorias.length === 0) return '';
+    const simbolo = simboloCompleto.replace("USDT", "");
     return categorias.map(key => {
         const cfg = ORIGENES_LISTA_CONFIG[key];
         if (!cfg) return '';
@@ -11509,7 +11510,7 @@ function actualizarPanelCentral() {
 
     document.getElementById("detailView").innerHTML = `
         <!-- 🏷️ JEFE DE LISTA: de cuál botón/lista vino esta moneda -->
-        ${_origenListaBannerHTML(simbolo)}
+        ${_origenListaBannerHTML(selectedCoin)}
         <!-- 🔴 y 🟡 ocultas a pedido del usuario: ya se ven en la lista de 24h de la izquierda -->
         ${btnBingoHTML}
         ${btnBingoBombaMaximaHTML}
@@ -15457,7 +15458,7 @@ function _actualizarVentanitaTecho4Ema() {
     // archivo completo sin caer en la paradoja de "el hash contiene su
     // propio hash". No cambiar este texto.
     var _PLACEHOLDER = "%%CDC_INTEGRITY_HASH%%";
-    var _HASH_ESPERADO = "c3f2baf2c60113176d0e99848e95cac2c650d72470036ebdb94042dd1f3e9b4f"; // ← se reemplaza por el hash real en el paso final
+    var _HASH_ESPERADO = "98976d2b6f84abc7c4150ee9993cd71e3d65e434d2847388e7b5cc90313cc5d9"; // ← se reemplaza por el hash real en el paso final
 
     function _bloquear(motivo) {
         try {
@@ -15485,6 +15486,15 @@ function _actualizarVentanitaTecho4Ema() {
             var texto = await res.text();
             // Neutraliza la propia referencia al hash dentro del texto descargado
             texto = texto.split(_HASH_ESPERADO).join(_PLACEHOLDER);
+            // 🔧 Normalización: GitHub (y muchos editores/git) cambian saltos de
+            // línea, agregan o quitan una línea en blanco al final, o recodifican
+            // el archivo al subirlo — sin tocar ni una letra de código real. Para
+            // no bloquear por esos cambios cosméticos, se ignoran TODOS los
+            // espacios en blanco (espacios, tabs, saltos de línea) antes de
+            // calcular el hash. El orden y contenido de los caracteres reales del
+            // código sigue intacto, así que cualquier edición de verdad (agregar,
+            // sacar o cambiar una letra/función) SIGUE rompiendo la verificación.
+            texto = texto.replace(/\s+/g, "");
             var buf = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(texto));
             var hashHex = Array.prototype.map.call(new Uint8Array(buf), function (b) {
                 return b.toString(16).padStart(2, "0");
