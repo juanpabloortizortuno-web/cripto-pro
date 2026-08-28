@@ -4,10 +4,10 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>CDC FUTURO-PRO | PROYECTO TECNOMAN</title>
-    <link href="2028_files/css2_E2YG_PIYQ_CBvr_WK7E_tNdw_9n6-_nMRO_ucX3_2vzm_x5HI__USL0.css" rel="stylesheet">
-    <link rel="stylesheet" href="2028_files/all.min_E2YG_PIYQ_CBvr_WK7E_tNdw_9n6-_nMRO_ucX3_2vzm_x5_USL0.css">
-    <!-- Respaldo: Font Awesome desde CDN por si el archivo local no carga (evita íconos en blanco) -->
-    <link rel="stylesheet" href="2028_files/all.min_WK7E_tNdw_9n6-_nMRO_ucX3_2vzm_x5HI_5Cxg_X4mi__G_USL0.css">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
     <style>
         :root {
             --bg-deep: #030712; --bg-card: #090f1c; --bg-input: #050914; 
@@ -1154,6 +1154,16 @@
             .main-workspace { display: flex; flex-direction: column; overflow: visible; }
             .column-center { width: 100%; min-width: 100%; padding: 10px; border-right: none; box-sizing: border-box; }
             .column-right { width: 100%; min-width: 100%; padding: 10px; box-sizing: border-box; }
+
+            /* ══ FIX BOTONES FLOTANTES TAPANDO DATOS EN MÓVIL ══
+               .floating-buttons queda fijo (position:fixed) abajo a la
+               derecha, apilando 4 círculos de 48px. Como el panel central
+               ocupa todo el ancho de la pantalla, texto/valores alineados
+               a la derecha (%, BTC/ETH, barras C: / V:) terminaban
+               DEBAJO de esos círculos y se veían "tapados/superpuestos".
+               Reservamos un carril libre a la derecha para que ningún
+               dato termine detrás de los botones. */
+            .column-center, .column-right { padding-right: 64px !important; }
             .gauge-box { transform: scale(.85); margin: auto; }
             table { width: 100%; table-layout: fixed; }
             th, td { font-size: 11px; padding: 8px; overflow-wrap: break-word; word-break: break-word; white-space: normal; }
@@ -1249,6 +1259,14 @@
                 transform: none !important;
             }
             #cryptoList > tr > td { padding-top: 7px !important; padding-bottom: 7px !important; }
+
+            /* ══ FIX BOTONES FLOTANTES TAPANDO EL MENÚ/LISTA EN MÓVIL ══
+               .floating-buttons (simulador, radar, Binance, app) usa
+               z-index:9999, por encima del menú móvil (8500). Al abrir
+               las 3 rayitas quedaban flotando sobre la lista de 24h,
+               impidiendo tocarla o desplegarla. Se ocultan mientras el
+               menú está abierto (ver abrirSidebarMobile/cerrarSidebarMobile). */
+            body.menu-movil-abierto .floating-buttons { display: none !important; }
         }
 
         /* ───────────────────────────────────────────────
@@ -1447,7 +1465,7 @@ la computadora.</p>
     <input type="tel" id="celularInput" class="input-pro" placeholder="TU NÚMERO DE CELULAR" style="margin-top:10px;">
     <div id="statusMsg" style="margin-top:14px; font-size:12px; color:var(--text-dim); min-height:16px;"></div>
     <button onclick="activarConDatos('licenseInput','nombreInput','celularInput','statusMsg')" class="btn binance" style="width:100%; max-width:300px;">ACTIVAR VIP</button>
-    <a href="https://wa.me/59177244375" target="_blank" class="btn ws" style="width:100%; max-width:300px; margin-top:15px;"><i class="fab fa-whatsapp"></i> COMPRAR LICENCIA</a>
+    <a href="https://wa.me/59177244375?text=Hola%2C%20quiero%20comprar%20una%20licencia%20por%201%20a%C3%B1o%20a%20300%20Bs.%20Vengo%20de%20TikTok." target="_blank" class="btn ws" style="width:100%; max-width:300px; margin-top:15px;"><i class="fab fa-whatsapp"></i> COMPRAR LICENCIA</a>
 </div>
 
 <header style="display:flex; justify-content:space-between; align-items:center; padding:0 20px; background:linear-gradient(135deg,#060b16 0%,#0a1428 100%); border-bottom:1px solid rgba(243,186,47,0.15); height:60px; box-shadow:0 2px 20px rgba(0,0,0,0.5);">
@@ -1492,7 +1510,7 @@ la computadora.</p>
     <!-- DERECHA: Test Audio + TikTok + WhatsApp -->
     <div style="display:flex; align-items:center; gap:10px; flex-shrink:0;">
 
-        <a href="https://www.tiktok.com/@chicodelascomputadoras" target="_blank" title="TikTok" style="display:flex;align-items:center;gap:7px;padding:0 13px;height:34px;border-radius:20px;
+        <a href="https://www.tiktok.com/@cdcfuturopro?is_from_webapp=1&sender_device=pc" target="_blank" title="TikTok" style="display:flex;align-items:center;gap:7px;padding:0 13px;height:34px;border-radius:20px;
                   background:linear-gradient(135deg,#010101 0%,#2d2d2d 40%,#69C9D0 75%,#EE1D52 100%);
                   color:#fff;font-size:13px;font-weight:700;text-decoration:none;
                   box-shadow:0 2px 12px rgba(238,29,82,0.4);border:1px solid rgba(238,29,82,0.3);
@@ -1501,7 +1519,7 @@ la computadora.</p>
             <span class="wa-label">TikTok</span>
         </a>
 
-        <a href="https://wa.me/59177244375" target="_blank" title="WhatsApp" style="display:flex;align-items:center;justify-content:center;gap:8px;padding:0 15px;height:34px;border-radius:20px;
+        <a href="https://wa.me/59177244375?text=Hola%2C%20quiero%20comprar%20una%20licencia%20por%201%20a%C3%B1o%20a%20300%20Bs.%20Vengo%20de%20TikTok." target="_blank" title="WhatsApp" style="display:flex;align-items:center;justify-content:center;gap:8px;padding:0 15px;height:34px;border-radius:20px;
                   background:linear-gradient(135deg,#25D366 0%,#128C7E 100%);
                   color:#fff;font-size:13px;font-weight:700;text-decoration:none;
                   box-shadow:0 2px 12px rgba(37,211,102,0.4);border:1px solid rgba(37,211,102,0.3);
@@ -4042,11 +4060,8 @@ contra su máximo de 24h</div>
         </div>
         <!-- REDES SOCIALES -->
         <div class="footer-socials">
-            <a href="https://www.tiktok.com/@chicodelascomputadoras" target="_blank" class="footer-social-btn footer-tiktok">
-                <i class="fab fa-tiktok" style="font-size:12px;"></i> chicodelascomputadoras
-            </a>
-            <a href="https://www.instagram.com/chicodelascomputadoras" target="_blank" class="footer-social-btn footer-instagram">
-                <i class="fab fa-instagram" style="font-size:13px;"></i> chicodelascomputadoras
+            <a href="https://www.tiktok.com/@cdcfuturopro?is_from_webapp=1&sender_device=pc" target="_blank" class="footer-social-btn footer-tiktok">
+                <i class="fab fa-tiktok" style="font-size:12px;"></i> cdcfuturopro
             </a>
         </div>
     </div>
@@ -6405,6 +6420,31 @@ function _cumpleFiltroEnVivo(tipo, c) {
 function _cumpleFiltroConRegistro(tipo, c) {
     if (_cumpleFiltroEnVivo(tipo, c)) return true;
     return _estaRegistrada(_tipoSenalCanonico(tipo), c.symbol);
+}
+
+// ── Botones del sidebar que pueden hacer que una moneda aparezca en el
+// panel central "MOTOR LONG/SHORT — SEÑALES IA", con su etiqueta visual.
+// Se usa para mostrar, al lado de cada moneda del panel, DE QUÉ BOTÓN salió.
+const _BOTONES_ORIGEN_PANEL = [
+    { tipo: 'BANDERA',     emoji: '🇧🇴', label: 'BANDERA',        color: '#f3ba2f' },
+    { tipo: 'BINGOCAIDA',  emoji: '🎯', label: 'BINGO',          color: '#4fc3f7' },
+    { tipo: 'BOMBAMAXIMA', emoji: '💣', label: 'BOMBA',          color: '#ff8c1a' },
+    { tipo: 'PULSO',       emoji: '🫀', label: 'PULSO',          color: '#e879f9' },
+    { tipo: 'EXPLOSION',   emoji: '🚀', label: 'EXPLOSIÓN',      color: '#0ecb81' },
+    { tipo: 'CAYENDO24H',  emoji: '📉', label: 'ROMPIENDO EL 0', color: '#f3ba2f' },
+];
+// Devuelve la lista de botones (0, 1 o varios) que la moneda `c` cumple
+// EN VIVO ahora mismo. Una moneda puede cumplir más de un botón a la vez.
+function _botonesOrigenDeMoneda(c) {
+    if (!c) return [];
+    return _BOTONES_ORIGEN_PANEL.filter(b => _cumpleFiltroEnVivo(b.tipo, c));
+}
+// Arma el HTML de las etiquetas ("chips") con el/los botón(es) de origen,
+// para pegar al lado del nombre de la moneda en el panel central.
+function _htmlBotonesOrigen(c) {
+    const origenes = _botonesOrigenDeMoneda(c);
+    if (origenes.length === 0) return '';
+    return origenes.map(b => `<span style="font-size:8px;font-weight:900;background:${b.color}22;color:${b.color};border:1px solid ${b.color}55;border-radius:5px;padding:1px 4px;margin-left:3px;white-space:nowrap;">${b.emoji} ${b.label}</span>`).join('');
 }
 
 // true si la moneda SOLO aparece en la lista por estar registrada (ya no
@@ -12494,6 +12534,21 @@ function actualizarTacometroDerecho() {
                 señalesIA = [...señalesIA, ...revShort];
             }
 
+            // ══ REQUISITO PRINCIPAL DEL PANEL CENTRAL (SOLO SHORT) ══
+            // En modo SHORT, solo deben aparecer monedas que pasan el 95% de su
+            // rango 24h (casi llegando a su techo) — sin importar de qué tipo de
+            // señal (BOMBA, DERRUMBE, AGOTADO, REVERSION_SHORT, TECHO_ALTO, etc.)
+            // venga, ni de qué botón/lista salió. En modo LONG este filtro NO se
+            // aplica: las señales LONG (REBOTE, DESPEGUE, REVERSION, PATRON_60_8)
+            // ocurren cerca del MÍNIMO de 24h, así que exigirles 95% del techo
+            // las descartaría siempre — quedaría el panel vacío en modo LONG.
+            if (!esLong) {
+                señalesIA = señalesIA.filter(p => {
+                    const cChk = cachedData[p.symbol];
+                    return cChk && (cChk.posicionPorcentaje || 0) >= 95;
+                });
+            }
+
             señalesIA.forEach(p => {
                 const s  = p.symbol;
                 const c2 = cachedData[s];
@@ -12503,6 +12558,17 @@ function actualizarTacometroDerecho() {
                 const esActiva = s === selectedCoin;
                 // Borde extra si es la moneda activa en el panel
                 const borderActivo = esActiva ? ';box-shadow:0 0 0 2px #f3ba2f;' : '';
+                // ── DE QUÉ BOTÓN SALE ──: chip(s) mostrando qué botón(es) del
+                // sidebar (BANDERA, BINGO, BOMBA, PULSO, EXPLOSIÓN, ROMPIENDO EL 0)
+                // hace que esta moneda esté calificando ahora mismo. Si no coincide
+                // con ningún botón del sidebar (llegó por el motor IA interno), se
+                // muestra un respaldo genérico con el tipo de señal interna, para que
+                // SIEMPRE se vea de dónde salió la moneda.
+                let badgeOrigen = _htmlBotonesOrigen(c2);
+                if (!badgeOrigen) {
+                    const _fallbackLabel = { DESPEGUE:'MOTOR IA · DESPEGUE', REBOTE:'MOTOR IA · REBOTE', REVERSION:'MOTOR IA · REVERSIÓN', PATRON_60_8:'MOTOR IA · PATRÓN -60%', BOMBA:'MOTOR IA · BOMBA', DERRUMBE:'MOTOR IA · DERRUMBE', AGOTADO:'MOTOR IA · AGOTADO', REVERSION_SHORT:'MOTOR IA · REV. SHORT', TECHO_ALTO:'MOTOR IA · TECHO' }[p.tipo] || 'MOTOR IA';
+                    badgeOrigen = `<span style="font-size:8px;font-weight:900;background:#47556922;color:#94a3b8;border:1px solid #47556955;border-radius:5px;padding:1px 4px;margin-left:3px;white-space:nowrap;">🧠 ${_fallbackLabel}</span>`;
+                }
                 const badgeActivo  = esActiva ? `<span style="font-size:9px;background:#f3ba2f;color:#000;font-weight:900;padding:1px 5px;border-radius:4px;margin-left:4px;">EN PANEL</span>` : '';
 
                 if (p.tipo === 'DESPEGUE' || p.tipo === 'REBOTE' || p.tipo === 'REVERSION' || p.tipo === 'PATRON_60_8') {
@@ -12512,29 +12578,29 @@ function actualizarTacometroDerecho() {
                     const bg    = p.tipo === 'REBOTE' ? 'rgba(0,212,255,0.08)' : 'rgba(14,203,129,0.1)';
                     const emoji = p.tipo === 'DESPEGUE' ? '🚀' : p.tipo === 'REBOTE' ? '🔄' : '📈';
                     motorItems.push(`<div onclick="seleccionarMoneda('${s}')" style="display:flex;align-items:center;justify-content:space-between;padding:5px 8px;border-radius:7px;background:${bg};border-left:3px solid ${color};margin-bottom:4px;cursor:pointer;${borderActivo}" title="Llevar ${nombre} al panel central">
-                        <span style="font-size:12px;font-weight:900;color:${color};">${emoji} ${nombre}${badgeActivo}</span>
+                        <span style="font-size:12px;font-weight:900;color:${color};">${emoji} ${nombre}${badgeActivo}${badgeOrigen}</span>
                         <span style="font-size:10px;color:${color};font-weight:700;">${label} +${pct}%</span>
                     </div>`);
                 } else if (p.tipo === 'BOMBA') {
                     motorItems.push(`<div onclick="seleccionarMoneda('${s}')" style="display:flex;align-items:center;justify-content:space-between;padding:5px 8px;border-radius:7px;background:rgba(14,203,129,0.15);border-left:3px solid #0ecb81;margin-bottom:4px;cursor:pointer;${borderActivo}" title="Llevar ${nombre} al panel central">
-                        <span style="font-size:12px;font-weight:900;color:#0ecb81;">💥 ${nombre}${badgeActivo}</span>
+                        <span style="font-size:12px;font-weight:900;color:#0ecb81;">💥 ${nombre}${badgeActivo}${badgeOrigen}</span>
                         <span style="font-size:10px;color:#6ee7b7;font-weight:700;">BOMBA +${c2.cambioReal2Min.toFixed(2)}% /2min</span>
                     </div>`);
                 } else if (p.tipo === 'DERRUMBE') {
                     motorItems.push(`<div onclick="seleccionarMoneda('${s}')" style="display:flex;align-items:center;justify-content:space-between;padding:5px 8px;border-radius:7px;background:rgba(255,42,59,0.1);border-left:3px solid #ff2a3b;margin-bottom:4px;cursor:pointer;${borderActivo}" title="Llevar ${nombre} al panel central">
-                        <span style="font-size:12px;font-weight:900;color:#ff2a3b;">📉 ${nombre}${badgeActivo}</span>
+                        <span style="font-size:12px;font-weight:900;color:#ff2a3b;">📉 ${nombre}${badgeActivo}${badgeOrigen}</span>
                         <span style="font-size:10px;color:#fca5a5;font-weight:700;">DERRUMBE ${c2.cambioReal2Min.toFixed(2)}% /2min</span>
                     </div>`);
                 } else if (p.tipo === 'AGOTADO') {
                     motorItems.push(`<div onclick="seleccionarMoneda('${s}')" style="display:flex;align-items:center;justify-content:space-between;padding:5px 8px;border-radius:7px;background:rgba(243,186,47,0.1);border-left:3px solid #f3ba2f;margin-bottom:4px;cursor:pointer;${borderActivo}" title="Llevar ${nombre} al panel central">
-                        <span style="font-size:12px;font-weight:900;color:#f3ba2f;">⚠️ ${nombre}${badgeActivo}</span>
+                        <span style="font-size:12px;font-weight:900;color:#f3ba2f;">⚠️ ${nombre}${badgeActivo}${badgeOrigen}</span>
                         <span style="font-size:10px;color:#fde68a;font-weight:700;">AGOTAMIENTO ${c2.posicionPorcentaje.toFixed(0)}% rango</span>
                     </div>`);
                 } else if (p.tipo === 'REVERSION_SHORT') {
                     const ms2 = (typeof _memoriaScoreMoneda === 'function') ? _memoriaScoreMoneda(s) : null;
                     const scoreLabel = ms2 ? `${ms2.scoreShortRev ?? ms2.scoreShort}/100` : '';
                     motorItems.push(`<div onclick="seleccionarMoneda('${s}')" style="display:flex;align-items:center;justify-content:space-between;padding:5px 8px;border-radius:7px;background:rgba(168,85,247,0.1);border-left:3px solid #a855f7;margin-bottom:4px;cursor:pointer;${borderActivo}" title="Llevar ${nombre} al panel central">
-                        <span style="font-size:12px;font-weight:900;color:#a855f7;">🔄 ${nombre}${badgeActivo}</span>
+                        <span style="font-size:12px;font-weight:900;color:#a855f7;">🔄 ${nombre}${badgeActivo}${badgeOrigen}</span>
                         <span style="font-size:10px;color:#d8b4fe;font-weight:700;">REV. SHORT · ${scoreLabel}</span>
                     </div>`);
                 } else if (p.tipo === 'TECHO_ALTO') {
@@ -12543,7 +12609,7 @@ function actualizarTacometroDerecho() {
                     const scoreLabel = ms2 ? ` · ${ms2.scoreShort}/100` : '';
                     const colorTecho = pos2 >= 95 ? '#ff2a3b' : '#f97316';
                     motorItems.push(`<div onclick="seleccionarMoneda('${s}')" style="display:flex;align-items:center;justify-content:space-between;padding:5px 8px;border-radius:7px;background:rgba(255,42,59,0.08);border-left:3px solid ${colorTecho};margin-bottom:4px;cursor:pointer;${borderActivo}" title="Llevar ${nombre} al panel central">
-                        <span style="font-size:12px;font-weight:900;color:${colorTecho};">🔴 ${nombre}${badgeActivo}</span>
+                        <span style="font-size:12px;font-weight:900;color:${colorTecho};">🔴 ${nombre}${badgeActivo}${badgeOrigen}</span>
                         <span style="font-size:10px;color:#fca5a5;font-weight:700;">TECHO ${pos2}%${scoreLabel}</span>
                     </div>`);
                 }
@@ -13331,6 +13397,12 @@ function abrirSidebarMobile(){
     const sidebar = document.getElementById("sidebar");
     sidebar.classList.remove("sidebar-mobile-hidden");
     sidebar.classList.add("sidebar-mobile-open");
+    // ── FIX BOTONES FLOTANTES TAPANDO LA LISTA EN MÓVIL ──
+    // .floating-buttons tiene z-index:9999, por ENCIMA del menú móvil
+    // (8500), así que quedaban dibujados arriba de la lista de 24h y
+    // bloqueaban el toque/scroll sobre esas filas. Los escondemos mientras
+    // el menú está abierto.
+    document.body.classList.add("menu-movil-abierto");
     // Fuerza un reflow/repintado real antes de mostrar el scroll interno,
     // para que el navegador del celular no deje la vista "pegada".
     void sidebar.offsetHeight;
@@ -13341,6 +13413,7 @@ function cerrarSidebarMobile(){
     const sidebar = document.getElementById("sidebar");
     sidebar.classList.remove("sidebar-mobile-open");
     sidebar.classList.add("sidebar-mobile-hidden");
+    document.body.classList.remove("menu-movil-abierto");
 }
 
 document.getElementById("menuToggle").onclick = () => {
@@ -15370,7 +15443,69 @@ function _actualizarVentanitaTecho4Ema() {
 
 </script>
 
+<script>
+// ════════════════════════════════════════════════════════════════
+// 🔒 VERIFICACIÓN DE INTEGRIDAD — CDC FUTURO-PRO
+// ────────────────────────────────────────────────────────────────
+// Si alguien copia este archivo y le agrega, saca o modifica CUALQUIER
+// carácter de su estructura (fuera de esta misma etiqueta), el hash
+// SHA-256 del archivo deja de coincidir con el valor esperado y la
+// página se bloquea sola. No tocar este bloque ni el placeholder.
+// ════════════════════════════════════════════════════════════════
+(function () {
+    // Placeholder que se auto-reemplaza para poder calcular el hash del
+    // archivo completo sin caer en la paradoja de "el hash contiene su
+    // propio hash". No cambiar este texto.
+    var _PLACEHOLDER = "%%CDC_INTEGRITY_HASH%%";
+    var _HASH_ESPERADO = "c3f2baf2c60113176d0e99848e95cac2c650d72470036ebdb94042dd1f3e9b4f"; // ← se reemplaza por el hash real en el paso final
 
+    function _bloquear(motivo) {
+        try {
+            for (var i = 1; i < 200000; i++) { clearInterval(i); clearTimeout(i); }
+        } catch (e) {}
+        try {
+            document.documentElement.innerHTML =
+                '<div style="position:fixed;inset:0;background:#030712;color:#ff2a3b;' +
+                'display:flex;align-items:center;justify-content:center;flex-direction:column;' +
+                'font-family:Arial,sans-serif;text-align:center;padding:24px;z-index:999999;">' +
+                '<div style="font-size:44px;margin-bottom:14px;">🔒</div>' +
+                '<div style="font-size:18px;font-weight:900;letter-spacing:0.5px;">' +
+                'Este código fue modificado y ha sido bloqueado.</div>' +
+                '<div style="font-size:12px;color:#94a3b8;margin-top:10px;max-width:420px;">' +
+                'CDC FUTURO-PRO detectó un cambio en su estructura original y detuvo su ' +
+                'ejecución para proteger la integridad del proyecto.</div></div>';
+        } catch (e) {}
+    }
 
+    async function _verificarIntegridad() {
+        try {
+            if (!window.crypto || !window.crypto.subtle) return; // navegador sin SubtleCrypto: no se puede verificar
+            var res = await fetch(location.href, { cache: "no-store" });
+            if (!res.ok) return;
+            var texto = await res.text();
+            // Neutraliza la propia referencia al hash dentro del texto descargado
+            texto = texto.split(_HASH_ESPERADO).join(_PLACEHOLDER);
+            var buf = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(texto));
+            var hashHex = Array.prototype.map.call(new Uint8Array(buf), function (b) {
+                return b.toString(16).padStart(2, "0");
+            }).join("");
+            if (_HASH_ESPERADO === "%%CDC_INTEGRITY_HASH%%") {
+                // Todavía no se generó el hash final — modo configuración, no bloquear.
+                console.warn("⚠️ CDC INTEGRITY: hash de referencia no configurado. Este archivo aún no está protegido.");
+                return;
+            }
+            if (hashHex !== _HASH_ESPERADO) {
+                _bloquear("hash_mismatch");
+            }
+        } catch (e) {
+            // Si falla la verificación misma (red bloqueada, CORS, etc.) no se bloquea
+            // la app por error ajeno — solo se bloquea ante un mismatch confirmado.
+            console.warn("⚠️ CDC INTEGRITY: no se pudo verificar (posible bloqueo de red).", e);
+        }
+    }
+
+    _verificarIntegridad();
+})();
+</script>
 
 </body></html>
