@@ -1709,8 +1709,8 @@ la computadora.</p>
                     <button id="btnModoBajistaSide" onclick="cambiarModoMercado('bajista')" title="Modo SHORT: la app prioriza monedas cerca de su techo, agotadas y listas para vender/caer" style="flex: 1 1 calc(50% - 6px); padding: 10px 6px; border-radius: 10px; border: 2px solid rgba(255, 42, 59, 0.12); cursor: pointer; font-size: 12px; font-weight: 900; transition: 0.25s; letter-spacing: 0.3px; background: rgba(255, 42, 59, 0.08); color: rgb(100, 116, 139); box-shadow: none; transform: scale(1);">
                         🔴 SHORT<br><span style="font-size:9px;font-weight:700;opacity:0.85;">VENTA · TECHO</span>
                     </button>
-                    <button id="btnTecho4EmaSide" onclick="abrirListaCayendo24h()" title="Tocó el máximo de 24h, las 4 EMAs ya confirman la caída, y el precio está a punto de cruzar de + a - contra ese máximo (rompiendo el 0)" style="flex:1 1 calc(50% - 6px);padding:10px 6px;border-radius:10px;border:none;cursor:pointer;font-size:12px;font-weight:900;transition:all 0.25s;letter-spacing:0.3px;background:rgba(243,186,47,0.22);color:#f3ba2f;box-shadow:inset 0 0 0 1px rgba(243,186,47,0.55);">
-                        📉 ROMPIENDO EL 0<br><span style="font-size:9px;font-weight:700;opacity:0.85;">+ A - DE MÁXIMO</span>
+                    <button id="btnTecho4EmaSide" onclick="abrirListaDorado()" title="BOTÓN DORADO: solo las monedas de MOMENTUM ALTO (cerca del 100% del rango 24h y subiendo con fuerza), las mismas que salen en el radar. La mejor se abre en el panel central." style="flex:1 1 calc(50% - 6px);padding:10px 6px;border-radius:10px;border:none;cursor:pointer;font-size:12px;font-weight:900;transition:all 0.25s;letter-spacing:0.3px;background:rgba(243,186,47,0.22);color:#f3ba2f;box-shadow:inset 0 0 0 1px rgba(243,186,47,0.55);">
+                        🟡 BOTÓN DORADO<br><span style="font-size:9px;font-weight:700;opacity:0.85;">MOMENTUM ALTO</span>
                     </button>
                     <button id="btnReventonSide" onclick="abrirListaBingoCaida()" title="Monedas pegadas a su 100% del rango 24h (95%+ de cercanía) y con más de +20% de cambio en 24h — el combo perfecto para que, al darse vuelta, la caída sea brutal. Ordenadas de mayor a menor % de subida." style="flex:1 1 calc(50% - 6px);padding:10px 6px;border-radius:10px;border:none;cursor:pointer;font-size:12px;font-weight:900;transition:all 0.25s;letter-spacing:0.3px;background:rgba(33,150,243,0.22);color:#4fc3f7;box-shadow:inset 0 0 0 1px rgba(33,150,243,0.55);">
                         🎯 BINGO<br><span style="font-size:9px;font-weight:700;opacity:0.85;">CAÍDA BRUTAL</span>
@@ -1757,13 +1757,10 @@ la computadora.</p>
                 <span id="alarmaLateralTexto" style="display:none;"></span>
                 <div id="alarmaSidePanel" style="display:none;"><div id="alarmaSideTexto"></div></div>
                 <div class="search-box">
-                    <div id="botSaludo" class="bot-saludo" style="margin-bottom:8px;">📉
- ROMPIENDO EL 0 + A - DE MÁXIMO: 47 candidatas — techos tras pump 🏔️ y 
-rebotes dentro de tendencia bajista 🔻, a punto de cruzar de + a - 
-contra su máximo de 24h</div>
+                    <div id="botSaludo" class="bot-saludo" style="margin-bottom:8px;">🟡 BOTÓN DORADO: monedas de momentum alto — cerca del 100% del rango y subiendo con fuerza</div>
                     <div class="search-wrap">
-                        <input type="text" id="searchCoin" placeholder="Buscar low-caps o filtros (BOMBA, POTENCIA, AGOTADO)..." onkeyup="buscarMoneda()" oninput="document.getElementById('btnLimpiarBusqueda').style.display = this.value ? 'flex' : 'none';" value="CAYENDO24H">
-                        <button id="btnLimpiarBusqueda" class="search-clear-btn" type="button" onclick="limpiarBusquedaMoneda()" title="Limpiar búsqueda" style="display: flex;">✕</button>
+                        <input type="text" id="searchCoin" placeholder="Buscar low-caps o filtros (BOMBA, POTENCIA, AGOTADO)..." onkeyup="buscarMoneda()" oninput="document.getElementById('btnLimpiarBusqueda').style.display = this.value ? 'flex' : 'none';" value="">
+                        <button id="btnLimpiarBusqueda" class="search-clear-btn" type="button" onclick="limpiarBusquedaMoneda()" title="Limpiar búsqueda" style="display: none;">✕</button>
                     </div>
                 </div>
             </div>
@@ -4023,9 +4020,9 @@ contra su máximo de 24h</div>
             🔴 EN MÁXIMO → CAE
             <span style="position: absolute; top: -6px; right: -6px; background: rgb(255, 60, 0); color: rgb(255, 255, 255); font-size: 9px; font-weight: 900; padding: 1px 5px; border-radius: 8px; display: inline;" id="contTecho">27</span>
         </button>
-        <button class="radar-tab" id="tabMomentum" onclick="filtrarRadar('momentum')" title="Monedas con el movimiento (momentum) más fuerte del momento" style="background:rgba(255,165,0,0.15);color:#ffa500;border-color:transparent;position:relative;">
-            ⭐ MOMENTUM ALTO
-            <span style="position: absolute; top: -6px; right: -6px; background: rgb(255, 165, 0); color: rgb(0, 0, 0); font-size: 9px; font-weight: 900; padding: 1px 5px; border-radius: 8px; display: none;" id="contMomentum">0</span>
+        <button class="radar-tab" id="tabMomentum" onclick="filtrarRadar('momentum')" title="Monedas de momentum alto — cerca del 100% del rango y subiendo con fuerza" style="background:rgba(243,186,47,0.18);color:#f3ba2f;border-color:rgba(243,186,47,0.5);position:relative;font-weight:900;">
+            🟡 BOTÓN DORADO
+            <span style="position: absolute; top: -6px; right: -6px; background: rgb(243, 186, 47); color: rgb(0, 0, 0); font-size: 9px; font-weight: 900; padding: 1px 5px; border-radius: 8px; display: none;" id="contMomentum">0</span>
         </button>
         <button class="radar-tab" id="tabBomba" onclick="filtrarRadar('bomba')" title="Monedas explotando al alza ahora mismo" style="background:rgba(14,203,129,0.1);color:#0ecb81;border-color:transparent;">
             🚀 EXPLOTANDO
@@ -4797,6 +4794,7 @@ const ORIGENES_LISTA_CONFIG = {
     BINGOCAIDA: { emoji: '🎯', nombre: 'BINGO · CAÍDA BRUTAL', borde: '#2196f3', texto: '#4fc3f7', fondo: 'rgba(33,150,243,0.18)', glow1: 'rgba(33,150,243,0.7)', glow2: 'rgba(79,195,247,0.5)' },
     PULSO:      { emoji: '🫀', nombre: 'PULSO',                borde: '#ec4899', texto: '#e879f9', fondo: 'linear-gradient(135deg, rgba(168,85,247,0.30), rgba(236,72,153,0.30))', glow1: 'rgba(168,85,247,0.7)', glow2: 'rgba(236,72,153,0.6)' },
     EXPLOSION:  { emoji: '🚀', nombre: 'EXPLOSIÓN',            borde: '#0ecb81', texto: '#0ecb81', fondo: 'rgba(14,203,129,0.18)', glow1: 'rgba(14,203,129,0.7)', glow2: 'rgba(5,166,96,0.5)' },
+    DORADO:     { emoji: '🟡', nombre: 'BOTÓN DORADO · MOMENTUM ALTO', borde: '#f3ba2f', texto: '#f3ba2f', fondo: 'rgba(243,186,47,0.18)', glow1: 'rgba(243,186,47,0.7)', glow2: 'rgba(255,165,0,0.5)' },
     CAYENDO24H: { emoji: '📉', nombre: 'ROMPIENDO EL 0 + A - DE MÁXIMO',       borde: '#f3ba2f', texto: '#f3ba2f', fondo: 'rgba(243,186,47,0.18)', glow1: 'rgba(243,186,47,0.7)', glow2: 'rgba(255,60,0,0.4)' },
     CANDIDATA:  { emoji: '⚡', nombre: 'SÚPER CANDIDATA 24H',  borde: '#f3ba2f', texto: '#f3ba2f', fondo: 'rgba(243,186,47,0.18)', glow1: 'rgba(243,186,47,0.7)', glow2: 'rgba(255,60,0,0.4)' },
     REVENTON:   { emoji: '💥', nombre: 'REVENTÓN',             borde: '#00aaff', texto: '#00aaff', fondo: 'rgba(0,153,255,0.18)', glow1: 'rgba(0,153,255,0.7)', glow2: 'rgba(0,212,255,0.5)' }
@@ -4814,7 +4812,7 @@ const ORIGENES_LISTA_CONFIG = {
 function _categoriasActivasDeMoneda(c) {
     if (!c) return [];
     const activas = [];
-    if (esTechoConfirmado4Ema(c)) activas.push('CAYENDO24H');
+    if (_esMomentumDorado(c)) activas.push('DORADO');
     if (_evaluarBanderaBoliviana(c).completa) activas.push('BANDERA');
     if (c.bingoExplosion) activas.push('BINGO');
     if ((c.posicionPorcentaje || 0) >= 95 && (c.change || 0) > 20) activas.push('BINGOCAIDA');
@@ -6424,6 +6422,7 @@ function _cumpleFiltroEnVivo(tipo, c) {
         case 'BOMBA': case 'LONG': return !!c.alertaBombaSubida;
         case 'AGOTADO': return !!c.alertaAgotamientoSubida;
         case 'CAYENDO24H': return esTechoConfirmado4Ema(c);
+        case 'DORADO': return _esMomentumDorado(c);
         case 'BANDERA': case 'BOLIVIANA': return _evaluarBanderaBoliviana(c).completa;
         case 'REVENTO': case 'REVENTON': case 'REVENTÓN': return _evaluarReventoAbajoArriba(c).activo;
         case 'BINGO': return !!c.bingoExplosion;
@@ -6454,7 +6453,7 @@ const _BOTONES_ORIGEN_PANEL = [
     { tipo: 'BOMBAMAXIMA', emoji: '💣', label: 'BOMBA',          color: '#ff8c1a' },
     { tipo: 'PULSO',       emoji: '🫀', label: 'PULSO',          color: '#e879f9' },
     { tipo: 'EXPLOSION',   emoji: '🚀', label: 'EXPLOSIÓN',      color: '#0ecb81' },
-    { tipo: 'CAYENDO24H',  emoji: '📉', label: 'ROMPIENDO EL 0', color: '#f3ba2f' },
+    { tipo: 'DORADO',      emoji: '🟡', label: 'BOTÓN DORADO',   color: '#f3ba2f' },
 ];
 // Devuelve la lista de botones (0, 1 o varios) que la moneda `c` cumple
 // EN VIVO ahora mismo. Una moneda puede cumplir más de un botón a la vez.
@@ -6532,6 +6531,8 @@ function buscarMoneda() {
         saludo.innerText = `🚀 Mostrando ${encontradas} subidas verticales a toda potencia`;
     } else if (query === 'AGOTADO') {
         saludo.innerText = `⚠️ Mostrando ${encontradas} activos agotándose en máximos`;
+    } else if (query === 'DORADO') {
+        saludo.innerText = `🟡 BOTÓN DORADO: ${encontradas} moneda(s) de MOMENTUM ALTO — cerca del 100% del rango 24h y subiendo con fuerza, ordenadas por score`;
     } else if (query === 'CAYENDO24H') {
         saludo.innerText = `📉 ROMPIENDO EL 0 + A - DE MÁXIMO: ${encontradas} candidatas — techos tras pump 🏔️ y rebotes dentro de tendencia bajista 🔻, a punto de cruzar de + a - contra su máximo de 24h`;
     } else if (query === 'BANDERA' || query === 'BOLIVIANA') {
@@ -6612,6 +6613,25 @@ function abrirListaCayendo24h() {
         }
     } else {
         _programarReintentoSeleccion('CAYENDO24H', _obtenerCand, 'CAYENDO24H', 'CAYENDO24H');
+    }
+}
+
+// Se llama desde el 🟡 BOTÓN DORADO del sidebar. Muestra SOLO las monedas de
+// MOMENTUM ALTO (las mismas del radar) y abre la #1 en el panel central.
+function abrirListaDorado() {
+    const _sc = document.getElementById('searchCoin');
+    _sc.value = 'DORADO';
+    buscarMoneda();
+    const _limpiar = document.getElementById('btnLimpiarBusqueda');
+    if (_limpiar) _limpiar.style.display = 'flex';
+    _sc.scrollIntoView({ behavior: 'smooth', block: 'start' });
+
+    const _obtenerCand = () => _listaMomentumDorado().slice(); // ya viene ordenada de mejor a peor
+    const todas = _obtenerCand();
+    if (todas.length > 0) {
+        seleccionarMoneda(todas[0].symbol, false, 'DORADO');
+    } else {
+        _programarReintentoSeleccion('DORADO', _obtenerCand, 'DORADO', 'DORADO');
     }
 }
 
@@ -8962,6 +8982,15 @@ function _evaluarReventoAbajoArriba(c) {
     return { activo, subida, caida, minReciente, precioActual, velasDesdeMin };
 }
 
+// ══════════════════════════════════════════════════════════════════
+// ⭐ LISTA PRINCIPAL DE 24H = SOLO SEÑALES DEL MOTOR
+// true  → la lista predeterminada (buscador vacío) muestra ÚNICAMENTE:
+//         🟡 BOTÓN DORADO - MOMENTUM ALTO (mismo criterio del radar). Nada más.
+//         Las demás monedas solo aparecen al tocar su botón/filtro.
+// false → vuelve a la lista de antes.
+// ══════════════════════════════════════════════════════════════════
+const LISTA_PRINCIPAL_SOLO_SENALES = true;
+
 function actualizarTablaIzquierda() {
     const tbody = document.getElementById("cryptoList");
     if (!tbody) return;
@@ -8982,10 +9011,23 @@ function actualizarTablaIzquierda() {
     const queryBusqueda = (document.getElementById('searchCoin')?.value || '').toUpperCase().trim();
 
     let todas = Object.values(cachedData);
+
+    // ── ⭐ LISTA PRINCIPAL PREDETERMINADA (buscador vacío): solo las monedas
+    // que hoy salen en el motor BOTÓN DORADO + las amarillas + BINGO. Con
+    // texto en el buscador o tocando un botón de filtro, todo funciona igual
+    // que siempre (se puede encontrar cualquier moneda). ──
+    const _principalSyms = new Set();
+    const _soloSenales = LISTA_PRINCIPAL_SOLO_SENALES && queryBusqueda === '';
+    if (_soloSenales) {
+        // 🟡 BOTÓN DORADO - MOMENTUM ALTO: mismo criterio que el radar (apalancamiento bajo +
+        // detectarMomentumAlto), ordenadas por score, máximo 15. SOLO estas monedas.
+        _listaMomentumDorado().forEach(c => _principalSyms.add(c.symbol));
+        todas = todas.filter(c => _principalSyms.has(c.symbol));
+    }
     // El filtro de calidad (90%+ de rango y 10%+ de cambio) solo se aplica a la
     // vista normal en modo SHORT/bajista. Si el usuario está buscando algo
     // puntual (con el buscador), se sigue pudiendo encontrar cualquier moneda.
-    if (modoMercado === 'bajista' && queryBusqueda === '') {
+    if (modoMercado === 'bajista' && queryBusqueda === '' && !_soloSenales) {
         todas = todas.filter(c =>
             ((c.posicionPorcentaje || 0) >= UMBRAL_POSICION_LISTA_IZQUIERDA &&
             (c.change || 0) >= CAMBIO_MINIMO_LISTA_IZQUIERDA)
@@ -9059,6 +9101,14 @@ function actualizarTablaIzquierda() {
         grupoMaximo = ordenadas; // se usa solo para el conteo del encabezado
         grupoMinimo = [];
         grupoExplosivo = [];
+    } else if (_soloSenales) {
+        // 🟡 BOTÓN DORADO: la lista principal muestra SOLO las monedas de MOMENTUM ALTO,
+        // de mejor a peor score (sin zona de máximo/mínimo, sin diamante ni explosivas).
+        ordenadas = [...todas].sort((a, b) => calcularScoreMomentum(b) - calcularScoreMomentum(a));
+        grupoMaximo = ordenadas;
+        grupoMinimo = [];
+        grupoExplosivo = [];
+        grupoDiamante = [];
     } else {
         // ── PRIORIDAD ABSOLUTA: monedas EN SU MÁXIMO de las 24H con subida >10% ──
         // Estas van SIEMPRE primero en la lista. Se usan monedas desde el precio
@@ -9119,6 +9169,7 @@ function actualizarTablaIzquierda() {
             .sort((a, b) => (b.posicionPorcentaje - a.posicionPorcentaje) || (b.change - a.change)); // 💛 máxima prioridad: más pegada al techo primero
         grupoMaximo = grupoMaximo.filter(c => !grupoDiamante.includes(c));
         grupoMinimo = grupoMinimo.filter(c => !grupoDiamante.includes(c));
+        if (_soloSenales) grupoMinimo = []; // lista predeterminada: nada de "zona de mínimo"
 
         ordenadas = [...grupoMaximo, ...grupoDiamante, ...grupoExplosivo, ...grupoMinimo];
     }
@@ -9127,7 +9178,7 @@ function actualizarTablaIzquierda() {
         const trVacio = document.createElement('tr');
         trVacio.innerHTML = queryBusqueda !== ''
             ? `<td colspan="2" style="text-align:center; padding:16px; color:#64748b; font-size:11px;">❌ No encontré esa cripto o filtro</td>`
-            : `<td colspan="2" style="text-align:center; padding:16px; color:#64748b; font-size:11px;">⏳ Cargando datos de mercado…</td>`;
+            : (_soloSenales && Object.keys(cachedData).length > 0 ? `<td colspan="2" style="text-align:center; padding:16px; color:#ffa500; font-size:11px; font-weight:700;">🟡 Ninguna moneda de MOMENTUM ALTO (BOTÓN DORADO) ahora mismo. Toca un botón (BANDERA, BOMBA, PULSO…) para ver otras.</td>` : `<td colspan="2" style="text-align:center; padding:16px; color:#64748b; font-size:11px;">⏳ Cargando datos de mercado…</td>`);
         fragmento.appendChild(trVacio);
     }
 
@@ -9139,7 +9190,7 @@ function actualizarTablaIzquierda() {
             const trH = document.createElement('tr');
             trH.innerHTML = queryBusqueda !== ''
                 ? `<td colspan="2" style="background:rgba(243,186,47,0.15); color:#f3ba2f; font-size:10px; font-weight:900; padding:6px 10px; letter-spacing:0.5px;">🔍 RESULTADOS PARA "${queryBusqueda}" (${grupoMaximo.length})</td>`
-                : `<td colspan="2" style="background:rgba(255,60,0,0.15); color:#ff3c00; font-size:10px; font-weight:900; padding:6px 10px; letter-spacing:0.5px;">🔴 ZONA DE MÁXIMO 24H (${grupoMaximo.length})</td>`;
+                : `<td colspan="2" style="background:${_soloSenales ? 'rgba(243,186,47,0.15)' : 'rgba(255,60,0,0.15)'}; color:${_soloSenales ? '#f3ba2f' : '#ff3c00'}; font-size:10px; font-weight:900; padding:6px 10px; letter-spacing:0.5px;">${_soloSenales ? '🟡 BOTÓN DORADO — MOMENTUM ALTO' : '🔴 ZONA DE MÁXIMO 24H'} (${grupoMaximo.length})</td>`;
             fragmento.appendChild(trH);
         }
         // Encabezado separador al inicio del grupo 💎🟡 DIAMANTE DE ORO
@@ -9515,6 +9566,9 @@ function actualizarTablaIzquierda() {
     // aparece una moneda con el patrón APRUSDT (pump 100%+ y ya cayendo),
     // se manda sola al panel central igual que el BINGO de techo.
     try { autoAbrirMonedaBombaMaxima(); } catch (err) { console.error('Auto BINGO Bomba Máxima:', err); }
+
+    // 🟡 BOTÓN DORADO: la mejor moneda de momentum alto va al panel central.
+    try { autoAbrirMonedaDorada(); } catch (err) { console.error('Auto BOTÓN DORADO:', err); }
 }
 
 // ══════════════════════════════════════════════════════════════════
@@ -9678,6 +9732,27 @@ function autoAbrirMonedaBombaMaxima() {
     try { hablar(_textoVozBomba, true); } catch (err) {}
 }
 
+// ══════════════════════════════════════════════════════════════════
+// 🟡 BOTÓN DORADO — la MEJOR moneda de momentum alto es la moneda principal
+// del panel central. Se abre sola (igual que BINGO / BOMBA MÁXIMA), sin pisar
+// una selección manual hecha hace menos de 15s ni repetir en bucle.
+// ══════════════════════════════════════════════════════════════════
+var _ultimoDoradoSymbol = null;
+
+function autoAbrirMonedaDorada() {
+    if (!cachedData) return;
+    const candidatas = _listaMomentumDorado(); // ya viene ordenada de mejor a peor score
+    if (candidatas.length === 0) { _ultimoDoradoSymbol = null; return; }
+
+    const mejor = candidatas[0];
+    if (mejor.symbol === selectedCoin) { _ultimoDoradoSymbol = mejor.symbol; return; } // ya está abierta
+    if (mejor.symbol === _ultimoDoradoSymbol) return; // ya se abrió sola antes, no repetir
+    if (Date.now() - _ultimaSeleccionManualTs < 15000) return; // no pisar una elección manual reciente
+
+    _ultimoDoradoSymbol = mejor.symbol;
+    seleccionarMoneda(mejor.symbol, true, 'DORADO');
+}
+
 function autoAbrirMejorCandidataFuerte() {
     const candidatas = Object.values(cachedData).filter(c =>
         (c.posicionPorcentaje || 0) >= UMBRAL_POSICION_AUTO_PANEL &&
@@ -9796,7 +9871,7 @@ function calcularScoreExplosivo(c) {
     return score;
 }
 
-// ── MOMENTUM ALTO: cerca del 100% del rango Y subiendo rápido ──
+// ── BOTÓN DORADO - Rompiendo el 0: cerca del 100% del rango Y subiendo rápido ──
 // Tu criterio principal: posición alta en el rango diario + velocidad fuerte
 function detectarMomentumAlto(c) {
     const enZonaAlta     = c.posicionPorcentaje >= 70;          // 70-100% del rango del día
@@ -9805,6 +9880,26 @@ function detectarMomentumAlto(c) {
     const ciclosFuertes  = c.ciclosSubiendo >= 3;               // al menos 3 de 5 ciclos subiendo
     const volumenOK      = c.volume > 8000000;                  // algo de volumen mínimo
     return enZonaAlta && subiendoRapido && velocidadPos && ciclosFuertes && volumenOK;
+}
+
+// 🟡 BOTÓN DORADO: lista de MOMENTUM ALTO = exactamente el mismo criterio del radar
+// (apalancamiento bajo + detectarMomentumAlto), ordenada por score, máximo 15.
+// Se cachea ~0.5s porque _cumpleFiltroEnVivo la consulta moneda por moneda.
+var _doradoCache = { ts: 0, lista: [], set: new Set() };
+function _listaMomentumDorado() {
+    const ahora = Date.now();
+    if (ahora - _doradoCache.ts < 500) return _doradoCache.lista;
+    const lista = Object.values(cachedData || {})
+        .filter(c => tieneApalancamientoBajo(c.symbol) && detectarMomentumAlto(c))
+        .sort((a, b) => calcularScoreMomentum(b) - calcularScoreMomentum(a))
+        .slice(0, 15);
+    _doradoCache = { ts: ahora, lista: lista, set: new Set(lista.map(c => c.symbol)) };
+    return lista;
+}
+function _esMomentumDorado(c) {
+    if (!c) return false;
+    _listaMomentumDorado();
+    return _doradoCache.set.has(c.symbol);
 }
 
 // Score especial para momentum: prioriza rango alto + velocidad
@@ -10820,11 +10915,11 @@ function renderizarRadar() {
         return h;
     };
 
-    // ── Render especial para MOMENTUM ALTO ──
+    // ── Render especial para BOTÓN DORADO (Rompiendo el 0) ──
     const renderMomentum = () => {
         if (radarFiltroActual !== 'todas' && radarFiltroActual !== 'momentum') return '';
         let h = `<div class="radar-titulo-seccion" style="color:#ffa500;">
-            ⭐ MOMENTUM ALTO — Cerca del 100% y subiendo
+            🟡 BOTÓN DORADO — Momentum alto
             <span style="font-size:10px;background:rgba(255,165,0,0.12);padding:2px 8px;border-radius:10px;color:#ffa500;">${grupos.momentum.length}</span>
             <span style="font-size:9px;color:#64748b;margin-left:4px;">ordenadas por rango + velocidad</span>
         </div>`;
@@ -13523,7 +13618,7 @@ if (!_origActualizarTablaIzq2) {
         if (!_bbAutoAplicadoInicio && cachedData && Object.keys(cachedData).length > 0) {
             _bbAutoAplicadoInicio = true;
             const inputBB = document.getElementById('searchCoin');
-            if (inputBB && inputBB.value.trim() === '' && typeof _bbAbrirDesdeAlarma === 'function') {
+            if (!LISTA_PRINCIPAL_SOLO_SENALES && inputBB && inputBB.value.trim() === '' && typeof _bbAbrirDesdeAlarma === 'function') {
                 _bbAbrirDesdeAlarma();
             }
         }
@@ -15480,7 +15575,7 @@ function _actualizarVentanitaTecho4Ema() {
     // archivo completo sin caer en la paradoja de "el hash contiene su
     // propio hash". No cambiar este texto.
     var _PLACEHOLDER = "%%CDC_INTEGRITY_HASH%%";
-    var _HASH_ESPERADO = "467329434425cabfdc05788beb088b72a0387bbb59a648bac655f17f9cc20d7f"; // ← se reemplaza por el hash real en el paso final
+    var _HASH_ESPERADO = "0407235a878575d53e9823498a1a0350a3455a2c429ddc3bf876d89df1cc5ed1"; // ← se reemplaza por el hash real en el paso final
 
     function _bloquear(motivo) {
         try {
