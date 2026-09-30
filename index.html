@@ -4046,8 +4046,7 @@ la computadora.</p>
 <div id="paperBox" style="display: none;">🧪 PAPER TRADING</div>
 
 <div id="floatingButtons" class="floating-buttons">
-    <button id="simuladorBtn" class="float-btn float-sim" onclick="abrirSimulador()" title="Abre el simulador de operaciones (probar compras/ventas sin dinero real)" 🧪<="" button="">
-    </button><button id="emaRadarBtn" class="float-btn" onclick="abrirRadarDespegue()" title="Abre el radar de despegues: monedas con las EMAs alineadas al alza en tiempo real" style="background:#0ecb81; color:#fff; font-weight:900;">⚡</button>
+    <button id="emaRadarBtn" class="float-btn" onclick="abrirRadarDespegue()" title="Abre el radar de despegues: monedas con las EMAs alineadas al alza en tiempo real" style="background:#0ecb81; color:#fff; font-weight:900;">⚡</button>
     <a id="linkBinance" class="float-btn float-binance" target="_blank" style="display: flex;" title="Abrir en web Binance" onclick="event.preventDefault(); abrirParEnBinance(selectedCoin || 'AAOIUSDT');" href="https://www.binance.com/es-LA/futures/LRCXUSDT"><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M3 17l5-6 4 4 4-6 5 7"></path></svg></a>
     <button id="linkApp" class="float-btn" onclick="abrirEnApp()" style="display: flex; background: linear-gradient(135deg, rgb(243, 186, 47), rgb(255, 107, 0)); color: rgb(0, 0, 0); font-size: 13px; font-weight: 900; border: medium; cursor: pointer; animation: 1.5s infinite pulse-app; box-shadow: rgba(243, 186, 47, 0.6) 0px 4px 16px;" title="Abrir en App Binance">📱</button>
     <style>@keyframes pulse-app{0%,100%{box-shadow:0 4px 16px rgba(243,186,47,0.5)}50%{box-shadow:0 4px 28px rgba(243,186,47,0.95)}}</style>
@@ -5879,6 +5878,7 @@ const MAX_COLA_VOZ = 20; // capacidad suficiente para todas las monedas de la li
 function hablar(texto, esMasculino) {
     if (!('speechSynthesis' in window)) return;
     // Si la cola ya está llena, descartamos el aviso más antiguo (ya perdió vigencia)
+    if (colaVoz.some(q => q.texto === texto)) return; // no repetir el mismo aviso en cola
     if (colaVoz.length >= MAX_COLA_VOZ) colaVoz.shift();
     colaVoz.push({ texto, esMasculino });
     procesarColaVoz();
@@ -5902,7 +5902,7 @@ function procesarColaVoz() {
     u.lang = 'es-ES';
     u.volume = 1;
     u.pitch = 1.0;
-    u.rate  = 0.90;
+    u.rate  = 1.0;
     if (vozFemenina) u.voice = vozFemenina;
 
     // Calcular duración estimada y bloquear durante ese tiempo + 1 seg
@@ -13574,7 +13574,8 @@ document.addEventListener("DOMContentLoaded", () => {
     document.body.addEventListener('click', initAudio, { once: false });
     document.body.addEventListener('touchstart', initAudio, { once: false });
 
-    setInterval(() => { obtenerDatosBinance(); actualizarPaperTradingUI(); evaluarAprendizajeCDC(); revisarAvisosOficialesBinance(); revisarNoticiasCointelegraph(); }, 6000);
+    let _cicloBinanceEnCurso = false;
+    setInterval(() => { if (_cicloBinanceEnCurso) return; _cicloBinanceEnCurso = true; setTimeout(() => { _cicloBinanceEnCurso = false; }, 5500); obtenerDatosBinance(); actualizarPaperTradingUI(); evaluarAprendizajeCDC(); revisarAvisosOficialesBinance(); revisarNoticiasCointelegraph(); }, 6000);
 
 // ── Aprendizaje continuo: absorber datos de la moneda seleccionada cada 8s ──
 setInterval(() => {
@@ -15575,7 +15576,7 @@ function _actualizarVentanitaTecho4Ema() {
     // archivo completo sin caer en la paradoja de "el hash contiene su
     // propio hash". No cambiar este texto.
     var _PLACEHOLDER = "%%CDC_INTEGRITY_HASH%%";
-    var _HASH_ESPERADO = "46006a9ba11f0dc00306b1732f4c7ec939be0bd0460c0e7c0c7935981ce90252"; // ← se reemplaza por el hash real en el paso final
+    var _HASH_ESPERADO = "4f3f606cfe9eb820d40d10602b41d630a7f486d57749606076fbee81a2452455"; // ← se reemplaza por el hash real en el paso final
 
     function _bloquear(motivo) {
         try {
@@ -15854,11 +15855,12 @@ tickAll();
    compara contra el núcleo del CDC con datos que la red NO vio (30% más reciente). */
 (function(){
 "use strict";
-var CFG={drop:1.5,up:1.0,mins:15,posMin:60,cada:60000,maxPend:500,hid:[12,6],nIn:24};
-var LS=localStorage,LIFE=[],VM={},DS=[], PEND=[], LAST={}, MODEL=null, MET=null, TRAIN=false, DB=null;
+var CFG={drop:1.5,up:1.0,mins:15,posMin:60,cada:60000,maxPend:1500,hid:[12,6],nIn:24};
+var MAXD=20000,MAXKEEP=40000,MINPOS=30,_lgTry=false,GC={},LS=localStorage,LIFE=[],VM={},DS=[], PEND=[], LAST={}, MODEL=null, MET=null, TRAIN=false, DB=null;
 try{var m=JSON.parse(LS.getItem("cdc_neuro_model")||"null"); if(m&&m.w&&m.w.cells){MODEL=m.w;MET=m.met;}}catch(e){}
+if(MET&&MET.indepPos==null){MET.gana=false;MET.legacy=1;} /* modelo viejo: se reevalúa con el criterio estricto */
 var usar=LS.getItem("cdc_neuro_on")==="1";
-function g(n){try{return (0,eval)("typeof "+n+"!=='undefined'?"+n+":undefined");}catch(e){}}
+function g(n){var f=GC[n];if(!f){try{f=GC[n]=new Function("try{return typeof "+n+"!=='undefined'?"+n+":undefined}catch(e){}");}catch(e){f=GC[n]=function(){};}}try{return f();}catch(e){}}
 function cl(v,a,b){return Math.max(a,Math.min(b,+v||0));}
 /* ── IndexedDB ── */
 function dbOpen(cb){var r=indexedDB.open("cdc_neuro",1);
@@ -15866,7 +15868,7 @@ function dbOpen(cb){var r=indexedDB.open("cdc_neuro",1);
  r.onsuccess=function(){DB=r.result;cb&&cb();}; r.onerror=function(){cb&&cb();};}
 function dbAdd(s){if(!DB)return;try{DB.transaction("ds","readwrite").objectStore("ds").add(s);}catch(e){}}
 function dbLoad(cb){if(!DB)return cb();var q=DB.transaction("ds").objectStore("ds").getAll();
- q.onsuccess=function(){DS=(q.result||[]).map(padX);cb();}; q.onerror=cb;}
+ q.onsuccess=function(){var r=q.result||[];if(r.length>MAXKEEP){r=r.slice(-MAXKEEP);try{var tx=DB.transaction("ds","readwrite"),os=tx.objectStore("ds");os.clear();r.forEach(function(s){os.add(s);});}catch(e){}}DS=r.map(padX);cb();}; q.onerror=cb;}
 function dbClear(){if(DB)DB.transaction("ds","readwrite").objectStore("ds").clear();DS=[];PEND=[];}
 /* ── Características ── */
 function feats(sym){
@@ -15935,25 +15937,65 @@ function epochCell(c,TR,wp){var V=VM[c.n];if(!V||V[0].W.length!==c.M[0].W.length
 function vitUpd(s){if(!MODEL||!MODEL.cells)return;MODEL.cells.forEach(function(c){c.ema=.97*c.ema+.03*Math.abs(fwd(c.M,pj(c,s.x))-s.y);c.vit=Math.max(.1,Math.pow(1-c.ema,3)*2);});}
 function save(){try{LS.setItem("cdc_neuro_model",JSON.stringify({w:MODEL,met:MET}));}catch(e){}}
 function cellInfo(){if(!MODEL||!MODEL.cells)return"";return"<b style='color:#b58cff'>Células:</b> "+MODEL.cells.map(function(c){return c.n+" ("+c.h+"n · vit "+c.vit.toFixed(1)+")";}).join(" · ")+(MODEL.log&&MODEL.log.length?"<br><i>🧬 "+MODEL.log.slice(-3).join(" · ")+"</i>":"")+"<br>";}
+/* ── Entrenador por tajadas de tiempo (sirve igual en Worker o en el hilo principal) ── */
+function mkTrainer(cells,TR,VAL,wp,EP,FR,PAT){
+ var yv=VAL.map(function(s){return s.y;}),ep=0,V=cells.map(function(c){return zr(c.M);}),
+  Xs=cells.map(function(c){return TR.map(function(s){return pj(c,s.x);});}),
+  Vx=cells.map(function(c){return VAL.map(function(s){return pj(c,s.x);});}),
+  st=cells.map(function(){return{best:0,bj:null,stall:0,done:false};});
+ return{run:function(ms){var t0=Date.now();
+   while(ep<EP&&Date.now()-t0<ms){var any=false;
+    for(var ci=0;ci<cells.length;ci++){var s=st[ci];if(s.done)continue;any=true;var c=cells[ci],P=[];
+     for(var i=0;i<TR.length;i++)if(Math.random()<FR)P.push({x:Xs[ci][i],y:TR[i].y});
+     for(var j=P.length-1;j>0;j--){var k=Math.floor(Math.random()*(j+1)),tmp=P[j];P[j]=P[k];P[k]=tmp;}
+     for(var b=0;b<P.length;b+=32)step(c.M,V[ci],P.slice(b,b+32),.02,wp);
+     if((ep+1)%4===0){var a=auc(Vx[ci].map(function(x){return fwd(c.M,x);}),yv);
+      if(a>s.best){s.best=a;s.bj=JSON.stringify(c.M);s.stall=0;}else if(++s.stall>=PAT)s.done=true;}}
+    ep++;if(!any)ep=EP;}
+   return{done:ep>=EP,pct:Math.min(100,Math.round(ep/EP*100))};},
+  result:function(){return cells.map(function(c,i){return{M:st[i].bj?JSON.parse(st[i].bj):c.M,bestV:st[i].best};});}};}
+function workerSrc(){return [zr,pj,fwd,step,auc,mkTrainer].map(String).join("\n")+
+ "\nself.onmessage=function(e){var d=e.data,tr=mkTrainer(d.cells,d.TR,d.VAL,d.wp,d.EP,d.FR,d.PAT),r;do{r=tr.run(80);self.postMessage({p:r.pct});}while(!r.done);self.postMessage({done:1,res:tr.result()});};";}
+/* casos de caída realmente independientes (varias muestras de la misma moneda en 15 min cuentan como 1) */
+function indep(T){var last={},n=0,gap=CFG.mins*60000;T.forEach(function(s){if(!s.y)return;if(s.ts-(last[s.sym]||-1e15)>=gap)n++;last[s.sym]=s.ts;});return n;}
+/* Bootstrap por bloques de tiempo: ¿la ventaja de la red sobre el CDC aguanta o fue suerte? (percentil 10) */
+function boot(M,T){var pn=T.map(function(s){return pens(M,s.x);}),pc=T.map(function(s){return s.cdc;}),y=T.map(function(s){return s.y;}),B={},bl=[];
+ T.forEach(function(s,i){var k=Math.floor(s.ts/(CFG.mins*60000));(B[k]=B[k]||[]).push(i);});for(var k in B)bl.push(B[k]);
+ if(bl.length<8)return null;var R=T.length>4000?80:150,d=[];
+ for(var r=0;r<R;r++){var a=[],b=[],yy=[];for(var j=0;j<bl.length;j++){var G=bl[Math.floor(Math.random()*bl.length)];for(var q=0;q<G.length;q++){a.push(pn[G[q]]);b.push(pc[G[q]]);yy.push(y[G[q]]);}}d.push(auc(a,yy)-auc(b,yy));}
+ d.sort(function(x,z){return x-z;});return{lo:d[Math.floor(R*.1)],med:d[R>>1]};}
 function train(ui){
  if(TRAIN)return;var D=DS.filter(function(s){return s.y===0||s.y===1;});
  if(D.length<200){ui("Faltan datos: "+D.length+"/200 mínimo (ideal 2000+).");return;}
- D.sort(function(a,b){return a.ts-b.ts;});var cut=Math.floor(D.length*.7),TR=D.slice(0,cut),TE=D.slice(cut);
- var pos=TR.filter(function(s){return s.y;}).length;if(pos<10||TE.filter(function(s){return s.y;}).length<5){ui("Muy pocos ejemplos de caída ("+pos+"). Sigue recolectando.");return;}
- var wp=Math.min(10,(TR.length-pos)/pos);if(!MODEL||!MODEL.cells)MODEL={cells:CELLS_DEF.map(function(d){return mkCell(d[0],d[1]);}),log:[]};
- var E=MODEL,ep=0,EP=120;TRAIN=true;
- (function loop(){for(var i=0;i<2&&ep<EP;i++,ep++)E.cells.forEach(function(c){epochCell(c,TR,wp);});
-  ui("Entrenando… "+Math.round(ep/EP*100)+"%");if(ep<EP)return setTimeout(loop,0);
+ D.sort(function(a,b){return a.ts-b.ts;});if(D.length>MAXD)D=D.slice(-MAXD);
+ var gap=CFG.mins*60000,c1=Math.floor(D.length*.56),c2=Math.floor(D.length*.7),TE=D.slice(c2),VAL=D.slice(c1,c2).filter(function(s){return s.ts<=TE[0].ts-gap;}),TR=D.slice(0,c1).filter(function(s){return VAL.length&&s.ts<=VAL[0].ts-gap;});
+ var pos=TR.filter(function(s){return s.y;}).length;if(pos<10||TE.filter(function(s){return s.y;}).length<5||VAL.filter(function(s){return s.y;}).length<5){ui("Muy pocos ejemplos de caída ("+pos+"). Sigue recolectando.");return;}
+ var wp=Math.min(20,(TR.length-pos)/pos);if(!MODEL||!MODEL.cells)MODEL={cells:CELLS_DEF.map(function(d){return mkCell(d[0],d[1]);}),log:[]};
+ var E=MODEL,first=!E.cells.some(function(c){return c.aucTe!=null;}),EP=first?120:70,FR=.6,PAT=8,finished=false,gotMsg=false,w=null;TRAIN=true;
+ var sTR=TR.map(function(s){return{x:s.x,y:s.y};}),sVAL=VAL.map(function(s){return{x:s.x,y:s.y};});
+ function fin(res){if(finished)return;finished=true;
+  E.cells.forEach(function(c,i){c.M=res[i].M;c.aucVal=res[i].bestV;});
   var ytr=TR.map(function(s){return s.y;}),yte=TE.map(function(s){return s.y;});
-  E.cells.forEach(function(c){c.aucTr=auc(TR.map(function(s){return fwd(c.M,pj(c,s.x));}),ytr);c.aucTe=auc(TE.map(function(s){return fwd(c.M,pj(c,s.x));}),yte);
-   c.vit=Math.max(.1,(c.aucTe-.45)*6);c.ema=Math.min(.6,Math.max(.2,1-c.aucTe));
-   if(c.aucTr<.62&&c.h<MAXH){grow(c,4);E.log.push(c.n+" crece a "+c.h+" neuronas");}
-   else if(c.aucTr-c.aucTe>.15&&c.h>4){shrink(c,2);E.log.push(c.n+" poda a "+c.h+" (memorizaba)");}});
-  MET=evalSet(E,TE);
-  if(E.cells.length<MAXC&&MET.aucN<.58&&D.length>=E.cells.length*300){var ix=[];while(ix.length<7){var r=Math.floor(Math.random()*CFG.nIn);if(ix.indexOf(r)<0)ix.push(r);}
-   E.cells.push(mkCell("Célula "+(E.cells.length+1),ix.sort(function(a,b){return a-b;})));E.log.push("Nace Célula "+E.cells.length+" (faltaba capacidad)");}
-  E.log=E.log.slice(-6);MET.trainN=TR.length;MET.totalN=D.length;MET.ts=Date.now();MET.gana=MET.aucN>MET.aucC+.02&&MET.n>=100;
-  TRAIN=false;if(!MET.gana){usar=false;LS.setItem("cdc_neuro_on","0");}save();ui("Listo.");})();}
+   E.cells.forEach(function(c){c.aucTr=auc(TR.map(function(s){return fwd(c.M,pj(c,s.x));}),ytr);c.aucTe=auc(TE.map(function(s){return fwd(c.M,pj(c,s.x));}),yte);
+    c.vit=Math.max(.1,(c.aucTe-.45)*6);c.ema=Math.min(.6,Math.max(.2,1-c.aucTe));
+    if(c.aucTr<.62&&c.h<MAXH){grow(c,4);E.log.push(c.n+" crece a "+c.h+" neuronas");}
+    else if(c.aucTr-c.aucTe>.15&&c.h>4){shrink(c,2);E.log.push(c.n+" poda a "+c.h+" (memorizaba)");}});
+   MET=evalSet(E,TE);MET.indepPos=indep(TE);var bt=boot(E,TE);MET.boot=bt?bt.lo:null;MET.legacy=0;var sv=VAL.map(function(s){return pens(E,s.x);}),ov=VAL.map(function(s){return s.y;}),ix2=sv.map(function(_,i){return i;}).sort(function(a,b){return sv[a]-sv[b];}),cal=[],mxr=0;for(var bq=0;bq<6;bq++){var lo=Math.floor(ix2.length*bq/6),hi=Math.floor(ix2.length*(bq+1)/6),ss=0;if(hi<=lo)continue;for(var q=lo;q<hi;q++)ss+=ov[ix2[q]];mxr=Math.max(mxr,ss/(hi-lo));cal.push([sv[ix2[hi-1]],mxr]);}MET.cal=cal;
+   if(E.cells.length<MAXC&&MET.aucN<.58&&D.length>=E.cells.length*300){var ix=[];while(ix.length<7){var r=Math.floor(Math.random()*CFG.nIn);if(ix.indexOf(r)<0)ix.push(r);}
+    E.cells.push(mkCell("Célula "+(E.cells.length+1),ix.sort(function(a,b){return a-b;})));E.log.push("Nace Célula "+E.cells.length+" (faltaba capacidad)");}
+   E.log=E.log.slice(-6);MET.trainN=TR.length;MET.totalN=D.length;MET.ts=Date.now();MET.lift=MET.base>0?MET.p20N/MET.base:0;MET.gana=MET.aucN>Math.max(MET.aucC,.5)+.03&&MET.lift>=1.5&&MET.n>=300&&MET.indepPos>=MINPOS&&MET.boot!=null&&MET.boot>0;
+  TRAIN=false;if(!MET.gana){usar=false;LS.setItem("cdc_neuro_on","0");}save();ui("Listo.");}
+ function main(){var tr=mkTrainer(E.cells.map(function(c){return{n:c.n,idx:c.idx,M:c.M};}),sTR,sVAL,wp,EP,FR,PAT);
+  (function loop(){var r=tr.run(12);ui("Entrenando… "+r.pct+"%");if(!r.done)return setTimeout(loop,4);finished=false;fin(tr.result());})();}
+ function fallback(){if(w){try{w.terminate();}catch(x){}w=null;}finished=false;main();}
+ try{
+  w=new Worker(URL.createObjectURL(new Blob([workerSrc()],{type:"text/javascript"})));
+  w.onmessage=function(e){gotMsg=true;if(e.data.done){try{w.terminate();}catch(x){}fin(e.data.res);}else ui("Entrenando (2º plano)… "+e.data.p+"%");};
+  w.onerror=function(){if(!finished&&!gotMsg)fallback();};
+  w.postMessage({cells:E.cells.map(function(c){return{n:c.n,idx:c.idx,M:c.M};}),TR:sTR,VAL:sVAL,wp:wp,EP:EP,FR:FR,PAT:PAT});
+  setTimeout(function(){if(!gotMsg&&!finished)fallback();},10000);
+ }catch(e){fallback();}}
+function probCal(sym){var p=prob(sym);if(p==null||!MET||!MET.cal||!MET.cal.length)return null;for(var i=0;i<MET.cal.length;i++)if(p<=MET.cal[i][0])return MET.cal[i][1];return MET.cal[MET.cal.length-1][1];}
 function prob(sym){if(!MODEL||!MODEL.cells)return null;var x=feats(sym);return x?pens(MODEL,x):null;}
 /* ── Recolector + etiquetado ── */
 function tick(){var C=g("cachedData");if(!C)return;var now=Date.now(),k;
@@ -15978,21 +16020,29 @@ if(typeof orig==="function")window.calcularPrediccionCDC=function(sym){
 function ui(){
  var b=document.createElement("button");b.textContent="🧠 NEURO";
  b.style.cssText="display:none;position:fixed;left:10px;bottom:10px;z-index:9998;background:#0b1220;color:#f3ba2f;border:1px solid #f3ba2f;border-radius:8px;padding:6px 10px;font:700 12px Arial;cursor:pointer";
- var p=document.createElement("div");p.style.cssText="display:none;position:fixed;left:10px;bottom:48px;z-index:9998;width:330px;max-height:70vh;overflow:auto;background:#030712;color:#e2e8f0;border:1px solid #f3ba2f;border-radius:10px;padding:12px;font:12px Arial";
+ var p=document.createElement("div");p.style.cssText="display:none;position:fixed;left:10px;bottom:48px;z-index:9998;width:250px;max-height:60vh;overflow:auto;background:rgba(3,7,18,.78);backdrop-filter:blur(3px);color:#e2e8f0;border:1px solid rgba(243,186,47,.7);border-radius:10px;padding:8px;font:11px/1.35 Arial";
  window.CDC_BRAIN.btn=b;document.body.appendChild(b);document.body.appendChild(p);var msg="",t=null;
- function draw(){var lab=DS.length,pos=DS.filter(function(s){return s.y;}).length,h="<b style='color:#f3ba2f'>CDC-NEURO</b> · caída ≥"+CFG.drop+"% en "+CFG.mins+" min antes de +"+CFG.up+"%<br>";
-  h+="Muestras: <b>"+lab+"</b> (caídas: "+pos+") · pendientes: "+PEND.length+"<br>"+cellInfo();
-  if(MET){var f=function(v){return (v*100).toFixed(1)+"%";};
-   h+="<hr style='border-color:#1e293b'><b>Validación (datos no vistos, n="+MET.n+")</b><br>Tasa base de caída: "+f(MET.base)+
-   "<br>AUC CDC: <b>"+MET.aucC.toFixed(3)+"</b> · AUC Red: <b style='color:"+(MET.gana?"#22c55e":"#ff2a3b")+"'>"+MET.aucN.toFixed(3)+"</b>"+
-   "<br>Acierto top 20%: CDC "+f(MET.p20C)+" · Red "+f(MET.p20N)+
-   "<br><b>"+(MET.gana?"✅ La red supera al CDC":"❌ La red NO supera al CDC (no se usa)")+"</b><br>"+
-   "<label><input type='checkbox' id='nUsar' "+(usar?"checked":"")+(MET.gana?"":" disabled")+"> Usar como factor (40%) en el score</label><br>";}
-  h+="<div style='margin:8px 0'><button id='nT'>Entrenar</button> <button id='nE'>Exportar CSV</button> <button id='nC'>Borrar datos</button></div><i>"+msg+"</i>";
-  if(MODEL){var rows=[],C=g("cachedData")||{};for(var k in C){if(C[k].posicionPorcentaje>=CFG.posMin){var q=prob(k);if(q!=null)rows.push([k,q]);}}
-   rows.sort(function(a,b){return b[1]-a[1];});
-   h+="<hr style='border-color:#1e293b'><b>Más probables de caer (red)</b><br>"+rows.slice(0,8).map(function(r){return r[0].replace("USDT","")+": <b>"+Math.round(r[1]*100)+"%</b>";}).join(" · ");}
+ var mini=LS.getItem("cdc_neuro_mini")==="1",det=LS.getItem("cdc_neuro_det")==="1",dg=null;
+ p.addEventListener("pointerdown",function(e){if(!e.target.closest||!e.target.closest("#nH")||e.target.tagName==="BUTTON")return;var r=p.getBoundingClientRect(),o=(p.offsetParent||document.body).getBoundingClientRect();dg={dx:e.clientX-r.left,dy:e.clientY-r.top,ox:o.left,oy:o.top};try{p.setPointerCapture(e.pointerId);}catch(x){}e.preventDefault();});
+ p.addEventListener("pointermove",function(e){if(!dg)return;p.style.left=(e.clientX-dg.dx-dg.ox)+"px";p.style.top=(e.clientY-dg.dy-dg.oy)+"px";p.style.right="auto";p.style.bottom="auto";});
+ p.addEventListener("pointerup",function(){dg=null;});
+ function draw(){var pos=DS.filter(function(s){return s.y;}).length,f=function(v){return (v*100).toFixed(1)+"%";},
+  h="<div id='nH' style='display:flex;align-items:center;gap:6px;cursor:move;user-select:none'><b style='color:#f3ba2f;flex:1'>🧠 CDC-NEURO</b><span style='color:#94a3b8;font-size:10px'>"+DS.length+" muestras</span><button id='nMin' title='Minimizar' style='padding:0 6px;cursor:pointer'>"+(mini?"▢":"—")+"</button></div>";
+  if(!mini){
+   if(MET){var lift=MET.base>0?MET.p20N/MET.base:0,col=MET.gana?"#22c55e":"#ff2a3b";
+    h+="<div style='margin-top:5px'>AUC red <b style='color:"+col+"'>"+MET.aucN.toFixed(3)+"</b> · CDC <b>"+MET.aucC.toFixed(3)+"</b><br>Top 20%: red <b>"+f(MET.p20N)+"</b> · CDC "+f(MET.p20C)+"<br>Base "+f(MET.base)+" · la red acierta <b style='color:"+col+"'>x"+lift.toFixed(1)+"</b></div>"+
+    "<div style='margin-top:4px;color:#94a3b8;font-size:10px'>Casos de caída independientes: <b>"+(MET.indepPos==null?"?":MET.indepPos)+"</b>/"+MINPOS+" · ventaja sobre CDC (peor caso 90%): <b>"+(MET.boot==null?"—":(MET.boot>=0?"+":"")+MET.boot.toFixed(3))+"</b>"+(MET.legacy?" · reevaluando con criterio estricto":"")+"</div>"+
+    "<div style='margin-top:4px'><b style='color:"+col+"'>"+(MET.gana?"✅ Supera al CDC":"❌ No supera al CDC")+"</b></div>"+
+    "<label style='display:block;margin-top:2px'><input type='checkbox' id='nUsar' "+(usar?"checked":"")+(MET.gana?"":" disabled")+"> Usar como factor (40%)</label>";}
+   h+="<div style='margin:6px 0 4px;display:flex;gap:4px;flex-wrap:wrap'><button id='nT'>Entrenar</button><button id='nE'>CSV</button><button id='nC'>Borrar</button></div>"+(msg?"<i style='color:#94a3b8'>"+msg+"</i>":"");
+   if(MODEL){var rows=[],C=g("cachedData")||{};for(var k in C){if(C[k].posicionPorcentaje>=CFG.posMin){var q=prob(k);if(q!=null)rows.push([k,q,probCal(k)]);}}
+    rows.sort(function(a,b){return b[1]-a[1];});
+    h+="<div style='margin-top:4px;border-top:1px solid #1e293b;padding-top:4px'><b>Más probables de caer</b> <span style='color:#94a3b8'>(prob. real)</span><br>"+rows.slice(0,5).map(function(r){return r[0].replace("USDT","")+" <b>"+(r[2]!=null?Math.round(r[2]*100):Math.round(r[1]*100))+"%</b>";}).join(" · ")+"</div>";}
+   h+="<details id='nD' "+(det?"open":"")+" style='margin-top:4px'><summary style='cursor:pointer;color:#7fe9ff'>Detalles</summary>caída ≥"+CFG.drop+"% en "+CFG.mins+" min antes de +"+CFG.up+"%<br>Caídas: "+pos+" · pendientes: "+PEND.length+"<br>"+cellInfo()+(MET?"Validación n="+MET.n+"<br>":"")+"<span style='color:#94a3b8'>El % calibrado es la frecuencia real observada con ese puntaje; el % grande del cerebro es un puntaje de ranking.</span></details>";}
   p.innerHTML=h;
+  var bm=p.querySelector("#nMin");bm.onclick=function(){mini=!mini;LS.setItem("cdc_neuro_mini",mini?"1":"0");draw();};
+  if(mini)return;
+  var dd=p.querySelector("#nD");dd.ontoggle=function(){det=dd.open;LS.setItem("cdc_neuro_det",det?"1":"0");};
   p.querySelector("#nT").onclick=function(){train(function(m){msg=m;window.CDC_BRAIN.burst(m);draw();});};
   p.querySelector("#nE").onclick=exp;p.querySelector("#nC").onclick=function(){if(confirm("¿Borrar todos los datos recolectados?")){dbClear();draw();}};
   var u=p.querySelector("#nUsar");if(u)u.onchange=function(){usar=u.checked;LS.setItem("cdc_neuro_on",usar?"1":"0");};}
@@ -16000,8 +16050,8 @@ function ui(){
 function exp(){var h="ts,symbol,y,minRet,maxRet,cdcCaida,"+Array.from({length:CFG.nIn},function(_,i){return "f"+i;}).join(",");
  var t=[h].concat(DS.map(function(s){return [s.ts,s.sym,s.y,s.minRet,s.maxRet,s.cdc.toFixed(1)].concat(s.x.map(function(v){return v.toFixed(4);})).join(",");})).join("\n");
  var a=document.createElement("a");a.href=URL.createObjectURL(new Blob([t],{type:"text/csv"}));a.download="cdc_neuro_dataset.csv";a.click();}
-window.CDC_NEURO={life:function(){return{pend:PEND,life:LIFE};},net:function(){return{M:MODEL,met:MET,n:DS.length};},feats:feats,fwd:fwd,prob:prob,train:function(){train(console.log);},muestras:function(){return DS.length;}};
-function start(){dbOpen(function(){dbLoad(function(){ui();setInterval(tick,10000);setInterval(function(){var n=DS.length;if(!TRAIN&&n>=200&&n-((MET&&MET.totalN)||0)>=100)train(function(m){window.CDC_BRAIN.burst(m);});else save();},60000);});});}
+window.CDC_NEURO={life:function(){return{pend:PEND,life:LIFE};},net:function(){return{M:MODEL,met:MET,n:DS.length};},feats:feats,fwd:fwd,prob:prob,probCal:probCal,train:function(){train(console.log);},muestras:function(){return DS.length;}};
+function start(){dbOpen(function(){dbLoad(function(){ui();setInterval(tick,10000);setInterval(function(){var n=DS.length;var tN=(MET&&MET.totalN)||0,due=(n-tN>=200&&Date.now()-((MET&&MET.ts)||0)>=6e5)||(MET&&MET.legacy&&!_lgTry);if(!TRAIN&&n>=200&&due){if(MET&&MET.legacy)_lgTry=true;train(function(m){window.CDC_BRAIN.burst(m);});}else save();},60000);});});}
 if(document.readyState==="loading")document.addEventListener("DOMContentLoaded",start);else start();
 })();
 </script>
