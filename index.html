@@ -6125,7 +6125,7 @@ function mostrarBannerScalp(nombre, symbol, tipoOp, apalRec, apalTexto, cambio2m
     const esLong = tipoOp === 'LONG';
 
     // ── 1. ABRIR MONEDA EN PANEL CENTRAL AUTOMÁTICAMENTE ──
-    seleccionarMoneda(symbol);
+    if (_cerebroAprueba(symbol)) seleccionarMoneda(symbol); // 🧠 el cerebro manda
 
     // ── 2. HACER PARPADEAR EL PANEL CENTRAL ──
     const panelCentral = document.getElementById('detailView');
@@ -6455,6 +6455,55 @@ const _BOTONES_ORIGEN_PANEL = [
     { tipo: 'EXPLOSION',   emoji: '🚀', label: 'EXPLOSIÓN',      color: '#0ecb81' },
     { tipo: 'DORADO',      emoji: '🟡', label: 'BOTÓN DORADO',   color: '#f3ba2f' },
 ];
+// ══ PANEL CENTRAL ← CEREBRO NEURONAL (EL CEREBRO MANDA) ══
+// Regla única: a la moneda solo se le permite estar en el panel central si el
+// cerebro (CDC-NEURO, 30 entradas) dice que YA LLEGÓ A SU MÁXIMO (>=95% del rango 24h)
+// y que VA A CAER (prob. de caída >= CEREBRO_UMBRAL_CAIDA). Sin excepciones:
+// aunque el cerebro todavía esté aprendiendo, él decide; si no hay cerebro o no
+// da probabilidad para la moneda, NO entra. Para cambiar la exigencia, tocar solo
+// la constante de abajo.
+const CEREBRO_UMBRAL_CAIDA = 50;
+function _cerebroAprueba(sym) {
+    try {
+        // El cerebro predice CAÍDAS desde el techo: solo gobierna el modo SHORT.
+        if (typeof modoMercado !== 'undefined' && modoMercado === 'alcista') return true;
+        const c = (typeof cachedData !== 'undefined') ? cachedData[sym] : null;
+        if (!c || (c.posicionPorcentaje || 0) < 95) return false;
+        if (!window.CDC_NEURO || !CDC_NEURO.panel) return false;
+        const n = CDC_NEURO.panel(sym);
+        return !!(n && n.p >= CEREBRO_UMBRAL_CAIDA);
+    } catch (e) { return false; }
+}
+function _cerebroFiltrarPanel(lista) {
+    try {
+        if (!window.CDC_NEURO || !CDC_NEURO.panel) return [];
+        const out = lista
+            .map(p => ({ p, n: CDC_NEURO.panel(p.symbol) }))
+            .filter(o => o.n && o.n.p >= CEREBRO_UMBRAL_CAIDA);
+        out.sort((a, b) => b.n.p - a.n.p);
+        return out.map(o => o.p);
+    } catch (e) { return []; }
+}
+function _htmlCerebroNN(sym) {
+    try {
+        const n = (window.CDC_NEURO && CDC_NEURO.panel) ? CDC_NEURO.panel(sym) : null;
+        const d = (typeof datosEMA !== 'undefined' && datosEMA[sym]) ? datosEMA[sym].estudiosTecho : null;
+        const f = [];
+        if (d) {
+            if (d.rsiDiv >= 0.3) f.push('DIV-RSI');
+            if (d.bb > 0.67) f.push('BB↑');
+            if (d.rej >= 0.7) f.push('RECHAZO');
+            if (d.ext >= 0.5) f.push('EXT');
+            if (d.cvd >= 0.5) f.push('CVD↓');
+            if (Math.abs(d.fibo) <= 0.15) f.push('FIBO');
+        }
+        if (!n && !f.length) return '';
+        const col = (n && n.valida) ? '#b58cff' : '#94a3b8';
+        const pct = n ? ((n.real != null ? n.real : n.p) + '%' + (n.valida ? '' : ' (aprende)')) : 'recopilando';
+        return `<span style="font-size:8px;font-weight:900;background:${col}22;color:${col};border:1px solid ${col}55;border-radius:5px;padding:1px 4px;margin-left:3px;white-space:nowrap;">🧠 ${pct}${f.length ? ' · ' + f.join(' ') : ''}</span>`;
+    } catch (e) { return ''; }
+}
+
 // Devuelve la lista de botones (0, 1 o varios) que la moneda `c` cumple
 // EN VIVO ahora mismo. Una moneda puede cumplir más de un botón a la vez.
 function _botonesOrigenDeMoneda(c) {
@@ -7680,6 +7729,123 @@ async function obtenerKlines(symbol, interval, limit) {
     }
 }
 
+// ══════════════════════════════════════════════════════════════════
+// 6 ESTUDIOS DE TECHO — alimentan al CEREBRO NEURONAL (entradas 25–30)
+// Trabajan sobre las velas de 1h que ya se descargan para las EMAs
+// (cero peticiones nuevas a Binance). Cada valor sale normalizado.
+//   fibo   : distancia al nivel Fibonacci 0.618 / 0.786 más cercano (-1..1)
+//   rsiDiv : divergencia bajista del RSI (precio sube, RSI no)      (0..1)
+//   bb     : posición vs banda superior de Bollinger (>0.67 = fuera) (-1..1)
+//   ext    : extensión sobre la EMA20, medida en ATR                (-1..1)
+//   rej    : vela de rechazo (estrella fugaz / envolvente bajista)  (0..1)
+//   cvd    : el comprador se debilita mientras el precio sube       (-1..1)
+// ══════════════════════════════════════════════════════════════════
+function calcularEstudiosTecho(kl) {
+    if (!Array.isArray(kl) || kl.length < 60) return null;
+    const n = kl.length, last = n - 1;
+    const O = kl.map(k => +k[1]), H = kl.map(k => +k[2]), Lo = kl.map(k => +k[3]);
+    const C = kl.map(k => +k[4]), V = kl.map(k => +k[5]), TB = kl.map(k => +k[9]);
+    if (C.some(v => !isFinite(v)) || H.some(v => !isFinite(v)) || Lo.some(v => !isFinite(v))) return null;
+    const px = C[last];
+    if (!(px > 0)) return null;
+    const cl = (v, a, b) => Math.max(a, Math.min(b, v));
+
+    // ATR 14 (Wilder)
+    const tr = [];
+    for (let i = 1; i < n; i++) tr.push(Math.max(H[i] - Lo[i], Math.abs(H[i] - C[i - 1]), Math.abs(Lo[i] - C[i - 1])));
+    let atr = tr.slice(0, 14).reduce((a, b) => a + b, 0) / 14;
+    for (let i = 14; i < tr.length; i++) atr = (atr * 13 + tr[i]) / 14;
+    if (!(atr > 0)) atr = px * 0.001;
+
+    // RSI 14 (Wilder) — serie completa
+    const rsi = new Array(n).fill(null);
+    let g = 0, p = 0;
+    for (let i = 1; i <= 14; i++) { const d = C[i] - C[i - 1]; if (d >= 0) g += d; else p -= d; }
+    g /= 14; p /= 14;
+    rsi[14] = p === 0 ? 100 : 100 - 100 / (1 + g / p);
+    for (let i = 15; i < n; i++) {
+        const d = C[i] - C[i - 1];
+        g = (g * 13 + (d > 0 ? d : 0)) / 14;
+        p = (p * 13 + (d < 0 ? -d : 0)) / 14;
+        rsi[i] = p === 0 ? 100 : 100 - 100 / (1 + g / p);
+    }
+
+    // 1) FIBONACCI — niveles 0.618 y 0.786 del swing de las últimas 72 velas
+    let fibo = 0;
+    {
+        const w = Math.min(72, n);
+        let hi = -Infinity, lo = Infinity;
+        for (let i = n - w; i < n; i++) { if (H[i] > hi) hi = H[i]; if (Lo[i] < lo) lo = Lo[i]; }
+        const rng = hi - lo;
+        if (rng > 0) {
+            const d1 = (px - (lo + 0.618 * rng)) / rng, d2 = (px - (lo + 0.786 * rng)) / rng;
+            fibo = cl((Math.abs(d1) <= Math.abs(d2) ? d1 : d2) / 0.3, -1, 1);
+        }
+    }
+
+    // 2) DIVERGENCIA DEL RSI — último máximo más alto en precio, pero más bajo en RSI
+    let rsiDiv = 0;
+    {
+        const piv = [];
+        for (let i = Math.max(16, n - 45); i <= last; i++) {
+            let esP = true;
+            for (let j = Math.max(0, i - 2); j <= Math.min(last, i + 2); j++) if (H[j] > H[i]) { esP = false; break; }
+            if (esP && rsi[i] != null) piv.push(i);
+        }
+        if (piv.length >= 2) {
+            const p2 = piv[piv.length - 1];
+            let p1 = null;
+            for (let k = piv.length - 2; k >= 0; k--) if (p2 - piv[k] >= 3) { p1 = piv[k]; break; }
+            if (p1 != null && last - p2 <= 8 && H[p2] >= H[p1] * 0.999 && rsi[p2] < rsi[p1])
+                rsiDiv = cl((rsi[p1] - rsi[p2]) / 15, 0, 1);
+        }
+    }
+
+    // 3) BOLLINGER (20, 2σ) — 0.67 = tocando la banda superior, >0.67 = cierre fuera
+    let bb = 0;
+    {
+        const w = C.slice(-20), m = w.reduce((a, b) => a + b, 0) / 20;
+        const sd = Math.sqrt(w.reduce((a, b) => a + (b - m) ** 2, 0) / 20);
+        if (sd > 0) bb = cl((px - m) / (2 * sd), -1.5, 1.5) / 1.5;
+    }
+
+    // 4) EXTENSIÓN SOBRE LA EMA20 EN ATR (5 ATR = máximo)
+    let ext = 0;
+    {
+        const k = 2 / 21; let e = C[0];
+        for (let i = 1; i < n; i++) e = C[i] * k + e * (1 - k);
+        ext = cl(((px - e) / atr) / 5, -1, 1);
+    }
+
+    // 5) VELAS DE RECHAZO en el máximo (estrella fugaz / envolvente bajista)
+    let rej = 0;
+    {
+        const alMax = i => { let m = -Infinity; for (let j = Math.max(0, i - 24); j <= last; j++) if (H[j] > m) m = H[j]; return H[i] >= m - 0.35 * atr; };
+        const score = i => {
+            if (i < 1 || !alMax(i)) return 0;
+            const body = Math.abs(C[i] - O[i]), rg = H[i] - Lo[i];
+            if (rg <= 0) return 0;
+            const up = H[i] - Math.max(C[i], O[i]), dn = Math.min(C[i], O[i]) - Lo[i];
+            const engulf = C[i - 1] > O[i - 1] && C[i] < O[i] && O[i] >= C[i - 1] && C[i] <= O[i - 1];
+            const star = up >= 2 * body && up >= 0.5 * rg && dn <= 0.25 * rg;
+            return engulf ? 1 : (star ? 0.75 : 0);
+        };
+        rej = Math.max(score(last), 0.7 * score(last - 1));
+    }
+
+    // 6) CVD / VOLUMEN COMPRADOR (taker buy de las velas) — precio sube pero compra se apaga
+    let cvd = 0;
+    {
+        const br = (a, b) => { let d = 0, v = 0; for (let i = a; i < b; i++) { d += 2 * TB[i] - V[i]; v += V[i]; } return v > 0 ? d / v : 0; };
+        const ahora = br(n - 12, n), antes = br(n - 24, n - 12);
+        if (px > C[n - 13]) cvd = cl((0.7 * (antes - ahora) + 0.3 * (-ahora)) * 4, -1, 1);
+    }
+
+    const r = v => Math.round(v * 1000) / 1000;
+    return { fibo: r(fibo), rsiDiv: r(rsiDiv), bb: r(bb), ext: r(ext), rej: r(rej), cvd: r(cvd), ts: Date.now() };
+}
+
+
 async function actualizarEMASimbolo(symbol) {
     try {
         // 250 velas de 1h ≈ 10.4 días. Antes eran 150 (suficiente para EMA99),
@@ -7834,6 +8000,7 @@ async function actualizarEMASimbolo(symbol) {
             sma20, sma50, sma20Prev, smaAlcista,
             adx, diPlus, diMinus, tendenciaFuerte, direccionDMI,
             vwap, precioSobreVwap, distVwapPct,
+            estudiosTecho: (function(){ try { return calcularEstudiosTecho(klines); } catch (eEst) { return null; } })(),
             actualizado: Date.now()
         };
     } catch (e) {
@@ -9718,6 +9885,7 @@ function autoAbrirMonedaBombaMaxima() {
     if (mejor.symbol === selectedCoin) { _ultimoBombaMaximaSymbol = mejor.symbol; return; } // ya está abierta
     if (mejor.symbol === _ultimoBombaMaximaSymbol) return; // ya se abrió sola antes, no repetir
     if (Date.now() - _ultimaSeleccionManualTs < 15000) return; // no pisar una elección manual reciente
+    if (!_cerebroAprueba(mejor.symbol)) return; // 🧠 el cerebro manda
 
     _ultimoBombaMaximaSymbol = mejor.symbol;
     seleccionarMoneda(mejor.symbol, true, 'BOMBA');
@@ -9775,6 +9943,8 @@ function autoAbrirMejorCandidataFuerte() {
 let _ultimaSeleccionManualTs = 0; // se actualiza SOLO con clicks reales del usuario, no con el auto-cambio por techo
 
 function seleccionarMoneda(symbol, _esAutoTecho, _origen) {
+    // 🧠 EL CEREBRO MANDA: ninguna selección AUTOMÁTICA (listas, botones, alarmas) entra al panel central si el cerebro no la aprueba. El click manual del usuario sí pasa.
+    if ((_esAutoTecho === true || _origen) && !_cerebroAprueba(symbol)) return;
     initAudio(); 
     selectedCoin = symbol;
     // 🏷️ Guarda de qué lista/botón vino esta moneda (BANDERA, BOMBA, BINGO,
@@ -11641,7 +11811,7 @@ function actualizarPanelCentral() {
                     ⚡ MONITOREO EN TIEMPO REAL
                 </div>
                 <div style="font-size:26px; font-weight:900; color:#fff; letter-spacing:1px; display:flex; align-items:center; justify-content:center; gap:8px; flex-wrap:wrap;">
-                    ${simbolo} <span style="font-size:14px; color:#64748b; font-weight:600;">USDT</span>${badgeAlarma}
+                    <span class="cdc-click-moneda" data-sym="${simbolo}" title="Click: estudiar esta moneda en el Cerebro Neuronal" style="cursor:pointer;border-bottom:1px dashed rgba(255,255,255,0.35);">${simbolo}</span> <span style="font-size:14px; color:#64748b; font-weight:600;">USDT</span>${badgeAlarma}
                 </div>
                 <!-- 🔴 % de techo · 🟡 cambio 24h · 🟢 valor de la moneda — orden BANDERA BOLIVIANA (rojo, amarillo, verde), los 3 juntos, mismo tamaño, sin repetir en ningún otro lado del panel -->
                 ${(() => {
@@ -12667,6 +12837,9 @@ function actualizarTacometroDerecho() {
                 });
             }
 
+            // ══ EL CEREBRO NEURONAL ELIGE (solo SHORT: predice caída desde el techo) ══
+            if (!esLong) señalesIA = _cerebroFiltrarPanel(señalesIA);
+
             señalesIA.forEach(p => {
                 const s  = p.symbol;
                 const c2 = cachedData[s];
@@ -12687,6 +12860,7 @@ function actualizarTacometroDerecho() {
                     const _fallbackLabel = { DESPEGUE:'MOTOR IA · DESPEGUE', REBOTE:'MOTOR IA · REBOTE', REVERSION:'MOTOR IA · REVERSIÓN', PATRON_60_8:'MOTOR IA · PATRÓN -60%', BOMBA:'MOTOR IA · BOMBA', DERRUMBE:'MOTOR IA · DERRUMBE', AGOTADO:'MOTOR IA · AGOTADO', REVERSION_SHORT:'MOTOR IA · REV. SHORT', TECHO_ALTO:'MOTOR IA · TECHO' }[p.tipo] || 'MOTOR IA';
                     badgeOrigen = `<span style="font-size:8px;font-weight:900;background:#47556922;color:#94a3b8;border:1px solid #47556955;border-radius:5px;padding:1px 4px;margin-left:3px;white-space:nowrap;">🧠 ${_fallbackLabel}</span>`;
                 }
+                badgeOrigen += _htmlCerebroNN(s);
                 const badgeActivo  = esActiva ? `<span style="font-size:9px;background:#f3ba2f;color:#000;font-weight:900;padding:1px 5px;border-radius:4px;margin-left:4px;">EN PANEL</span>` : '';
 
                 if (p.tipo === 'DESPEGUE' || p.tipo === 'REBOTE' || p.tipo === 'REVERSION' || p.tipo === 'PATRON_60_8') {
@@ -14446,7 +14620,8 @@ window.seleccionarMonedaConIA = function(symbol) {
 setTimeout(() => {
     if (typeof seleccionarMoneda === 'function') {
         const _orig = seleccionarMoneda;
-        window.seleccionarMoneda = function(symbol) {
+        window.seleccionarMoneda = function(symbol, _a, _o) {
+            if ((_a === true || _o) && !_cerebroAprueba(symbol)) return; // 🧠 el cerebro manda
             _orig(symbol);
             setTimeout(() => _iaActivarParaMoneda(symbol), 600);
         };
@@ -15576,7 +15751,7 @@ function _actualizarVentanitaTecho4Ema() {
     // archivo completo sin caer en la paradoja de "el hash contiene su
     // propio hash". No cambiar este texto.
     var _PLACEHOLDER = "%%CDC_INTEGRITY_HASH%%";
-    var _HASH_ESPERADO = "4f3f606cfe9eb820d40d10602b41d630a7f486d57749606076fbee81a2452455"; // ← se reemplaza por el hash real en el paso final
+    var _HASH_ESPERADO = "b71813b171c450dda9c30938040e1a693ea65c43077276aa7121e34c5dfab23b"; // ← se reemplaza por el hash real en el paso final
 
     function _bloquear(motivo) {
         try {
@@ -15643,7 +15818,7 @@ var B="https://fapi.binance.com",FR={},OI={},CD={};
 function ev(n){try{return (0,eval)("typeof "+n+"!=='undefined'?"+n+":undefined");}catch(e){}}
 async function jf(u){var r=await fetch(u);if(!r.ok)throw 0;return r.json();}
 async function loadFR(){try{(await jf(B+"/fapi/v1/premiumIndex")).forEach(function(x){FR[x.symbol]={fr:+x.lastFundingRate*100,next:+x.nextFundingTime};});}catch(e){}}
-async function loadOI(s){try{var h=await jf(B+"/futures/data/openInterestHist?symbol="+s+"&period=5m&limit=13");
+async function loadOI(s){try{var h=await jf(B+"/futures/data/openInterestHist?symbol="+encodeURIComponent(s)+"&period=5m&limit=13");
  if(h&&h.length>4){var v=h.map(function(z){return +z.sumOpenInterestValue;}),n=v.length-1;OI[s]={now:v[n],c15:(v[n]/v[n-3]-1)*100,c60:(v[n]/v[0]-1)*100,t:Date.now()};}}catch(e){}}
 function get(s){var f=FR[s],o=OI[s];if(!f&&!o)return null;var C=ev("cachedData")||{},c=C[s]||{},fr=f?f.fr:0,c15=o?o.c15:0,c60=o?o.c60:0,
  up=(c.cambioReal2Min||0)>0.05||(c.velocidad||0)>0,q={tipo:null,nivel:0,txt:""};
@@ -15674,7 +15849,7 @@ if(document.readyState==="loading")document.addEventListener("DOMContentLoaded",
 var IMG="",BR={btn:null,burst:function(m){if(/Entren/.test(m||""))bu=1;}},bu=0,hov=-1,ST=null,stT=0,NL=[],CN={},PU=[];
 var ROT=-0.35,AUTOSPD=0.22,DRAG=false,LX=0,LFT=null,FOCAL=280,GR=0,lastHead=0,img=new Image();
 img.src=IMG;
-var NM=["Posición rango","Pos. extendida","Cambio 2m","Velocidad","Vel. media","RSI","ADX","Dirección DMI","VWAP","SMA20/50","Caída desde máx","Hrs desde máx","Veces en techo","BTC cae","ETH cae","Cambio 24h","Rango 24h","Hora (sin)","Hora (cos)","Funding rate","Open Interest 15m","Open Interest 1h","Squeeze","Datos futuros"];
+var NF=30,NM=["Posición rango","Pos. extendida","Cambio 2m","Velocidad","Vel. media","RSI","ADX","Dirección DMI","VWAP","SMA20/50","Caída desde máx","Hrs desde máx","Veces en techo","BTC cae","ETH cae","Cambio 24h","Rango 24h","Hora (sin)","Hora (cos)","Funding rate","Open Interest 15m","Open Interest 1h","Squeeze","Datos futuros","Fibonacci 0.618/0.786","Divergencia RSI","Bollinger","Extensión EMA/ATR","Vela de rechazo","CVD comprador"];
 var P=[[225,215],[245,165],[290,135],[350,120],[420,118],[480,135],[520,170],[540,225],[530,275],[495,305],[450,320],[420,340],[400,375],[380,340],[330,315],[280,300],[240,270]],cx=0,cy=0;
 P.forEach(function(p){cx+=p[0];cy+=p[1];});cx/=P.length;cy/=P.length;
 var BX=0,BY=0;(function(){var mnx=1e9,mxx=-1e9,mny=1e9,mxy=-1e9;P.forEach(function(p){mnx=Math.min(mnx,p[0]);mxx=Math.max(mxx,p[0]);mny=Math.min(mny,p[1]);mxy=Math.max(mxy,p[1]);});BX=(mxx-mnx)/2;BY=(mxy-mny)/2;})();
@@ -15685,7 +15860,7 @@ function ring(n,sc,off){var sg=[],L=0,i,o=[];for(i=0;i<P.length;i++){var a=P[i],
  for(var k=0;k<n;k++){var t=((k+off)/n)*L,j=0;while(j<sg.length-1&&t>sg[j]){t-=sg[j];j++;}var a2=P[j],b2=P[(j+1)%P.length],u=t/sg[j],x=a2[0]+(b2[0]-a2[0])*u,y=a2[1]+(b2[1]-a2[1])*u;o.push([cx+(x-cx)*sc,cy+(y-cy)*sc]);}return o;}
 function inside(x,y){var c=false;for(var i=0,j=P.length-1;i<P.length;j=i++)if((P[i][1]>y)!=(P[j][1]>y)&&x<(P[j][0]-P[i][0])*(y-P[i][1])/(P[j][1]-P[i][1])+P[i][0])c=!c;return c;}
 var N=[],DE=[];
-ring(24,.86,0).forEach(function(p,i){N.push({x:p[0],y:p[1],l:0,i:i,g:0,id:i});});
+ring(NF,.86,0).forEach(function(p,i){N.push({x:p[0],y:p[1],l:0,i:i,g:0,id:i});});
 ring(8,.55,.5).forEach(function(p,i){N.push({x:p[0],y:p[1],l:1,i:i,g:0,id:1000+i});});
 N.push({x:cx,y:cy+6,l:2,i:0,g:0,id:9999});
 N.forEach(function(n,i){n.z=n.l===2?0:zOf(n.x,n.y,i);});
@@ -15739,14 +15914,14 @@ function state(){var now=Date.now();if(ST&&now-stT<600)return ST;stT=now;var sym
   CN[s].died=0;try{CN[s].p=E?CDC_NEURO.prob(s):null;}catch(e){}});
  Object.keys(CN).forEach(function(s){var c=CN[s];if(lst.indexOf(s)<0){if(!c.died){c.died=now;var f=null;L.life.forEach(function(z){if(z.sym===s)f=z;});c.y=f?f.y:null;}if(now-c.died>6000)delete CN[s];}});
  NL=[];var mx=1e-9,mv=1e-9;o.cells.forEach(function(c,ci){var W0=c.M[0].W,W1=c.M[1].W[0];mv=Math.max(mv,c.vit);
-  c.idx.forEach(function(fi,ps){var s2=0,ab=0;for(var j=0;j<W0.length;j++){s2+=W0[j][ps]*W1[j];ab+=Math.abs(W0[j][ps]);}ab/=W0.length;mx=Math.max(mx,ab);NL.push({a:N[fi],b:N[24+ci],w:s2,s:ab});});});
+  c.idx.forEach(function(fi,ps){var s2=0,ab=0;for(var j=0;j<W0.length;j++){s2+=W0[j][ps]*W1[j];ab+=Math.abs(W0[j][ps]);}ab/=W0.length;mx=Math.max(mx,ab);NL.push({a:N[fi],b:N[NF+ci],w:s2,s:ab});});});
  NL.forEach(function(k){k.s/=mx;});
- o.cells.forEach(function(c,ci){NL.push({a:N[24+ci],b:N[32],w:o.ca[ci]?o.ca[ci][2][0]-.5:0,s:c.vit/mv});});
+ o.cells.forEach(function(c,ci){NL.push({a:N[NF+ci],b:N[NF+8],w:o.ca[ci]?o.ca[ci][2][0]-.5:0,s:c.vit/mv});});
  ST=o;return o;}
 var VIEWS=[];
 function sizeView(v){var r=v.cv.getBoundingClientRect(),d=window.devicePixelRatio||1;v.CW=r.width;v.CH=r.height;v.cv.width=Math.max(1,v.CW*d);v.cv.height=Math.max(1,v.CH*d);v.S=Math.min(v.CW/750,v.CH/500)||.3;v.OX=(v.CW-750*v.S)/2;v.OY=(v.CH-500*v.S)/2;v.ctx.setTransform(d,0,0,d,0,0);}
 function attachInteraction(v){
- function moveAt(cx3,cy3){var r=v.cv.getBoundingClientRect(),mx=cx3-r.left,my=cy3-r.top;hov=-1;for(var i=0;i<24;i++)if(Math.hypot(v.OX+N[i]._px*v.S-mx,v.OY+N[i]._py*v.S-my)<12){hov=i;break;}}
+ function moveAt(cx3,cy3){var r=v.cv.getBoundingClientRect(),mx=cx3-r.left,my=cy3-r.top;hov=-1;for(var i=0;i<NF;i++)if(Math.hypot(v.OX+N[i]._px*v.S-mx,v.OY+N[i]._py*v.S-my)<12){hov=i;break;}}
  v.cv.style.cursor="grab";
  v.cv.onmousemove=function(e){if(DRAG){ROT+=(e.clientX-LX)*0.008;LX=e.clientX;}else moveAt(e.clientX,e.clientY);};
  v.cv.onmousedown=function(e){DRAG=true;LX=e.clientX;v.cv.style.cursor="grabbing";};
@@ -15772,13 +15947,13 @@ function drawView(v,now,t,st,ks){var c=v.ctx,mini=v.S<0.42;
   c.fillStyle=p.c;c.shadowColor=p.c;c.shadowBlur=11;c.beginPath();c.arc(x,y,2.4,0,7);c.fill();c.shadowBlur=0;return true;});
  var deS=DE.slice().sort(function(a,b){return a._sc-b._sc;});
  deS.forEach(function(d2,q){var al=(.25+.28*Math.sin(t*2+q))*Math.max(.25,Math.min(1,d2._sc));c.fillStyle="rgba(140,235,255,"+al+")";c.beginPath();c.arc(X(v,d2),Y(v,d2),1.2*d2._sc,0,7);c.fill();});
- var featIdx=[];for(var i=0;i<24;i++)featIdx.push(i);featIdx.sort(function(a,b){return N[a]._sc-N[b]._sc;});
+ var featIdx=[];for(var i=0;i<NF;i++)featIdx.push(i);featIdx.sort(function(a,b){return N[a]._sc-N[b]._sc;});
  var fs=Math.max(8,Math.min(11,9.5*v.S));c.font="600 "+fs+"px Inter,Arial";
  featIdx.forEach(function(i){var n=N[i],sc2=n._sc,a=st.x?Math.min(1,Math.abs(st.x[i])):.15,r=(2.6*Math.max(.55,sc2))+a*3+n.g*3;n.g*=.93;
   var al=Math.max(.28,Math.min(1,sc2));c.globalAlpha=al;c.shadowColor="#7fe9ff";c.shadowBlur=(6+a*14+n.g*10)*sc2;c.fillStyle="#7fe9ff";c.beginPath();c.arc(X(v,n),Y(v,n),r,0,7);c.fill();c.shadowBlur=0;
   if(!mini){var left=n.x<cx;c.fillStyle="rgba(215,240,255,"+(.9*al)+")";c.textAlign=left?"right":"left";c.fillText(NM[i],X(v,n)+(left?-9:9),Y(v,n)+3);}c.globalAlpha=1;});
- var cellIdx=[];for(var ci=0;ci<8;ci++)cellIdx.push(ci);cellIdx.sort(function(a,b){return N[24+a]._sc-N[24+b]._sc;});
- cellIdx.forEach(function(ci){var n2=N[24+ci],cell=st.cells[ci],sc2=n2._sc,al=Math.max(.3,Math.min(1,sc2));
+ var cellIdx=[];for(var ci=0;ci<8;ci++)cellIdx.push(ci);cellIdx.sort(function(a,b){return N[NF+a]._sc-N[NF+b]._sc;});
+ cellIdx.forEach(function(ci){var n2=N[NF+ci],cell=st.cells[ci],sc2=n2._sc,al=Math.max(.3,Math.min(1,sc2));
   if(!cell){c.globalAlpha=al;c.strokeStyle="rgba(181,140,255,.35)";c.setLineDash([3,3]);c.beginPath();c.arc(X(v,n2),Y(v,n2),6*Math.max(.55,sc2),0,7);c.stroke();c.setLineDash([]);c.globalAlpha=1;return;}
   var pc=st.ca[ci]?st.ca[ci][2][0]:.5,r2=(5+cell.vit*2.5)*Math.max(.55,sc2)+n2.g*3;n2.g*=.93;
   c.globalAlpha=al;c.shadowColor="#b58cff";c.shadowBlur=(10+n2.g*10)*sc2;c.fillStyle=pc>.5?"#ff8fa3":"#b58cff";c.beginPath();c.arc(X(v,n2),Y(v,n2),r2,0,7);c.fill();c.shadowBlur=0;
@@ -15790,7 +15965,7 @@ function drawView(v,now,t,st,ks){var c=v.ctx,mini=v.S<0.42;
   sz=.75+.35*Math.max(0,n._d*.5+.5),col=n.desp?"#ff2a3b":n.pow?"#ffd21f":"#5fc8e8";
   c.globalAlpha=al;c.shadowColor=col;c.shadowBlur=(n.desp||n.pow?22+8*Math.sin(t*(n.desp?9:4)+n.k):6)*sz;c.fillStyle=col;c.beginPath();c.arc(v.OX+n.x*v.S,v.OY+n.y*v.S,(3.2*sz+(n.desp?3.5:n.pow?3:(n.f||0)*1.5)+n.g*2),0,7);c.fill();c.shadowBlur=0;
   if(!mini){c.font="600 "+(Math.max(7,Math.min(9,8*v.S))*(n.desp||n.pow?1.35:1))+"px Inter,Arial";var lt=n.x<375;c.textAlign=lt?"right":"left";c.fillStyle=n.desp?"#ff6b78":n.pow?"#ffe066":"rgba(180,215,235,.7)";c.fillText((n.desp?"▲ ":"")+s.replace("USDT",""),v.OX+n.x*v.S+(lt?-7:7),v.OY+n.y*v.S+3);}c.globalAlpha=1;});
- var o=N[32];c.textAlign="center";c.font="900 "+Math.max(13,20*v.S)+"px Inter,Arial";c.fillStyle=st.p==null?"#7fe9ff":st.p>.5?"#ff4d6d":"#0ecb81";
+ var o=N[NF+8];c.textAlign="center";c.font="900 "+Math.max(13,20*v.S)+"px Inter,Arial";c.fillStyle=st.p==null?"#7fe9ff":st.p>.5?"#ff4d6d":"#0ecb81";
  c.shadowColor=c.fillStyle;c.shadowBlur=12;c.beginPath();c.arc(X(v,o),Y(v,o),9*Math.max(.7,o._sc),0,7);c.fill();c.shadowBlur=0;
  c.fillText(st.p==null?(mini?"…":"aprendiendo…"):"CAÍDA "+Math.round(st.p*100)+"%",X(v,o),Y(v,o)+(mini?18:26)*v.S+8);
  if(hov>=0&&st.x&&!mini){var n3=N[hov],tt=NM[hov]+": "+st.x[hov].toFixed(3);c.font="700 12px Inter,Arial";var w2=c.measureText(tt).width+14;
@@ -15811,7 +15986,7 @@ function tickAll(){GR=requestAnimationFrame(tickAll);var now=Date.now(),t=now/10
  N.forEach(function(n){var pr=proj3(n.x,n.y,n.z||0);n._px=pr.px;n._py=pr.py;n._sc=pr.sc;});
  DE.forEach(function(n){var pr=proj3(n.x,n.y,n.z||0);n._px=pr.px;n._py=pr.py;n._sc=pr.sc;});
  var ks=Object.keys(CN);ks.forEach(function(s){var q=cpos(CN[s].k);CN[s].x=q.x;CN[s].y=q.y;CN[s]._d=q.d;
-  if(CN[s].r==null){var b=0,bd=1e9;for(var i=0;i<24;i++){var dd=Math.hypot(N[i].x-q.x,N[i].y-q.y);if(dd<bd){bd=dd;b=i;}}CN[s].r=b;}});
+  if(CN[s].r==null){var b=0,bd=1e9;for(var i=0;i<NF;i++){var dd=Math.hypot(N[i].x-q.x,N[i].y-q.y);if(dd<bd){bd=dd;b=i;}}CN[s].r=b;}});
  classify(ks);VIEWS.forEach(function(v){if(v.active)drawView(v,now,t,st,ks);});
  if(bu>0)bu=Math.max(0,bu-.004);
  if(!lastHead||t-lastHead>1){lastHead=t;head(st);}}
@@ -15828,7 +16003,7 @@ function buildFull(){ov=document.createElement("div");ov.style.cssText="display:
  hdE.lastChild.onclick=function(){if(BR.btn)BR.btn.click();else toggle();};BR.hd=hdE.firstChild;
  var cvF=document.createElement("canvas");cvF.style.cssText="flex:1;width:100%;min-height:0;touch-action:none";
  var lg=document.createElement("div");lg.style.cssText="position:absolute;left:12px;bottom:46px;z-index:2;color:#cbd5e1;font:11px Arial;background:rgba(6,11,22,.8);padding:6px 10px;border-radius:8px;max-width:520px";
- lg.innerHTML="Gira solo · arrastra para girarlo tú mismo · Borde: 24 datos · anillo interior: <span style='color:#b58cff'>células</span> · anillo exterior: monedas en estudio (<span style='color:#ff4d6d'>●</span> cayó · <span style='color:#0ecb81'>●</span> no cayó) · puentes <span style='color:#ff4d6d'>●</span> empujan a caída, <span style='color:#0ecb81'>●</span> la frenan · monedas: <span style='color:#ffd21f'>●</span> más poderosas · <span style='color:#ff2a3b'>●</span> ▲ despegando";
+ lg.innerHTML="Gira solo · arrastra para girarlo tú mismo · Borde: 30 datos · anillo interior: <span style='color:#b58cff'>células</span> · anillo exterior: monedas en estudio (<span style='color:#ff4d6d'>●</span> cayó · <span style='color:#0ecb81'>●</span> no cayó) · puentes <span style='color:#ff4d6d'>●</span> empujan a caída, <span style='color:#0ecb81'>●</span> la frenan · monedas: <span style='color:#ffd21f'>●</span> más poderosas · <span style='color:#ff2a3b'>●</span> ▲ despegando";
  ov.appendChild(hdE);ov.appendChild(cvF);ov.appendChild(lg);document.body.appendChild(ov);
  fullView={cv:cvF,ctx:cvF.getContext("2d"),active:false};attachInteraction(fullView);VIEWS.push(fullView);}
 function toggle(p){if(!ov)buildFull();var o=ov.style.display!=="flex";ov.style.display=o?"flex":"none";fullView.active=o;
@@ -15855,7 +16030,7 @@ tickAll();
    compara contra el núcleo del CDC con datos que la red NO vio (30% más reciente). */
 (function(){
 "use strict";
-var CFG={drop:1.5,up:1.0,mins:15,posMin:60,cada:60000,maxPend:1500,hid:[12,6],nIn:24};
+var CFG={drop:1.5,up:1.0,mins:15,posMin:60,cada:60000,maxPend:1500,hid:[12,6],nIn:30};
 var MAXD=20000,MAXKEEP=40000,MINPOS=30,_lgTry=false,GC={},LS=localStorage,LIFE=[],VM={},DS=[], PEND=[], LAST={}, MODEL=null, MET=null, TRAIN=false, DB=null;
 try{var m=JSON.parse(LS.getItem("cdc_neuro_model")||"null"); if(m&&m.w&&m.w.cells){MODEL=m.w;MET=m.met;}}catch(e){}
 if(MET&&MET.indepPos==null){MET.gana=false;MET.legacy=1;} /* modelo viejo: se reevalúa con el criterio estricto */
@@ -15882,8 +16057,9 @@ function feats(sym){
   cl(c.cambioReal2Min,-3,3)/3, cl(c.velocidad,-3,3)/3, cl((c.velPromedio||0)*5,-1,1),
   (rsi==null?50:rsi)/100, cl((e.adx||0),0,50)/50, dir, cl(e.distVwapPct||0,-5,5)/5, cl(sma,-3,3)/3,
   cl(c.caidaDesdeMaximo,0,10)/10, cl(c.horasDesdeMaximo24h,0,24)/24, cl(c.vecesEnTechoActual,0,4)/4,
-  inf.btcCayendo?1:0, inf.ethCayendo?1:0, cl(c.change,-30,60)/60, cl(c.rangoPct24h,0,40)/40, Math.sin(h), Math.cos(h)].concat(fut(sym));
+  inf.btcCayendo?1:0, inf.ethCayendo?1:0, cl(c.change,-30,60)/60, cl(c.rangoPct24h,0,40)/40, Math.sin(h), Math.cos(h)].concat(fut(sym)).concat(est(sym));
 }
+function est(sym){var E=((g("datosEMA")||{})[sym]||{}).estudiosTecho;if(!E)return [0,0,0,0,0,0];return [cl(E.fibo,-1,1),cl(E.rsiDiv,0,1),cl(E.bb,-1,1),cl(E.ext,-1,1),cl(E.rej,0,1),cl(E.cvd,-1,1)];}
 function fut(sym){var F=window.CDC_FUT?CDC_FUT.get(sym):null;return F?[cl(F.fr,-0.3,0.3)/0.3,cl(F.c15,-15,15)/15,cl(F.c60,-30,30)/30,F.sqz,1]:[0,0,0,0,0];}
 function padX(s){while(s.x.length<CFG.nIn)s.x.push(0);return s;}
 /* Núcleo del CDC (misma fórmula y pesos CDC_CONFIG: rango+momentum+RSI+DMI+VWAP) → % caída */
@@ -15926,7 +16102,8 @@ function evalSet(M,T){var y=T.map(function(s){return s.y;});
  var base=y.reduce(function(a,b){return a+b;},0)/y.length;
  return{n:T.length,base:base,aucN:auc(pn,y),aucC:auc(pc,y),p20N:prec(pn,y,.2),p20C:prec(pc,y,.2)};}
 function zr(M){return M.map(function(L){return{W:L.W.map(function(r){return r.map(function(){return 0;});}),b:L.b.map(function(){return 0;})};});}
-var CELLS_DEF=[["Techo",[0,1,10,11,12,16]],["Momentum",[2,3,4,5,6,7,8,9]],["Futuros",[19,20,21,22,23]],["Contexto",[13,14,15,16,17,18]]],MAXC=8,MAXH=24;
+var CELLS_DEF=[["Techo",[0,1,10,11,12,16]],["Momentum",[2,3,4,5,6,7,8,9]],["Futuros",[19,20,21,22,23]],["Contexto",[13,14,15,16,17,18]],["Estudios de techo",[24,25,26,27,28,29]]],MAXC=8,MAXH=24;
+if(MODEL&&MODEL.cells&&!MODEL.cells.some(function(c){return c.n==="Estudios de techo";})){var _cn=mkCell("Estudios de techo",[24,25,26,27,28,29]);_cn.vit=.1;MODEL.cells.push(_cn);if(MET){MET.gana=false;MET.legacy=1;}usar=false;}
 function pj(c,x){return c.idx.map(function(i){return x[i];});}
 function mkCell(n,idx){return{n:n,idx:idx,h:6,M:init(idx.length,[6]),vit:1,ema:.5};}
 function pens(E,x){var s=0,w=0;E.cells.forEach(function(c){s+=c.vit*fwd(c.M,pj(c,x));w+=c.vit;});return w?s/w:.5;}
@@ -15971,7 +16148,7 @@ function train(ui){
  var gap=CFG.mins*60000,c1=Math.floor(D.length*.56),c2=Math.floor(D.length*.7),TE=D.slice(c2),VAL=D.slice(c1,c2).filter(function(s){return s.ts<=TE[0].ts-gap;}),TR=D.slice(0,c1).filter(function(s){return VAL.length&&s.ts<=VAL[0].ts-gap;});
  var pos=TR.filter(function(s){return s.y;}).length;if(pos<10||TE.filter(function(s){return s.y;}).length<5||VAL.filter(function(s){return s.y;}).length<5){ui("Muy pocos ejemplos de caída ("+pos+"). Sigue recolectando.");return;}
  var wp=Math.min(20,(TR.length-pos)/pos);if(!MODEL||!MODEL.cells)MODEL={cells:CELLS_DEF.map(function(d){return mkCell(d[0],d[1]);}),log:[]};
- var E=MODEL,first=!E.cells.some(function(c){return c.aucTe!=null;}),EP=first?120:70,FR=.6,PAT=8,finished=false,gotMsg=false,w=null;TRAIN=true;
+ var E=MODEL,first=E.cells.some(function(c){return c.aucTe==null;}),EP=first?120:70,FR=.6,PAT=8,finished=false,gotMsg=false,w=null;TRAIN=true;
  var sTR=TR.map(function(s){return{x:s.x,y:s.y};}),sVAL=VAL.map(function(s){return{x:s.x,y:s.y};});
  function fin(res){if(finished)return;finished=true;
   E.cells.forEach(function(c,i){c.M=res[i].M;c.aucVal=res[i].bestV;});
@@ -16050,8 +16227,209 @@ function ui(){
 function exp(){var h="ts,symbol,y,minRet,maxRet,cdcCaida,"+Array.from({length:CFG.nIn},function(_,i){return "f"+i;}).join(",");
  var t=[h].concat(DS.map(function(s){return [s.ts,s.sym,s.y,s.minRet,s.maxRet,s.cdc.toFixed(1)].concat(s.x.map(function(v){return v.toFixed(4);})).join(",");})).join("\n");
  var a=document.createElement("a");a.href=URL.createObjectURL(new Blob([t],{type:"text/csv"}));a.download="cdc_neuro_dataset.csv";a.click();}
-window.CDC_NEURO={life:function(){return{pend:PEND,life:LIFE};},net:function(){return{M:MODEL,met:MET,n:DS.length};},feats:feats,fwd:fwd,prob:prob,probCal:probCal,train:function(){train(console.log);},muestras:function(){return DS.length;}};
+window.CDC_NEURO={panel:function(sym){if(!MODEL||!MODEL.cells)return null;var p=prob(sym);if(p==null)return null;var pc=probCal(sym);return{p:Math.round(p*100),real:pc==null?null:Math.round(pc*100),valida:!!(MET&&MET.gana)};},life:function(){return{pend:PEND,life:LIFE};},net:function(){return{M:MODEL,met:MET,n:DS.length};},feats:feats,fwd:fwd,prob:prob,probCal:probCal,train:function(){train(console.log);},muestras:function(){return DS.length;}};
 function start(){dbOpen(function(){dbLoad(function(){ui();setInterval(tick,10000);setInterval(function(){var n=DS.length;var tN=(MET&&MET.totalN)||0,due=(n-tN>=200&&Date.now()-((MET&&MET.ts)||0)>=6e5)||(MET&&MET.legacy&&!_lgTry);if(!TRAIN&&n>=200&&due){if(MET&&MET.legacy)_lgTry=true;train(function(m){window.CDC_BRAIN.burst(m);});}else save();},60000);});});}
+if(document.readyState==="loading")document.addEventListener("DOMContentLoaded",start);else start();
+})();
+</script>
+
+<script>
+/* ═══ CDC-MONEDA · casilla única para elegir UNA moneda y estudiar hacia dónde va (funding, OI, taker, precio) ═══ */
+(function(){"use strict";
+var B="https://fapi.binance.com",SYM=null,TM=null,LS=null;try{LS=localStorage;}catch(e){}
+function ev(n){try{return (0,eval)("typeof "+n+"!=='undefined'?"+n+":undefined");}catch(e){}}
+async function jf(u){var r=await fetch(u);if(!r.ok)throw 0;return r.json();}
+function pct(a,b){return b?(a/b-1)*100:0;}
+function f(x,d){return (x>=0?"+":"")+x.toFixed(d==null?2:d)+"%";}
+async function analizar(s){
+ var r=await Promise.all([
+  jf(B+"/fapi/v1/klines?symbol="+encodeURIComponent(s)+"&interval=5m&limit=30").catch(function(){return null;}),
+  jf(B+"/fapi/v1/premiumIndex?symbol="+s).catch(function(){return null;}),
+  jf(B+"/futures/data/openInterestHist?symbol="+encodeURIComponent(s)+"&period=5m&limit=30").catch(function(){return null;}),
+  jf(B+"/futures/data/takerlongshortRatio?symbol="+encodeURIComponent(s)+"&period=5m&limit=6").catch(function(){return null;})]);
+ var k=r[0],pi=r[1],oi=r[2],tk=r[3];if(!k||k.length<13)return null;
+ var c=k.map(function(x){return +x[4];}),n=c.length-1;
+ var hi=k.slice(-12).map(function(x){return +x[2];}),lo=k.map(function(x){return +x[3];}),hi60=Math.max.apply(null,hi),lo30=Math.min.apply(null,lo),red=(+k[n][4])<(+k[n][1]),g3=[n,n-1,n-2].every(function(i){return +k[i][4]>+k[i][1];}),dh=pct(c[n],hi60);
+ var p15=pct(c[n],c[n-3]),p60=pct(c[n],c[n-12]),fr=pi?+pi.lastFundingRate*100:0,o15=0,o60=0,hasOI=false;
+ if(oi&&oi.length>12){var v=oi.map(function(z){return +z.sumOpenInterestValue;}),m=v.length-1;o15=pct(v[m],v[m-3]);o60=pct(v[m],v[m-12]);hasOI=true;}
+ var tr=1;if(tk&&tk.length){tr=tk.slice(-3).reduce(function(a,z){return a+ +z.buySellRatio;},0)/Math.min(3,tk.length);}
+ var sc=0,why=[];
+ if(p15>0.3)sc+=1;else if(p15<-0.3)sc-=1;
+ if(p60>0.8)sc+=1;else if(p60<-0.8)sc-=1;
+ if(hasOI){
+  if(o15>1&&p15>0.2){sc+=2;why.push("dinero nuevo entrando con el precio subiendo");}
+  else if(o15>1&&p15<-0.2){sc-=2;why.push("dinero nuevo entrando en contra (apuestas a la baja)");}
+  else if(o15<-1&&p15>0.2){sc-=0.5;why.push("sube por cierre de cortos, sin dinero nuevo (débil)");}
+  else if(o15<-1&&p15<-0.2){sc-=0.5;why.push("la gente está saliendo y el precio cae");}}
+ if(tr>1.1){sc+=1;why.push("más compras agresivas que ventas");}else if(tr<0.9){sc-=1;why.push("más ventas agresivas que compras");}
+ if(fr>=0.05&&p60>0){sc-=1;why.push("largos muy cargados (riesgo de caída)");}
+ if(fr<=-0.03){sc+=1;why.push("cortos pagando funding (posible squeeze al alza)");}
+ var cer=ev("cerebroCDC"),lab=cer&&cer[s]?cer[s]:"";
+ if(/DESPEGUE|TODA POTENCIA|REBOTE|FORMACIÓN/.test(lab)){sc+=1;}
+ if(/DERRUMBE|AGOTADA|GIRO CONFIRMADO/.test(lab)){sc-=1;}
+ var v2=sc>=2.5?["▲ TIENDE A SUBIR","#0ecb81"]:sc<=-2.5?["▼ TIENDE A BAJAR","#ff4d6d"]:sc>=1?["↗ leve sesgo alcista","#7fe9ff"]:sc<=-1?["↘ leve sesgo bajista","#ffb86b"]:["◆ LATERAL · sin dirección clara","#f3ba2f"];
+ var dn=!hasOI?"sin datos de OI":o15>1?"ENTRA dinero":o15<-1?"SALE dinero":"flujo estable";
+ return{hi60:hi60,lo30:lo30,red:red,g3:g3,dh:dh,s:s,price:c[n],p15:p15,p60:p60,fr:fr,o15:o15,o60:o60,hasOI:hasOI,tr:tr,sc:sc,v:v2,dn:dn,why:why,lab:lab,t:Date.now()};}
+function shortEval(a){
+ var sc=0,pro=[],con=[],blk=false;
+ if(a.p15>=4||a.p60>=3){sc+=1;pro.push("subida extendida (posible agotamiento)");}
+ if(a.red&&a.dh<=-0.3){sc+=1;pro.push("ya se dio la vuelta desde el máximo ("+a.dh.toFixed(2)+"%)");}
+ if(a.fr>=0.03){sc+=1;pro.push("largos cargados (funding "+a.fr.toFixed(3)+"%)");}
+ if(a.hasOI&&a.o15>1&&a.p15<-0.2){sc+=2;pro.push("entran cortos nuevos (OI sube y precio baja)");}
+ if(a.tr<0.95){sc+=1;pro.push("dominan las ventas agresivas");}
+ if(/DERRUMBE|AGOTADA|GIRO CONFIRMADO/.test(a.lab)){sc+=1;pro.push("el cerebro ve agotamiento/giro");}
+ if(a.g3&&a.p15>1){blk=true;con.push("3 velas verdes seguidas: el precio sigue empujando arriba");}
+ if(a.hasOI&&a.o15>1&&a.p15>0.5){blk=true;con.push("entra dinero nuevo con el precio subiendo");}
+ if(a.fr<=-0.03){blk=true;con.push("funding negativo: riesgo de squeeze contra el corto");}
+ if(a.tr>1.1){sc-=1;con.push("compras agresivas dominan ("+a.tr.toFixed(2)+")");}
+ if(/DESPEGUE|TODA POTENCIA/.test(a.lab)){blk=true;con.push("el cerebro marca despegue alcista");}
+ var stop=a.hi60*1.003,tg=a.lo30,rr=(a.price-tg)/(stop-a.price);
+ var v=blk?["⛔ NO ENTRAR en short ahora","#ff4d6d"]:sc>=3?["✅ CONDICIONES A FAVOR del short","#0ecb81"]:["⏳ ESPERAR confirmación","#f3ba2f"];
+ return{v:v,pro:pro,con:con,stop:stop,tg:tg,rr:rr};}
+function pintar(box,a){
+ if(!a){box.innerHTML="<span style='color:#ff4d6d'>No encontré datos de futuros para esa moneda en Binance.</span>";return;}
+ var nm=a.s.replace("USDT","");
+ box.innerHTML="<b style='color:"+a.v[1]+";font-size:13px'>"+nm+" · "+a.v[0]+"</b> <span style='color:#94a3b8'>($"+a.price+")</span><br>"+
+ "Precio 15m <b>"+f(a.p15)+"</b> · 1h <b>"+f(a.p60)+"</b> · "+(a.hasOI?"OI 15m <b>"+f(a.o15)+"</b> · OI 1h <b>"+f(a.o60)+"</b> → <b style='color:#f3ba2f'>"+a.dn+"</b>":"<b>"+a.dn+"</b>")+
+ "<br>Funding <b>"+a.fr.toFixed(3)+"%</b> · Compras/ventas agresivas <b>"+a.tr.toFixed(2)+"</b>"+(a.lab?" · Cerebro: <b>"+a.lab+"</b>":"")+
+ (a.why.length?"<br><span style='color:#cbd5e1'>"+a.why.join(" · ")+"</span>":"")+
+ (function(){var q=shortEval(a);return "<div style='margin-top:4px;padding-top:4px;border-top:1px solid #1e293b'><b style='color:"+q.v[1]+";font-size:12px'>SHORT: "+q.v[0]+"</b><br>"+
+ (q.pro.length?"<span style='color:#7fe9ff'>A favor:</span> "+q.pro.join(" · ")+"<br>":"")+(q.con.length?"<span style='color:#ffb86b'>En contra:</span> "+q.con.join(" · ")+"<br>":"")+
+ "Stop sugerido sobre <b>"+q.stop.toPrecision(5)+"</b> · Objetivo cerca de <b>"+q.tg.toPrecision(5)+"</b> · Riesgo/beneficio <b>"+(isFinite(q.rr)&&q.rr>0?q.rr.toFixed(1):"—")+"</b>"+(q.rr<1.5?" <span style='color:#ffb86b'>(poco atractivo)</span>":"")+"</div>";})()+
+ "<br><span style='color:#64748b;font-size:10px'>Estimación de corto plazo según posicionamiento, no es garantía ni consejo financiero.</span>";}
+function mount(){
+ var w=document.getElementById("cdcBrainEmbed");
+ if(!w){setTimeout(mount,500);return;}if(document.getElementById("cdcMonedaBar"))return;
+ var cv=w.querySelector("canvas");w.style.height="600px";if(cv)cv.style.height="calc(100% - 32px - 78px - 38px - 170px)";
+ var bar=document.createElement("div");bar.id="cdcMonedaBar";
+ bar.style.cssText="display:flex;gap:6px;align-items:center;padding:5px 10px;background:rgba(6,11,22,.92);border-bottom:1px solid rgba(243,186,47,.3);height:38px;box-sizing:border-box";
+ bar.innerHTML="<span style='font:900 11px Inter,Arial;color:#f3ba2f'>🔎 MONEDA:</span>"+
+  "<input id='cdcMonedaIn' type='text' placeholder='ej: MOVR' maxlength='15' autocomplete='off' style='flex:1;min-width:0;background:#050914;color:#fff;border:1px solid #475569;border-radius:6px;padding:4px 8px;font:700 12px Inter,Arial;text-transform:uppercase'>"+
+  "<button id='cdcMonedaBt' style='background:#f3ba2f;color:#000;border:0;border-radius:6px;padding:5px 10px;font:900 11px Inter,Arial;cursor:pointer'>ESTUDIAR</button>";
+ var out=document.createElement("div");out.id="cdcMonedaOut";
+ out.style.cssText="height:170px;overflow-y:auto;box-sizing:border-box;padding:5px 10px;font:11px/1.4 Inter,Arial,sans-serif;color:#cbd5e1;background:rgba(6,11,22,.95);border-bottom:1px solid rgba(243,186,47,.3)";
+ out.textContent="Escribe una moneda y pulsa ESTUDIAR.";
+ var hd=w.firstChild;w.insertBefore(out,hd.nextSibling);w.insertBefore(bar,hd.nextSibling);
+ var inp=bar.querySelector("input"),bt=bar.querySelector("button");
+ async function run(){if(!SYM)return;try{pintar(out,await analizar(SYM));}catch(e){out.textContent="Error consultando Binance. Reintentando…";}}
+ function go(skipSel){var t=(inp.value||"").trim().toUpperCase().replace(/[^\p{L}\p{N}]/gu,"");if(!t)return;if(!/USDT$/.test(t))t+="USDT";
+  SYM=t;inp.value=t.replace("USDT","");try{LS&&LS.setItem("cdc_moneda_elegida",t);}catch(e){}
+  out.textContent="Estudiando "+t.replace("USDT","")+"…";
+  try{var C=ev("cachedData");if(skipSel!==true&&C&&C[t]&&typeof ev("seleccionarMoneda")==="function")(0,eval)("seleccionarMoneda('"+t+"',false,'cerebro')");}catch(e){}
+  run();clearInterval(TM);TM=setInterval(run,10000);}
+ bt.onclick=function(){go();};document.addEventListener("click",function(e){var el=e.target&&e.target.closest?e.target.closest(".cdc-click-moneda"):null;if(!el)return;var s=el.getAttribute("data-sym");if(!s)return;inp.value=s;go(true);try{w.scrollIntoView({behavior:"smooth",block:"nearest"});}catch(x){}});inp.addEventListener("keydown",function(e){if(e.key==="Enter")go();});
+ inp.addEventListener("click",function(e){e.stopPropagation();});
+ try{var g=LS&&LS.getItem("cdc_moneda_elegida");if(g){inp.value=g.replace("USDT","");go();}}catch(e){}
+ setTimeout(function(){window.dispatchEvent(new Event("resize"));},100);}
+if(document.readyState==="loading")document.addEventListener("DOMContentLoaded",mount);else mount();
+})();
+</script>
+
+<script>
+/* ═══ CDC-FRENO · Alarma: "la caída de la MONEDA ELEGIDA se detuvo y va a subir" ═══
+   Lee la moneda de la casilla 🔎 MONEDA (cdc_moneda_elegida), mira velas de 1 min en Binance
+   y avisa ARRIBA cuando: hubo una caída real → ya no hace mínimos nuevos → las ventas se agotan
+   → entran compras agresivas / cierran velas verdes. Es una señal de probabilidad, no una garantía. */
+(function(){"use strict";
+var KEY="cdc_moneda_elegida",MUTE="cdc_freno_mute",LS=null;try{LS=localStorage;}catch(e){}
+var CFG={minCaida:0.7,ventana:30,maxVelas:8,cada:5000,fallCool:180000};
+var SYM=null,seq=0,lastFall=0,fallShut=false,EV={key:null,lvl:0,off:0,shut:false},muted=false,AC=null,T0=document.title,chip=null,tit=false;
+try{muted=LS.getItem(MUTE)==="1";}catch(e){}
+function fp(x){return x>=100?x.toFixed(2):x>=1?x.toFixed(4):x.toPrecision(4);}
+function avg(f,a,z){var s=0,m=0;for(var q=a;q<=z;q++){s+=f(q);m++;}return m?s/m:0;}
+
+/* ── Detector ── */
+function evaluar(k){
+ var n=k.length;if(n<20)return null;
+ var o=[],h=[],l=[],c=[],v=[],b=[],j;
+ k.forEach(function(x){o.push(+x[1]);h.push(+x[2]);l.push(+x[3]);c.push(+x[4]);v.push(+x[5]);b.push(+x[9]);});
+ var i=n-1,s0=n-Math.min(CFG.ventana,n),iHi=s0,iLo=i,hi=h[s0],lo=Infinity;
+ for(j=s0;j<n;j++)if(h[j]>=hi){hi=h[j];iHi=j;}
+ for(j=iHi;j<n;j++)if(l[j]<=lo){lo=l[j];iLo=j;}
+ var caida=(lo/hi-1)*100,velas=i-iLo,rec=hi>lo?(c[i]-lo)/(hi-lo):1;
+ var atr=avg(function(q){return (h[q]-l[q])/c[q]*100;},n-20,n-1);
+ var rg=function(q){return (h[q]-l[q])/c[q]*100;};
+ var r3=avg(rg,n-4,n-2),r4=avg(rg,n-8,n-5),v3=avg(function(q){return v[q];},n-4,n-2),v4=avg(function(q){return v[q];},n-8,n-5);
+ var tq=0,tw=0;for(j=n-3;j<n;j++){tq+=b[j];tw+=v[j];}var tk=tw?tq/tw:0.5;
+ var cayo=caida<=-CFG.minCaida&&iLo>iHi,fall=cayo&&velas===0;
+ var frena=cayo&&velas>=1&&velas<=CFG.maxVelas&&rec<0.75,pts=0,why=[],up2=false,verde=false;
+ if(frena){
+  if(velas>=2){pts+=2;why.push("sin mínimos nuevos hace "+velas+" min");}else{pts+=1;why.push("no hizo mínimo nuevo en la última vela");}
+  if(r4>0&&r3<=r4*0.65){pts+=1;why.push("las velas se achican (ventas con menos fuerza)");}
+  if(v4>0&&v3<=v4*0.7){pts+=1;why.push("baja el volumen vendedor");}
+  up2=c[i]>c[i-1]&&c[i-1]>=c[i-2];if(up2){pts+=1;why.push("cierres subiendo");}
+  var reb=(c[i]/lo-1)*100;if(atr>0&&reb>=atr*0.25){pts+=1;why.push("rebota +"+reb.toFixed(2)+"% desde el mínimo");}
+  if(tk>=0.58){pts+=2;why.push("compras agresivas "+Math.round(tk*100)+"%");}else if(tk>=0.52){pts+=1;why.push("compras agresivas "+Math.round(tk*100)+"%");}
+  verde=c[i-1]>o[i-1];if(verde){pts+=1;why.push("última vela cerrada en verde");}
+ }
+ var lvl=0;
+ if(frena&&pts>=3&&(velas>=2||pts>=4))lvl=1;
+ if(frena&&pts>=5&&velas>=2&&c[i]>lo&&(up2||verde)&&tk>=0.52)lvl=2;
+ return{lvl:lvl,pts:pts,why:why,fall:fall,price:c[i],lo:lo,hi:hi,caida:caida,velas:velas,tk:tk,key:k[iLo][0]};}
+
+/* ── Sonido (se activa con el primer toque/click en la página) ── */
+function unlock(){try{AC=AC||new (window.AudioContext||window.webkitAudioContext)();if(AC.state==="suspended")AC.resume();}catch(e){}}
+["pointerdown","click","keydown","touchstart"].forEach(function(t){document.addEventListener(t,unlock,{passive:true});});
+function beep(fr){if(muted||!AC||AC.state!=="running")return;var t=AC.currentTime;
+ fr.forEach(function(f,x){var o=AC.createOscillator(),g=AC.createGain(),s=t+x*.22;o.type="sine";o.frequency.value=f;
+  g.gain.setValueAtTime(.0001,s);g.gain.exponentialRampToValueAtTime(.35,s+.02);g.gain.exponentialRampToValueAtTime(.0001,s+.2);
+  o.connect(g);g.connect(AC.destination);o.start(s);o.stop(s+.22);});}
+
+/* ── Interfaz ── */
+function css(){if(document.getElementById("cdcFrenoCss"))return;var s=document.createElement("style");s.id="cdcFrenoCss";
+ s.textContent="@keyframes cdcFr{0%,100%{filter:brightness(1)}50%{filter:brightness(1.3)}}"+
+ "#cdcFrenoBan{position:fixed;top:0;left:0;right:0;z-index:100000;display:none;align-items:center;gap:8px;padding:calc(env(safe-area-inset-top,0px) + 8px) 12px 8px;font:600 12px/1.4 Inter,Arial,sans-serif;box-shadow:0 4px 18px rgba(0,0,0,.6);animation:cdcFr 1.2s infinite}"+
+ "#cdcFrenoBan .t{display:block;font-size:14px;font-weight:900}#cdcFrenoBan button{flex-shrink:0;background:rgba(0,0,0,.35);color:#fff;border:1px solid rgba(255,255,255,.4);border-radius:6px;padding:4px 8px;cursor:pointer;font:700 12px Arial}"+
+ "@media(prefers-reduced-motion:reduce){#cdcFrenoBan{animation:none}}";document.head.appendChild(s);}
+function ban(){var b=document.getElementById("cdcFrenoBan");if(b)return b;css();b=document.createElement("div");b.id="cdcFrenoBan";
+ b.innerHTML="<div style='flex:1;min-width:0'></div><button data-a='m' title='Sonido de la alarma'></button><button data-a='x' title='Cerrar aviso'>✕</button>";
+ b.onclick=function(e){var a=e.target.getAttribute&&e.target.getAttribute("data-a");if(a==="x"){EV.shut=true;fallShut=true;b.style.display="none";}if(a==="m")setMute(!muted);};
+ document.body.appendChild(b);syncMute();return b;}
+function syncMute(){var t=muted?"🔕":"🔔";["cdcFrenoMute"].forEach(function(id){var e=document.getElementById(id);if(e)e.textContent=t;});
+ var b=document.getElementById("cdcFrenoBan");if(b){var m=b.querySelector("[data-a=m]");if(m)m.textContent=t;}}
+function setMute(m){muted=m;try{LS.setItem(MUTE,m?"1":"0");}catch(e){}syncMute();}
+function setChip(t,c){if(chip){chip.textContent=t;chip.style.color=c||"#94a3b8";}}
+function ocultar(){var b=document.getElementById("cdcFrenoBan");if(b)b.style.display="none";if(tit){document.title=T0;tit=false;}}
+function mostrar(r,nm){var b=ban(),f=(r.lvl===0),g=r.lvl===2;
+ b.style.background=f?"linear-gradient(90deg,#7f1d1d,#ff2a3b)":g?"linear-gradient(90deg,#065f46,#0ecb81)":"linear-gradient(90deg,#92400e,#f3b32f)";b.style.color=(f||g)?"#fff":"#1a1203";
+ var tit1=f?"\ud83d\udcc9 EST\u00c1 CAYENDO "+r.caida.toFixed(1)+"%":g?"\u2705 CA\u00cdDA CONFIRMADA \u2014 VA A SUBIR":"\u26a0\ufe0f SE DETUVO LA CA\u00cdDA";
+ var det=f?"$"+fp(r.price)+" \u00b7 m\u00e1ximo $"+fp(r.hi)+" \u00b7 sigue haciendo m\u00ednimos nuevos":"$"+fp(r.price)+" \u00b7 m\u00ednimo $"+fp(r.lo)+" hace "+r.velas+" min \u00b7 ca\u00edda "+r.caida.toFixed(2)+"% desde el m\u00e1ximo";
+ b.firstChild.innerHTML="<b class='t'>"+nm+" \u2014 "+tit1+"</b>"+det+(r.why.length?"<br>"+r.why.join(" \u00b7 "):"")+((!muted&&(!AC||AC.state!=="running"))?"<br>\ud83d\udd07 toca cualquier parte de la p\u00e1gina una vez para activar el sonido":"");
+ b.style.display=(f?fallShut:EV.shut)?"none":"flex";
+ if(!tit){T0=document.title;tit=true;}document.title=(f?"\ud83d\udcc9 CAE ":g?"\u2705 SUBE ":"\u26a0\ufe0f FRENA ")+nm+" \u00b7 "+T0;}
+function alarma(r,nm){mostrar(r,nm);beep(r.lvl===2?[660,880,1100]:r.lvl===1?[660,660]:[330,262]);try{navigator.vibrate&&navigator.vibrate(r.lvl===2?[200,100,200,100,300]:r.lvl===1?[200]:[120]);}catch(e){}}
+
+/* ── Ciclo ── */
+function proc(r){
+ var nm=SYM.replace("USDT",""),now=Date.now();
+ if(r.key!==EV.key){EV={key:r.key,lvl:0,off:0,shut:false};ocultar();}   /* m\u00ednimo nuevo = la ca\u00edda sigue \u2192 se rearma */
+ if(r.lvl>0){fallShut=false;EV.off=0;if(r.lvl>EV.lvl){EV.lvl=r.lvl;EV.shut=false;alarma(r,nm);}else mostrar(r,nm);}
+ else if(r.fall){EV.off=0;if(now-lastFall>CFG.fallCool){lastFall=now;fallShut=false;alarma(r,nm);}else mostrar(r,nm);}
+ else if(++EV.off>=2){ocultar();fallShut=false;}
+ var ok=(muted||(AC&&AC.state==="running"));
+ setChip(r.lvl===2?"\u2705 confirmada":r.lvl===1?"\u26a0\ufe0f se detuvo":r.fall?"\ud83d\udcc9 cayendo "+r.caida.toFixed(1)+"%":"\ud83d\udc41 vigilando",r.lvl===2?"#0ecb81":r.lvl===1?"#f3ba2f":r.fall?"#ff4d6d":"#94a3b8");
+ if(!ok&&chip)chip.textContent+=" \ud83d\udd07";}
+async function kl(s){
+ var u=["https://fapi.binance.com/fapi/v1/klines?symbol="+encodeURIComponent(s)+"&interval=1m&limit=45","https://api.binance.com/api/v3/klines?symbol="+encodeURIComponent(s)+"&interval=1m&limit=45"];
+ for(var i=0;i<u.length;i++){try{var r=await fetch(u[i]);if(r.ok){var d=await r.json();if(d&&d.length>=20)return d;}}catch(e){}}
+ return null;}
+async function tick(){if(!SYM)return;var my=SYM,id=++seq,k=await kl(my);if(my!==SYM||id!==seq)return;
+ if(!k){setChip("sin datos");return;}var r=evaluar(k);if(r)proc(r);}
+function watch(){var g=null;try{g=LS.getItem(KEY);}catch(e){}if(!g){try{if(typeof selectedCoin!=="undefined"&&selectedCoin)g=selectedCoin;}catch(e){}}if(g===SYM)return;
+ SYM=g||null;EV={key:null,lvl:0,off:0,shut:false};ocultar();setChip(SYM?"…":"");if(SYM)tick();}
+function probar(){unlock();EV.shut=false;fallShut=false;
+ var A={lvl:0,fall:true,price:1,lo:.98,hi:1.03,velas:0,caida:-2.4,why:["PRUEBA 1/3"]},
+     B={lvl:1,price:1,lo:.98,hi:1.03,velas:3,caida:-2.4,why:["PRUEBA 2/3","sin m\u00ednimos nuevos hace 3 min"]},
+     C={lvl:2,price:1,lo:.98,hi:1.03,velas:4,caida:-2.4,why:["PRUEBA 3/3","compras agresivas 61%"]};
+ alarma(A,"PRUEBA");setTimeout(function(){alarma(B,"PRUEBA");},2800);setTimeout(function(){alarma(C,"PRUEBA");},5600);setTimeout(ocultar,10000);}
+function mount(){var br=document.getElementById("cdcMonedaBar");if(!br){setTimeout(mount,700);return;}if(document.getElementById("cdcFrenoChip"))return;
+ chip=document.createElement("span");chip.id="cdcFrenoChip";chip.title="Estado de la vigilancia (autom\u00e1tica)";chip.style.cssText="flex-shrink:0;font:800 10px Inter,Arial;color:#94a3b8;white-space:nowrap";
+ var mb=document.createElement("button");mb.id="cdcFrenoMute";mb.title="Sonido de la alarma de freno";
+ mb.style.cssText="flex-shrink:0;background:#0b1220;color:#f3ba2f;border:1px solid #475569;border-radius:6px;padding:4px 6px;font:700 11px Arial;cursor:pointer";mb.onclick=function(){setMute(!muted);};
+ var tb=document.createElement("button");tb.textContent="\ud83e\uddea";tb.title="Probar las 3 alarmas (solo prueba)";tb.style.cssText=mb.style.cssText;tb.onclick=probar;
+ br.appendChild(chip);br.appendChild(mb);br.appendChild(tb);syncMute();watch();}
+window.CDC_FRENO={probar:probar,evaluar:evaluar,cfg:CFG};
+function start(){css();mount();setInterval(watch,1500);setInterval(tick,CFG.cada);}
 if(document.readyState==="loading")document.addEventListener("DOMContentLoaded",start);else start();
 })();
 </script>
