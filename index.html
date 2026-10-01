@@ -1402,6 +1402,65 @@
             transition: width 0.3s;
         }
 
+
+        /* ══════════════════════════════════════════════════════════
+           📱 PULIDO VISUAL MÓVIL (solo celular/tablet ≤950px)
+           Solo CSS: no toca datos ni lógica. En PC no se aplica.
+           ══════════════════════════════════════════════════════════ */
+        @media (max-width: 950px) {
+            html { -webkit-text-size-adjust: 100%; }
+            body { -webkit-tap-highlight-color: transparent; }
+            /* Sin retraso de 300 ms ni zoom accidental al tocar */
+            button, .float-btn, select, a, [onclick], tr[data-symbol], .cdc-click-moneda { touch-action: manipulation; }
+
+            /* Deslizadores suaves: inercia nativa, sin arrastrar la página de fondo */
+            #deslizadorLista, #sidebarScroll, #listaNoticiasCompleta, #listaNoticiasGenerales,
+            .sidebar.sidebar-mobile-open .table-wrapper {
+                -webkit-overflow-scrolling: touch;
+                overscroll-behavior: contain;
+                scrollbar-width: thin;
+                scrollbar-color: rgba(243,186,47,0.65) transparent;
+            }
+            #deslizadorLista::-webkit-scrollbar, #sidebarScroll::-webkit-scrollbar,
+            #listaNoticiasCompleta::-webkit-scrollbar, #listaNoticiasGenerales::-webkit-scrollbar { width: 6px !important; }
+            #deslizadorLista::-webkit-scrollbar-thumb, #sidebarScroll::-webkit-scrollbar-thumb,
+            #listaNoticiasCompleta::-webkit-scrollbar-thumb, #listaNoticiasGenerales::-webkit-scrollbar-thumb {
+                background: rgba(243,186,47,0.65); border-radius: 6px;
+            }
+
+            /* Deslizador PUMP: se adapta a la altura del celular, se detiene en cada
+               bloque y muestra un resplandor dorado arriba/abajo cuando hay más por ver */
+            #deslizadorLista {
+                max-height: min(300px, 45dvh) !important;
+                padding: 8px 8px 10px !important;
+                gap: 8px !important;
+                scroll-snap-type: y proximity;
+                background:
+                    linear-gradient(#060b16 30%, rgba(6,11,22,0)) center top,
+                    linear-gradient(rgba(6,11,22,0), #060b16 70%) center bottom,
+                    radial-gradient(farthest-side at 50% 0, rgba(243,186,47,0.40), rgba(0,0,0,0)) center top,
+                    radial-gradient(farthest-side at 50% 100%, rgba(243,186,47,0.40), rgba(0,0,0,0)) center bottom !important;
+                background-repeat: no-repeat !important;
+                background-color: #060b16 !important;
+                background-size: 100% 26px, 100% 26px, 100% 10px, 100% 10px !important;
+                background-attachment: local, local, scroll, scroll !important;
+            }
+            #deslizadorLista > * { scroll-snap-align: start; border-radius: 12px; }
+
+            /* Lista principal: filas más cómodas de tocar, con divisor suave y
+               respuesta al toque (se conserva la barra de color de cada fila) */
+            #cryptoList td { padding: 11px 10px; }
+            #cryptoList tr[data-symbol] { border-bottom: 1px solid rgba(255,255,255,0.07); }
+            #cryptoList tr[data-symbol]:active { filter: brightness(1.3); }
+
+            /* Bloques / tarjetas */
+            .card { border-radius: 16px; }
+            .short-confirmado-card { border-radius: 12px; }
+
+            /* Nombre de la moneda (click → estudiar): zona de toque más grande */
+            .cdc-click-moneda { padding: 4px 8px; margin: -4px -8px; border-radius: 8px; }
+            .cdc-click-moneda:active { background: rgba(243,186,47,0.22); }
+        }
 </style>
 </head>
 <body>
@@ -5759,9 +5818,71 @@ function abrirParEnBinance(par) {
     }
 }
 
+// ══════════════════════════════════════════════════════════════════
+// 📱 ABRIR DIRECTO LA APP DE BINANCE (botón 📱) — nunca va a la web sola
+// Usa el esquema propio de la app (bnc://). Si la app no abre, NO redirige
+// a la página: avisa y deja que el usuario decida. En PC (sin app móvil)
+// se mantiene el comportamiento anterior.
+// ══════════════════════════════════════════════════════════════════
+function _avisoBinanceApp(html, ms) {
+    try {
+        let b = document.getElementById('avisoBinanceApp');
+        if (!b) {
+            b = document.createElement('div');
+            b.id = 'avisoBinanceApp';
+            b.style.cssText = 'position:fixed;left:50%;bottom:calc(env(safe-area-inset-bottom,0px) + 84px);transform:translateX(-50%);z-index:1000000;max-width:92vw;background:#0b1220;color:#fff;border:1px solid #f3ba2f;border-radius:12px;padding:10px 14px;font:700 12px/1.4 Arial,sans-serif;text-align:center;box-shadow:0 6px 24px rgba(0,0,0,.6);';
+            document.body.appendChild(b);
+        }
+        b.innerHTML = html;
+        b.style.display = 'block';
+        clearTimeout(b._t);
+        b._t = setTimeout(function () { b.style.display = 'none'; }, ms || 5000);
+    } catch (e) {}
+}
+
+function abrirParEnAppBinance(par) {
+    if (!par) return;
+    const ua = navigator.userAgent;
+    const esMovil = /Android|iPhone|iPad|iPod/i.test(ua);
+    if (!esMovil) { abrirParEnBinance(par); return; }   // PC: no existe la app móvil
+
+    const pair = String(par).toUpperCase();
+    let abrio = false;
+    const marcar = function () { abrio = true; };
+    const vis = function () { if (document.hidden) abrio = true; };
+    document.addEventListener('visibilitychange', vis);
+    window.addEventListener('pagehide', marcar);
+    window.addEventListener('blur', marcar);
+    const limpiar = function () {
+        document.removeEventListener('visibilitychange', vis);
+        window.removeEventListener('pagehide', marcar);
+        window.removeEventListener('blur', marcar);
+    };
+
+    // Binance no documenta un enlace directo a un par de futuros: se copia el
+    // nombre del par para pegarlo en el buscador si la app abre en el inicio.
+    try { navigator.clipboard && navigator.clipboard.writeText(pair); } catch (e) {}
+    _avisoBinanceApp('📋 <b>' + pair.replace('USDT', '') + '</b> copiado · si la app abre en el inicio, pégalo en el buscador', 6000);
+
+    // 1) Intento: ir al par de futuros dentro de la app
+    window.location.href = 'bnc://app.binance.com/futures/' + pair;
+
+    // 2) Si la app no tomó el control, abrir la app (inicio)
+    setTimeout(function () {
+        if (abrio || document.hidden) { limpiar(); return; }
+        window.location.href = 'bnc://app.binance.com';
+        // 3) Si todavía no abrió: avisar, SIN mandar a la web automáticamente
+        setTimeout(function () {
+            limpiar();
+            if (abrio || document.hidden) return;
+            _avisoBinanceApp('⚠️ No se pudo abrir la app de Binance. ¿Está instalada?<br><a href="https://www.binance.com/es-LA/futures/' + pair + '" target="_blank" rel="noopener" style="color:#f3ba2f;text-decoration:underline;">Abrir en la web (opcional)</a>', 9000);
+        }, 1500);
+    }, 1200);
+}
+
 function abrirEnApp() {
     if (!selectedCoin) return;
-    abrirParEnBinance(selectedCoin);
+    abrirParEnAppBinance(selectedCoin);
 }
 
 // Cache de voces separadas por género
@@ -15751,7 +15872,7 @@ function _actualizarVentanitaTecho4Ema() {
     // archivo completo sin caer en la paradoja de "el hash contiene su
     // propio hash". No cambiar este texto.
     var _PLACEHOLDER = "%%CDC_INTEGRITY_HASH%%";
-    var _HASH_ESPERADO = "b71813b171c450dda9c30938040e1a693ea65c43077276aa7121e34c5dfab23b"; // ← se reemplaza por el hash real en el paso final
+    var _HASH_ESPERADO = "d4c87799416443dfb6381226fac945d80877d697a9ef78b550c9fb0fc55fcc49"; // ← se reemplaza por el hash real en el paso final
 
     function _bloquear(motivo) {
         try {
@@ -16392,11 +16513,11 @@ function setChip(t,c){if(chip){chip.textContent=t;chip.style.color=c||"#94a3b8";
 function ocultar(){var b=document.getElementById("cdcFrenoBan");if(b)b.style.display="none";if(tit){document.title=T0;tit=false;}}
 function mostrar(r,nm){var b=ban(),f=(r.lvl===0),g=r.lvl===2;
  b.style.background=f?"linear-gradient(90deg,#7f1d1d,#ff2a3b)":g?"linear-gradient(90deg,#065f46,#0ecb81)":"linear-gradient(90deg,#92400e,#f3b32f)";b.style.color=(f||g)?"#fff":"#1a1203";
- var tit1=f?"\ud83d\udcc9 EST\u00c1 CAYENDO "+r.caida.toFixed(1)+"%":g?"\u2705 CA\u00cdDA CONFIRMADA \u2014 VA A SUBIR":"\u26a0\ufe0f SE DETUVO LA CA\u00cdDA";
+ var tit1=f?"\ud83d\udcc9 est\u00e1 cayendo "+Math.abs(r.caida).toFixed(1)+"%":g?"\ud83d\udfe2 posibles se\u00f1ales de rebote":"\ud83d\udfe1 la ca\u00edda se est\u00e1 frenando";
  var det=f?"$"+fp(r.price)+" \u00b7 m\u00e1ximo $"+fp(r.hi)+" \u00b7 sigue haciendo m\u00ednimos nuevos":"$"+fp(r.price)+" \u00b7 m\u00ednimo $"+fp(r.lo)+" hace "+r.velas+" min \u00b7 ca\u00edda "+r.caida.toFixed(2)+"% desde el m\u00e1ximo";
- b.firstChild.innerHTML="<b class='t'>"+nm+" \u2014 "+tit1+"</b>"+det+(r.why.length?"<br>"+r.why.join(" \u00b7 "):"")+((!muted&&(!AC||AC.state!=="running"))?"<br>\ud83d\udd07 toca cualquier parte de la p\u00e1gina una vez para activar el sonido":"");
+ b.firstChild.innerHTML="<b class='t'>"+nm+" \u2014 "+tit1+"</b>"+det+(r.why.length?"<br>"+r.why.join(" \u00b7 "):"")+(f?"":"<br><i style=\'opacity:.85\'>Es una se\u00f1al de probabilidad: no asegura que suba ni que baje.</i>")+((!muted&&(!AC||AC.state!=="running"))?"<br>\ud83d\udd07 toca cualquier parte de la p\u00e1gina una vez para activar el sonido":"");
  b.style.display=(f?fallShut:EV.shut)?"none":"flex";
- if(!tit){T0=document.title;tit=true;}document.title=(f?"\ud83d\udcc9 CAE ":g?"\u2705 SUBE ":"\u26a0\ufe0f FRENA ")+nm+" \u00b7 "+T0;}
+ if(!tit){T0=document.title;tit=true;}document.title=(f?"\ud83d\udcc9 CAE ":g?"\ud83d\udfe2 REBOTE? ":"\ud83d\udfe1 FRENA ")+nm+" \u00b7 "+T0;}
 function alarma(r,nm){mostrar(r,nm);beep(r.lvl===2?[660,880,1100]:r.lvl===1?[660,660]:[330,262]);try{navigator.vibrate&&navigator.vibrate(r.lvl===2?[200,100,200,100,300]:r.lvl===1?[200]:[120]);}catch(e){}}
 
 /* ── Ciclo ── */
@@ -16407,7 +16528,7 @@ function proc(r){
  else if(r.fall){EV.off=0;if(now-lastFall>CFG.fallCool){lastFall=now;fallShut=false;alarma(r,nm);}else mostrar(r,nm);}
  else if(++EV.off>=2){ocultar();fallShut=false;}
  var ok=(muted||(AC&&AC.state==="running"));
- setChip(r.lvl===2?"\u2705 confirmada":r.lvl===1?"\u26a0\ufe0f se detuvo":r.fall?"\ud83d\udcc9 cayendo "+r.caida.toFixed(1)+"%":"\ud83d\udc41 vigilando",r.lvl===2?"#0ecb81":r.lvl===1?"#f3ba2f":r.fall?"#ff4d6d":"#94a3b8");
+ setChip(r.lvl===2?"\ud83d\udfe2 posible rebote":r.lvl===1?"\ud83d\udfe1 frenando":r.fall?"\ud83d\udcc9 cayendo "+Math.abs(r.caida).toFixed(1)+"%":"\ud83d\udc41 vigilando",r.lvl===2?"#0ecb81":r.lvl===1?"#f3ba2f":r.fall?"#ff4d6d":"#94a3b8");
  if(!ok&&chip)chip.textContent+=" \ud83d\udd07";}
 async function kl(s){
  var u=["https://fapi.binance.com/fapi/v1/klines?symbol="+encodeURIComponent(s)+"&interval=1m&limit=45","https://api.binance.com/api/v3/klines?symbol="+encodeURIComponent(s)+"&interval=1m&limit=45"];
@@ -16427,7 +16548,7 @@ function mount(){var br=document.getElementById("cdcMonedaBar");if(!br){setTimeo
  var mb=document.createElement("button");mb.id="cdcFrenoMute";mb.title="Sonido de la alarma de freno";
  mb.style.cssText="flex-shrink:0;background:#0b1220;color:#f3ba2f;border:1px solid #475569;border-radius:6px;padding:4px 6px;font:700 11px Arial;cursor:pointer";mb.onclick=function(){setMute(!muted);};
  var tb=document.createElement("button");tb.textContent="\ud83e\uddea";tb.title="Probar las 3 alarmas (solo prueba)";tb.style.cssText=mb.style.cssText;tb.onclick=probar;
- br.appendChild(chip);br.appendChild(mb);br.appendChild(tb);syncMute();watch();}
+ br.appendChild(chip);br.appendChild(mb);syncMute();watch();}
 window.CDC_FRENO={probar:probar,evaluar:evaluar,cfg:CFG};
 function start(){css();mount();setInterval(watch,1500);setInterval(tick,CFG.cada);}
 if(document.readyState==="loading")document.addEventListener("DOMContentLoaded",start);else start();
