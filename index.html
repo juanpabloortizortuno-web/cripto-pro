@@ -15927,7 +15927,7 @@ function _actualizarVentanitaTecho4Ema() {
     // archivo completo sin caer en la paradoja de "el hash contiene su
     // propio hash". No cambiar este texto.
     var _PLACEHOLDER = "%%CDC_INTEGRITY_HASH%%";
-    var _HASH_ESPERADO = "d5d533ada976beacd5472abf0ec58773d51233c94c2b875e3180539962899bde"; // ← se reemplaza por el hash real en el paso final
+    var _HASH_ESPERADO = "b06ff311f2db99d71380998c46219bf18d7c8457b2dcf9316e08c56c2394b88e"; // ← se reemplaza por el hash real en el paso final
 
     function _bloquear(motivo) {
         try {
@@ -16443,7 +16443,17 @@ async function analizar(s){
  var cer=ev("cerebroCDC"),lab=cer&&cer[s]?cer[s]:"";
  if(/DESPEGUE|TODA POTENCIA|REBOTE|FORMACIÓN/.test(lab)){sc+=1;}
  if(/DERRUMBE|AGOTADA|GIRO CONFIRMADO/.test(lab)){sc-=1;}
- var v2=sc>=2.5?["▲ TIENDE A SUBIR","#0ecb81"]:sc<=-2.5?["▼ TIENDE A BAJAR","#ff4d6d"]:sc>=1?["↗ leve sesgo alcista","#7fe9ff"]:sc<=-1?["↘ leve sesgo bajista","#ffb86b"]:["◆ LATERAL · sin dirección clara","#f3ba2f"];
+ var nn=null,cdOk=false;try{nn=window.CDC_NEURO&&window.CDC_NEURO.panel?window.CDC_NEURO.panel(s):null;}catch(e){}
+ try{cdOk=!!(window.CDC_CAIDA&&window.CDC_CAIDA.aprueba(s));}catch(e){}
+ /* Titular enfocado en CAÍDA: confirmada / señal próxima / sin señal (nunca afirma una caída que no existe) */
+ var conf=[[red&&dh<=-0.8,"ya se dio la vuelta del máximo ("+dh.toFixed(2)+"%)"],[p15<=-0.5,"el precio cae en 15 min"],[tr<0.95,"dominan las ventas agresivas"],[hasOI&&o15>1&&p15<-0.2,"entran cortos nuevos"],[sc<=-2.5,"el flujo completo apunta a bajar"],[!!(nn&&nn.p>=62)||cdOk,"el cerebro lo ve bajar"]];
+ var pre=[[p15>=4||p60>=3,"subida extendida"],[fr>=0.03,"largos muy cargados"],[!!(nn&&nn.p>=50),"el cerebro ve riesgo de caída"],[tr<1,"compras flojas"],[red,"vela roja"],[hasOI&&o15<-1&&p15>0.2,"sube sin dinero nuevo"]];
+ var nc=0,np=0,tc=[],tp=[];conf.forEach(function(x){if(x[0]){nc++;tc.push(x[1]);}});pre.forEach(function(x){if(x[0]){np++;tp.push(x[1]);}});
+ var emp=(g3&&p15>1)||(hasOI&&o15>1&&p15>0.5)||/DESPEGUE|TODA POTENCIA/.test(lab),v2;
+ if(conf[0][0]&&conf[1][0]&&nc>=3){v2=["🔻 CAÍDA CONFIRMADA · "+nc+"/6","#ff4d6d"];why.push("Señales de caída: "+tc.join(" · "));}
+ else if(!emp&&Math.max(nc,np)>=2){v2=["⚠️ SEÑAL PRÓXIMA DE CAÍDA · "+Math.max(nc,np)+"/6","#ffb86b"];why.push("Señales: "+(nc>=np?tc:tp).join(" · "));}
+ else if(emp){v2=["▲ SIGUE SUBIENDO · sin señal de caída","#7fe9ff"];}
+ else{v2=["◆ SIN SEÑAL DE CAÍDA aún · "+Math.max(nc,np)+"/6","#f3ba2f"];}
  var dn=!hasOI?"sin datos de OI":o15>1?"ENTRA dinero":o15<-1?"SALE dinero":"flujo estable";
  return{hi60:hi60,lo30:lo30,red:red,g3:g3,dh:dh,s:s,price:c[n],p15:p15,p60:p60,fr:fr,o15:o15,o60:o60,hasOI:hasOI,tr:tr,sc:sc,v:v2,dn:dn,why:why,lab:lab,t:Date.now()};}
 function shortEval(a){
