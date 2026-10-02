@@ -6589,7 +6589,9 @@ function _cerebroAprueba(sym) {
         // El cerebro predice CAÍDAS desde el techo: solo gobierna el modo SHORT.
         if (typeof modoMercado !== 'undefined' && modoMercado === 'alcista') return true;
         const c = (typeof cachedData !== 'undefined') ? cachedData[sym] : null;
-        if (!c || (c.posicionPorcentaje || 0) < 95) return false;
+        // 🎯 CDC-CAIDA (caída 3% en 30 min): puede aprobar monedas que reventaron y ya caen
+        if (c && window.CDC_CAIDA && _esReventadaCayendo(c) && CDC_CAIDA.aprueba(sym)) return true;
+        if (!c || ((c.posicionPorcentaje || 0) < 95 && !_esReventadaCayendo(c))) return false;
         if (!window.CDC_NEURO || !CDC_NEURO.panel) return false;
         const n = CDC_NEURO.panel(sym);
         return !!(n && n.p >= CEREBRO_UMBRAL_CAIDA);
@@ -6597,13 +6599,46 @@ function _cerebroAprueba(sym) {
 }
 function _cerebroFiltrarPanel(lista) {
     try {
-        if (!window.CDC_NEURO || !CDC_NEURO.panel) return [];
-        const out = lista
-            .map(p => ({ p, n: CDC_NEURO.panel(p.symbol) }))
-            .filter(o => o.n && o.n.p >= CEREBRO_UMBRAL_CAIDA);
-        out.sort((a, b) => b.n.p - a.n.p);
+        const out = lista.map(p => {
+            const n  = (window.CDC_NEURO && CDC_NEURO.panel) ? CDC_NEURO.panel(p.symbol) : null;
+            const cc = cachedData[p.symbol];
+            const ok1 = !!(n && n.p >= CEREBRO_UMBRAL_CAIDA);
+            const ok2 = !!(window.CDC_CAIDA && cc && _esReventadaCayendo(cc) && CDC_CAIDA.aprueba(p.symbol));
+            const pr  = Math.max(n ? n.p : 0, ok2 ? Math.round((CDC_CAIDA.probCal(p.symbol) || 0) * 100) : 0);
+            return { p, pr, ok: ok1 || ok2 };
+        }).filter(o => o.ok);
+        out.sort((x, y) => y.pr - x.pr);
         return out.map(o => o.p);
     } catch (e) { return []; }
+}
+// ══ 💥 "REVENTÓ Y YA CAE DESDE SU MÁXIMO" (puerta de entrada al cerebro) ══
+// Una moneda que subió fuerte, tocó su máximo de 24h y ya muestra caída confirmada
+// desde ahí deja de estar pegada al techo (posición < 95%), y la regla vieja la
+// dejaba afuera. Esta definición la deja ser CANDIDATA; NO la aprueba: sigue
+// teniendo que pasar el cerebro (CDC-NEURO, prob. de caída >= CEREBRO_UMBRAL_CAIDA).
+// Para ajustar la exigencia, tocar solo estas 3 constantes:
+const REVENTO_SUBIDA_24H_MIN      = 20;   // % mínimo que subió en 24h (la moneda "reventó")
+const REVENTO_CAIDA_DESDE_MAX_MIN = 1.5;  // % mínimo ya caído desde el máximo de 24h
+const REVENTO_CICLOS_BAJANDO_MIN  = 3;    // ciclos bajistas de los últimos 5 (caída confirmada)
+function _esReventadaCayendo(c) {
+    try {
+        if (!c) return false;
+        // Patrón APRUSDT ya existente (pump 100%+ y cayendo desde el pico)
+        if (typeof _evaluarBombaMaxima === 'function' && _evaluarBombaMaxima(c).activo) return true;
+        const subio    = (c.change || 0) >= REVENTO_SUBIDA_24H_MIN;
+        const caeDeMax = typeof c.caidaDesdeMaximo === 'number' && c.caidaDesdeMaximo >= REVENTO_CAIDA_DESDE_MAX_MIN;
+        const confirma = (c.ciclosBajando || 0) >= REVENTO_CICLOS_BAJANDO_MIN || (c.cambioReal2Min || 0) < -0.2;
+        return subio && caeDeMax && confirma;
+    } catch (e) { return false; }
+}
+// Texto del veredicto del cerebro según su probabilidad de caída (misma escala
+// de lenguaje que el panel del cerebro neuronal).
+function _etiquetaVeredictoCerebro(p) {
+    if (p == null) return '';
+    if (p >= 75) return '▼ TIENDE A BAJAR';
+    if (p >= 62) return '↘ sesgo bajista';
+    if (p >= 50) return '↘ leve sesgo bajista';
+    return '◆ sin señal clara de caída';
 }
 function _htmlCerebroNN(sym) {
     try {
@@ -6621,7 +6656,10 @@ function _htmlCerebroNN(sym) {
         if (!n && !f.length) return '';
         const col = (n && n.valida) ? '#b58cff' : '#94a3b8';
         const pct = n ? ((n.real != null ? n.real : n.p) + '%' + (n.valida ? '' : ' (aprende)')) : 'recopilando';
-        return `<span style="font-size:8px;font-weight:900;background:${col}22;color:${col};border:1px solid ${col}55;border-radius:5px;padding:1px 4px;margin-left:3px;white-space:nowrap;">🧠 ${pct}${f.length ? ' · ' + f.join(' ') : ''}</span>`;
+        const _cc = (typeof cachedData !== 'undefined') ? cachedData[sym] : null;
+        const _veredicto = n ? _etiquetaVeredictoCerebro(n.p) : '';
+        const _tope = (_cc && (_cc.posicionPorcentaje || 0) >= 95) ? '🔝 límite de subida · ' : '';
+        return `<span style="font-size:8px;font-weight:900;background:${col}22;color:${col};border:1px solid ${col}55;border-radius:5px;padding:1px 4px;margin-left:3px;white-space:nowrap;">🧠 ${_tope}${_veredicto ? _veredicto + ' · ' : ''}${pct}${f.length ? ' · ' + f.join(' ') : ''}</span>`;
     } catch (e) { return ''; }
 }
 
@@ -12952,9 +12990,18 @@ function actualizarTacometroDerecho() {
             // ocurren cerca del MÍNIMO de 24h, así que exigirles 95% del techo
             // las descartaría siempre — quedaría el panel vacío en modo LONG.
             if (!esLong) {
+                // 💥 Candidatas nuevas: monedas que reventaron y ya caen desde su máximo
+                // (no están pegadas al techo, por eso no salían). Entran SOLO como
+                // candidatas: más abajo el cerebro decide cuáles se quedan.
+                const yaListadas = new Set(señalesIA.map(p => p.symbol));
+                Object.values(cachedData).forEach(cR => {
+                    if (!yaListadas.has(cR.symbol) && _esReventadaCayendo(cR)) {
+                        señalesIA.push({ symbol: cR.symbol, tipo: 'REVENTADA' });
+                    }
+                });
                 señalesIA = señalesIA.filter(p => {
                     const cChk = cachedData[p.symbol];
-                    return cChk && (cChk.posicionPorcentaje || 0) >= 95;
+                    return cChk && ((cChk.posicionPorcentaje || 0) >= 95 || _esReventadaCayendo(cChk));
                 });
             }
 
@@ -12978,10 +13025,11 @@ function actualizarTacometroDerecho() {
                 // SIEMPRE se vea de dónde salió la moneda.
                 let badgeOrigen = _htmlBotonesOrigen(c2);
                 if (!badgeOrigen) {
-                    const _fallbackLabel = { DESPEGUE:'MOTOR IA · DESPEGUE', REBOTE:'MOTOR IA · REBOTE', REVERSION:'MOTOR IA · REVERSIÓN', PATRON_60_8:'MOTOR IA · PATRÓN -60%', BOMBA:'MOTOR IA · BOMBA', DERRUMBE:'MOTOR IA · DERRUMBE', AGOTADO:'MOTOR IA · AGOTADO', REVERSION_SHORT:'MOTOR IA · REV. SHORT', TECHO_ALTO:'MOTOR IA · TECHO' }[p.tipo] || 'MOTOR IA';
+                    const _fallbackLabel = { REVENTADA:'MOTOR IA · REVENTÓ Y CAE', DESPEGUE:'MOTOR IA · DESPEGUE', REBOTE:'MOTOR IA · REBOTE', REVERSION:'MOTOR IA · REVERSIÓN', PATRON_60_8:'MOTOR IA · PATRÓN -60%', BOMBA:'MOTOR IA · BOMBA', DERRUMBE:'MOTOR IA · DERRUMBE', AGOTADO:'MOTOR IA · AGOTADO', REVERSION_SHORT:'MOTOR IA · REV. SHORT', TECHO_ALTO:'MOTOR IA · TECHO' }[p.tipo] || 'MOTOR IA';
                     badgeOrigen = `<span style="font-size:8px;font-weight:900;background:#47556922;color:#94a3b8;border:1px solid #47556955;border-radius:5px;padding:1px 4px;margin-left:3px;white-space:nowrap;">🧠 ${_fallbackLabel}</span>`;
                 }
                 badgeOrigen += _htmlCerebroNN(s);
+                try { if (window.CDC_CAIDA) badgeOrigen += CDC_CAIDA.chip(s); } catch (e) {}
                 const badgeActivo  = esActiva ? `<span style="font-size:9px;background:#f3ba2f;color:#000;font-weight:900;padding:1px 5px;border-radius:4px;margin-left:4px;">EN PANEL</span>` : '';
 
                 if (p.tipo === 'DESPEGUE' || p.tipo === 'REBOTE' || p.tipo === 'REVERSION' || p.tipo === 'PATRON_60_8') {
@@ -13025,10 +13073,17 @@ function actualizarTacometroDerecho() {
                         <span style="font-size:12px;font-weight:900;color:${colorTecho};">🔴 ${nombre}${badgeActivo}${badgeOrigen}</span>
                         <span style="font-size:10px;color:#fca5a5;font-weight:700;">TECHO ${pos2}%${scoreLabel}</span>
                     </div>`);
+                } else if (p.tipo === 'REVENTADA') {
+                    const subeR  = (c2.change || 0).toFixed(0);
+                    const caidaR = (c2.caidaDesdeMaximo || 0).toFixed(1);
+                    motorItems.push(`<div onclick="seleccionarMoneda('${s}')" style="display:flex;align-items:center;justify-content:space-between;padding:5px 8px;border-radius:7px;background:rgba(255,107,107,0.1);border-left:3px solid #ff6b6b;margin-bottom:4px;cursor:pointer;${borderActivo}">
+                        <span style="font-size:12px;font-weight:900;color:#ff6b6b;">💥 ${nombre}${badgeActivo}${badgeOrigen}</span>
+                        <span style="font-size:10px;color:#fca5a5;font-weight:700;">REVENTÓ +${subeR}% · cae -${caidaR}% del máx</span>
+                    </div>`);
                 }
             });
 
-            const titulo = esLong ? '⚡ MOTOR LONG — SEÑALES IA' : '⚡ MOTOR SHORT — SEÑALES IA';
+            const titulo = esLong ? '⚡ MOTOR LONG — SEÑALES IA' : ('⚡ MOTOR SHORT — SEÑALES IA' + (window.CDC_CAIDA ? CDC_CAIDA.estado() : ''));
             const hint = `<div style="font-size:9px;color:#475569;text-align:center;margin-bottom:6px;">👆 Tocá una moneda para llevarla al panel</div>`;
             const flechaMotor = `<span style="font-size:11px;color:#f3ba2f;transition:transform 0.25s;transform:${window._motorLongShortAbierto ? 'rotate(180deg)' : 'rotate(0deg)'};">▾</span>`;
             const headerMotor = (cant) => `<div onclick="_toggleMotorLongShort()" style="display:flex;align-items:center;justify-content:space-between;cursor:pointer;margin-bottom:${window._motorLongShortAbierto ? '4px' : '0px'};">
@@ -15872,7 +15927,7 @@ function _actualizarVentanitaTecho4Ema() {
     // archivo completo sin caer en la paradoja de "el hash contiene su
     // propio hash". No cambiar este texto.
     var _PLACEHOLDER = "%%CDC_INTEGRITY_HASH%%";
-    var _HASH_ESPERADO = "d4c87799416443dfb6381226fac945d80877d697a9ef78b550c9fb0fc55fcc49"; // ← se reemplaza por el hash real en el paso final
+    var _HASH_ESPERADO = "d5d533ada976beacd5472abf0ec58773d51233c94c2b875e3180539962899bde"; // ← se reemplaza por el hash real en el paso final
 
     function _bloquear(motivo) {
         try {
@@ -16552,6 +16607,90 @@ function mount(){var br=document.getElementById("cdcMonedaBar");if(!br){setTimeo
 window.CDC_FRENO={probar:probar,evaluar:evaluar,cfg:CFG};
 function start(){css();mount();setInterval(watch,1500);setInterval(tick,CFG.cada);}
 if(document.readyState==="loading")document.addEventListener("DOMContentLoaded",start);else start();
+})();
+</script>
+
+<script>
+/* ═══ CDC-CAIDA · Detector de "CAÍDA CONFIRMADA" (≥3% en 30 min) — regresión logística, JS puro ═══
+   Cerebro SEPARADO del CDC-NEURO. Aprende en vivo de monedas que ya cayeron desde su máximo
+   (las que el otro cerebro no estudia). Ejemplo = "foto" de 19 datos; 30 min después se anota si
+   cayó >=3% antes de subir 2%. Solo APRUEBA monedas si en datos que NO vio le gana al azar. */
+(function(){
+"use strict";
+var CFG={drop:3,up:2,mins:30,cada:60000,tickMs:20000,maxPend:600,maxDS:6000,minDS:200,minPos:30,umbral:0.35};
+var DS=[],PEND=[],LAST={},MODEL=null,MET=null,DB=null,sinceTrain=0,dirty=0,lastSave=0,LS=null;
+try{LS=localStorage;var m=JSON.parse(LS.getItem("cdc_caida_model")||"null");if(m&&m.w){MODEL=m.w;MET=m.met;}}catch(e){}
+function CD(){return typeof cachedData!=="undefined"?cachedData:{};}
+function DE(){return typeof datosEMA!=="undefined"?datosEMA:{};}
+function BI(){return typeof btcEthInfluencia!=="undefined"?btcEthInfluencia:{};}
+function cl(v,a,b){return Math.max(a,Math.min(b,+v||0));}
+function r3(v){return Math.round(v*1000)/1000;}
+function feats(sym){var c=CD()[sym];if(!c||!c.price)return null;var e=DE()[sym]||{},inf=BI()[sym]||{},rsi=null,p=c.price,e7=e.ema7,e25=e.ema25;
+ try{rsi=calcularRSI(sym,14);}catch(x){}
+ return [cl(c.posicionPorcentaje,0,100)/100,cl(c.caidaDesdeMaximo,0,15)/15,cl(c.cambioReal2Min,-3,3)/3,cl(c.velocidad,-3,3)/3,
+  cl((c.velPromedio||0)*5,-1,1),cl(c.ciclosBajando,0,5)/5,cl(c.change,-30,150)/150,cl(c.horasDesdeMaximo24h,0,24)/24,
+  (rsi==null?50:rsi)/100,cl(e.adx||0,0,50)/50,(e.diPlus!=null&&e.diMinus!=null)?(e.diPlus>e.diMinus?1:-1):0,
+  cl(e.distVwapPct||0,-5,5)/5,e7?cl((p-e7)/e7*100,-5,5)/5:0,e25?cl((p-e25)/e25*100,-10,10)/10:0,
+  (e7&&e25)?cl((e7-e25)/e25*100,-5,5)/5:0,cl(e.subidaDesdeMinimo||0,0,300)/300,cl(c.vecesEnTechoActual,0,4)/4,
+  inf.btcCayendo?1:0,cl(e.emaSpreadPct||0,0,60)/60];}
+function sig(z){return 1/(1+Math.exp(-z));}
+function score(M,x){var z=M.b;for(var i=0;i<x.length;i++)z+=M.w[i]*x[i];return sig(z);}
+function auc(s,y){var ix=s.map(function(_,i){return i;}).sort(function(a,b){return s[a]-s[b];}),r=0,n1=0,n0=0;
+ ix.forEach(function(i,k){if(y[i]){r+=k+1;n1++;}else n0++;});return(n1&&n0)?(r-n1*(n1+1)/2)/(n1*n0):0.5;}
+function fit(T){var n=T[0].x.length,M={w:new Array(n).fill(0),b:0},pos=T.filter(function(s){return s.y;}).length,
+ wp=Math.min(10,(T.length-pos)/Math.max(1,pos)),A=T.slice();
+ for(var ep=0;ep<60;ep++){var lr=0.08/(1+ep*0.1);
+  for(var i=A.length-1;i>0;i--){var j=Math.floor(Math.random()*(i+1)),t=A[i];A[i]=A[j];A[j]=t;}
+  for(i=0;i<A.length;i++){var s=A[i],er=(score(M,s.x)-s.y)*(s.y?wp:1);
+   for(var k=0;k<n;k++)M.w[k]-=lr*(er*s.x[k]+0.001*M.w[k]);M.b-=lr*er;}}
+ return M;}
+function indep(T){var last={},n=0,gap=CFG.mins*60000;T.forEach(function(s){if(!s.y)return;if(s.ts-(last[s.sym]||-1e15)>=gap)n++;last[s.sym]=s.ts;});return n;}
+function train(){
+ var D=DS.filter(function(s){return s.y===0||s.y===1;}).sort(function(a,b){return a.ts-b.ts;}),pos=D.filter(function(s){return s.y;}).length;
+ if(D.length<CFG.minDS||pos<CFG.minPos)return "Faltan datos: "+D.length+" ejemplos, "+pos+" caídas";
+ var c=Math.floor(D.length*0.7),TE=D.slice(c),gap=CFG.mins*60000,TR=D.slice(0,c).filter(function(s){return s.ts<=TE[0].ts-gap;});
+ if(TR.length<100||!TR.some(function(s){return s.y;})||!TE.some(function(s){return s.y;}))return "Faltan datos";
+ var M=fit(TR),sc=TE.map(function(s){return score(M,s.x);}),yt=TE.map(function(s){return s.y;}),a=auc(sc,yt),
+  base=yt.reduce(function(p,q){return p+q;},0)/yt.length,ord=sc.map(function(_,i){return i;}).sort(function(p,q){return sc[q]-sc[p];}),
+  k=Math.max(10,Math.floor(TE.length*0.2)),hit=0,i;
+ for(i=0;i<k;i++)hit+=yt[ord[i]];
+ var top=hit/k,asc=ord.slice().reverse(),cal=[];
+ for(var b=0;b<6;b++){var lo=Math.floor(asc.length*b/6),hi=Math.floor(asc.length*(b+1)/6),sl=asc.slice(lo,hi);if(!sl.length)continue;
+  cal.push([sc[sl[sl.length-1]],sl.reduce(function(p,q){return p+yt[q];},0)/sl.length]);}
+ MET={auc:a,base:base,top:top,lift:base>0?top/base:0,n:TE.length,indep:indep(TE),cal:cal,ts:Date.now(),nTrain:TR.length};
+ MET.gana=a>=0.60&&MET.lift>=1.5&&MET.n>=150&&MET.indep>=20;
+ MODEL=M;try{LS&&LS.setItem("cdc_caida_model",JSON.stringify({w:M,met:MET}));}catch(e){}
+ return "Listo: AUC "+a.toFixed(2)+(MET.gana?" (confiable)":" (aún no confiable)");}
+function prob(sym){if(!MODEL)return null;var x=feats(sym);return x?score(MODEL,x):null;}
+function calp(sym){var p=prob(sym);if(p==null||!MET||!MET.cal||!MET.cal.length)return null;
+ for(var i=0;i<MET.cal.length;i++)if(p<=MET.cal[i][0])return MET.cal[i][1];return MET.cal[MET.cal.length-1][1];}
+function aprueba(sym){if(!MODEL||!MET||!MET.gana)return false;var p=calp(sym);return p!=null&&p>=CFG.umbral;}
+function chip(sym){if(!MODEL||!MET||!MET.gana)return "";var p=calp(sym);if(p==null)return "";var ok=p>=CFG.umbral,col=ok?"#0ecb81":"#94a3b8";
+ return '<span style="font-size:8px;font-weight:900;background:'+col+'22;color:'+col+';border:1px solid '+col+'55;border-radius:5px;padding:1px 4px;margin-left:3px;white-space:nowrap;">🎯 caída '+CFG.drop+'%/'+CFG.mins+'m · '+Math.round(p*100)+'%</span>';}
+function estado(){var n=DS.length,pos=DS.filter(function(s){return s.y;}).length,t;
+ if(MODEL&&MET)t=MET.gana?"activo · AUC "+MET.auc.toFixed(2)+" · "+MET.lift.toFixed(1)+"× mejor que azar":"entrenado, aún no confiable (AUC "+MET.auc.toFixed(2)+") · "+n+" ejemplos";
+ else t="aprendiendo: "+n+" ejemplos · "+pos+" caídas (mín "+CFG.minDS+" y "+CFG.minPos+")";
+ return '<div style="font-size:8px;font-weight:700;color:#94a3b8;margin-top:2px;">🎯 Caída '+CFG.drop+'%/'+CFG.mins+'min · '+t+'</div>';}
+function candidata(c){return c.caidaDesdeMaximo>=0.8&&(c.change>=10||(typeof _esReventadaCayendo==="function"&&_esReventadaCayendo(c)));}
+/* ── Persistencia (IndexedDB) ── */
+function dbOpen(cb){if(typeof indexedDB==="undefined")return cb();try{var r=indexedDB.open("cdc_caida",1);r.onupgradeneeded=function(){r.result.createObjectStore("kv");};r.onsuccess=function(){DB=r.result;cb();};r.onerror=function(){cb();};}catch(e){cb();}}
+function dbPut(k,v){if(!DB)return;try{DB.transaction("kv","readwrite").objectStore("kv").put(v,k);}catch(e){}}
+function dbGet(k,cb){if(!DB)return cb(null);try{var q=DB.transaction("kv").objectStore("kv").get(k);q.onsuccess=function(){cb(q.result||null);};q.onerror=function(){cb(null);};}catch(e){cb(null);}}
+function persist(now){if(!dirty||now-lastSave<120000)return;lastSave=now;dirty=0;dbPut("ds",DS);dbPut("pend",PEND);}
+function tick(){try{var C=CD(),now=Date.now(),i,p,c,r,y;
+ for(i=PEND.length-1;i>=0;i--){p=PEND[i];c=C[p.sym];
+  if(c&&c.price){r=(c.price/p.p0-1)*100;if(r>=CFG.up)p.up=true;y=null;
+   if(r<=-CFG.drop&&!p.up)y=1;else if(p.up)y=0;else if(now-p.ts>=CFG.mins*60000)y=0;
+   if(y!==null){DS.push({sym:p.sym,ts:p.ts,x:p.x,y:y});PEND.splice(i,1);dirty++;sinceTrain++;}}
+  else if(now-p.ts>CFG.mins*60000*3)PEND.splice(i,1);}
+ if(DS.length>CFG.maxDS)DS=DS.slice(-CFG.maxDS);
+ if(PEND.length<CFG.maxPend)for(var k in C){c=C[k];if(!c||!c.price||(LAST[k]&&now-LAST[k]<CFG.cada)||!candidata(c))continue;
+  var x=feats(k);if(!x)continue;LAST[k]=now;PEND.push({sym:k,ts:now,p0:c.price,x:x.map(r3),up:false});dirty++;if(PEND.length>=CFG.maxPend)break;}
+ if(sinceTrain>=100&&DS.length>=CFG.minDS){sinceTrain=0;train();}
+ persist(now);}catch(e){}}
+window.CDC_CAIDA={prob:prob,probCal:calp,aprueba:aprueba,chip:chip,estado:estado,entrenar:train,met:function(){return MET;},cfg:CFG,
+ muestras:function(){return DS.length;},_push:function(s){DS.push(s);sinceTrain++;}};
+dbOpen(function(){dbGet("ds",function(v){if(v&&v.length)DS=v.concat(DS);dbGet("pend",function(q){if(q&&q.length)PEND=q.concat(PEND);setInterval(tick,CFG.tickMs);});});});
 })();
 </script>
 
