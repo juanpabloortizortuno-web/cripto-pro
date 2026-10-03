@@ -5953,6 +5953,7 @@ function caidaVolumenPct(symbol) {
     return Math.max(0, ((pico - actual) / pico) * 100);
 }
 
+var vozJarvis = null;   // 🎩 voz masculina grave para el modo Jarvis
 function cargarVoces() {
     const todas = window.speechSynthesis.getVoices();
     if (todas.length === 0) return;
@@ -5980,6 +5981,9 @@ function cargarVoces() {
         vozFemenina  = pool[0];
     }
 
+    // 🎩 Jarvis: prefiere una voz masculina en español (Jorge, Diego, Pablo, Raúl, Álvaro, Google español…)
+    vozJarvis = pool.find(v => /(jorge|diego|pablo|raul|raúl|alvaro|álvaro|enrique|carlos|miguel|juan|google español|male|hombre)/i.test(v.name) && !keysFemale.test(v.name)) || vozMasculina || null;
+    console.log("🔊 Voz JARVIS:", vozJarvis ? vozJarvis.name : "no hay voz masculina, usa la disponible");
     console.log("🔊 Voz HOMBRE (SUBIDA):", vozMasculina ? vozMasculina.name : "pitch bajo");
     console.log("🔊 Voz MUJER  (CAÍDA) :", vozFemenina  ? vozFemenina.name  : "pitch alto");
 }
@@ -6058,7 +6062,7 @@ function _vozCerebroReemplazo(texto, opt) {
         _vozCerebroUltimo[sym] = ahora;
         const nn = (window.CDC_NEURO && CDC_NEURO.panel) ? CDC_NEURO.panel(sym) : null;
         const pr = nn ? nn.p : Math.round(((window.CDC_CAIDA && CDC_CAIDA.probCal(sym)) || 0) * 100);
-        hablar(`${sym.replace('USDT','')}: el cerebro neuronal ve que se acabó la subida y viene una caída${pr ? ', probabilidad ' + pr + ' por ciento' : ''}.`,
+        hablar(`${sym.replace('USDT','')}: el cerebro neuronal indica que la subida ha terminado y se aproxima una caída${pr ? ', probabilidad ' + pr + ' por ciento' : ''}.`,
                false, { sym: sym, dir: 'SHORT', cerebro: true });
     } catch (e) {}
 }
@@ -6103,6 +6107,22 @@ function _vozCerebroTick() {
 }
 setTimeout(function () { setInterval(_vozCerebroTick, 10000); }, 20000);
 
+// ══════════════════════════════════════════════════════════════════
+// 🎩 MODO JARVIS — voz masculina, grave, formal y sin leer emojis.
+// Pon JARVIS_ACTIVO = false para volver a la voz anterior.
+// ══════════════════════════════════════════════════════════════════
+const JARVIS_ACTIVO = true;
+const JARVIS_PITCH  = 0.88;   // más grave
+const JARVIS_RATE   = 1.04;   // un poco más ágil
+let _jarvisN = 0;
+function _jarvisTexto(t) {
+    if (!JARVIS_ACTIVO) return t;
+    t = String(t || '').replace(/[\u{1F000}-\u{1FAFF}\u{2190}-\u{27BF}\u{2B00}-\u{2BFF}\uFE0F]/gu, '').replace(/\s{2,}/g, ' ').trim();
+    if (/^(señor|atención, señor|informe)/i.test(t)) return t;
+    const aperturas = ['Señor, ', 'Atención, señor. ', 'Señor, informe: ', 'Señor, '];
+    return aperturas[(_jarvisN++) % aperturas.length] + t;
+}
+
 function hablar(texto, esMasculino, opt) {
     if (!('speechSynthesis' in window)) return;
     // 🧠 Voz coherente con el cerebro (si el guardia falla, habla igual: nunca queda mudo por un error)
@@ -6110,7 +6130,7 @@ function hablar(texto, esMasculino, opt) {
     // Si la cola ya está llena, descartamos el aviso más antiguo (ya perdió vigencia)
     if (colaVoz.some(q => q.texto === texto)) return; // no repetir el mismo aviso en cola
     if (colaVoz.length >= MAX_COLA_VOZ) colaVoz.shift();
-    colaVoz.push({ texto, esMasculino });
+    colaVoz.push({ texto: _jarvisTexto(texto), esMasculino });
     procesarColaVoz();
 }
 
@@ -6131,9 +6151,10 @@ function procesarColaVoz() {
     const u = new SpeechSynthesisUtterance(texto);
     u.lang = 'es-ES';
     u.volume = 1;
-    u.pitch = 1.0;
-    u.rate  = 1.0;
-    if (vozFemenina) u.voice = vozFemenina;
+    u.pitch = JARVIS_ACTIVO ? JARVIS_PITCH : 1.0;
+    u.rate  = JARVIS_ACTIVO ? JARVIS_RATE  : 1.0;
+    if (JARVIS_ACTIVO && (vozJarvis || vozMasculina)) u.voice = vozJarvis || vozMasculina;
+    else if (vozFemenina) u.voice = vozFemenina;
 
     // Calcular duración estimada y bloquear durante ese tiempo + 1 seg
     const duracionEstimada = Math.ceil((texto.length / (u.rate * 14)) * 1000);
@@ -8008,6 +8029,94 @@ async function obtenerKlines(symbol, interval, limit) {
 //   rej    : vela de rechazo (estrella fugaz / envolvente bajista)  (0..1)
 //   cvd    : el comprador se debilita mientras el precio sube       (-1..1)
 // ══════════════════════════════════════════════════════════════════
+// ══════════════════════════════════════════════════════════════════
+// 🛣️ MAPA DE RUTA — 6 cruces con las velas de 1h (≈10 días) de cada moneda
+//  1 DURACIÓN  : cuánto tardó el dinero en entrar en la subida actual
+//  2 SALIDA    : cuánto tardaron en salir sus subidas anteriores
+//  3 TECHOS    : cuántas veces chocó antes con este nivel (máximos previos)
+//  4 SOPORTES  : qué hay debajo si cae (soportes o vacío)
+//  5 EDAD      : moneda nueva (poca historia) o con historial
+//  6 HORARIO   : cómo se ha portado a esta hora del día (UTC)
+// Aquí solo se MIDE; los votos se calculan en _votosRuta().
+// ══════════════════════════════════════════════════════════════════
+function calcularRutaCruces(kl) {
+    if (!Array.isArray(kl) || kl.length < 30) return null;
+    const n = kl.length, last = n - 1;
+    const T = kl.map(k => +k[0]), O = kl.map(k => +k[1]), H = kl.map(k => +k[2]), Lo = kl.map(k => +k[3]), Cc = kl.map(k => +k[4]);
+    if (Cc.some(v => !isFinite(v)) || H.some(v => !isFinite(v)) || Lo.some(v => !isFinite(v))) return null;
+    const px = Cc[last];
+    if (!(px > 0)) return null;
+    const R = { n, edadDias: Math.round(n / 24 * 10) / 10, nueva: n < 168 };
+
+    // pivotes (±3 velas)
+    const pivH = [], pivL = [];
+    for (let i = 3; i < n - 3; i++) {
+        let isH = true, isL = true;
+        for (let j = i - 3; j <= i + 3; j++) { if (H[j] > H[i]) isH = false; if (Lo[j] < Lo[i]) isL = false; }
+        if (isH) pivH.push(i);
+        if (isL) pivL.push(i);
+    }
+
+    // 1) DURACIÓN de la subida actual: desde el mínimo de las últimas 72 h
+    {
+        let iLow = last, vLow = Lo[last];
+        for (let i = Math.max(0, n - 72); i <= last; i++) if (Lo[i] < vLow) { vLow = Lo[i]; iLow = i; }
+        // el inicio real de la subida = la ÚLTIMA vela que todavía estaba cerca (<=3%) de ese mínimo
+        let iIni = iLow;
+        for (let i = last; i >= iLow; i--) if (Lo[i] <= vLow * 1.03) { iIni = i; break; }
+        R.duracion = { horas: Math.max(1, last - iIni), runPct: (px / vLow - 1) * 100 };
+    }
+
+    // 2) SALIDA histórica: subidas previas >=8% en <=12 h y cuánto tardaron en devolver la mitad
+    {
+        let eps = 0, rev = 0, hrs = [], ultI = -99;
+        for (const i of pivH) {
+            if (i - ultI < 6) continue;
+            let low = Infinity;
+            for (let j = Math.max(0, i - 12); j <= i; j++) if (Lo[j] < low) low = Lo[j];
+            const rise = (H[i] / low - 1) * 100;
+            if (rise < 8) continue;
+            ultI = i; eps++;
+            const objetivo = H[i] - 0.5 * (H[i] - low);
+            for (let j = i + 1; j <= Math.min(last, i + 24); j++) if (Lo[j] <= objetivo) { rev++; hrs.push(j - i); break; }
+        }
+        hrs.sort((a, b) => a - b);
+        R.salida = { episodios: eps, devueltas: rev, medH: hrs.length ? hrs[Math.floor(hrs.length / 2)] : null };
+    }
+
+    // 3) TECHOS: máximos anteriores (se excluyen las últimas 8 h)
+    {
+        const prev = pivH.filter(i => i <= n - 8);
+        const hits = prev.filter(i => Math.abs(H[i] / px - 1) <= 0.015).length;
+        let maxPrev = 0;
+        for (let i = 0; i <= Math.max(0, n - 8); i++) if (H[i] > maxPrev) maxPrev = H[i];
+        R.techos = { hits, sobreMaxPct: maxPrev > 0 ? (px / maxPrev - 1) * 100 : 0 };
+    }
+
+    // 4) SOPORTES: pivotes bajos por debajo del precio
+    {
+        const niveles = [];
+        pivL.map(i => Lo[i]).filter(v => v < px * 0.99).sort((a, b) => b - a).forEach(v => {
+            if (!niveles.length || niveles[niveles.length - 1] / v - 1 > 0.015) niveles.push(v);
+        });
+        const cerca = niveles.filter(v => v >= px * 0.85).length;
+        R.soportes = { cerca, gapPct: niveles.length ? (px / niveles[0] - 1) * 100 : null };
+    }
+
+    // 6) HORARIO: velas de esta hora y la siguiente (UTC) en los últimos días
+    {
+        const h0 = new Date().getUTCHours(), h1 = (h0 + 1) % 24;
+        let tot = 0, rojas = 0, suma = 0;
+        for (let i = 0; i < last; i++) {
+            const hh = new Date(T[i]).getUTCHours();
+            if (hh !== h0 && hh !== h1) continue;
+            tot++; const r = (Cc[i] / O[i] - 1) * 100; suma += r; if (r < 0) rojas++;
+        }
+        R.horario = { horaUTC: h0, n: tot, rojasPct: tot ? rojas / tot : null, prom: tot ? suma / tot : null };
+    }
+    return R;
+}
+
 function calcularEstudiosTecho(kl) {
     if (!Array.isArray(kl) || kl.length < 60) return null;
     const n = kl.length, last = n - 1;
@@ -8269,6 +8378,7 @@ async function actualizarEMASimbolo(symbol) {
             adx, diPlus, diMinus, tendenciaFuerte, direccionDMI,
             vwap, precioSobreVwap, distVwapPct,
             estudiosTecho: (function(){ try { return calcularEstudiosTecho(klines); } catch (eEst) { return null; } })(),
+            rutaCruces: (function(){ try { return calcularRutaCruces(klines); } catch (eRut) { return null; } })(),
             actualizado: Date.now()
         };
     } catch (e) {
@@ -11253,7 +11363,7 @@ function _vozCoheteTick() {
         const cer = _vv.codigo === 'CAE' ? ' Veredicto: va a caer muy pronto.'
                   : _vv.codigo === 'SUBE' ? ' Veredicto: va a seguir subiendo.'
                   : ' Veredicto: indecisa, ' + (_vv.sesgo === 'CAER' ? 'más probable que caiga.' : _vv.sesgo === 'SUBIR' ? 'más probable que siga.' : 'sin ventaja clara.');
-        hablar(`${n} subió casi en vertical y está en su máximo, ${ext} por ciento por encima de su media, ${estado}.${cer}`,
+        hablar(`${n} ha subido casi en vertical y se encuentra en su máximo, ${ext} por ciento por encima de su media, ${estado}.${cer}`,
                false, { sym: mejor.sym, cerebro: true });
     } catch (e) {}
 }
@@ -11335,6 +11445,16 @@ function _veredictoUnificado(sym) {
             else if (pr.rsi <= 50) add(1, -0.3, 'RSI ' + pr.rsi + ' con espacio para subir');
         }
 
+        // 5b) 🛣️ MAPA DE RUTA: 6 cruces (duración, salida histórica, techos, soportes, edad, horario)
+        try {
+            const RC = e ? e.rutaCruces : null;
+            if (RC) {
+                out.ruta = _votosRuta(RC, c);
+                out.ruta.forEach(k => { if (k.s !== null) add(k.w, k.s, k.txt); });
+                if (RC.nueva) out.nueva = true;
+            }
+        } catch (x5) {}
+
         // 6) 🤖 MOTORES IA (últimas opiniones de Claude para esta moneda, si existen y están vigentes)
         const iv = _iaVotos[sym];
         if (iv) {
@@ -11358,6 +11478,7 @@ function _veredictoUnificado(sym) {
         out.pCaer = Math.round(_verClamp(50 + score * 50, 1, 99));
         out.sesgo = score > 0.08 ? 'CAER' : score < -0.08 ? 'SUBIR' : 'PAREJO';
         out.conf = Math.round(100 * Math.min(1, Math.abs(score) * 1.3) * (0.6 + 0.4 * Math.min(1, comp.length / 6)));
+        if (out.nueva) out.conf = Math.round(out.conf * 0.8);   // moneda nueva = menos historia = menos confianza
         out.razones = comp.slice().sort((a, b) => Math.abs(b.w * b.s) - Math.abs(a.w * a.s)).slice(0, 3).map(k => k.txt);
         out.cerebro = cerebroVeCaida;
         out.sigueSubiendo = sigueSubiendo;
@@ -11373,6 +11494,179 @@ function _veredictoUnificado(sym) {
     return out;
 }
 
+// ══════════════════════════════════════════════════════════════════
+// 🛣️ VOTOS DE LOS 6 CRUCES + DIAGRAMA DE CARRETERA + MEDIDOR DE ACIERTOS
+// Todos los umbrales de abajo son ESTIMACIONES mías: se ajustan con el
+// medidor de aciertos reales (más abajo), no a ojo.
+// ══════════════════════════════════════════════════════════════════
+function _votosRuta(R, c) {
+    const f1 = x => (Math.round(x * 10) / 10);
+    const out = [];
+    // 1) DURACIÓN
+    {
+        let s = null, txt = 'Sin subida reciente relevante';
+        const d = R.duracion;
+        if (d && d.runPct >= 5) {
+            if (d.horas <= 8 && d.runPct >= 15)        { s = 0.7;  txt = `Subida relámpago: +${f1(d.runPct)}% en ${d.horas} h`; }
+            else if (d.horas <= 16 && d.runPct >= 12)  { s = 0.35; txt = `Subida rápida: +${f1(d.runPct)}% en ${d.horas} h`; }
+            else if (d.horas >= 36)                    { s = -0.25; txt = `Subida lenta y sostenida: +${f1(d.runPct)}% en ${d.horas} h`; }
+            else                                       { s = 0;    txt = `Subida normal: +${f1(d.runPct)}% en ${d.horas} h`; }
+        }
+        out.push({ id: 'duracion', ico: '⏱️', nom: 'DURACIÓN', s, w: 1.5, txt });
+    }
+    // 2) SALIDA histórica
+    {
+        let s = null, txt = 'Sin subidas anteriores para comparar';
+        const q = R.salida;
+        if (q && q.episodios >= 1) {
+            const ratio = q.devueltas / q.episodios;
+            if (ratio >= 0.67 && q.medH != null && q.medH <= 8) { s = 0.6;  txt = `Sus ${q.episodios} subidas previas se devolvieron en ~${q.medH} h`; }
+            else if (ratio >= 0.67)                              { s = 0.4;  txt = `Devolvió ${q.devueltas} de ${q.episodios} subidas previas`; }
+            else if (ratio <= 0.34)                              { s = -0.4; txt = `Sostuvo ${q.episodios - q.devueltas} de ${q.episodios} subidas previas`; }
+            else                                                 { s = 0;    txt = `Subidas previas mixtas (${q.devueltas}/${q.episodios} devueltas)`; }
+        }
+        out.push({ id: 'salida', ico: '🚪', nom: 'SALIDA', s, w: 2, txt });
+    }
+    // 3) TECHOS
+    {
+        let s = null, txt = 'Sin datos de máximos';
+        const t = R.techos;
+        if (t) {
+            if (t.hits >= 2)          { s = 0.6;  txt = `Choca con un techo que ya tocó ${t.hits} veces`; }
+            else if (t.hits === 1)    { s = 0.3;  txt = 'Choca con un techo que ya tocó antes'; }
+            else if (t.sobreMaxPct >= 3) { s = -0.2; txt = `Rompió todos sus máximos (+${f1(t.sobreMaxPct)}%): sin techo conocido`; }
+            else                      { s = 0;    txt = 'Sin techo histórico cercano'; }
+        }
+        out.push({ id: 'techos', ico: '🏔️', nom: 'TECHOS', s, w: 2, txt });
+    }
+    // 4) SOPORTES
+    {
+        let s = null, txt = 'Sin datos de soportes';
+        const p = R.soportes;
+        if (p) {
+            if (p.gapPct === null)            { s = 0.5;  txt = 'Sin soportes debajo: aire hasta el fondo'; }
+            else if (p.gapPct >= 15)          { s = 0.5;  txt = `Vacío de ${f1(p.gapPct)}% hasta su soporte más cercano`; }
+            else if (p.gapPct >= 8)           { s = 0.25; txt = `Soporte a ${f1(p.gapPct)}% por debajo`; }
+            else if (p.cerca >= 3)            { s = -0.3; txt = `${p.cerca} soportes cerca amortiguan una caída`; }
+            else                              { s = 0;    txt = `Soporte cercano a ${f1(p.gapPct)}%`; }
+        }
+        out.push({ id: 'soportes', ico: '🧱', nom: 'SOPORTES', s, w: 1, txt });
+    }
+    // 5) EDAD (no vota: solo baja la confianza si es nueva)
+    {
+        const txt = R.nueva ? `Moneda NUEVA (${R.edadDias} días): poca historia, lecturas menos fiables`
+                            : `Con historial (${R.edadDias >= 10 ? '10+' : R.edadDias} días de velas)`;
+        out.push({ id: 'edad', ico: '🆕', nom: 'EDAD', s: null, w: 0, txt, col: R.nueva ? '#f3ba2f' : '#64748b' });
+    }
+    // 6) HORARIO
+    {
+        let s = null, txt = 'Pocos datos de esta hora';
+        const h = R.horario;
+        if (h && h.n >= 8 && h.rojasPct !== null) {
+            const rp = Math.round(h.rojasPct * 100);
+            if (h.rojasPct >= 0.7 && h.prom < 0)      { s = 0.35;  txt = `A esta hora (UTC ${h.horaUTC}) cerró en rojo ${rp}% de ${h.n} veces`; }
+            else if (h.rojasPct <= 0.3 && h.prom > 0) { s = -0.35; txt = `A esta hora (UTC ${h.horaUTC}) cerró en verde ${100 - rp}% de ${h.n} veces`; }
+            else                                      { s = 0;     txt = `A esta hora (UTC ${h.horaUTC}) sin patrón claro (${h.n} muestras)`; }
+        }
+        out.push({ id: 'horario', ico: '🕒', nom: 'HORARIO', s, w: 0.7, txt });
+    }
+    return out;
+}
+
+// 🛣️ Diagrama de carretera: 6 intersecciones, cada una en semáforo
+function _htmlRuta(v) {
+    if (!v || !v.ruta) return '';
+    const col = k => k.col || (k.s === null ? '#475569' : k.s >= 0.25 ? '#ff2a3b' : k.s <= -0.2 ? '#0ecb81' : '#f3ba2f');
+    const xs = v.ruta.map((k, i) => 45 + i * 102), ys = v.ruta.map((k, i) => (i % 2 === 0 ? 24 : 46));
+    const pts = xs.map((x, i) => x + ',' + ys[i]).join(' ');
+    let svg = `<svg viewBox="0 0 640 82" style="width:100%;max-width:640px;height:auto;display:block;margin:4px 0;" xmlns="http://www.w3.org/2000/svg">
+        <polyline points="8,35 ${pts} 632,35" fill="none" stroke="#1f2937" stroke-width="13" stroke-linejoin="round" stroke-linecap="round"/>
+        <polyline points="8,35 ${pts} 632,35" fill="none" stroke="#94a3b8" stroke-width="1.2" stroke-dasharray="5 5" stroke-linejoin="round"/>`;
+    v.ruta.forEach((k, i) => {
+        svg += `<g><title>${k.nom}: ${k.txt}</title><circle cx="${xs[i]}" cy="${ys[i]}" r="12" fill="${col(k)}" stroke="#0b1220" stroke-width="2"/>
+            <text x="${xs[i]}" y="${ys[i] + 4}" font-size="11" text-anchor="middle">${k.ico}</text>
+            <text x="${xs[i]}" y="${i % 2 === 0 ? 70 : 12}" font-size="8.5" font-weight="800" fill="${col(k)}" text-anchor="middle">${k.nom}</text></g>`;
+    });
+    svg += `</svg>`;
+    const lineas = v.ruta.map(k => `<div style="font-size:9px;color:${col(k)};line-height:1.35;">${k.ico} <b>${k.nom}:</b> <span style="color:#cbd5e1;">${k.txt}</span></div>`).join('');
+    return `<div style="margin-top:4px;"><div style="font-size:9px;color:#94a3b8;font-weight:800;letter-spacing:.5px;">🛣️ MAPA DE RUTA · 6 cruces <span style="font-weight:600;">(rojo = empuja a caer · verde = empuja a subir · amarillo = neutro/nueva · gris = sin datos)</span></div>${svg}${lineas}</div>`;
+}
+
+// 🎯 MEDIDOR DE ACIERTOS REALES: guarda cada veredicto CAE / SUBE (confianza>=50%) y mira
+// 60 min después qué hizo el precio. Se guarda en este navegador (localStorage).
+//   CAE   acierta si el precio bajó >=1% · falla si subió >=1%
+//   SUBE  acierta si el precio subió >=1% · falla si bajó >=1%
+// También anota el peor movimiento EN CONTRA que tuvo en esa hora (el "VELVET").
+// Necesita la app abierta para resolver cada señal (60 min).
+const VER_LOG_KEY = 'cdc_ver_log_v1';
+const VER_LOG_HORIZ_MS = 60 * 60 * 1000;
+const VER_LOG_COOLDOWN_MS = 90 * 60 * 1000;
+const VER_LOG_CONF_MIN = 50;
+let _verLog = { pend: [], res: [] };
+let _verLogUlt = {};
+function _verLogCargar() {
+    try {
+        const r = localStorage.getItem(VER_LOG_KEY);
+        if (r) { const o = JSON.parse(r); if (o && Array.isArray(o.pend) && Array.isArray(o.res)) _verLog = o; }
+    } catch (e) {}
+    _verLog.pend.concat(_verLog.res).forEach(x => { if (x && x.sym) _verLogUlt[x.sym] = Math.max(_verLogUlt[x.sym] || 0, x.ts || 0); });
+}
+function _verLogGuardar() {
+    try { localStorage.setItem(VER_LOG_KEY, JSON.stringify({ pend: _verLog.pend.slice(-120), res: _verLog.res.slice(-300) })); } catch (e) {}
+}
+function _verLogTick() {
+    try {
+        if (typeof cachedData === 'undefined') return;
+        const ahora = Date.now();
+        const quedan = [];
+        _verLog.pend.forEach(p => {
+            const cc = cachedData[p.sym], px = cc && cc.price;
+            if (px) {
+                const mov = (px / p.p0 - 1) * 100, adv = p.cod === 'CAE' ? mov : -mov;
+                if (adv > (p.adv || 0)) p.adv = Math.round(adv * 100) / 100;
+                p.pN = px;
+            }
+            if (ahora - p.ts >= VER_LOG_HORIZ_MS) {
+                const mov = ((p.pN || p.p0) / p.p0 - 1) * 100, fav = p.cod === 'CAE' ? -mov : mov;
+                p.res = fav >= 1 ? 'acierto' : fav <= -1 ? 'fallo' : 'neutral';
+                p.mov = Math.round(mov * 100) / 100;
+                _verLog.res.push(p);
+            } else quedan.push(p);
+        });
+        _verLog.pend = quedan;
+        let nuevas = 0;
+        for (const sym in cachedData) {
+            if (nuevas >= 6) break;
+            const cc = cachedData[sym];
+            if (!cc || !cc.price || (cc.volume || 0) < COHETE_VOL_MIN) continue;
+            if (!((cc.change || 0) >= 8 || (cc.posicionPorcentaje || 0) >= 85)) continue;
+            if (ahora - (_verLogUlt[sym] || 0) < VER_LOG_COOLDOWN_MS) continue;
+            const v = _veredictoUnificado(sym);
+            if ((v.codigo !== 'CAE' && v.codigo !== 'SUBE') || v.conf < VER_LOG_CONF_MIN) continue;
+            _verLog.pend.push({ sym, cod: v.codigo, ts: ahora, p0: cc.price, conf: v.conf, razon: (v.razones[0] || ''), adv: 0 });
+            _verLogUlt[sym] = ahora; nuevas++;
+        }
+        _verLogGuardar();
+    } catch (e) {}
+}
+function _verPrecisionHTML() {
+    try {
+        const st = { CAE: { n: 0, a: 0, f: 0, adv: 0 }, SUBE: { n: 0, a: 0, f: 0, adv: 0 } };
+        _verLog.res.forEach(x => {
+            const q = st[x.cod]; if (!q) return;
+            q.n++; if (x.res === 'acierto') q.a++; else if (x.res === 'fallo') q.f++; q.adv += (x.adv || 0);
+        });
+        const fila = (ico, nom, q) => q.n === 0
+            ? `${ico} ${nom}: sin señales resueltas aún`
+            : `${ico} ${nom}: <b>${Math.round(q.a / q.n * 100)}%</b> acierto · ${Math.round(q.f / q.n * 100)}% fallo · ${q.n} señales · peor contra promedio <b>${(q.adv / q.n).toFixed(1)}%</b>`;
+        const pend = _verLog.pend.length;
+        return `<div style="font-size:9.5px;color:#cbd5e1;background:rgba(0,212,255,0.07);border:1px solid rgba(0,212,255,0.25);border-radius:6px;padding:5px 8px;margin:4px 0;">
+            🎯 <b>PRECISIÓN REAL a 60 min</b> (medida con tus propias señales) &nbsp;|&nbsp; ${fila('🔴', 'CAE', st.CAE)} &nbsp;|&nbsp; ${fila('🟢', 'SUBE', st.SUBE)} <span style="color:#64748b;">· ${pend} en seguimiento</span></div>`;
+    } catch (e) { return ''; }
+}
+_verLogCargar();
+setTimeout(function () { setInterval(_verLogTick, 60000); }, 45000);
+
 function _chipVeredicto(v, compacto) {
     if (!v) return '';
     const mapa = {
@@ -11382,7 +11676,7 @@ function _chipVeredicto(v, compacto) {
     };
     const m = mapa[v.codigo] || mapa.INDECISA;
     const razon = (v.razones || []).join(' · ');
-    return `<div style="font-size:${compacto ? 10 : 11}px;font-weight:900;color:${m.col};background:${m.bg};border:1px solid ${m.col}66;border-radius:6px;padding:4px 7px;margin:4px 0;">${m.t} <span style="opacity:.8;">· confianza ${v.conf}% · caer ${v.pCaer}%${v.tieneIA ? ' · 🤖IA' : ''}</span>${razon ? `<div style="font-size:9px;font-weight:600;color:#cbd5e1;margin-top:2px;">${razon}</div>` : ''}</div>`;
+    return `<div style="font-size:${compacto ? 10 : 11}px;font-weight:900;color:${m.col};background:${m.bg};border:1px solid ${m.col}66;border-radius:6px;padding:4px 7px;margin:4px 0;">${m.t} <span style="opacity:.8;">· confianza ${v.conf}% · caer ${v.pCaer}%${v.tieneIA ? ' · 🤖IA' : ''}${v.nueva ? ' · 🆕 nueva' : ''}</span>${razon ? `<div style="font-size:9px;font-weight:600;color:#cbd5e1;margin-top:2px;">${razon}</div>` : ''}</div>`;
 }
 
 // 🔊 Voz del veredicto: SOLO habla cuando una moneda pasa a "VA A CAER MUY PRONTO"
@@ -11408,7 +11702,7 @@ function _vozVeredictoTick() {
         _vozCerebroUltimo[mejor.sym] = ahora;
         _vozVeredictoGlobalTs = ahora;
         const n = mejor.sym.replace('USDT', '');
-        hablar(`${n}: veredicto del cerebro, va a caer muy pronto. Confianza ${mejor.v.conf} por ciento. ${(mejor.v.razones[0] || '')}.`,
+        hablar(`${n}: mis sistemas indican una caída inminente. Confianza ${mejor.v.conf} por ciento. Motivo principal: ${mejor.v.razones[0] || 'varias señales coinciden'}.`,
                false, { sym: mejor.sym, dir: 'SHORT', cerebro: true });
     } catch (e) {}
 }
@@ -11439,8 +11733,9 @@ setInterval(function () {
         if (!box) return;
         let el = document.getElementById('cdcVeredictoUnif');
         if (!el) { el = document.createElement('div'); el.id = 'cdcVeredictoUnif'; box.insertBefore(el, box.firstChild); }
-        el.innerHTML = '<div style="font-size:9px;color:#94a3b8;font-weight:800;letter-spacing:.5px;">🧭 VEREDICTO UNIFICADO (cerebro + IA + estudios)</div>' +
-                       _chipVeredicto(_veredictoUnificado(_iaMonedaActual));
+        const _vv = _veredictoUnificado(_iaMonedaActual);
+        el.innerHTML = '<div style="font-size:9px;color:#94a3b8;font-weight:800;letter-spacing:.5px;">🧭 VEREDICTO UNIFICADO (cerebro + IA + estudios + ruta)</div>' +
+                       _chipVeredicto(_vv) + _htmlRuta(_vv) + _verPrecisionHTML();
     } catch (e) {}
 }, 4000);
 
@@ -11827,6 +12122,7 @@ function renderizarRadar() {
             return h + `</div>`;
         };
         return `<div class="radar-titulo-seccion" style="color:#00d4ff;">🧭 VEREDICTO UNIFICADO <span style="font-size:9px;color:#64748b;">cerebro neuronal + motores IA + estudios de techo + flujo. Solo monedas calientes (subieron 8%+ o cerca de su máximo). Es una lectura de tu sistema, no una orden</span></div>
+            ${_verPrecisionHTML()}
             <div style="display:flex;gap:12px;flex-wrap:wrap;align-items:flex-start;">
             ${col('🔴 VA A CAER MUY PRONTO', '#ff2a3b', cae, 'Ninguna cumple todavía.')}
             ${col('🟡 INDECISA / LENTA', '#f3ba2f', ind, 'Ninguna en duda ahora.')}
@@ -16408,7 +16704,7 @@ function _actualizarVentanitaTecho4Ema() {
     // archivo completo sin caer en la paradoja de "el hash contiene su
     // propio hash". No cambiar este texto.
     var _PLACEHOLDER = "%%CDC_INTEGRITY_HASH%%";
-    var _HASH_ESPERADO = "c62d7d33d40e2671ef22d08b2aae1a91d7da2806eec4e87f1cd5c523dc4377ed"; // ← se reemplaza por el hash real en el paso final
+    var _HASH_ESPERADO = "a549665682fa48e290e88383bef394eafdcbf2d8b06315c01a58fe3c25992b56"; // ← se reemplaza por el hash real en el paso final
 
     function _bloquear(motivo) {
         try {
