@@ -5982,8 +5982,8 @@ function cargarVoces() {
     }
 
     // 🎩 Jarvis: prefiere una voz masculina en español (Jorge, Diego, Pablo, Raúl, Álvaro, Google español…)
-    vozJarvis = pool.find(v => /(jorge|diego|pablo|raul|raúl|alvaro|álvaro|enrique|carlos|miguel|juan|google español|male|hombre)/i.test(v.name) && !keysFemale.test(v.name)) || vozMasculina || null;
-    console.log("🔊 Voz JARVIS:", vozJarvis ? vozJarvis.name : "no hay voz masculina, usa la disponible");
+    vozJarvis = _elegirVozHumana(pool) || vozMasculina || null;   // 🎙️ la de mejor calidad (ver motor de voz humana)
+    console.log("🔊 Voz principal:", vozJarvis ? vozJarvis.name + ' (' + vozJarvis.lang + ')' : 'no hay voz masculina, usa la disponible');
     console.log("🔊 Voz HOMBRE (SUBIDA):", vozMasculina ? vozMasculina.name : "pitch bajo");
     console.log("🔊 Voz MUJER  (CAÍDA) :", vozFemenina  ? vozFemenina.name  : "pitch alto");
 }
@@ -6062,7 +6062,7 @@ function _vozCerebroReemplazo(texto, opt) {
         _vozCerebroUltimo[sym] = ahora;
         const nn = (window.CDC_NEURO && CDC_NEURO.panel) ? CDC_NEURO.panel(sym) : null;
         const pr = nn ? nn.p : Math.round(((window.CDC_CAIDA && CDC_CAIDA.probCal(sym)) || 0) * 100);
-        hablar(`${sym.replace('USDT','')}: el cerebro neuronal indica que la subida ha terminado y se aproxima una caída${pr ? ', probabilidad ' + pr + ' por ciento' : ''}.`,
+        hablar(_narrarVeredicto(sym, { apertura: 'Había una señal de compra en ' + _nombreHablado(sym) + ', pero la descarté.', cerebroAviso: pr || 0 }),
                false, { sym: sym, dir: 'SHORT', cerebro: true });
     } catch (e) {}
 }
@@ -6098,10 +6098,11 @@ function _vozCerebroTick() {
         if (!mejor) return;
         _vozCerebroUltimo[mejor.sym] = ahora;
         _vozCerebroGlobalTs = ahora;
-        const nombre = mejor.sym.replace('USDT', '');
-        const texto = mejor.reventada
-            ? `${nombre} subió de golpe y ya empieza a caer. El cerebro neuronal ve caída, probabilidad ${mejor.pr} por ciento.`
-            : `${nombre} llegó a su límite de subida. El cerebro neuronal ve que se acabó la subida y viene una caída, probabilidad ${mejor.pr} por ciento.`;
+        const nombre = _nombreHablado(mejor.sym);
+        const texto = _narrarVeredicto(mejor.sym, {
+            apertura: mejor.reventada ? nombre + ' subió de golpe y ya empieza a caer.' : nombre + ' llegó a su límite de subida.',
+            cerebroAviso: mejor.pr
+        });
         hablar(texto, false, { sym: mejor.sym, dir: 'SHORT', cerebro: true });
     } catch (e) {}
 }
@@ -6114,14 +6115,340 @@ setTimeout(function () { setInterval(_vozCerebroTick, 10000); }, 20000);
 const JARVIS_ACTIVO = true;
 const JARVIS_PITCH  = 0.88;   // más grave
 const JARVIS_RATE   = 1.04;   // un poco más ágil
-let _jarvisN = 0;
-function _jarvisTexto(t) {
-    if (!JARVIS_ACTIVO) return t;
-    t = String(t || '').replace(/[\u{1F000}-\u{1FAFF}\u{2190}-\u{27BF}\u{2B00}-\u{2BFF}\uFE0F]/gu, '').replace(/\s{2,}/g, ' ').trim();
-    if (/^(señor|atención, señor|informe)/i.test(t)) return t;
-    const aperturas = ['Señor, ', 'Atención, señor. ', 'Señor, informe: ', 'Señor, '];
-    return aperturas[(_jarvisN++) % aperturas.length] + t;
+// ══════════════════════════════════════════════════════════════════
+// 🎙️ MOTOR DE VOZ HUMANA
+//  1) Elige la MEJOR voz en español (Premium/Mejorada/Natural primero) y
+//     descarta las voces robóticas de iPhone (Eddy, Flo, Reed, Grandpa...).
+//  2) Habla por frases con pequeñas pausas (más fluido, como un asistente).
+//  3) Vocabulario: nombres de monedas pronunciables, números en palabras,
+//     siglas, frases variadas y explicaciones del veredicto.
+//  4) Botón 🎙️ (abajo a la izquierda): elegir voz, velocidad, estilo, probar.
+// ══════════════════════════════════════════════════════════════════
+function _esIOS() { try { return /iP(hone|ad|od)/.test(navigator.userAgent) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1); } catch (e) { return false; } }
+
+var _VOZ_NOVEDAD = /(eddy|\bflo\b|grandma|grandpa|\breed\b|rocko|sandy|shelley|albert|bad news|bahh|bells|boing|bubbles|cellos|good news|jester|organ|superstar|trinoids|whisper|wobble|zarvox|\bfred\b|junior|ralph|kathy|agnes)/i;
+var _VOZ_MASC = /(jorge|juan|diego|carlos|pablo|alvaro|álvaro|raul|raúl|enrique|miguel|francisco|andres|andrés|antonio|rafael|jaime|tomas|tomás|santiago|mateo|gonzalo|\bmale\b|hombre)/i;
+var _VOZ_FEM  = /(female|mujer|monica|mónica|paulina|marisol|helena|sabina|lucia|lucía|maria|maría|carmen|sofia|sofía|elena|dalia|camila|paloma|esperanza|laura|ximena|valentina|catalina|isabella|marta|luciana|angelica|angélica)/i;
+function _puntuarVoz(v) {
+    const n = (v.name || '') + ' ' + (v.voiceURI || ''), l = String(v.lang || '').replace('_', '-');
+    if (!/^es/i.test(l)) return -999;
+    let p = 0;
+    if (_VOZ_NOVEDAD.test(n)) p -= 120;                    // voces "Eloquence": suenan nasales y robóticas
+    if (/premium/i.test(n)) p += 60;
+    if (/enhanced|mejorad|siri/i.test(n)) p += 50;
+    if (/neural|natural|online/i.test(n)) p += 55;         // Edge/Windows: "Microsoft Jorge Online (Natural)"
+    if (/compact|compacta/i.test(n)) p -= 25;
+    if (/google/i.test(n)) p += 15;
+    if (_VOZ_MASC.test(n) && !_VOZ_FEM.test(n)) p += 35;
+    else if (_VOZ_FEM.test(n)) p -= 40;
+    p += /^es-(MX|US|419|AR|CO|CL|PE|BO|VE|UY|EC|PY)/i.test(l) ? 8 : 3;   // español latino primero
+    return p;
 }
+function _elegirVozHumana(lista) {
+    try {
+        const arr = (lista || []).filter(v => /^es/i.test(String(v.lang || ''))).slice();
+        if (!arr.length) return null;
+        arr.sort((a, b) => _puntuarVoz(b) - _puntuarVoz(a));
+        return arr[0];
+    } catch (e) { return null; }
+}
+
+var _cdcVozCfg = { voz: null, rate: null, pitch: null, estilo: 'natural', detalle: 'completo' };
+try { const _r = localStorage.getItem('cdc_voz_cfg'); if (_r) { const _o = JSON.parse(_r); if (_o && typeof _o === 'object') for (const k in _o) _cdcVozCfg[k] = _o[k]; } } catch (e) {}
+function _guardarVozCfg() { try { localStorage.setItem('cdc_voz_cfg', JSON.stringify(_cdcVozCfg)); } catch (e) {} }
+function _vozConfig() {
+    let voz = null;
+    try { if (_cdcVozCfg.voz) voz = (window.speechSynthesis.getVoices() || []).find(v => v.voiceURI === _cdcVozCfg.voz) || null; } catch (e) {}
+    if (!voz) voz = (JARVIS_ACTIVO ? (vozJarvis || vozMasculina) : vozFemenina) || null;
+    return {
+        voz: voz,
+        rate:  _cdcVozCfg.rate  != null ? _cdcVozCfg.rate  : (_esIOS() ? 0.96 : 1.0),   // iPhone: sin bajar el tono (lo vuelve nasal)
+        pitch: _cdcVozCfg.pitch != null ? _cdcVozCfg.pitch : 1.0,
+        estilo: _cdcVozCfg.estilo || 'natural',
+        detalle: _cdcVozCfg.detalle || 'completo'
+    };
+}
+function _crearUtterance(texto, cfg) {
+    const u = new SpeechSynthesisUtterance(texto);
+    if (cfg.voz) { u.voice = cfg.voz; u.lang = cfg.voz.lang; } else { u.lang = 'es-ES'; }
+    u.volume = 1; u.rate = cfg.rate; u.pitch = cfg.pitch;
+    return u;
+}
+let _vozToken = 0;
+
+// ── Vocabulario: nombres, números, siglas ──
+var _TICK = { BTC:'Bitcoin', ETH:'Ethereum', SOL:'Solana', BNB:'B N B', XRP:'X R P', DOGE:'Doge', ADA:'Cardano', AVAX:'Avalanche', LINK:'Link', DOT:'Polkadot', MATIC:'Polygon', LTC:'Litecoin', TRX:'Tron', SHIB:'Shiba', PEPE:'Pepe', WIF:'W I F', SUI:'Sui', APT:'Aptos', ARB:'Arbitrum', OP:'Optimism', TON:'Ton', NEAR:'Near', ATOM:'Cosmos', UNI:'Uniswap', AAVE:'Aave', FIL:'Filecoin', ETC:'Ethereum Classic', BCH:'Bitcoin Cash', XLM:'Stellar', ICP:'I C P', INJ:'Injective', TIA:'Celestia', SEI:'Sei', RUNE:'Thorchain', HBAR:'H bar', FET:'Fetch', RENDER:'Render', GALA:'Gala', SAND:'Sand', MANA:'Mana', CRV:'Curve', LDO:'Lido', MKR:'Maker', APE:'Ape', JUP:'Jupiter', WLD:'Worldcoin', BONK:'Bonk', FLOKI:'Floki', VELVET:'Velvet', MAGMA:'Magma' };
+var _TICK_CORE = { BTC:1, ETH:1, SOL:1, BNB:1, XRP:1, DOGE:1 };
+function _nombreHablado(sym) {
+    let b = String(sym || '').toUpperCase().replace(/USDT$/, ''), pre = '';
+    const m = b.match(/^(1000000|10000|1000)(.+)$/);
+    if (m) { pre = m[1] === '1000' ? 'mil ' : m[1] === '10000' ? 'diez mil ' : 'un millón de '; b = m[2]; }
+    if (_TICK[b]) return pre + _TICK[b];
+    if (/^[A-Z]{4,}$/.test(b) && /[AEIOU]/.test(b)) return pre + b.charAt(0) + b.slice(1).toLowerCase();   // se dice como palabra
+    return pre + b.split('').join(' ');                                                                      // se deletrea
+}
+var _NU = ['cero','uno','dos','tres','cuatro','cinco','seis','siete','ocho','nueve','diez','once','doce','trece','catorce','quince','dieciséis','diecisiete','dieciocho','diecinueve','veinte','veintiuno','veintidós','veintitrés','veinticuatro','veinticinco','veintiséis','veintisiete','veintiocho','veintinueve'];
+var _ND = ['','','','treinta','cuarenta','cincuenta','sesenta','setenta','ochenta','noventa'];
+var _NC = ['','ciento','doscientos','trescientos','cuatrocientos','quinientos','seiscientos','setecientos','ochocientos','novecientos'];
+function _nPal(n) {
+    n = Math.round(Number(n) || 0);
+    if (n < 0) return 'menos ' + _nPal(-n);
+    if (n < 30) return _NU[n];
+    if (n < 100) { const d = Math.floor(n / 10), u = n % 10; return _ND[d] + (u ? ' y ' + _NU[u] : ''); }
+    if (n === 100) return 'cien';
+    if (n < 1000) { const c = Math.floor(n / 100), r = n % 100; return _NC[c] + (r ? ' ' + _nPal(r) : ''); }
+    return String(n);
+}
+function _pctPal(x) { x = Math.abs(Number(x) || 0); return x < 1 ? 'menos de uno' : _nPal(x); }
+function _horasPal(h) { h = Math.max(1, Math.round(h)); return h === 1 ? 'una hora' : _nPal(h) + ' horas'; }
+function _vecesPal(k) { return k === 1 ? 'una vez' : _nPal(k) + ' veces'; }
+
+var _ACRO = { EMA: 'E M A', RSI: 'R S I', CDC: 'C D C', IA: 'I A', CVD: 'C V D', USDT: '', TP: 'take profit', SL: 'stop loss' };
+let _jarvisN = 0;
+function _humanizarTexto(t, opt) {
+    t = String(t || '');
+    if (!JARVIS_ACTIVO) return t;
+    t = t.replace(/[\u{1F000}-\u{1FAFF}\u{2190}-\u{27BF}\u{2B00}-\u{2BFF}\uFE0F]/gu, ' ');
+    try {   // la moneda de este aviso, dicha como palabra
+        if (opt && opt.sym) {
+            const base = String(opt.sym).toUpperCase().replace(/USDT$/, '');
+            if (base) {
+                const nombre = _nombreHablado(base);
+                t = t.replace(new RegExp('\\b' + base.replace(/[.*+?^${}()|[\]\\]/g, '\\$&') + '(USDT)?\\b', 'g'), function () { return nombre; });
+            }
+        }
+    } catch (e) {}
+    t = t.replace(/\b[A-Z]{2,6}\b/g, function (m) { return _ACRO.hasOwnProperty(m) ? _ACRO[m] : (_TICK_CORE[m] ? _TICK[m] : m); });
+    t = t.replace(/\b[A-ZÁÉÍÓÚÑ]{4,}\b/g, function (w) { return w.charAt(0) + w.slice(1).toLowerCase(); });   // MAYÚSCULAS no se deletrean
+    t = t.replace(/(\d)\.(\d)/g, '$1 punto $2').replace(/(\d+)\s*%/g, '$1 por ciento');
+    t = t.replace(/\s{2,}/g, ' ').trim();
+    if (_cdcVozCfg.estilo === 'jarvis' && !/^(señor|atención, señor|informe)/i.test(t)) {
+        const aperturas = ['Señor, ', 'Atención, señor. ', 'Señor, informe: ', 'Señor, '];
+        t = aperturas[(_jarvisN++) % aperturas.length] + t;
+    }
+    return t;
+}
+function _partirFrases(t) {
+    const base = String(t || '').match(/[^.!?;]+[.!?;]*/g) || [String(t || '')];
+    const out = [];
+    base.forEach(function (x) {
+        x = x.trim(); if (!x) return;
+        if (out.length && out[out.length - 1].length < 28) out[out.length - 1] += ' ' + x; else out.push(x);
+    });
+    const res = [];
+    out.forEach(function (x) {
+        if (x.length <= 190) { res.push(x); return; }
+        let cur = '';
+        x.split(/,\s*/).forEach(function (q) {
+            if (cur && (cur + ', ' + q).length > 170) { res.push(cur + ','); cur = q; } else cur = cur ? cur + ', ' + q : q;
+        });
+        if (cur) res.push(cur);
+    });
+    return res.length ? res : [String(t || '')];
+}
+
+// ── Narrador: convierte el veredicto en una explicación hablada ──
+let _vocabN = 0;
+function _pick(arr) { return arr[(_vocabN++) % arr.length]; }
+function _lowerFirst(s) { return s.charAt(0).toLowerCase() + s.slice(1); }
+function _narrarVeredicto(sym, o) {
+    o = o || {};
+    const n = _nombreHablado(sym);
+    try {
+        const cfg = _vozConfig(), breve = cfg.detalle === 'breve', jarvis = cfg.estilo === 'jarvis';
+        const c = cachedData[sym];
+        if (!c) return n + ': sin datos suficientes por ahora.';
+        const e = (typeof datosEMA !== 'undefined' && datosEMA[sym]) || {};
+        const R = e.rutaCruces || null, E = e.estudiosTecho || null;
+        const pr = (typeof prediccionCDC !== 'undefined') ? prediccionCDC[sym] : null;
+        const v = _veredictoUnificado(sym);
+        const hechos = [];
+        const add = function (side, w, t) { hechos.push({ side: side, w: w, t: t }); };
+
+        let nn = null; try { nn = (window.CDC_NEURO && CDC_NEURO.panel) ? CDC_NEURO.panel(sym) : null; } catch (x) {}
+        if (nn) {
+            const p = Math.round(nn.real != null ? nn.real : nn.p);
+            if (v.cerebro === true)  add('cae', 4, 'El cerebro neuronal calcula ' + _nPal(p) + ' por ciento de probabilidad de caída.');
+            if (v.cerebro === false) add('sube', 4, 'El cerebro neuronal no ve caída: solo ' + _nPal(p) + ' por ciento de probabilidad.');
+        }
+        if (R && R.duracion && R.duracion.runPct >= 8) {
+            const d = R.duracion;
+            if (d.horas <= 12) add('cae', d.horas <= 8 ? 3 : 2, 'Subió unos ' + _pctPal(d.runPct) + ' por ciento en apenas ' + _horasPal(d.horas) + '.');
+            else if (d.horas >= 36) add('sube', 1.5, 'Lleva ' + _horasPal(d.horas) + ' subiendo de forma sostenida, unos ' + _pctPal(d.runPct) + ' por ciento.');
+        }
+        let rc = null; try { rc = _esCoheteEnMaximo(c); } catch (x) {}
+        if (rc && rc.activo && !o.sinExt) add('cae', 3, 'Está ' + _pctPal(rc.extEma25) + ' por ciento por encima de su media, muy estirada.');
+        if (E) {
+            if ((E.cvd || 0) > 0.5)    add('cae', 2.5, 'El flujo comprador se está apagando.');
+            if ((E.rsiDiv || 0) > 0.5) add('cae', 2.5, 'Hay divergencia en el R S I justo en el máximo.');
+            if ((E.rej || 0) > 0.5)    add('cae', 2.5, 'Dejó una vela de rechazo en el máximo.');
+            if ((E.bb || 0) > 0.6)     add('cae', 1.5, 'Está tocando el borde superior de sus bandas.');
+            if ((E.cvd || 0) < -0.3)   add('sube', 2, 'El flujo comprador sigue activo.');
+        }
+        if (R && R.salida && R.salida.episodios >= 1) {
+            const q = R.salida, ratio = q.devueltas / q.episodios, cuando = q.medH ? ' en unas ' + _horasPal(q.medH) : '';
+            if (ratio >= 0.67) add('cae', 3, q.episodios === 1 ? 'Su última subida fuerte se devolvió' + cuando + '.' : 'Sus últimas ' + _nPal(q.episodios) + ' subidas fuertes se devolvieron' + cuando + '.');
+            else if (ratio <= 0.34) add('sube', 2, 'Sus subidas anteriores se sostuvieron.');
+        }
+        if (R && R.techos) {
+            if (R.techos.hits >= 1) add('cae', 2.5, 'Está chocando con un techo que ya tocó ' + _vecesPal(R.techos.hits) + ' antes.');
+            else if (R.techos.sobreMaxPct >= 3) add('sube', 2, 'Ya rompió todos sus máximos de los últimos diez días, así que no tiene un techo conocido.');
+        }
+        if (R && R.soportes) {
+            const g = R.soportes.gapPct;
+            if (g === null) add('cae', 1.5, 'No hay soportes debajo: si cae, cae lejos.');
+            else if (g >= 15) add('cae', 1.5, 'Si cae, no hay soporte hasta unos ' + _pctPal(g) + ' por ciento más abajo.');
+            else if (R.soportes.cerca >= 3 && g < 5) add('sube', 1, 'Tiene varios soportes cerca que amortiguarían una caída.');
+        }
+        const cb = c.ciclosBajando || 0, c2 = c.cambioReal2Min || 0, dMax = c.caidaDesdeMaximo || 0;
+        if (dMax >= 1 && cb >= 2)        add('cae', 3.5, 'Ya está cayendo desde su máximo.');
+        else if (cb >= 2 || c2 <= -0.1)  add('cae', 3, 'Ya empezó a frenar.');
+        else if (v.sigueSubiendo)        add('sube', 3.5, 'Todavía sigue subiendo con fuerza.');
+        if (pr && pr.rsi >= 80) add('cae', 2, 'El R S I está en ' + _nPal(pr.rsi) + ', sobrecomprado.');
+        if (v.tieneIA) {
+            try {
+                const iv = _iaVotos[sym]; let suma = 0, k = 0;
+                for (const m in iv) { if (Date.now() - iv[m].ts > VER_IA_VIGENCIA_MS) continue; suma += iv[m].v === 'VENDER' ? 1 : iv[m].v === 'COMPRAR' ? -1 : 0; k++; }
+                if (k && suma > 0) add('cae', 3, 'La inteligencia artificial también lee una caída.');
+                if (k && suma < 0) add('sube', 3, 'La inteligencia artificial también lee una subida.');
+            } catch (x) {}
+        }
+
+        hechos.sort(function (a, b) { return b.w - a.w; });
+        const cae = hechos.filter(function (h) { return h.side === 'cae'; }), sube = hechos.filter(function (h) { return h.side === 'sube'; });
+        const N = breve ? 1 : 3;
+        let sel = [];
+        if (v.codigo === 'CAE') sel = cae.slice(0, N);
+        else if (v.codigo === 'SUBE') sel = sube.slice(0, N);
+        else if (breve) sel = hechos.slice(0, 1);
+        else { if (cae[0]) sel.push(cae[0]); if (sube[0]) sel.push(sube[0]); if (cae[1]) sel.push(cae[1]); sel = sel.slice(0, 3); }
+
+        const aperturas = {
+            CAE:      ['Ojo con ' + n + '.', n + ' se ve agotada.', 'Atención con ' + n + ': muestra señales claras de cansancio.'],
+            INDECISA: [n + ' está dudando.', 'Sobre ' + n + ': por ahora no hay una dirección clara.', n + ' va lenta y sin rumbo definido.'],
+            SUBE:     [n + ' sigue con fuerza.', 'Sobre ' + n + ': mantiene el impulso.', n + ' se ve sana por ahora.']
+        };
+        const partes = [o.apertura || _pick(aperturas[v.codigo] || aperturas.INDECISA)];
+        sel.forEach(function (h, i) {
+            if (i === 0) { partes.push(h.t); return; }
+            const contraste = h.side !== sel[0].side;
+            const enlace = contraste ? _pick(['Pero ', 'Sin embargo, ', 'Por otro lado, ']) : _pick(['Además, ', 'Y ', 'También ']);
+            partes.push(enlace + _lowerFirst(h.t));
+        });
+        if (R && R.nueva && !breve) partes.push('Es una moneda nueva, con apenas ' + _nPal(Math.max(1, Math.round(R.edadDias))) + ' días de historia, así que tomo estas lecturas con cautela.');
+
+        const conf = _nPal(v.conf);
+        let concl;
+        if (o.cerebroAviso && v.codigo !== 'CAE') {
+            concl = 'El cerebro neuronal ve una caída, con ' + _nPal(o.cerebroAviso) + ' por ciento, aunque el resto de las señales todavía no lo confirma del todo.';
+        } else if (v.codigo === 'CAE') {
+            concl = _pick(['Mi conclusión: va a caer muy pronto, con ' + conf + ' por ciento de confianza.', 'En resumen, veo una caída cercana. Confianza, ' + conf + ' por ciento.', 'Por todo esto, creo que va a caer muy pronto. Confianza, ' + conf + ' por ciento.']);
+        } else if (v.codigo === 'SUBE') {
+            concl = _pick(['Mi conclusión: lo más probable es que siga subiendo, sin señales de caída por ahora. Confianza, ' + conf + ' por ciento.', 'En resumen, no veo señales de caída. Es más probable que siga subiendo.']);
+        } else {
+            concl = v.sesgo === 'CAER'  ? 'Mi lectura: está indecisa, pero con más probabilidad de caer que de subir.'
+                  : v.sesgo === 'SUBIR' ? 'Mi lectura: está indecisa, pero con más probabilidad de seguir subiendo que de caer.'
+                  :                       'Mi lectura: sin ventaja clara por ahora. Prefiero esperar más datos.';
+        }
+        partes.push(concl);
+        if (!breve && (_vocabN % 3 === 0)) partes.push(jarvis ? 'Es solo una lectura de mis sistemas; la decisión es suya.' : 'Es solo una lectura de mis sistemas; la decisión es tuya.');
+        return partes.join(' ');
+    } catch (err) { return n + ': revisa esta moneda, el análisis no pudo completarse.'; }
+}
+
+// ── Probar la voz AHORA (desde el botón; también desbloquea el audio en iPhone) ──
+function _hablarAhora(texto) {
+    try {
+        const ss = window.speechSynthesis;
+        if (ss.speaking) ss.cancel();
+        const cfg = _vozConfig(), partes = _partirFrases(_humanizarTexto(texto));
+        const dec = function (i) {
+            if (i >= partes.length) return;
+            const u = _crearUtterance(partes[i], cfg);
+            u.onend = function () { setTimeout(function () { dec(i + 1); }, 140); };
+            ss.speak(u);
+        };
+        dec(0);
+    } catch (e) {}
+}
+function _narrarMuestra() {
+    return 'Hola, soy el cerebro del C D C. Así sueno ahora. Ojo con Velvet. Subió unos treinta y ocho por ciento en apenas seis horas y está pegada a su máximo. Además, el flujo comprador se está apagando. Mi conclusión: va a caer muy pronto, con setenta y ocho por ciento de confianza.';
+}
+
+// ── iPhone: el audio solo se activa tras un toque; aquí se desbloquea con el primero ──
+(function () {
+    let hecho = false;
+    function desbloquear() {
+        if (hecho) return; hecho = true;
+        try { const u = new SpeechSynthesisUtterance(' '); u.volume = 0; window.speechSynthesis.speak(u); } catch (e) {}
+    }
+    ['touchend', 'click', 'keydown'].forEach(function (t) { document.addEventListener(t, desbloquear, { once: true, passive: true }); });
+})();
+
+// ── Botón 🎙️ y panel de ajustes de voz ──
+function _vozRefrescarPanel() {
+    try {
+        const sel = document.getElementById('cdcVozSel'); if (!sel) return;
+        const voces = (window.speechSynthesis.getVoices() || []).filter(function (v) { return /^es/i.test(String(v.lang || '')); });
+        voces.sort(function (a, b) { return _puntuarVoz(b) - _puntuarVoz(a); });
+        let h = '<option value="">Automática (la mejor disponible)</option>';
+        voces.forEach(function (v) {
+            const sc = _puntuarVoz(v), marca = _VOZ_NOVEDAD.test(v.name) ? ' ⚠ robótica' : (sc >= 50 ? ' ⭐' : '');
+            h += '<option value="' + v.voiceURI + '"' + (_cdcVozCfg.voz === v.voiceURI ? ' selected' : '') + '>' + v.name + ' (' + v.lang + ')' + marca + '</option>';
+        });
+        sel.innerHTML = h;
+        const cfg = _vozConfig();
+        document.getElementById('cdcVozRate').value = cfg.rate;
+        document.getElementById('cdcVozPitch').value = cfg.pitch;
+        document.getElementById('cdcVozRateV').textContent = Number(cfg.rate).toFixed(2);
+        document.getElementById('cdcVozPitchV').textContent = Number(cfg.pitch).toFixed(2);
+        document.getElementById('cdcVozEstilo').value = cfg.estilo;
+        document.getElementById('cdcVozDetalle').value = cfg.detalle;
+        document.getElementById('cdcVozActual').textContent = cfg.voz ? 'Usando: ' + cfg.voz.name + ' (' + cfg.voz.lang + ')' : 'Sin voz en español detectada: usa la del sistema.';
+    } catch (e) {}
+}
+function _vozInitPanel() {
+    try {
+        if (document.getElementById('cdcVozBtn') || !document.body) return;
+        const btn = document.createElement('button');
+        btn.id = 'cdcVozBtn'; btn.type = 'button'; btn.textContent = '🎙️'; btn.title = 'Ajustes de voz';
+        btn.style.cssText = 'position:fixed;left:10px;bottom:calc(10px + env(safe-area-inset-bottom,0px));z-index:99998;width:40px;height:40px;border-radius:50%;border:1px solid rgba(0,212,255,.6);background:rgba(8,14,26,.92);color:#fff;font-size:18px;cursor:pointer;box-shadow:0 2px 10px rgba(0,0,0,.5);';
+        const panel = document.createElement('div');
+        panel.id = 'cdcVozPanel';
+        panel.style.cssText = 'display:none;position:fixed;left:8px;right:8px;bottom:calc(58px + env(safe-area-inset-bottom,0px));max-width:420px;z-index:99999;background:#0b1220;border:1px solid rgba(0,212,255,.5);border-radius:12px;padding:12px;color:#e2e8f0;font-size:12px;box-shadow:0 8px 30px rgba(0,0,0,.6);max-height:72vh;overflow:auto;';
+        const est = 'width:100%;margin:2px 0 8px;background:#111a2e;color:#e2e8f0;border:1px solid #1f2d4a;border-radius:6px;padding:6px;font-size:13px;';
+        const bt = 'flex:1;padding:9px;border-radius:8px;border:1px solid rgba(0,212,255,.5);background:rgba(0,212,255,.12);color:#00d4ff;font-weight:800;font-size:12px;cursor:pointer;';
+        panel.innerHTML =
+            '<div style="font-weight:900;color:#00d4ff;margin-bottom:6px;">🎙️ VOZ DEL CDC</div>' +
+            '<label>Voz</label><select id="cdcVozSel" style="' + est + '"></select>' +
+            '<div id="cdcVozActual" style="font-size:10px;color:#94a3b8;margin:-4px 0 6px;"></div>' +
+            '<div style="font-size:10px;color:#f3ba2f;margin-bottom:8px;line-height:1.35;">' + (_esIOS()
+                ? '📱 iPhone: para una voz mucho más natural, ve a Ajustes ▸ Accesibilidad ▸ Contenido hablado ▸ Voces ▸ Español, descarga una voz «Mejorada» o «Premium» (por ejemplo Jorge o Juan) y vuelve aquí a elegirla.'
+                : 'Las voces con ⭐ son las de mejor calidad (Premium, Natural u Online).') + '</div>' +
+            '<label>Velocidad <b id="cdcVozRateV"></b></label><input id="cdcVozRate" type="range" min="0.8" max="1.2" step="0.02" style="width:100%;margin-bottom:8px;">' +
+            '<label>Tono <b id="cdcVozPitchV"></b> <span style="color:#64748b;">(1.00 es lo más natural)</span></label><input id="cdcVozPitch" type="range" min="0.85" max="1.1" step="0.01" style="width:100%;margin-bottom:8px;">' +
+            '<label>Estilo</label><select id="cdcVozEstilo" style="' + est + '"><option value="natural">Natural (como un asistente)</option><option value="jarvis">Jarvis (formal, «Señor»)</option></select>' +
+            '<label>Explicación</label><select id="cdcVozDetalle" style="' + est + '"><option value="completo">Completa (razones + conclusión)</option><option value="breve">Breve (una razón + conclusión)</option></select>' +
+            '<div style="display:flex;gap:6px;"><button id="cdcVozProbar" type="button" style="' + bt + '">▶ Probar</button><button id="cdcVozReset" type="button" style="' + bt + '">↺ Restablecer</button><button id="cdcVozCerrar" type="button" style="' + bt + '">✕</button></div>';
+        document.body.appendChild(panel);
+        document.body.appendChild(btn);
+        const $ = function (id) { return document.getElementById(id); };
+        btn.onclick = function () { const ab = panel.style.display === 'none'; panel.style.display = ab ? 'block' : 'none'; if (ab) _vozRefrescarPanel(); };
+        $('cdcVozCerrar').onclick = function () { panel.style.display = 'none'; };
+        $('cdcVozSel').onchange = function () { _cdcVozCfg.voz = this.value || null; _guardarVozCfg(); _vozRefrescarPanel(); };
+        $('cdcVozRate').oninput = function () { _cdcVozCfg.rate = parseFloat(this.value); $('cdcVozRateV').textContent = Number(this.value).toFixed(2); _guardarVozCfg(); };
+        $('cdcVozPitch').oninput = function () { _cdcVozCfg.pitch = parseFloat(this.value); $('cdcVozPitchV').textContent = Number(this.value).toFixed(2); _guardarVozCfg(); };
+        $('cdcVozEstilo').onchange = function () { _cdcVozCfg.estilo = this.value; _guardarVozCfg(); };
+        $('cdcVozDetalle').onchange = function () { _cdcVozCfg.detalle = this.value; _guardarVozCfg(); };
+        $('cdcVozProbar').onclick = function () { _hablarAhora(_narrarMuestra()); };
+        $('cdcVozReset').onclick = function () { _cdcVozCfg = { voz: null, rate: null, pitch: null, estilo: 'natural', detalle: 'completo' }; _guardarVozCfg(); _vozRefrescarPanel(); };
+        _vozRefrescarPanel();
+    } catch (e) {}
+}
+setTimeout(_vozInitPanel, 1200);
+if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', function () { setTimeout(_vozInitPanel, 300); });
+// (cargarVoces ya corrió una vez antes de que existieran estas tablas: se repite para elegir bien la voz en iPhone)
+try { cargarVoces(); } catch (e) {}
 
 function hablar(texto, esMasculino, opt) {
     if (!('speechSynthesis' in window)) return;
@@ -6130,7 +6457,7 @@ function hablar(texto, esMasculino, opt) {
     // Si la cola ya está llena, descartamos el aviso más antiguo (ya perdió vigencia)
     if (colaVoz.some(q => q.texto === texto)) return; // no repetir el mismo aviso en cola
     if (colaVoz.length >= MAX_COLA_VOZ) colaVoz.shift();
-    colaVoz.push({ texto: _jarvisTexto(texto), esMasculino });
+    colaVoz.push({ texto: _humanizarTexto(texto, opt), esMasculino });
     procesarColaVoz();
 }
 
@@ -6148,16 +6475,12 @@ function procesarColaVoz() {
     // Si todavía no hay ninguna voz cargada, reintentamos cargar justo antes de hablar
     if (!vozFemenina && !vozMasculina) cargarVoces();
 
-    const u = new SpeechSynthesisUtterance(texto);
-    u.lang = 'es-ES';
-    u.volume = 1;
-    u.pitch = JARVIS_ACTIVO ? JARVIS_PITCH : 1.0;
-    u.rate  = JARVIS_ACTIVO ? JARVIS_RATE  : 1.0;
-    if (JARVIS_ACTIVO && (vozJarvis || vozMasculina)) u.voice = vozJarvis || vozMasculina;
-    else if (vozFemenina) u.voice = vozFemenina;
+    const cfg = _vozConfig();
+    const partes = _partirFrases(texto);
+    const miToken = ++_vozToken;
 
     // Calcular duración estimada y bloquear durante ese tiempo + 1 seg
-    const duracionEstimada = Math.ceil((texto.length / (u.rate * 14)) * 1000);
+    const duracionEstimada = Math.ceil((texto.length / (cfg.rate * 14)) * 1000) + partes.length * 250;
     audioBloqueadoHasta = Date.now() + duracionEstimada + 1000;
     vozHablandoAhora = true;
 
@@ -6166,15 +6489,21 @@ function procesarColaVoz() {
         audioBloqueadoHasta = Date.now() + 1000;
         procesarColaVoz(); // si quedó algo en cola, lo habla a continuación
     };
-
-    u.onend = liberarYContinuar;
-    u.onerror = (e) => {
-        console.log("Error de voz, liberando bloqueo:", e);
-        audioBloqueadoHasta = 0;
-        liberarYContinuar();
+    // Cada frase se habla por separado, con un respiro entre ellas (suena más humano y evita cortes en iPhone)
+    const hablarParte = (i) => {
+        if (miToken !== _vozToken) return;
+        if (i >= partes.length) { liberarYContinuar(); return; }
+        const u = _crearUtterance(partes[i], cfg);
+        u.onend = () => { setTimeout(() => hablarParte(i + 1), 140); };
+        u.onerror = (e) => {
+            if (miToken !== _vozToken) return;
+            console.log("Error de voz, liberando bloqueo:", e);
+            audioBloqueadoHasta = 0;
+            liberarYContinuar();
+        };
+        window.speechSynthesis.speak(u);
     };
-
-    window.speechSynthesis.speak(u);
+    hablarParte(0);
 
     // Watchdog: en Android Chrome a veces speak() se traba en silencio sin disparar
     // onend/onerror. Si tras el tiempo estimado + margen sigue "hablando" (o quedó
@@ -11356,14 +11685,9 @@ function _vozCoheteTick() {
         if (!mejor) return;
         _vozCerebroUltimo[mejor.sym] = ahora;
         _vozCoheteGlobalTs = ahora;
-        const n = mejor.sym.replace('USDT', '');
+        const n = _nombreHablado(mejor.sym);
         const ext = Math.round(mejor.r.extEma25);
-        const estado = mejor.r.estado === 'FRENANDO' ? 'y empieza a frenar' : 'y todavía sigue subiendo';
-        const _vv = _veredictoUnificado(mejor.sym);
-        const cer = _vv.codigo === 'CAE' ? ' Veredicto: va a caer muy pronto.'
-                  : _vv.codigo === 'SUBE' ? ' Veredicto: va a seguir subiendo.'
-                  : ' Veredicto: indecisa, ' + (_vv.sesgo === 'CAER' ? 'más probable que caiga.' : _vv.sesgo === 'SUBIR' ? 'más probable que siga.' : 'sin ventaja clara.');
-        hablar(`${n} ha subido casi en vertical y se encuentra en su máximo, ${ext} por ciento por encima de su media, ${estado}.${cer}`,
+        hablar(_narrarVeredicto(mejor.sym, { apertura: n + ' subió casi en vertical y está pegada a su máximo, ' + _nPal(ext) + ' por ciento por encima de su media.', sinExt: true }),
                false, { sym: mejor.sym, cerebro: true });
     } catch (e) {}
 }
@@ -11701,8 +12025,7 @@ function _vozVeredictoTick() {
         if (!mejor) return;
         _vozCerebroUltimo[mejor.sym] = ahora;
         _vozVeredictoGlobalTs = ahora;
-        const n = mejor.sym.replace('USDT', '');
-        hablar(`${n}: mis sistemas indican una caída inminente. Confianza ${mejor.v.conf} por ciento. Motivo principal: ${mejor.v.razones[0] || 'varias señales coinciden'}.`,
+        hablar(_narrarVeredicto(mejor.sym),
                false, { sym: mejor.sym, dir: 'SHORT', cerebro: true });
     } catch (e) {}
 }
@@ -16704,7 +17027,7 @@ function _actualizarVentanitaTecho4Ema() {
     // archivo completo sin caer en la paradoja de "el hash contiene su
     // propio hash". No cambiar este texto.
     var _PLACEHOLDER = "%%CDC_INTEGRITY_HASH%%";
-    var _HASH_ESPERADO = "a549665682fa48e290e88383bef394eafdcbf2d8b06315c01a58fe3c25992b56"; // ← se reemplaza por el hash real en el paso final
+    var _HASH_ESPERADO = "90ea08aced2c68a43c64b1a6ae7bc93e8b2d9792a1e737645a98e023bd582fe2"; // ← se reemplaza por el hash real en el paso final
 
     function _bloquear(motivo) {
         try {
