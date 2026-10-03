@@ -116,6 +116,8 @@
         .radar-card.tipo-techo4ema::before { background: linear-gradient(90deg,#ff006e,#ff3c00); }
         .radar-card.tipo-techo4ema-cayendo { border-color: rgba(0,153,255,0.75); box-shadow: 0 0 18px rgba(0,153,255,0.4); background: linear-gradient(165deg, rgba(0,102,255,0.14), #090f1c 55%); }
         .radar-card.tipo-techo4ema-cayendo::before { background: linear-gradient(90deg,#0066ff,#00c3ff); }
+        .radar-card.tipo-cohete { border-color: rgba(255,153,0,0.75); box-shadow: 0 0 18px rgba(255,153,0,0.35); background: linear-gradient(165deg, rgba(255,140,0,0.13), #090f1c 55%); }
+        .radar-card.tipo-cohete::before { background: linear-gradient(90deg,#ff9900,#ff2a3b); }
         .radar-card.tipo-rebote { border-color: rgba(0,212,255,0.4); box-shadow: 0 0 12px rgba(0,212,255,0.15); }
         .radar-card.tipo-rebote::before { background: linear-gradient(90deg,#00d4ff,#00b4d8); }
         .techo-score-bar { height:4px; border-radius:4px; margin:5px 0; background:rgba(255,255,255,0.06); overflow:hidden; }
@@ -4060,6 +4062,14 @@ la computadora.</p>
             📉 MÁXIMO 24H + YA CAYENDO
             <span style="position:absolute;top:-6px;right:-6px;background:#00c3ff;color:#001a33;font-size:9px;font-weight:900;padding:1px 5px;border-radius:8px;" id="contTecho4Ema">0</span>
         </button>
+        <button class="radar-tab" id="tabCohete" onclick="filtrarRadar('cohete')" title="Monedas que subieron casi en vertical y están pegadas a su máximo, muy separadas de sus medias (patrón VELVET)" style="background:rgba(255,153,0,0.2);color:#ff9900;border-color:rgba(255,153,0,0.55);position:relative;font-weight:900;">
+            🚀 VERTICAL EN SU MÁXIMO
+            <span style="position:absolute;top:-6px;right:-6px;background:#ff9900;color:#1a0d00;font-size:9px;font-weight:900;padding:1px 5px;border-radius:8px;" id="contCohete">0</span>
+        </button>
+        <button class="radar-tab" id="tabVeredicto" onclick="filtrarRadar('veredicto')" title="Veredicto unificado: cerebro neuronal + IA + estudios. 3 conclusiones: va a caer / indecisa / va a seguir subiendo" style="background:rgba(0,212,255,0.15);color:#00d4ff;border-color:rgba(0,212,255,0.5);position:relative;font-weight:900;">
+            🧭 VEREDICTO
+            <span style="position:absolute;top:-6px;right:-6px;background:#ff2a3b;color:#fff;font-size:9px;font-weight:900;padding:1px 5px;border-radius:8px;" id="contVeredicto">0</span>
+        </button>
         <button class="radar-tab" id="tabTodas" onclick="filtrarRadar('todas')" title="Muestra todas las monedas del radar sin filtrar por categoría" style="background:rgba(243,186,47,0.15);color:#f3ba2f;border-color:rgba(243,186,47,0.4);">
             🌐 TODAS
         </button>
@@ -5996,8 +6006,107 @@ let colaVoz = [];
 let vozHablandoAhora = false;
 const MAX_COLA_VOZ = 20; // capacidad suficiente para todas las monedas de la lista central
 
-function hablar(texto, esMasculino) {
+// ══════════════════════════════════════════════════════════════════
+// 🧠 VOZ COHERENTE CON EL CEREBRO NEURONAL
+// Antes, 6 sistemas de voz decidían LONG/SHORT cada uno por su cuenta y ninguno
+// consultaba al cerebro (por eso una voz decía "compra en LONG" y el cerebro
+// decía "va a caer"). Ahora toda voz que mencione una moneda y una dirección
+// pasa por este guardia:
+//   · Voz de LONG  → se silencia si el cerebro ve caída en esa moneda.
+//   · Voz de SHORT → se silencia si el cerebro (con modelo) dice que NO cae.
+//   · Si el cerebro no tiene opinión (sin modelo o sin datos) se habla igual.
+// Para volver al comportamiento anterior: VOZ_COHERENTE_CEREBRO = false.
+// ══════════════════════════════════════════════════════════════════
+const VOZ_COHERENTE_CEREBRO = true;
+function _cerebroVeCaida(sym) {   // true = ve caída · false = no ve caída · null = sin opinión
+    try {
+        if (window.CDC_CAIDA && CDC_CAIDA.aprueba(sym)) return true;
+        const nn = (window.CDC_NEURO && CDC_NEURO.panel) ? CDC_NEURO.panel(sym) : null;
+        if (nn) return nn.p >= CEREBRO_UMBRAL_CAIDA;
+        return null;
+    } catch (e) { return null; }
+}
+function _symCerebro(s) { s = String(s || '').toUpperCase(); return (s && !/USDT$/.test(s)) ? s + 'USDT' : s; }
+function _dirDeTexto(texto) {   // detecta la dirección que la voz está recomendando
+    const t = String(texto || '').toLowerCase();
+    const esLong  = /\blong\b|\bcompra\b|\bcomprar\b|entrada anticipada|va a subir|\brebote\b|\bdespeg/.test(t);
+    const esShort = /\bshort\b|\bvender\b|\bventa\b|va a caer|\bcaída\b/.test(t);
+    if (esLong && !esShort) return 'LONG';
+    if (esShort && !esLong) return 'SHORT';
+    return null;
+}
+function _vozCoherente(texto, opt) {
+    if (!VOZ_COHERENTE_CEREBRO || !opt || !opt.sym || opt.cerebro) return true;
+    const sym = _symCerebro(opt.sym);
+    const dir = opt.dir || _dirDeTexto(texto);
+    if (!dir) return true;
+    const ve = _cerebroVeCaida(sym);
+    if (dir === 'LONG')  return ve !== true;
+    if (dir === 'SHORT') return ve !== false;
+    return true;
+}
+// Cuando el cerebro bloquea una voz de LONG porque ve caída, habla ÉL en su lugar
+// (una vez cada VOZ_CEREBRO_COOLDOWN_MS por moneda) para que se escuche una sola verdad.
+function _vozCerebroReemplazo(texto, opt) {
+    try {
+        if (!opt || !opt.sym || opt.cerebro) return;
+        const sym = _symCerebro(opt.sym);
+        const dir = opt.dir || _dirDeTexto(texto);
+        if (dir !== 'LONG' || _cerebroVeCaida(sym) !== true) return;
+        const ahora = Date.now();
+        if (ahora - (_vozCerebroUltimo[sym] || 0) < VOZ_CEREBRO_COOLDOWN_MS) return;
+        _vozCerebroUltimo[sym] = ahora;
+        const nn = (window.CDC_NEURO && CDC_NEURO.panel) ? CDC_NEURO.panel(sym) : null;
+        const pr = nn ? nn.p : Math.round(((window.CDC_CAIDA && CDC_CAIDA.probCal(sym)) || 0) * 100);
+        hablar(`${sym.replace('USDT','')}: el cerebro neuronal ve que se acabó la subida y viene una caída${pr ? ', probabilidad ' + pr + ' por ciento' : ''}.`,
+               false, { sym: sym, dir: 'SHORT', cerebro: true });
+    } catch (e) {}
+}
+
+// ══════════════════════════════════════════════════════════════════
+// 🧠 VOZ DEL CEREBRO NEURONAL
+// Avisa por voz las monedas cuya subida se acabó (pegadas al techo) o que
+// subieron de golpe y ya caen, SOLO si el cerebro las aprueba.
+// ══════════════════════════════════════════════════════════════════
+const VOZ_CEREBRO_ACTIVA = true;
+const VOZ_CEREBRO_COOLDOWN_MS = 180000;   // no repetir la misma moneda antes de 3 min
+const VOZ_CEREBRO_GLOBAL_MS   = 25000;    // mínimo entre avisos del cerebro
+let _vozCerebroUltimo = {}, _vozCerebroGlobalTs = 0;
+function _vozCerebroTick() {
+    try {
+        if (!VOZ_CEREBRO_ACTIVA || typeof cachedData === 'undefined') return;
+        const ahora = Date.now();
+        if (ahora - _vozCerebroGlobalTs < VOZ_CEREBRO_GLOBAL_MS) return;
+        let mejor = null;
+        for (const sym in cachedData) {
+            const c = cachedData[sym];
+            if (!c || (ahora - (_vozCerebroUltimo[sym] || 0)) < VOZ_CEREBRO_COOLDOWN_MS) continue;
+            const arriba    = (c.posicionPorcentaje || 0) >= 95;
+            const reventada = !arriba && (c.caidaDesdeMaximo || 0) >= 1.5 && _esReventadaCayendo(c);
+            if (!arriba && !reventada) continue;
+            const nn = (window.CDC_NEURO && CDC_NEURO.panel) ? CDC_NEURO.panel(sym) : null;
+            const okCaida = !!(window.CDC_CAIDA && CDC_CAIDA.aprueba(sym));
+            const p = nn ? nn.p : 0;
+            if (!(p >= CEREBRO_UMBRAL_CAIDA || okCaida)) continue;
+            const pr = okCaida ? Math.max(p, Math.round((CDC_CAIDA.probCal(sym) || 0) * 100)) : p;
+            if (!mejor || pr > mejor.pr) mejor = { sym, pr, reventada };
+        }
+        if (!mejor) return;
+        _vozCerebroUltimo[mejor.sym] = ahora;
+        _vozCerebroGlobalTs = ahora;
+        const nombre = mejor.sym.replace('USDT', '');
+        const texto = mejor.reventada
+            ? `${nombre} subió de golpe y ya empieza a caer. El cerebro neuronal ve caída, probabilidad ${mejor.pr} por ciento.`
+            : `${nombre} llegó a su límite de subida. El cerebro neuronal ve que se acabó la subida y viene una caída, probabilidad ${mejor.pr} por ciento.`;
+        hablar(texto, false, { sym: mejor.sym, dir: 'SHORT', cerebro: true });
+    } catch (e) {}
+}
+setTimeout(function () { setInterval(_vozCerebroTick, 10000); }, 20000);
+
+function hablar(texto, esMasculino, opt) {
     if (!('speechSynthesis' in window)) return;
+    // 🧠 Voz coherente con el cerebro (si el guardia falla, habla igual: nunca queda mudo por un error)
+    try { if (!_vozCoherente(texto, opt)) { _vozCerebroReemplazo(texto, opt); return; } } catch (e) {}
     // Si la cola ya está llena, descartamos el aviso más antiguo (ya perdió vigencia)
     if (colaVoz.some(q => q.texto === texto)) return; // no repetir el mismo aviso en cola
     if (colaVoz.length >= MAX_COLA_VOZ) colaVoz.shift();
@@ -6150,7 +6259,7 @@ function generarTextoAlarma(coinName, tipoAlerta) {
 function playAlarmVoice(coinName, tipoAlerta) {
     try {
         const { texto, esMasculino } = generarTextoAlarma(coinName, tipoAlerta);
-        hablar(texto, esMasculino);
+        hablar(texto, esMasculino, { sym: coinName, dir: (['BOMBA','REBOTE','REVERSION','PATRON_60_8'].includes(tipoAlerta) ? 'LONG' : (['DERRUMBE','AGOTADO'].includes(tipoAlerta) ? 'SHORT' : null)) });
     } catch(e) { console.log("Error voz:", e); }
 }
 
@@ -6226,7 +6335,7 @@ function verificarAlertasScalping() {
 
     // ── VOZ ─────────────────────────────────────────────────────
     const textoVoz = `¡${nombre} cumple las condiciones! Entra en ${tipoOp} a ${apalRec}x para ganar. Se movió ${cambio2m} por ciento en dos minutos. Ganancia estimada ${ganancia} dólares. Actúa rápido.`;
-    hablar(textoVoz, direccionLong);
+    hablar(textoVoz, direccionLong, { sym: mejorCandidato, dir: direccionLong ? 'LONG' : 'SHORT' });
 
     // ── BANNER VISUAL ────────────────────────────────────────────
     mostrarBannerScalp(nombre, mejorCandidato, tipoOp, apalRec, apalTexto, cambio2m, ganancia, emoji, colorOp, c, e);
@@ -10056,7 +10165,7 @@ function autoAbrirMonedaBombaMaxima() {
     const _textoVozBomba = mejorCandidata.confirmacionFuerte
         ? `Bingo. Bomba máxima confirmada en ${mejor.symbol.replace('USDT','')}`
         : `Bingo. Bomba máxima en ${mejor.symbol.replace('USDT','')}`;
-    try { hablar(_textoVozBomba, true); } catch (err) {}
+    try { hablar(_textoVozBomba, true, { sym: mejor.symbol, dir: 'SHORT' }); } catch (err) {}
 }
 
 // ══════════════════════════════════════════════════════════════════
@@ -10173,7 +10282,7 @@ function cerrarRadarExplosivo() {
 function filtrarRadar(tipo) {
     radarFiltroActual = tipo;
     // Actualizar tabs
-    ['todas','motorAlcista','crashReversion','rebote','bomba','lista','caida','agotado','techo','techo4ema'].forEach(t => {
+    ['todas','motorAlcista','crashReversion','rebote','bomba','lista','caida','agotado','techo','techo4ema','cohete','veredicto'].forEach(t => {
         const tab = document.getElementById('tab' + t.charAt(0).toUpperCase() + t.slice(1));
         if (!tab) return;
         if (t === tipo) {
@@ -10495,7 +10604,7 @@ function revisarAlertasTecho4Ema() {
             hablar(confirmadoIA
                 ? `Atención. ${nombre} tocó su máximo de 24 horas, las 4 EMAs están en posición de techo, y la inteligencia artificial confirma caída en marcha. Short recomendado.`
                 : `Atención. ${nombre} tocó su máximo de 24 horas y las 4 EMAs están en posición de techo. Alta probabilidad de caída.`,
-                true);
+                true, { sym: symbol, dir: 'SHORT' });
         } catch (e) { /* si falla la voz, no rompemos el ciclo */ }
 
         // Marca visual: reutiliza el sistema de alarma lateral ya existente
@@ -11068,6 +11177,273 @@ function actualizarCorrelacionBtcEth(allData) {
 }
 
 
+// ══════════════════════════════════════════════════════════════════
+// 🚀 DETECTOR "SUBIDA VERTICAL PEGADA A SU MÁXIMO" (patrón VELVETUSDT)
+// Los detectores de techo anteriores descartan a propósito las monedas que
+// SIGUEN subiendo fuerte (filtro anti-sorpresa), por eso este caso quedaba
+// afuera. Aquí se detecta justo eso: la moneda subió casi en vertical, está
+// pegada a su máximo y muy separada de sus medias (EMA7>EMA25>EMA99 abiertas).
+// Es una ALERTA temprana: marca el estado (SUBIENDO / FRENANDO) y muestra qué
+// opina el cerebro neuronal. No es una orden de short.
+// Para ajustar la exigencia, tocar solo estas constantes:
+// ══════════════════════════════════════════════════════════════════
+const COHETE_DIST_MAX_PCT   = 0.5;       // a <=0.5% de su máximo de 24h
+const COHETE_EXT_EMA25_PCT  = 5;         // precio >=5% por encima de la EMA25 (1h)
+const COHETE_EXT_EMA7_PCT   = 2;         // precio >=2% por encima de la EMA7 (1h)
+const COHETE_SUBIDA_MIN_PCT = 12;        // subió >=12% (24h o desde el mínimo de 48h)
+const COHETE_VOL_MIN        = 3000000;   // volumen 24h mínimo (USDT)
+function _esCoheteEnMaximo(c) {
+    const no = { activo: false, score: 0 };
+    try {
+        if (!c || !c.price || (c.volume || 0) < COHETE_VOL_MIN) return no;
+        const e = datosEMA[c.symbol];
+        if (!e || !e.ema7 || !e.ema25 || !e.ema99) return no;
+        const dist = (typeof c.caidaDesdeMaximo === 'number') ? c.caidaDesdeMaximo : 999;
+        if (dist > COHETE_DIST_MAX_PCT) return no;
+        if (!(e.ema7 > e.ema25 && e.ema25 > e.ema99)) return no;           // medias abiertas en abanico alcista
+        const extEma7  = (c.price / e.ema7  - 1) * 100;
+        const extEma25 = (c.price / e.ema25 - 1) * 100;
+        const extEma99 = (c.price / e.ema99 - 1) * 100;
+        if (extEma25 < COHETE_EXT_EMA25_PCT || extEma7 < COHETE_EXT_EMA7_PCT) return no;
+        const subida = Math.max(c.change || 0, e.subidaDesdeMinimo || 0);
+        if (subida < COHETE_SUBIDA_MIN_PCT) return no;
+
+        let score = 0;
+        score += Math.min(35, extEma25 * 3);
+        score += Math.min(25, subida * 0.6);
+        score += dist <= 0.15 ? 20 : dist <= 0.3 ? 14 : 8;
+        if (e.alineadasAlcista) score += 10;
+        if ((c.ciclosSubiendo || 0) >= 3) score += 10;
+        score = Math.max(0, Math.min(100, Math.round(score)));
+
+        const frenando = (c.ciclosBajando || 0) >= 2 || (c.cambioReal2Min || 0) <= -0.1;
+        let cerebro = null, pCerebro = null;
+        try { cerebro = _cerebroVeCaida(c.symbol); } catch (e1) {}
+        try { const nn = (window.CDC_NEURO && CDC_NEURO.panel) ? CDC_NEURO.panel(c.symbol) : null; if (nn) pCerebro = nn.p; } catch (e2) {}
+        return { activo: true, score, dist, extEma7, extEma25, extEma99, subida,
+                 estado: frenando ? 'FRENANDO' : 'SUBIENDO', cerebro, pCerebro };
+    } catch (err) { return no; }
+}
+
+// 🔊 Voz del cohete: avisa UNA vez por moneda y SIEMPRE dice qué opina el cerebro.
+// Comparte el cooldown con la voz del cerebro para no avisar dos veces lo mismo.
+const VOZ_COHETE_ACTIVA = true;
+const VOZ_COHETE_SCORE_MIN = 70;
+const VOZ_COHETE_GLOBAL_MS = 45000;
+let _vozCoheteGlobalTs = 0;
+function _vozCoheteTick() {
+    try {
+        if (!VOZ_COHETE_ACTIVA || typeof cachedData === 'undefined') return;
+        const ahora = Date.now();
+        if (ahora - _vozCoheteGlobalTs < VOZ_COHETE_GLOBAL_MS) return;
+        let mejor = null;
+        for (const sym in cachedData) {
+            if ((ahora - (_vozCerebroUltimo[sym] || 0)) < VOZ_CEREBRO_COOLDOWN_MS) continue;
+            const r = _esCoheteEnMaximo(cachedData[sym]);
+            if (!r.activo || r.score < VOZ_COHETE_SCORE_MIN) continue;
+            if (!mejor || r.score > mejor.r.score) mejor = { sym, r };
+        }
+        if (!mejor) return;
+        _vozCerebroUltimo[mejor.sym] = ahora;
+        _vozCoheteGlobalTs = ahora;
+        const n = mejor.sym.replace('USDT', '');
+        const ext = Math.round(mejor.r.extEma25);
+        const estado = mejor.r.estado === 'FRENANDO' ? 'y empieza a frenar' : 'y todavía sigue subiendo';
+        const _vv = _veredictoUnificado(mejor.sym);
+        const cer = _vv.codigo === 'CAE' ? ' Veredicto: va a caer muy pronto.'
+                  : _vv.codigo === 'SUBE' ? ' Veredicto: va a seguir subiendo.'
+                  : ' Veredicto: indecisa, ' + (_vv.sesgo === 'CAER' ? 'más probable que caiga.' : _vv.sesgo === 'SUBIR' ? 'más probable que siga.' : 'sin ventaja clara.');
+        hablar(`${n} subió casi en vertical y está en su máximo, ${ext} por ciento por encima de su media, ${estado}.${cer}`,
+               false, { sym: mejor.sym, cerebro: true });
+    } catch (e) {}
+}
+setTimeout(function () { setInterval(_vozCoheteTick, 10000); }, 25000);
+
+// ══════════════════════════════════════════════════════════════════
+// 🧭 VEREDICTO UNIFICADO CDC — une CEREBRO NEURONAL + MOTORES IA + ESTUDIOS
+// Da SIEMPRE una de 3 conclusiones por moneda:
+//   CAE      → 🔴 VA A CAER MUY PRONTO
+//   INDECISA → 🟡 LENTA / INDECISA  (con sesgo: más probable caer / subir / parejo)
+//   SUBE     → 🟢 VA A SEGUIR SUBIENDO (sin señales de caída)
+// Cada fuente emite un voto entre -1 (sube) y +1 (cae) con un peso; el
+// veredicto es el promedio ponderado. Si una fuente no tiene datos, no
+// vota (no inventa). Se explican las 3 razones que más pesaron.
+// ══════════════════════════════════════════════════════════════════
+const VER_CAE_SCORE        = 0.30;   // puntaje mínimo (0..1) para decir "va a caer muy pronto"
+const VER_CAE_SCORE_SIN_CER = 0.45;  // si el cerebro no tiene opinión, se exige más
+const VER_SUBE_SCORE       = -0.20;  // puntaje máximo para decir "va a seguir subiendo"
+const VER_IA_VIGENCIA_MS   = 20 * 60 * 1000;  // una opinión de la IA vale 20 min
+const _iaVotos = {};   // { SYM: { motorId: { v:'COMPRAR|VENDER|ESPERAR', ts } } }
+
+function _verClamp(x, a, b) { return Math.max(a, Math.min(b, x)); }
+
+function _veredictoUnificado(sym) {
+    const out = { codigo: 'INDECISA', score: 0, conf: 0, sesgo: 'PAREJO', pCaer: 50, razones: [], nComp: 0, tieneIA: false };
+    try {
+        const c = cachedData[sym];
+        if (!c) return out;
+        const e = (typeof datosEMA !== 'undefined') ? datosEMA[sym] : null;
+        const pr = (typeof prediccionCDC !== 'undefined') ? prediccionCDC[sym] : null;
+        const comp = [];   // { w, s, txt }
+        const add = (w, s, txt) => comp.push({ w, s: _verClamp(s, -1, 1), txt });
+
+        // 1) 🧠 CEREBRO NEURONAL (calibrado si puede)
+        let nn = null, okCaida = false;
+        try { nn = (window.CDC_NEURO && CDC_NEURO.panel) ? CDC_NEURO.panel(sym) : null; } catch (x1) {}
+        try { okCaida = !!(window.CDC_CAIDA && CDC_CAIDA.aprueba(sym)); } catch (x2) {}
+        let cerebroVeCaida = null;
+        if (nn) {
+            const pEff = (nn.real != null) ? nn.real : nn.p;
+            const U = (typeof CEREBRO_UMBRAL_CAIDA === 'number') ? CEREBRO_UMBRAL_CAIDA : 50;
+            const sC = pEff >= U ? 0.5 + 0.5 * (pEff - U) / Math.max(1, 100 - U) : -0.6 * (1 - pEff / Math.max(1, U));
+            add(nn.valida ? 3 : 2, sC, `Cerebro neuronal ${pEff}% de caída`);
+            cerebroVeCaida = pEff >= U;
+        }
+        if (okCaida) { add(2, 1, 'Cerebro APRUEBA la caída'); cerebroVeCaida = true; }
+
+        // 2) 📉 ESTUDIOS DE TECHO (Fibonacci, divergencia RSI, Bollinger, extensión, rechazo, flujo comprador)
+        const E = e ? e.estudiosTecho : null;
+        if (E) {
+            const m = (Math.max(0, E.fibo || 0) + Math.max(0, E.rsiDiv || 0) + Math.max(0, E.bb || 0) +
+                       Math.max(0, E.ext || 0) + Math.max(0, E.rej || 0) + Math.max(0, E.cvd || 0)) / 6;
+            let txt = 'Estudios de techo ' + Math.round(m * 100) + '/100';
+            if ((E.cvd || 0) > 0.5) txt = 'La compra se está apagando (flujo)';
+            else if ((E.rsiDiv || 0) > 0.5) txt = 'Divergencia del RSI en el máximo';
+            else if ((E.rej || 0) > 0.5) txt = 'Vela de rechazo en el máximo';
+            add(2, (m - 0.25) / 0.35, txt);
+        }
+
+        // 3) ⚡ MOMENTO AHORA (¿sigue subiendo o ya frena?)
+        const c2 = c.cambioReal2Min || 0, cs = c.ciclosSubiendo || 0, cb = c.ciclosBajando || 0, dMax = c.caidaDesdeMaximo || 0;
+        const sigueSubiendo = c2 > 0.15 && cs >= 3 && cb < 2;
+        if (dMax >= 1.0 && cb >= 2)       add(2.5, 0.9, 'Ya cae desde su máximo (' + dMax.toFixed(1) + '%)');
+        else if (cb >= 2 || c2 <= -0.1)   add(2.5, 0.55, 'Empezó a frenar');
+        else if (sigueSubiendo)           add(2.5, -0.7, 'Sigue subiendo con fuerza');
+        else                              add(2.5, 0, 'Lenta, sin dirección clara');
+
+        // 4) 🚀 EXTENSIÓN vs MEDIAS (¿estirada o sana?)
+        try {
+            const r = _esCoheteEnMaximo(c);
+            if (r.activo)                      add(1.5, Math.min(1, r.extEma25 / 12), 'Estirada ' + r.extEma25.toFixed(0) + '% sobre su media');
+            else if (e && e.ema7 && e.alineadasAlcista && c.price <= e.ema7 * 1.01) add(1.5, -0.4, 'Tendencia sana sobre sus medias');
+        } catch (x3) {}
+
+        // 5) 📊 RSI
+        if (pr && pr.rsi != null) {
+            if (pr.rsi >= 80)      add(1, 0.8, 'RSI ' + pr.rsi + ' sobrecomprado');
+            else if (pr.rsi >= 70) add(1, 0.4, 'RSI ' + pr.rsi + ' alto');
+            else if (pr.rsi <= 50) add(1, -0.3, 'RSI ' + pr.rsi + ' con espacio para subir');
+        }
+
+        // 6) 🤖 MOTORES IA (últimas opiniones de Claude para esta moneda, si existen y están vigentes)
+        const iv = _iaVotos[sym];
+        if (iv) {
+            const ahora = Date.now(); let suma = 0, n = 0;
+            for (const k in iv) {
+                if (ahora - iv[k].ts > VER_IA_VIGENCIA_MS) continue;
+                suma += iv[k].v === 'VENDER' ? 1 : iv[k].v === 'COMPRAR' ? -1 : 0; n++;
+            }
+            if (n > 0) { out.tieneIA = true; add(2, suma / n, 'IA: ' + (suma > 0 ? 'opina VENDER' : suma < 0 ? 'opina COMPRAR' : 'opina ESPERAR')); }
+        }
+
+        // 7) ₿ Contexto de mercado
+        try { const inf = btcEthInfluencia[sym]; if (inf && inf.btcCayendo) add(0.5, 0.3, 'BTC cayendo'); } catch (x4) {}
+
+        // ── Promedio ponderado ──
+        let sw = 0, ss = 0;
+        comp.forEach(k => { sw += k.w; ss += k.w * k.s; });
+        const score = sw > 0 ? ss / sw : 0;
+        out.score = Math.round(score * 1000) / 1000;
+        out.nComp = comp.length;
+        out.pCaer = Math.round(_verClamp(50 + score * 50, 1, 99));
+        out.sesgo = score > 0.08 ? 'CAER' : score < -0.08 ? 'SUBIR' : 'PAREJO';
+        out.conf = Math.round(100 * Math.min(1, Math.abs(score) * 1.3) * (0.6 + 0.4 * Math.min(1, comp.length / 6)));
+        out.razones = comp.slice().sort((a, b) => Math.abs(b.w * b.s) - Math.abs(a.w * a.s)).slice(0, 3).map(k => k.txt);
+        out.cerebro = cerebroVeCaida;
+        out.sigueSubiendo = sigueSubiendo;
+
+        // ── Clasificación en 3 conclusiones ──
+        const exigido = (nn || okCaida) ? VER_CAE_SCORE : VER_CAE_SCORE_SIN_CER;
+        const cerebroNoContradice = (cerebroVeCaida !== false);
+        if (score >= exigido && cerebroNoContradice && !sigueSubiendo) out.codigo = 'CAE';
+        else if (score <= VER_SUBE_SCORE && cerebroVeCaida !== true && !(E && (E.rej || 0) > 0.6)) out.codigo = 'SUBE';
+        else out.codigo = 'INDECISA';
+        if (out.codigo === 'INDECISA' && score >= exigido && sigueSubiendo) out.razones.unshift('Cargada para caer, pero aún no frena');
+    } catch (err) {}
+    return out;
+}
+
+function _chipVeredicto(v, compacto) {
+    if (!v) return '';
+    const mapa = {
+        CAE:      { t: '🔴 VA A CAER MUY PRONTO',        col: '#ff2a3b', bg: 'rgba(255,42,59,0.14)' },
+        SUBE:     { t: '🟢 VA A SEGUIR SUBIENDO',        col: '#0ecb81', bg: 'rgba(14,203,129,0.14)' },
+        INDECISA: { t: '🟡 INDECISA · ' + (v.sesgo === 'CAER' ? 'más probable CAER' : v.sesgo === 'SUBIR' ? 'más probable SUBIR' : 'sin ventaja'), col: '#f3ba2f', bg: 'rgba(243,186,47,0.14)' }
+    };
+    const m = mapa[v.codigo] || mapa.INDECISA;
+    const razon = (v.razones || []).join(' · ');
+    return `<div style="font-size:${compacto ? 10 : 11}px;font-weight:900;color:${m.col};background:${m.bg};border:1px solid ${m.col}66;border-radius:6px;padding:4px 7px;margin:4px 0;">${m.t} <span style="opacity:.8;">· confianza ${v.conf}% · caer ${v.pCaer}%${v.tieneIA ? ' · 🤖IA' : ''}</span>${razon ? `<div style="font-size:9px;font-weight:600;color:#cbd5e1;margin-top:2px;">${razon}</div>` : ''}</div>`;
+}
+
+// 🔊 Voz del veredicto: SOLO habla cuando una moneda pasa a "VA A CAER MUY PRONTO"
+// con confianza alta. Una vez por moneda (cooldown compartido con las demás voces del cerebro).
+const VOZ_VEREDICTO_ACTIVA = true;
+const VOZ_VEREDICTO_CONF_MIN = 60;
+let _vozVeredictoGlobalTs = 0;
+function _vozVeredictoTick() {
+    try {
+        if (!VOZ_VEREDICTO_ACTIVA || typeof cachedData === 'undefined') return;
+        const ahora = Date.now();
+        if (ahora - _vozVeredictoGlobalTs < 30000 || ahora - _vozCoheteGlobalTs < 15000) return;
+        let mejor = null;
+        for (const sym in cachedData) {
+            const c = cachedData[sym];
+            if (!c || (c.volume || 0) < COHETE_VOL_MIN) continue;
+            if ((ahora - (_vozCerebroUltimo[sym] || 0)) < VOZ_CEREBRO_COOLDOWN_MS) continue;
+            const v = _veredictoUnificado(sym);
+            if (v.codigo !== 'CAE' || v.conf < VOZ_VEREDICTO_CONF_MIN) continue;
+            if (!mejor || v.conf > mejor.v.conf) mejor = { sym, v };
+        }
+        if (!mejor) return;
+        _vozCerebroUltimo[mejor.sym] = ahora;
+        _vozVeredictoGlobalTs = ahora;
+        const n = mejor.sym.replace('USDT', '');
+        hablar(`${n}: veredicto del cerebro, va a caer muy pronto. Confianza ${mejor.v.conf} por ciento. ${(mejor.v.razones[0] || '')}.`,
+               false, { sym: mejor.sym, dir: 'SHORT', cerebro: true });
+    } catch (e) {}
+}
+setTimeout(function () { setInterval(_vozVeredictoTick, 12000); }, 30000);
+
+// 🤖 Registrar cada opinión de los motores IA como un voto más del veredicto
+setTimeout(function () {
+    try {
+        if (typeof _iaMostrarOpinion !== 'function' || typeof _iaExtraerVeredicto !== 'function') return;
+        const prev = _iaMostrarOpinion;
+        _iaMostrarOpinion = function (motor, texto, snap) {
+            try {
+                const vd = _iaExtraerVeredicto(texto);
+                if (vd && snap && snap.symbol) {
+                    (_iaVotos[snap.symbol] = _iaVotos[snap.symbol] || {})[motor.id] = { v: vd, ts: Date.now() };
+                }
+            } catch (e) {}
+            return prev(motor, texto, snap);
+        };
+    } catch (e) {}
+}, 4000);
+
+// Banner del veredicto dentro del panel de la IA (moneda seleccionada), se refresca solo
+setInterval(function () {
+    try {
+        if (typeof _iaMonedaActual === 'undefined' || !_iaMonedaActual) return;
+        const box = document.getElementById('iaMultiOpinionBox');
+        if (!box) return;
+        let el = document.getElementById('cdcVeredictoUnif');
+        if (!el) { el = document.createElement('div'); el.id = 'cdcVeredictoUnif'; box.insertBefore(el, box.firstChild); }
+        el.innerHTML = '<div style="font-size:9px;color:#94a3b8;font-weight:800;letter-spacing:.5px;">🧭 VEREDICTO UNIFICADO (cerebro + IA + estudios)</div>' +
+                       _chipVeredicto(_veredictoUnificado(_iaMonedaActual));
+    } catch (e) {}
+}, 4000);
+
 function renderizarRadar() {
     const contenido = document.getElementById('radarContenido');
     if (!contenido) return;
@@ -11089,10 +11465,14 @@ function renderizarRadar() {
         caida:    [],  // cayendo fuerte (SHORT/salida)
         agotado:  [],  // subió mucho y se agota (cerca de reversión)
         techo:    [],  // 🔴 EN TECHO Y A PUNTO DE CAER — PRIORIDAD MÁXIMA
-        techo4ema: []  // 🎯 EN MÁXIMO + LAS 4 EMAs (7/25/99/200) JUNTAS/CRUZANDO
+        techo4ema: [], // 🎯 EN MÁXIMO + LAS 4 EMAs (7/25/99/200) JUNTAS/CRUZANDO
+        cohete: [],    // 🚀 SUBIDA VERTICAL PEGADA A SU MÁXIMO (patrón VELVET) — detecta ANTES de la caída
+        veredicto: []  // 🧭 VEREDICTO UNIFICADO (cae / indecisa / sube)
     };
 
     todas.forEach(c => {
+        // 🚀 Cohete en su máximo: se evalúa para TODAS las monedas con liquidez (no depende de la lista de apalancamiento)
+        try { if (_esCoheteEnMaximo(c).activo) grupos.cohete.push(c); } catch (eCoh) {}
         // 🔺 FILTRO EXCLUSIVO: solo monedas de la lista MONEDAS_BAJO_APALANCAMIENTO
         // entran al radar, tanto para señales LONG como SHORT. Si la lista está
         // vacía, no entra ninguna moneda — hay que llenarla primero.
@@ -11149,6 +11529,18 @@ function renderizarRadar() {
         return (ea?.emaSpreadPct ?? 999) - (eb?.emaSpreadPct ?? 999); // EMAs más juntas primero
     });
     grupos.techo4ema = grupos.techo4ema.slice(0, 20);
+    grupos.cohete.sort((a,b) => _esCoheteEnMaximo(b).score - _esCoheteEnMaximo(a).score);
+    grupos.cohete = grupos.cohete.slice(0, 20);
+    // 🧭 Veredicto unificado: solo monedas "calientes" con liquidez (subieron fuerte o están cerca de su máximo)
+    try {
+        Object.keys(cachedData).forEach(sy => {
+            const cc = cachedData[sy];
+            if (!cc || !cc.price || (cc.volume || 0) < COHETE_VOL_MIN) return;
+            if (!((cc.change || 0) >= 8 || (cc.posicionPorcentaje || 0) >= 85)) return;
+            const vv = _veredictoUnificado(sy);
+            grupos.veredicto.push({ c: cc, v: vv });
+        });
+    } catch (eVer) {}
     ['bomba','lista','caida','agotado'].forEach(k => {
         grupos[k].sort((a,b) => calcularScoreExplosivo(b) - calcularScoreExplosivo(a));
         grupos[k] = grupos[k].slice(0, 20);
@@ -11181,9 +11573,20 @@ function renderizarRadar() {
         contTecho4EmaEl.textContent = grupos.techo4ema.length;
         contTecho4EmaEl.style.display = grupos.techo4ema.length > 0 ? 'inline' : 'none';
     }
+    const contVerEl = document.getElementById('contVeredicto');
+    if (contVerEl) {
+        const nCae = grupos.veredicto.filter(x => x.v.codigo === 'CAE').length;
+        contVerEl.textContent = nCae;
+        contVerEl.style.display = nCae > 0 ? 'inline' : 'none';
+    }
+    const contCoheteEl = document.getElementById('contCohete');
+    if (contCoheteEl) {
+        contCoheteEl.textContent = grupos.cohete.length;
+        contCoheteEl.style.display = grupos.cohete.length > 0 ? 'inline' : 'none';
+    }
 
     // Actualizar contador total en el botón flotante
-    const total = grupos.motorAlcista.length + grupos.crashReversion.length + grupos.rebote.length + grupos.momentum.length + grupos.bomba.length + grupos.lista.length + grupos.caida.length + grupos.agotado.length + grupos.techo.length + grupos.techo4ema.length;
+    const total = grupos.motorAlcista.length + grupos.crashReversion.length + grupos.rebote.length + grupos.momentum.length + grupos.bomba.length + grupos.lista.length + grupos.caida.length + grupos.agotado.length + grupos.techo.length + grupos.techo4ema.length + grupos.cohete.length + grupos.veredicto.length;
     const contEl = document.getElementById('radarContador');
     if (contEl) contEl.textContent = total > 99 ? '99+' : total;
 
@@ -11404,6 +11807,82 @@ function renderizarRadar() {
         return h;
     };
 
+    // ── Tablero "VEREDICTO UNIFICADO": 3 conclusiones lado a lado ──
+    const renderVeredicto = () => {
+        if (radarFiltroActual !== 'todas' && radarFiltroActual !== 'veredicto') return '';
+        const por = cod => grupos.veredicto.filter(x => x.v.codigo === cod);
+        const cae = por('CAE').sort((a, b) => b.v.conf - a.v.conf).slice(0, 12);
+        const ind = por('INDECISA').sort((a, b) => Math.abs(b.v.score) - Math.abs(a.v.score)).slice(0, 8);
+        const sube = por('SUBE').sort((a, b) => a.v.score - b.v.score).slice(0, 8);
+        const col = (titulo, color, items, vacio) => {
+            let h = `<div style="flex:1;min-width:230px;"><div class="radar-titulo-seccion" style="color:${color};">${titulo} <span style="font-size:10px;background:rgba(255,255,255,0.08);padding:2px 8px;border-radius:10px;">${items.length}</span></div>`;
+            if (!items.length) h += `<div class="radar-vacio" style="padding:12px;">${vacio}</div>`;
+            items.forEach(x => {
+                const sym = x.c.symbol.replace('USDT', '');
+                h += `<div class="radar-card" onclick="cerrarRadarExplosivo(); seleccionarMoneda('${x.c.symbol}');" style="min-height:0;padding:8px 10px;margin-bottom:6px;cursor:pointer;">
+                    <div style="display:flex;justify-content:space-between;align-items:center;"><b style="color:#fff;">${sym}</b>
+                    <span style="font-size:10px;color:#94a3b8;">${(x.c.change || 0) >= 0 ? '+' : ''}${(x.c.change || 0).toFixed(1)}% 24h · pos ${Math.round(x.c.posicionPorcentaje || 0)}%</span></div>
+                    ${_chipVeredicto(x.v, true)}</div>`;
+            });
+            return h + `</div>`;
+        };
+        return `<div class="radar-titulo-seccion" style="color:#00d4ff;">🧭 VEREDICTO UNIFICADO <span style="font-size:9px;color:#64748b;">cerebro neuronal + motores IA + estudios de techo + flujo. Solo monedas calientes (subieron 8%+ o cerca de su máximo). Es una lectura de tu sistema, no una orden</span></div>
+            <div style="display:flex;gap:12px;flex-wrap:wrap;align-items:flex-start;">
+            ${col('🔴 VA A CAER MUY PRONTO', '#ff2a3b', cae, 'Ninguna cumple todavía.')}
+            ${col('🟡 INDECISA / LENTA', '#f3ba2f', ind, 'Ninguna en duda ahora.')}
+            ${col('🟢 VA A SEGUIR SUBIENDO', '#0ecb81', sube, 'Ninguna sin señales de caída.')}
+            </div>`;
+    };
+
+    // ── Render del patrón "VERTICAL EN SU MÁXIMO" (tipo VELVET) ──
+    const renderCohete = () => {
+        if (radarFiltroActual !== 'todas' && radarFiltroActual !== 'cohete') return '';
+        let h = `<div class="radar-titulo-seccion" style="color:#ff9900;">
+            🚀 SUBIDA VERTICAL PEGADA A SU MÁXIMO
+            <span style="font-size:10px;background:rgba(255,153,0,0.15);padding:2px 8px;border-radius:10px;color:#ff9900;">${grupos.cohete.length}</span>
+            <span style="font-size:9px;color:#64748b;margin-left:4px;">en su máximo + muy separada de sus medias + subida fuerte. Es una ALERTA temprana, no una orden de short</span>
+        </div>`;
+        if (grupos.cohete.length === 0) {
+            h += `<div class="radar-vacio" style="padding:16px;">Ninguna moneda está ahora mismo pegada a su máximo tras una subida vertical.</div>`;
+            return h;
+        }
+        const fmtPrecio = v => (v === null || v === undefined) ? '—' : (v < 0.01 ? v.toFixed(6) : v < 1 ? v.toFixed(4) : v < 100 ? v.toFixed(3) : v.toFixed(2));
+        h += `<div class="radar-grid">`;
+        grupos.cohete.forEach((c, idx) => {
+            const r = _esCoheteEnMaximo(c);
+            const sym = c.symbol.replace('USDT','');
+            const medalla = idx === 0 ? '🥇' : idx === 1 ? '🥈' : idx === 2 ? '🥉' : `#${idx+1}`;
+            const frenando = r.estado === 'FRENANDO';
+            const colEst = frenando ? '#f3ba2f' : '#ff9900';
+            const txtEst = frenando ? '⚠️ EN SU MÁXIMO Y EMPIEZA A FRENAR' : '🚀 EN SU MÁXIMO Y TODAVÍA SUBE';
+            let cerebroTxt, cerebroCol;
+            if (r.cerebro === true)       { cerebroTxt = '🧠 Cerebro: VE CAÍDA' + (r.pCerebro != null ? ' (' + r.pCerebro + '%)' : ''); cerebroCol = '#ff2a3b'; }
+            else if (r.cerebro === false) { cerebroTxt = '🧠 Cerebro: NO ve caída' + (r.pCerebro != null ? ' (' + r.pCerebro + '%)' : ''); cerebroCol = '#0ecb81'; }
+            else                          { cerebroTxt = '🧠 Cerebro: sin opinión todavía'; cerebroCol = '#94a3b8'; }
+            let consejo;
+            if (!frenando)                    consejo = '⛔ Sigue subiendo: un short aquí va contra la corriente. Esperar primer freno y aprobación del cerebro.';
+            else if (r.cerebro === true)      consejo = '✅ Ya frena y el cerebro ve caída: candidata a revisar para short.';
+            else                              consejo = '⏳ Ya frena, pero el cerebro todavía no confirma caída. Esperar.';
+            h += `
+            <div class="radar-card tipo-cohete" onclick="cerrarRadarExplosivo(); seleccionarMoneda('${c.symbol}');" style="min-height:190px;">
+                <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px;">
+                    <div class="radar-coin-nombre" style="color:#ffb84d;">${sym} <span style="font-size:10px;color:#475569;">USDT</span></div>
+                    <span style="font-size:13px;">${medalla}</span>
+                </div>
+                <div style="font-size:10px;font-weight:900;background:rgba(255,153,0,0.18);color:${colEst};border:1px solid rgba(255,153,0,0.5);border-radius:6px;padding:4px 7px;margin-bottom:6px;">${txtEst} · ${r.score}/100</div>
+                <div class="radar-coin-stat">A <b style="color:#ff9900;">${r.dist.toFixed(2)}%</b> de su máximo 24h</div>
+                <div class="radar-coin-stat">Sobre EMA7 / EMA25 / EMA99 (1h): <b style="color:#fcd535;">+${r.extEma7.toFixed(1)}%</b> / <b style="color:#ff4d9e;">+${r.extEma25.toFixed(1)}%</b> / <b style="color:#8f7dfb;">+${r.extEma99.toFixed(1)}%</b></div>
+                <div class="radar-coin-stat">Subida: <b style="color:#0ecb81;">+${r.subida.toFixed(1)}%</b> <span style="color:#475569;">(24h / desde mínimo 48h)</span></div>
+                <div class="radar-coin-stat">Vel 2min: <b style="color:#ff9900;">${c.cambioReal2Min > 0 ? '+' : ''}${(c.cambioReal2Min||0).toFixed(2)}%</b> &nbsp;|&nbsp; Ciclos↑ <b>${c.ciclosSubiendo || 0}</b> · ↓ <b>${c.ciclosBajando || 0}</b></div>
+                <div class="radar-coin-stat" style="color:${cerebroCol};font-weight:900;">${cerebroTxt}</div>
+                ${_chipVeredicto(_veredictoUnificado(c.symbol), true)}
+                <div class="techo-pronostico" style="background:rgba(255,153,0,0.1);border-color:rgba(255,153,0,0.3);color:#ffb84d;">${consejo}</div>
+            </div>`;
+        });
+        h += `</div>`;
+        return h;
+    };
+
     // ── Render especial para TECHO CONFIRMADO POR LAS 4 EMAs (máximo + EMAs juntas/cruzando) ──
     const renderTecho4Ema = () => {
         if (radarFiltroActual !== 'todas' && radarFiltroActual !== 'techo4ema') return '';
@@ -11568,6 +12047,8 @@ function renderizarRadar() {
     html += renderCrashReversion();
     html += renderRebote();
     html += renderTecho();
+    html += renderVeredicto();
+    html += renderCohete();
     html += renderTecho4Ema();
     html += renderMomentum();
     html += renderGrupo('EXPLOTANDO AHORA — Entrar LONG', '🚀', grupos.bomba,   'bomba',   '#0ecb81');
@@ -14368,7 +14849,7 @@ function _analizarMonedalJefe(sym) {
     });
     const wrap = document.getElementById('btnAlarmaUnificado');
     if (wrap) { wrap.style.display = 'block'; window._alarmaSideMoneda = sym; }
-    try { hablar(textoVoz, esMasculino); } catch(e) {}
+    try { hablar(textoVoz, esMasculino, { sym: sym, dir: (tipoEstado === 'long' || (tipoEstado === 'alerta' && tipo !== 'CAIDA')) ? 'LONG' : null }); } catch(e) {}
 }
 
 function _mostrarDescansoJefe() {
@@ -14699,7 +15180,7 @@ function _iaMostrarOpinion(motor, texto, snap) {
     try {
         // Alternar voz por motor
         const esMasc = ['tecnico','alcista','correlacion'].includes(motor.id);
-        hablar(textoVoz, esMasc);
+        hablar(textoVoz, esMasc, { sym: _iaMonedaActual, dir: motor.id === 'alcista' ? 'LONG' : (motor.id === 'bajista' ? 'SHORT' : null) });
     } catch(e) {}
 }
 
@@ -15927,7 +16408,7 @@ function _actualizarVentanitaTecho4Ema() {
     // archivo completo sin caer en la paradoja de "el hash contiene su
     // propio hash". No cambiar este texto.
     var _PLACEHOLDER = "%%CDC_INTEGRITY_HASH%%";
-    var _HASH_ESPERADO = "b06ff311f2db99d71380998c46219bf18d7c8457b2dcf9316e08c56c2394b88e"; // ← se reemplaza por el hash real en el paso final
+    var _HASH_ESPERADO = "c62d7d33d40e2671ef22d08b2aae1a91d7da2806eec4e87f1cd5c523dc4377ed"; // ← se reemplaza por el hash real en el paso final
 
     function _bloquear(motivo) {
         try {
