@@ -5901,6 +5901,7 @@ let vozFemenina = null;
 
 // Control de tiempo para no cambiar de moneda muy rápido (5 segundos)
 let tiempoUltimoCambioAuto = 0;
+const PANEL_PAUSA_MS = 30000; // ⏱️ cada moneda se queda mínimo 30 s en el panel central antes de un cambio automático
 const BLOQUEO_CAMBIO_MS = 10000; // 10 segundos entre cambios automaticos — tiempo para que el sistema acumule historial/cálculo antes de mostrar otra moneda
 let indiceRotacionLong = 0;      // rota entre las candidatas en modo LONG
 
@@ -6030,6 +6031,20 @@ function _cerebroVeCaida(sym) {   // true = ve caída · false = no ve caída ·
         return null;
     } catch (e) { return null; }
 }
+// 🎯 CRITERIO ÚNICO (voz + panel central): la moneda tiene que estar en su MÁXIMO (95%+ del rango 24h)
+// Y tener señales de caída: el modelo neuronal la aprueba, o el análisis en vivo del Cerebro (el de la
+// derecha) marca 3 o más de 6 señales de caída. Si no, ni se muestra ni se habla.
+function _cdcCaidaLista(sym) {
+    try {
+        sym = _symCerebro(sym);
+        const c = cachedData[sym];
+        if (!c) return false;
+        if (Math.max(c.posicionPorcentaje || 0, c.posicionExtendida || 0) < 95) return false;
+        if (_cerebroVeCaida(sym) === true) return true;
+        const A = window.__cdcA;
+        return !!(A && A.sym === sym && A.a && A.a.fuerte && (Date.now() - A.t) < 60000);
+    } catch (e) { return false; }
+}
 function _symCerebro(s) { s = String(s || '').toUpperCase(); return (s && !/USDT$/.test(s)) ? s + 'USDT' : s; }
 function _dirDeTexto(texto) {   // detecta la dirección que la voz está recomendando
     const t = String(texto || '').toLowerCase();
@@ -6072,38 +6087,24 @@ function _vozCerebroReemplazo(texto, opt) {
 // Avisa por voz las monedas cuya subida se acabó (pegadas al techo) o que
 // subieron de golpe y ya caen, SOLO si el cerebro las aprueba.
 // ══════════════════════════════════════════════════════════════════
-const VOZ_CEREBRO_ACTIVA = true;
+const VOZ_CEREBRO_ACTIVA = false;   // (reemplazado por _vozPanelVeredicto: voz automática del panel central)
 const VOZ_CEREBRO_COOLDOWN_MS = 180000;   // no repetir la misma moneda antes de 3 min
 const VOZ_CEREBRO_GLOBAL_MS   = 25000;    // mínimo entre avisos del cerebro
 let _vozCerebroUltimo = {}, _vozCerebroGlobalTs = 0;
 function _vozCerebroTick() {
     try {
-        if (!VOZ_CEREBRO_ACTIVA || typeof cachedData === 'undefined') return;
+        if (!VOZ_CEREBRO_ACTIVA || typeof cachedData === 'undefined' || !selectedCoin) return;
         const ahora = Date.now();
+        const sym = _symCerebro(selectedCoin);
         if (ahora - _vozCerebroGlobalTs < VOZ_CEREBRO_GLOBAL_MS) return;
-        let mejor = null;
-        for (const sym in cachedData) {
-            const c = cachedData[sym];
-            if (!c || (ahora - (_vozCerebroUltimo[sym] || 0)) < VOZ_CEREBRO_COOLDOWN_MS) continue;
-            const arriba    = (c.posicionPorcentaje || 0) >= 95;
-            const reventada = !arriba && (c.caidaDesdeMaximo || 0) >= 1.5 && _esReventadaCayendo(c);
-            if (!arriba && !reventada) continue;
-            const nn = (window.CDC_NEURO && CDC_NEURO.panel) ? CDC_NEURO.panel(sym) : null;
-            const okCaida = !!(window.CDC_CAIDA && CDC_CAIDA.aprueba(sym));
-            const p = nn ? nn.p : 0;
-            if (!(p >= CEREBRO_UMBRAL_CAIDA || okCaida)) continue;
-            const pr = okCaida ? Math.max(p, Math.round((CDC_CAIDA.probCal(sym) || 0) * 100)) : p;
-            if (!mejor || pr > mejor.pr) mejor = { sym, pr, reventada };
-        }
-        if (!mejor) return;
-        _vozCerebroUltimo[mejor.sym] = ahora;
+        if (ahora - (_vozCerebroUltimo[sym] || 0) < VOZ_CEREBRO_COOLDOWN_MS) return;
+        if (!_cdcCaidaLista(sym)) return;   // solo si está en su máximo y el cerebro ve caída
+        const nn = (window.CDC_NEURO && CDC_NEURO.panel) ? CDC_NEURO.panel(sym) : null;
+        let pr = nn ? Math.round(nn.p) : 0;
+        if (!pr && window.CDC_CAIDA && CDC_CAIDA.probCal) pr = Math.round((CDC_CAIDA.probCal(sym) || 0) * 100);
+        _vozCerebroUltimo[sym] = ahora;
         _vozCerebroGlobalTs = ahora;
-        const nombre = _nombreHablado(mejor.sym);
-        const texto = _narrarVeredicto(mejor.sym, {
-            apertura: mejor.reventada ? nombre + ' subió de golpe y ya empieza a caer.' : nombre + ' llegó a su límite de subida.',
-            cerebroAviso: mejor.pr
-        });
-        hablar(texto, false, { sym: mejor.sym, dir: 'SHORT', cerebro: true });
+        hablar(_nombreHablado(sym) + ' está en su máximo y tiene señales de caída.' + (pr ? ' ' + _nPal(pr) + ' por ciento.' : ''), false, { sym: sym, dir: 'SHORT', cerebro: true });
     } catch (e) {}
 }
 setTimeout(function () { setInterval(_vozCerebroTick, 10000); }, 20000);
@@ -6450,8 +6451,56 @@ if (document.readyState === 'loading') document.addEventListener('DOMContentLoad
 // (cargarVoces ya corrió una vez antes de que existieran estas tablas: se repite para elegir bien la voz en iPhone)
 try { cargarVoces(); } catch (e) {}
 
+// 🎯 REGLA ÚNICA DE VOZ: solo habla de la moneda que está en el PANEL CENTRAL y solo si el
+// Cerebro dice que VA A CAER. Cualquier otra moneda o aviso de subida/long queda en silencio.
+// Para volver al comportamiento anterior: VOZ_SOLO_PANEL_CAIDA = false.
+const VOZ_SOLO_PANEL_CAIDA = true;
+function _vozPermitidaPanel(texto, opt) {
+    if (!VOZ_SOLO_PANEL_CAIDA) return true;
+    try {
+        if (!selectedCoin || !opt || !opt.sym) return false;
+        const sym = _symCerebro(opt.sym);
+        if (sym !== _symCerebro(selectedCoin)) return false;
+        if (opt.panel === true) return true;   // veredicto automático del panel central
+        const dir = opt.dir || _dirDeTexto(texto);
+        if (dir === 'LONG') return false;
+        return _cdcCaidaLista(sym);
+    } catch (e) { return false; }
+}
+// 🔊 VOZ AUTOMÁTICA DEL PANEL CENTRAL: anuncia el MISMO veredicto que muestra el informe (VA A CAER /
+// POSIBLE CAÍDA / SIGUE SUBIENDO) cada vez que entra una moneda al panel o cambia su veredicto.
+// Solo habla de la moneda que está en el panel central. Para no oír las que siguen subiendo:
+// VOZ_PANEL_DECIR_SUBIDA = false. Para apagarla del todo: VOZ_PANEL_AUTO = false.
+const VOZ_PANEL_AUTO = true;
+const VOZ_PANEL_DECIR_SUBIDA = true;
+const VOZ_PANEL_REPETIR_MS = 120000;   // misma moneda y mismo veredicto: lo repite cada 2 min
+const VOZ_PANEL_MIN_CAMBIO_MS = 30000; // misma moneda con veredicto distinto: no más seguido que 30 s
+let _vozPanelUlt = { sym: null, nivel: null, ts: 0 };
+function _vozPanelVeredicto(a) {
+    try {
+        if (!VOZ_PANEL_AUTO || !a || !selectedCoin) return;
+        const sym = _symCerebro(a.s);
+        if (sym !== _symCerebro(selectedCoin)) return;
+        const cae = _cdcCaidaLista(sym);
+        const n = Math.max(a.nc || 0, a.np || 0);
+        const nivel = cae ? 'CAE' : (n >= 2 ? 'POSIBLE' : 'SUBE');
+        if (nivel === 'SUBE' && !VOZ_PANEL_DECIR_SUBIDA) return;
+        const U = _vozPanelUlt, ahora = Date.now();
+        const mismaMoneda = U.sym === sym;
+        if (mismaMoneda && U.nivel === nivel && ahora - U.ts < VOZ_PANEL_REPETIR_MS) return;
+        if (mismaMoneda && U.nivel !== nivel && ahora - U.ts < VOZ_PANEL_MIN_CAMBIO_MS) return;
+        _vozPanelUlt = { sym: sym, nivel: nivel, ts: ahora };
+        const nombre = _nombreHablado(sym);
+        const señales = n >= 2 ? ' ' + _nPal(n) + ' de seis señales.' : '';
+        const texto = nivel === 'CAE'     ? nombre + ' está en su máximo y va a caer.' + señales
+                    : nivel === 'POSIBLE' ? nombre + ' tiene posible caída, todavía sin confirmar.' + señales
+                    :                       nombre + ' sigue subiendo, todavía no cae.';
+        hablar(texto, false, { sym: sym, dir: 'SHORT', cerebro: true, panel: true });
+    } catch (e) {}
+}
 function hablar(texto, esMasculino, opt) {
     if (!('speechSynthesis' in window)) return;
+    if (!_vozPermitidaPanel(texto, opt)) return;
     // 🧠 Voz coherente con el cerebro (si el guardia falla, habla igual: nunca queda mudo por un error)
     try { if (!_vozCoherente(texto, opt)) { _vozCerebroReemplazo(texto, opt); return; } } catch (e) {}
     // Si la cola ya está llena, descartamos el aviso más antiguo (ya perdió vigencia)
@@ -13054,12 +13103,13 @@ function actualizarPanelCentral() {
         badgeAlarma = `<span style="display:inline-flex;align-items:center;gap:5px;background:#f3ba2f;color:#000;font-size:11px;font-weight:900;padding:3px 10px;border-radius:20px;margin-left:8px;animation:blinker-glow 0.6s linear infinite;">⚠️ AGOTAMIENTO</span>`;
     }
 
+    try { if (window.CDC_CEREBRO_SYNC) window.CDC_CEREBRO_SYNC(selectedCoin); } catch (e) {}
     document.getElementById("detailView").innerHTML = `
         <!-- 🏷️ JEFE DE LISTA: de cuál botón/lista vino esta moneda -->
-        ${_origenListaBannerHTML(selectedCoin)}
+        <div id="cdcCerebroEnPanel" data-sym="${selectedCoin}">${(window.CDC_CEREBRO_HTML ? window.CDC_CEREBRO_HTML(selectedCoin) : '')}</div>
         <!-- 🔴 y 🟡 ocultas a pedido del usuario: ya se ven en la lista de 24h de la izquierda -->
-        ${btnBingoHTML}
-        ${btnBingoBombaMaximaHTML}
+        
+        
         ${btnMotorAlcistaHTML}
 
         <!-- CABECERA: NOMBRE + PRECIO + CAMBIO -->
@@ -15898,6 +15948,12 @@ setTimeout(() => {
         const _orig = seleccionarMoneda;
         window.seleccionarMoneda = function(symbol, _a, _o) {
             if ((_a === true || _o) && !_cerebroAprueba(symbol)) return; // 🧠 el cerebro manda
+            // ⏱️ PAUSA ENTRE MONEDAS: un cambio AUTOMÁTICO no entra si la moneda actual lleva menos de
+            // PANEL_PAUSA_MS en el panel central (así el Cerebro la estudia con calma y concluye mejor).
+            // El click manual y el que viene de la casilla del Cerebro pasan siempre. Para volver a lo anterior: 0.
+            const _esAutoCambio = (_a === true || (_o && _o !== 'cerebro'));
+            if (_esAutoCambio && selectedCoin && symbol !== selectedCoin && (Date.now() - (window.__panelCambioTs || 0)) < PANEL_PAUSA_MS) return;
+            if (symbol !== selectedCoin) window.__panelCambioTs = Date.now();
             _orig(symbol);
             setTimeout(() => _iaActivarParaMoneda(symbol), 600);
         };
@@ -17027,7 +17083,7 @@ function _actualizarVentanitaTecho4Ema() {
     // archivo completo sin caer en la paradoja de "el hash contiene su
     // propio hash". No cambiar este texto.
     var _PLACEHOLDER = "%%CDC_INTEGRITY_HASH%%";
-    var _HASH_ESPERADO = "90ea08aced2c68a43c64b1a6ae7bc93e8b2d9792a1e737645a98e023bd582fe2"; // ← se reemplaza por el hash real en el paso final
+    var _HASH_ESPERADO = "d74a1707acab7634bc9c380deda04d40b278710f7cfa57572942d460e6cf2cb6"; // ← se reemplaza por el hash real en el paso final
 
     function _bloquear(motivo) {
         try {
@@ -17517,6 +17573,9 @@ function ev(n){try{return (0,eval)("typeof "+n+"!=='undefined'?"+n+":undefined")
 async function jf(u){var r=await fetch(u);if(!r.ok)throw 0;return r.json();}
 function pct(a,b){return b?(a/b-1)*100:0;}
 function f(x,d){return (x>=0?"+":"")+x.toFixed(d==null?2:d)+"%";}
+function cdcWrapPanel(sym,h){if(!h)return "";var cae=h.indexOf("data-cae")>=0;return "<div style='margin:0 0 12px;padding:10px 14px;border:1px solid "+(cae?"rgba(255,77,109,.7)":"rgba(243,186,47,.45)")+";border-radius:12px;background:"+(cae?"rgba(40,8,14,.92)":"rgba(6,11,22,.95)")+";font:13px/1.5 Inter,Arial,sans-serif;color:#cbd5e1;text-align:left'>"+h+"</div>";}
+window.CDC_CEREBRO_HTML=function(sym){var L=window.__cdcCerebroLast;var h=(L&&L.sym===sym)?L.html:"<b style='color:#f3ba2f'>🧠 Analizando "+String(sym||"").replace("USDT","")+"…</b>";return cdcWrapPanel(sym,h);};
+window.CDC_CEREBRO_SYNC=function(sym){try{if(sym&&window.__cdcGo)window.__cdcGo(sym);}catch(e){}};
 async function analizar(s){
  var r=await Promise.all([
   jf(B+"/fapi/v1/klines?symbol="+encodeURIComponent(s)+"&interval=5m&limit=30").catch(function(){return null;}),
@@ -17555,7 +17614,7 @@ async function analizar(s){
  else if(emp){v2=["▲ SIGUE SUBIENDO · sin señal de caída","#7fe9ff"];}
  else{v2=["◆ SIN SEÑAL DE CAÍDA aún · "+Math.max(nc,np)+"/6","#f3ba2f"];}
  var dn=!hasOI?"sin datos de OI":o15>1?"ENTRA dinero":o15<-1?"SALE dinero":"flujo estable";
- return{hi60:hi60,lo30:lo30,red:red,g3:g3,dh:dh,s:s,price:c[n],p15:p15,p60:p60,fr:fr,o15:o15,o60:o60,hasOI:hasOI,tr:tr,sc:sc,v:v2,dn:dn,why:why,lab:lab,t:Date.now()};}
+ return{hi60:hi60,lo30:lo30,red:red,g3:g3,dh:dh,s:s,price:c[n],p15:p15,p60:p60,fr:fr,o15:o15,o60:o60,hasOI:hasOI,tr:tr,sc:sc,v:v2,dn:dn,why:why,lab:lab,nc:nc,np:np,fuerte:!!((conf[0][0]&&conf[1][0]&&nc>=3)||(!emp&&Math.max(nc,np)>=3)),t:Date.now()};}
 function shortEval(a){
  var sc=0,pro=[],con=[],blk=false;
  if(a.p15>=4||a.p60>=3){sc+=1;pro.push("subida extendida (posible agotamiento)");}
@@ -17597,13 +17656,29 @@ function mount(){
  out.textContent="Escribe una moneda y pulsa ESTUDIAR.";
  var hd=w.firstChild;w.insertBefore(out,hd.nextSibling);w.insertBefore(bar,hd.nextSibling);
  var inp=bar.querySelector("input"),bt=bar.querySelector("button");
- async function run(){if(!SYM)return;try{pintar(out,await analizar(SYM));}catch(e){out.textContent="Error consultando Binance. Reintentando…";}}
+function resumen(a){var nm=a.s.replace("USDT",""),p=0;
+  try{if(typeof _cdcCaidaLista!=="function"||!_cdcCaidaLista(a.s))return "";}catch(e){return "";}
+  try{var nn=window.CDC_NEURO&&window.CDC_NEURO.panel?window.CDC_NEURO.panel(a.s):null;p=nn?Math.round(nn.p):0;}catch(e){}
+  var rs=[];try{rs=shortEval(a).pro.slice(0,3);}catch(e){}
+  var n=Math.max(a.nc||0,a.np||0);
+  return "<div style='font:900 17px Inter,Arial;color:#ff4d6d'>🔻 "+nm+" · EN SU MÁXIMO Y CON SEÑALES DE CAÍDA</div><div style='font-size:12px;margin-top:2px'><b>"+(p?p+"% el modelo · ":"")+n+"/6 señales</b>"+(rs.length?" · "+rs.join(" · "):"")+"</div><div style='font-size:10px;color:#64748b;margin-top:4px'>🧠 Cerebro Neuronal · estimación, no es consejo financiero</div>";}
+ function informe(a){var nm=a.s.replace("USDT",""),cae=false;try{cae=typeof _cdcCaidaLista==="function"&&_cdcCaidaLista(a.s);}catch(e){}
+  var q=null;try{q=shortEval(a);}catch(e){}
+  var n=Math.max(a.nc||0,a.np||0),pos=[],neg=[];
+  try{pos=(q&&q.pro?q.pro:[]).slice(0,3);neg=(q&&q.con?q.con:[]).slice(0,2);}catch(e){}
+  var tit=cae?"🔻 "+nm+" · VA A CAER":(n>=2?"⚠️ "+nm+" · POSIBLE CAÍDA":"▲ "+nm+" · SIGUE SUBIENDO, NO CAE AÚN");
+  var col=cae?"#ff4d6d":(n>=2?"#ffb86b":"#94a3b8");
+  return "<div "+(cae?"data-cae='1' ":"")+"style='font:900 16px Inter,Arial;color:"+col+"'>"+tit+" <span style='font:700 11px Inter,Arial;color:#94a3b8'>"+n+"/6 señales</span></div>"
+   +"<div style='font:12px/1.45 Inter,Arial,sans-serif;margin-top:3px'>"+(pos.length?"<span style='color:#7fe9ff'>Cae:</span> "+pos.join(" · "):"")+(neg.length?"<br><span style='color:#ffb86b'>Frena:</span> "+neg.join(" · "):"")+"</div>"
+   +"<div style='font-size:11px;color:#94a3b8;margin-top:3px'>Precio 15m <b>"+f(a.p15)+"</b> · 1h <b>"+f(a.p60)+"</b> · "+a.dn+" · Stop <b>"+(q?q.stop.toPrecision(5):"—")+"</b> · Obj. <b>"+(q?q.tg.toPrecision(5):"—")+"</b></div>";}
+ function espejo(a){try{var h=a?informe(a):"<b style='color:#f3ba2f'>🧠 Analizando "+SYM.replace("USDT","")+"…</b>";window.__cdcCerebroLast={sym:SYM,html:h};var pn=document.getElementById("cdcCerebroEnPanel");if(pn&&pn.getAttribute("data-sym")===SYM)pn.innerHTML=cdcWrapPanel(SYM,h);}catch(e){}}
+ async function run(){if(!SYM)return;var s0=SYM;try{var a0=await analizar(s0);if(s0!==SYM)return;window.__cdcA={sym:s0,a:a0,t:Date.now()};pintar(out,a0);espejo(a0);try{if(typeof _vozPanelVeredicto==="function")_vozPanelVeredicto(a0);}catch(e){}}catch(e){if(s0!==SYM)return;out.textContent="Error consultando Binance. Reintentando…";espejo();}}
  function go(skipSel){var t=(inp.value||"").trim().toUpperCase().replace(/[^\p{L}\p{N}]/gu,"");if(!t)return;if(!/USDT$/.test(t))t+="USDT";
   SYM=t;inp.value=t.replace("USDT","");try{LS&&LS.setItem("cdc_moneda_elegida",t);}catch(e){}
-  out.textContent="Estudiando "+t.replace("USDT","")+"…";
+  out.textContent="Estudiando "+t.replace("USDT","")+"…";espejo();
   try{var C=ev("cachedData");if(skipSel!==true&&C&&C[t]&&typeof ev("seleccionarMoneda")==="function")(0,eval)("seleccionarMoneda('"+t+"',false,'cerebro')");}catch(e){}
   run();clearInterval(TM);TM=setInterval(run,10000);}
- bt.onclick=function(){go();};document.addEventListener("click",function(e){var el=e.target&&e.target.closest?e.target.closest(".cdc-click-moneda"):null;if(!el)return;var s=el.getAttribute("data-sym");if(!s)return;inp.value=s;go(true);try{w.scrollIntoView({behavior:"smooth",block:"nearest"});}catch(x){}});inp.addEventListener("keydown",function(e){if(e.key==="Enter")go();});
+ bt.onclick=function(){go();};window.__cdcGo=function(sym){var t=String(sym||"").toUpperCase();if(!t)return;if(!/USDT$/.test(t))t+="USDT";if(t===SYM)return;inp.value=t.replace("USDT","");go(true);};document.addEventListener("click",function(e){var el=e.target&&e.target.closest?e.target.closest(".cdc-click-moneda"):null;if(!el)return;var s=el.getAttribute("data-sym");if(!s)return;inp.value=s;go(true);try{w.scrollIntoView({behavior:"smooth",block:"nearest"});}catch(x){}});inp.addEventListener("keydown",function(e){if(e.key==="Enter")go();});
  inp.addEventListener("click",function(e){e.stopPropagation();});
  try{var g=LS&&LS.getItem("cdc_moneda_elegida");if(g){inp.value=g.replace("USDT","");go();}}catch(e){}
  setTimeout(function(){window.dispatchEvent(new Event("resize"));},100);}
