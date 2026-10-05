@@ -1,1 +1,110 @@
+<!DOCTYPE html>
+<html lang="es"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Red neuronal 3D</title>
+<style>
+:root{box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}
+html,body{height:100%;margin:0}
+body{background:radial-gradient(circle at 50% 45%,#101c33,#050810 72%);overflow:hidden;font-family:system-ui,sans-serif;color:#9fb6d9;touch-action:none}
+canvas{position:absolute;inset:0;display:block;cursor:grab}
+#hud{position:absolute;top:14px;left:16px;font-size:12px;line-height:1.6;pointer-events:none;letter-spacing:.04em}
+#hud b{display:block;font-size:14px;color:#dbe8ff;margin-bottom:2px}
+#hud i{font-style:normal;display:inline-block;width:8px;height:8px;border-radius:50%;margin-right:6px}
+p{position:absolute;bottom:14px;width:100%;text-align:center;font-size:12px;margin:0;opacity:.6;pointer-events:none}
+</style></head><body>
+<div id="hud"><b>Red neuronal</b><span id="st">generando…</span><br>
+<i style="background:#ffa040"></i>corteza frontal <i style="background:#40c8ff;margin-left:8px"></i>posterior / cerebelo</div>
+<p>Arrastra para girar · los pulsos son señales viajando por las sinapsis</p>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<script>
+const T=THREE,rnd=Math.random;
+const scene=new T.Scene(),cam=new T.PerspectiveCamera(38,1,.1,50);
+const ren=new T.WebGLRenderer({antialias:true,alpha:true});
+ren.setPixelRatio(Math.min(devicePixelRatio,2));
+document.body.prepend(ren.domElement);
+const root=new T.Group();scene.add(root);
+const U={uTime:{value:0},uK:{value:800}};
 
+// la forma NO es una malla: solo decide dónde nacen las neuronas
+function F(x,y,z){
+ const ax=Math.abs(x);let f=1e9;
+ if(ax>.03){const a=(ax-.5)/.5,b=(y-.05)/.75,c=z/1.15;f=a*a+b*b+c*c}
+ const a2=x/.72,b2=(y+.5)/.4,c2=(z+.85)/.55,fc=a2*a2+b2*b2+c2*c2;
+ const zz=z+.4+(-.5-y)*.3,fs=(y<-.45&&y>-1.35)?(x*x+zz*zz)/.014:1e9;
+ return Math.min(f,fc,fs)+.07*Math.sin(9*x+3*z)*Math.sin(8*y+5*z)}
+const warm=new T.Color(1,.6,.2),cool=new T.Color(.2,.78,1);
+const colAt=(z)=>cool.clone().lerp(warm,Math.min(1,Math.max(0,(z+1)/2.1)));
+
+// neuronas: más densas cerca de la corteza
+const N=2200,P=[];
+while(P.length<N){
+ const x=(rnd()*2-1)*1.1,y=-1.4+rnd()*2.25,z=(rnd()*2-1)*1.2,f=F(x,y,z);
+ if(f<1&&rnd()<.12+.88*f*f*f)P.push({p:new T.Vector3(x,y,z),hub:rnd()<.06})}
+P.forEach(n=>n.c=colAt(n.p.z).lerp(new T.Color(1,.95,.6),n.hub?.55:0));
+
+// sinapsis: 3 vecinas más cercanas + conexiones largas curvas
+const L={pos:[],t:[],ph:[],sp:[],col:[]};let syn=0;
+function edge(a,b,segs,bulge,spd){
+ const m=a.p.clone().add(b.p).multiplyScalar(.5).add(new T.Vector3(rnd()-.5,rnd()-.5,rnd()-.5).multiplyScalar(bulge));
+ const at=t=>{const u=1-t;return new T.Vector3().addScaledVector(a.p,u*u).addScaledVector(m,2*u*t).addScaledVector(b.p,t*t)};
+ const ph=rnd(),sp=spd*(.6+rnd()*.8);syn++;
+ for(let s=0;s<segs;s++)for(const t of [s/segs,(s+1)/segs]){
+  const v=at(t),c=a.c.clone().lerp(b.c,t);
+  L.pos.push(v.x,v.y,v.z);L.t.push(t);L.ph.push(ph);L.sp.push(sp);L.col.push(c.r,c.g,c.b)}}
+for(let i=0;i<N;i++){
+ const d=[];
+ for(let j=0;j<N;j++)if(j!==i)d.push([P[i].p.distanceToSquared(P[j].p),j]);
+ d.sort((a,b)=>a[0]-b[0]);
+ for(let k=0;k<3;k++)edge(P[i],P[d[k][1]],5,.05,.35)}
+const hubs=P.filter(n=>n.hub);
+for(let k=0;k<380;k++){
+ const a=hubs[rnd()*hubs.length|0],b=P[rnd()*N|0];
+ if(a.p.distanceTo(b.p)>.9)edge(a,b,18,.5,.2)}
+
+const lg=new T.BufferGeometry();
+lg.setAttribute('position',new T.Float32BufferAttribute(L.pos,3));
+lg.setAttribute('aT',new T.Float32BufferAttribute(L.t,1));
+lg.setAttribute('aPh',new T.Float32BufferAttribute(L.ph,1));
+lg.setAttribute('aSp',new T.Float32BufferAttribute(L.sp,1));
+lg.setAttribute('aCol',new T.Float32BufferAttribute(L.col,3));
+const glow={transparent:true,depthTest:false,depthWrite:false,blending:T.AdditiveBlending};
+root.add(new T.LineSegments(lg,new T.ShaderMaterial({...glow,uniforms:U,
+ vertexShader:`attribute float aT,aPh,aSp;attribute vec3 aCol;varying float vT,vPh,vSp;varying vec3 vC;
+ void main(){vT=aT;vPh=aPh;vSp=aSp;vC=aCol;gl_Position=projectionMatrix*modelViewMatrix*vec4(position,1.);}`,
+ fragmentShader:`uniform float uTime;varying float vT,vPh,vSp;varying vec3 vC;
+ void main(){float p=fract(uTime*vSp+vPh)*1.5-.25;float k=(vT-p)*9.;float pulse=exp(-k*k);
+ gl_FragColor=vec4(vC*(.13+pulse*2.4)+vec3(pulse*.25),1.);}`})));
+
+// neuronas (soma) + células de glía
+const M=N+700,pp=new Float32Array(M*3),pc=new Float32Array(M*3),ps=new Float32Array(M),pph=new Float32Array(M);
+P.forEach((n,i)=>{pp.set([n.p.x,n.p.y,n.p.z],i*3);pc.set([n.c.r,n.c.g,n.c.b],i*3);ps[i]=n.hub?.1:.03+rnd()*.03;pph[i]=rnd()*6.28});
+for(let i=N;i<M;i++){let x,y,z;do{x=(rnd()*2-1)*1.1;y=-1.4+rnd()*2.25;z=(rnd()*2-1)*1.2}while(F(x,y,z)>.95);
+ pp.set([x,y,z],i*3);pc.set([.12,.2,.34],i*3);ps[i]=.06;pph[i]=rnd()*6.28}
+const pg=new T.BufferGeometry();
+pg.setAttribute('position',new T.BufferAttribute(pp,3));
+pg.setAttribute('aCol',new T.BufferAttribute(pc,3));
+pg.setAttribute('aSize',new T.BufferAttribute(ps,1));
+pg.setAttribute('aPh',new T.BufferAttribute(pph,1));
+root.add(new T.Points(pg,new T.ShaderMaterial({...glow,uniforms:U,
+ vertexShader:`uniform float uTime,uK;attribute float aSize,aPh;attribute vec3 aCol;varying vec3 vC;
+ void main(){vC=aCol;vec4 m=modelViewMatrix*vec4(position,1.);
+ gl_PointSize=aSize*uK/-m.z*(.85+.3*sin(uTime*2.+aPh));gl_Position=projectionMatrix*m;}`,
+ fragmentShader:`varying vec3 vC;void main(){float d=length(gl_PointCoord-.5);float a=smoothstep(.5,0.,d);float c=smoothstep(.16,0.,d);
+ gl_FragColor=vec4(vC*a*1.3+vec3(c*.9),a);}`})));
+
+document.getElementById('st').textContent=N.toLocaleString('es')+' neuronas · '+syn.toLocaleString('es')+' sinapsis · 700 células de glía';
+
+// rotación con arrastre
+let ry=-.5,rx=.15,vy=.005,drag=false,lx=0,ly=0;
+const cvs=ren.domElement;
+cvs.addEventListener('pointerdown',e=>{drag=true;lx=e.clientX;ly=e.clientY;cvs.setPointerCapture(e.pointerId)});
+cvs.addEventListener('pointermove',e=>{if(!drag)return;
+ vy=(e.clientX-lx)*.006;ry+=vy;rx=Math.max(-1.3,Math.min(1.3,rx+(e.clientY-ly)*.006));lx=e.clientX;ly=e.clientY});
+cvs.addEventListener('pointerup',()=>{drag=false;if(Math.abs(vy)<.003)vy=.005});
+function fit(){const w=innerWidth,h=innerHeight;ren.setSize(w,h);cam.aspect=w/h;cam.position.set(0,.1,w/h<.8?9:6);cam.updateProjectionMatrix();U.uK.value=ren.domElement.height/.6887}
+addEventListener('resize',fit);fit();
+ren.setAnimationLoop(t=>{
+ if(!drag){ry+=vy;vy+=((vy>0?.005:-.005)-vy)*.02}
+ root.rotation.set(rx,ry,0);U.uTime.value=t*.001;
+ ren.render(scene,cam)});
+</script></body></html>
