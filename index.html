@@ -5613,7 +5613,7 @@ function manejarClickAlarmaUnificada() {
     // Siempre llevar al panel central — nunca abrir Binance desde aquí
     const objetivo = window._alarmaSideMoneda || (alertaActivaGlobal && alertaActivaGlobal.symbol) || selectedCoin;
     if (objetivo) {
-        seleccionarMoneda(objetivo);
+        window.__selAuto = true; try { seleccionarMoneda(objetivo); } finally { window.__selAuto = false; }
         window.scrollTo({ top: 0, behavior: 'smooth' });
     }
 }
@@ -6034,12 +6034,22 @@ function _cerebroVeCaida(sym) {   // true = ve caída · false = no ve caída ·
 // 🎯 CRITERIO ÚNICO (voz + panel central): la moneda tiene que estar en su MÁXIMO (95%+ del rango 24h)
 // Y tener señales de caída: el modelo neuronal la aprueba, o el análisis en vivo del Cerebro (el de la
 // derecha) marca 3 o más de 6 señales de caída. Si no, ni se muestra ni se habla.
+// 📈 REGLA: el CDC solo muestra (panel central) y habla de monedas que estén en su MÁXIMO de 24 h
+// (95% o más de su rango). Los clicks manuales tuyos siempre se respetan. Para desactivar: SOLO_MAXIMO_24H = false.
+const SOLO_MAXIMO_24H = true;
+const MAX24_MIN_POS = 95;
+function _enMaximo24(sym) {
+    try {
+        const c = cachedData[_symCerebro(sym)];
+        return !!c && Math.max(c.posicionPorcentaje || 0, c.posicionExtendida || 0) >= MAX24_MIN_POS;
+    } catch (e) { return false; }
+}
 function _cdcCaidaLista(sym) {
     try {
         sym = _symCerebro(sym);
         const c = cachedData[sym];
         if (!c) return false;
-        if (Math.max(c.posicionPorcentaje || 0, c.posicionExtendida || 0) < 95) return false;
+        if (Math.max(c.posicionPorcentaje || 0, c.posicionExtendida || 0) < MAX24_MIN_POS) return false;
         if (_cerebroVeCaida(sym) === true) return true;
         const A = window.__cdcA;
         return !!(A && A.sym === sym && A.a && A.a.fuerte && (Date.now() - A.t) < 60000);
@@ -6461,6 +6471,7 @@ function _vozPermitidaPanel(texto, opt) {
         if (!selectedCoin || !opt || !opt.sym) return false;
         const sym = _symCerebro(opt.sym);
         if (sym !== _symCerebro(selectedCoin)) return false;
+        if (SOLO_MAXIMO_24H && !_enMaximo24(sym)) return false;
         if (opt.panel === true) return true;   // veredicto automático del panel central
         const dir = opt.dir || _dirDeTexto(texto);
         if (dir === 'LONG') return false;
@@ -6480,7 +6491,7 @@ function _vozPanelVeredicto(a) {
     try {
         if (!VOZ_PANEL_AUTO || !a || !selectedCoin) return;
         const sym = _symCerebro(a.s);
-        if (sym !== _symCerebro(selectedCoin)) return;
+        if (sym !== _symCerebro(selectedCoin) || !_enMaximo24(sym)) return;
         const cae = _cdcCaidaLista(sym);
         const n = Math.max(a.nc || 0, a.np || 0);
         const nivel = cae ? 'CAE' : (n >= 2 ? 'POSIBLE' : 'SUBE');
@@ -6754,7 +6765,7 @@ function mostrarBannerScalp(nombre, symbol, tipoOp, apalRec, apalTexto, cambio2m
     const esLong = tipoOp === 'LONG';
 
     // ── 1. ABRIR MONEDA EN PANEL CENTRAL AUTOMÁTICAMENTE ──
-    if (_cerebroAprueba(symbol)) seleccionarMoneda(symbol); // 🧠 el cerebro manda
+    if (_cerebroAprueba(symbol)) { window.__selAuto = true; try { seleccionarMoneda(symbol); } finally { window.__selAuto = false; } } // 🧠 el cerebro manda
 
     // ── 2. HACER PARPADEAR EL PANEL CENTRAL ──
     const panelCentral = document.getElementById('detailView');
@@ -15951,8 +15962,9 @@ setTimeout(() => {
             // ⏱️ PAUSA ENTRE MONEDAS: un cambio AUTOMÁTICO no entra si la moneda actual lleva menos de
             // PANEL_PAUSA_MS en el panel central (así el Cerebro la estudia con calma y concluye mejor).
             // El click manual y el que viene de la casilla del Cerebro pasan siempre. Para volver a lo anterior: 0.
-            const _esAutoCambio = (_a === true || (_o && _o !== 'cerebro'));
-            if (_esAutoCambio && selectedCoin && symbol !== selectedCoin && (Date.now() - (window.__panelCambioTs || 0)) < PANEL_PAUSA_MS) return;
+            const _esAutoCambio = (_a === true || (_o && _o !== 'cerebro') || window.__selAuto === true);
+            if (_esAutoCambio && SOLO_MAXIMO_24H && !_enMaximo24(symbol)) return; // 📈 solo monedas en su máximo de 24h
+            if (_esAutoCambio && selectedCoin && symbol !== selectedCoin && _enMaximo24(selectedCoin) && (Date.now() - (window.__panelCambioTs || 0)) < PANEL_PAUSA_MS) return;
             if (symbol !== selectedCoin) window.__panelCambioTs = Date.now();
             _orig(symbol);
             setTimeout(() => _iaActivarParaMoneda(symbol), 600);
@@ -17083,7 +17095,7 @@ function _actualizarVentanitaTecho4Ema() {
     // archivo completo sin caer en la paradoja de "el hash contiene su
     // propio hash". No cambiar este texto.
     var _PLACEHOLDER = "%%CDC_INTEGRITY_HASH%%";
-    var _HASH_ESPERADO = "d74a1707acab7634bc9c380deda04d40b278710f7cfa57572942d460e6cf2cb6"; // ← se reemplaza por el hash real en el paso final
+    var _HASH_ESPERADO = "03e6f42e2982d7fcdf59319ce68367c7f10147c563635f589bfa56023a8ea9b6"; // ← se reemplaza por el hash real en el paso final
 
     function _bloquear(motivo) {
         try {
@@ -17576,13 +17588,82 @@ function f(x,d){return (x>=0?"+":"")+x.toFixed(d==null?2:d)+"%";}
 function cdcWrapPanel(sym,h){if(!h)return "";var cae=h.indexOf("data-cae")>=0;return "<div style='margin:0 0 12px;padding:10px 14px;border:1px solid "+(cae?"rgba(255,77,109,.7)":"rgba(243,186,47,.45)")+";border-radius:12px;background:"+(cae?"rgba(40,8,14,.92)":"rgba(6,11,22,.95)")+";font:13px/1.5 Inter,Arial,sans-serif;color:#cbd5e1;text-align:left'>"+h+"</div>";}
 window.CDC_CEREBRO_HTML=function(sym){var L=window.__cdcCerebroLast;var h=(L&&L.sym===sym)?L.html:"<b style='color:#f3ba2f'>🧠 Analizando "+String(sym||"").replace("USDT","")+"…</b>";return cdcWrapPanel(sym,h);};
 window.CDC_CEREBRO_SYNC=function(sym){try{if(sym&&window.__cdcGo)window.__cdcGo(sym);}catch(e){}};
+var NCH={};
+function lvx(s){var z=NCH[s];if(z&&Date.now()-z.t<60000)return Promise.resolve(z);
+ return Promise.all([jf(B+"/fapi/v1/klines?symbol="+s+"&interval=15m&limit=96").catch(function(){return null;}),jf(B+"/fapi/v1/klines?symbol="+s+"&interval=1h&limit=168").catch(function(){return null;}),jf(B+"/futures/data/globalLongShortAccountRatio?symbol="+s+"&period=5m&limit=1").catch(function(){return null;})]).then(function(q){var o={t:Date.now(),k15:q[0],k1h:q[1],ls:q[2]&&q[2][0]?{l:+q[2][0].longAccount,s:+q[2][0].shortAccount}:null};if(o.k15&&o.k1h)NCH[s]=o;return o;});}
+function ema(a,n){var k=2/(n+1);return a.reduce(function(e,x,i){return i?e+k*(x-e):x;},a[0]);}
+/* 🧠 MEJORA: máximo 24h + soportes/resistencias + veredicto con % + advertencias + velocidad del capital */
+function extra(a,L,t,dp,pi,oi,tk){
+ if(!L||!L.k15||!L.k1h||!t||L.k15.length<20||L.k1h.length<20)return null;
+ var mk=function(x){return{o:+x[1],h:+x[2],l:+x[3],c:+x[4]};},k15=L.k15.map(mk),k1h=L.k1h.map(mk),last=a.price,hi=+t.highPrice,lo=+t.lowPrice,qv=+t.quoteVolume,ch=+t.priceChangePercent;
+ var pv=function(z,w){var r=[];for(var i=w;i<z.length-w;i++){var H=1,Lw=1;for(var j=1;j<=w;j++){if(z[i].h<=z[i-j].h||z[i].h<z[i+j].h)H=0;if(z[i].l>=z[i-j].l||z[i].l>z[i+j].l)Lw=0;}if(H)r.push(z[i].h);if(Lw)r.push(z[i].l);}return r;};
+ var cs=pv(k15,3).concat(pv(k1h,3)).sort(function(x,y){return x-y;}),A=[];
+ cs.forEach(function(x){var l=A[A.length-1];if(l&&x/l.p-1<0.006){l.p=(l.p*l.n+x)/(l.n+1);l.n++;}else A.push({p:x,n:1,t:""});});
+ var hi7=Math.max.apply(null,k1h.map(function(z){return z.h;})),lo7=Math.min.apply(null,k1h.map(function(z){return z.l;}));
+ var tag=function(p,t2){var b=A.filter(function(x){return Math.abs(x.p/p-1)<0.006;})[0];if(b){b.p=p;b.t=b.t?b.t+" · "+t2:t2;}else A.push({p:p,n:1,t:t2});};
+ tag(hi,"Máx 24h");tag(lo,"Mín 24h");tag(hi7,"Máx 7d");tag(lo7,"Mín 7d");
+ var w=k15.slice(-96),nr=w.map(function(z){return z.h>=hi*0.995;}),vis=0;nr.forEach(function(x,i){if(x&&!nr[i-1])vis++;});
+ var ix=0;w.forEach(function(z,i){if(z.h>=w[ix].h)ix=i;});var mins=(w.length-1-ix)*15;
+ var rej=w.slice(-8).filter(function(z){return z.h>=hi*0.99&&(z.h-Math.max(z.o,z.c))/((z.h-z.l)||1)>=0.5;}).length,d=Math.max(0,(hi/last-1)*100),rech=vis>=2||rej>=1;
+ var R=A.filter(function(x){return x.p>last*1.001;}).sort(function(x,y){return x.p-y.p;}).slice(0,3),S=A.filter(function(x){return x.p<last*0.999;}).sort(function(x,y){return y.p-x.p;}).slice(0,3);
+ var ds=S[0]?(1-S[0].p/last)*100:null,dr=R[0]?(R[0].p/last-1)*100:null,rs=[];
+ if(d<=0.5){if(rech)rs.push([-1.5,"Rechazada en el máximo de 24h ("+vis+" visita"+(vis==1?"":"s")+(rej?", mechas largas arriba":"")+")"]);else if(a.p15>0.5)rs.push([1.5,"Rompiendo el máximo de 24h sin rechazo: puede seguir subiendo"]);}
+ else if(d>=2&&mins>=30)rs.push([-0.5,"Ya retrocedió "+d.toFixed(1)+"% desde el máximo de 24h"]);
+ if(ds!=null){if(ds>=3)rs.push([-1,"El soporte más cercano está lejos (-"+ds.toFixed(1)+"%): hay espacio para caer"]);else if(ds<=0.8)rs.push([0.7,"Soporte pegado (-"+ds.toFixed(1)+"%): poco espacio para caer"]);}else rs.push([-1,"No hay soportes debajo en 7 días: puede caer sin freno"]);
+ if(dr!=null&&d>0.5&&dr<=1)rs.push([-0.8,"Resistencia cercana (+"+dr.toFixed(1)+"%): frena la subida"]);else if(d<=0.5&&dr==null&&!rech)rs.push([1,"No hay resistencias arriba: zona libre"]);
+ var nsc=rs.reduce(function(x,y){return x+y[0];},0),N={hi:hi,lo:lo,d:d,vis:vis,rej:rej,mins:mins,R:R,S:S,ds:ds,dr:dr,rs:rs,sc:nsc};
+ /* veredicto con porcentaje */
+ var Rr=[],add=function(w2,t2){if(w2)Rr.push([w2,t2]);},cr=function(x,m){return Math.max(-1,Math.min(1,x/m));};
+ var c15=k15.map(function(z){return z.c;}).slice(-40),e9=ema(c15,9),e21=ema(c15,21);
+ add(1.5*cr(e9/e21-1,0.006),e9>e21?"Tendencia de 15 min al alza (9 sobre 21)":"Tendencia de 15 min a la baja (9 bajo 21)");
+ if(Math.abs(a.sc)>=1)add(3*cr(a.sc,5),a.sc>0?"El flujo de dinero y precio empuja hacia arriba":"El flujo de dinero y precio empuja hacia abajo");
+ var bq=0,aq=0;((dp&&dp.bids)||[]).forEach(function(x){bq+=+x[1];});((dp&&dp.asks)||[]).forEach(function(x){aq+=+x[1];});var im=(bq-aq)/((bq+aq)||1)*100;
+ if(Math.abs(im)>=8)add(cr(im,30),im>0?"Más compradores que vendedores en el libro":"Más vendedores que compradores en el libro");
+ if(Math.abs(a.fr)>=0.03)add(-cr(a.fr,0.1),a.fr>0?"Funding alto: longs apalancados cargados":"Funding negativo: shorts cargados");
+ var pos=(last-lo)/((hi-lo)||1)*100;if(pos>=90)add(-1,"Pegada al máximo de 24h: riesgo de corrección");else if(pos<=10)add(1,"Pegada al mínimo de 24h: posible rebote");
+ if(L.ls&&Math.abs(L.ls.s-0.5)>=0.03)add(cr(L.ls.s-0.5,0.15),L.ls.s>0.5?"Más cuentas en short: combustible de squeeze":"Más cuentas en long: riesgo si cae");
+ rs.forEach(function(r){add(r[0],r[1]);});
+ var sum=Rr.reduce(function(x,y){return x+y[0];},0),pc=Math.round(Math.max(-100,Math.min(100,sum*8))),dir=pc>=20?"LONG":pc<=-20?"SHORT":"ESPERAR",lg=Math.round(50+pc/2),sh=100-lg,share=dir=="LONG"?lg:dir=="SHORT"?sh:Math.max(lg,sh);
+ Rr.sort(function(x,y){return Math.abs(y[0])-Math.abs(x[0]);});
+ var V={pc:pc,dir:dir,lg:lg,sh:sh,share:share,conf:share>=75?"alta":share>=62?"media":"baja",R:Rr.slice(0,4)};
+ /* advertencias */
+ var W=[],ad=function(n,t2){W.push([n,t2]);};
+ if(qv<5e6)ad(3,"Volumen bajo ($"+(qv/1e6).toFixed(1)+" M en 24h): cuesta entrar y salir");else if(qv<2e7)ad(1,"Volumen moderado ($"+(qv/1e6).toFixed(1)+" M en 24h)");
+ var dv=0;[].concat((dp&&dp.bids)||[],(dp&&dp.asks)||[]).forEach(function(x){dv+=+x[0]*+x[1];});if(dp&&dv<50000)ad(2,"Libro delgado ($"+Math.round(dv)+" en 20 niveles)");
+ var sp=dp&&dp.asks&&dp.asks[0]&&dp.bids&&dp.bids[0]?(+dp.asks[0][0]/+dp.bids[0][0]-1)*100:0;if(sp>=0.05)ad(2,"Diferencia compra/venta alta ("+sp.toFixed(3)+"%)");
+ if(pos>=95)ad(2,"Pegada al máximo de 24h: un short puede sufrir si lo rompe");if(pos<=5)ad(2,"Pegada al mínimo de 24h: puede rebotar");
+ if(Math.abs(ch)>=15)ad(2,"Se movió "+ch.toFixed(1)+"% en 24h");
+ if((hi/lo-1)*100>=20)ad(2,"Rango de "+((hi/lo-1)*100).toFixed(0)+"% en 24h: muy volátil");
+ if(Math.abs(a.fr)>=0.1)ad(2,"Funding extremo ("+a.fr.toFixed(3)+"%)");
+ var mk2=pi?+pi.markPrice:0;if(mk2&&Math.abs(last/mk2-1)*100>=0.3)ad(2,"Precio y mark separados "+((last/mk2-1)*100).toFixed(2)+"%");
+ if(Math.abs(a.o60)>=5)ad(2,"Dinero en contratos "+(a.o60>0?"+":"")+a.o60.toFixed(1)+"% en 1h");
+ if(L.ls&&L.ls.s>=0.55)ad(2,"Más del 55% de las cuentas en short: riesgo de squeeze");
+ if(L.ls&&L.ls.l>=0.65)ad(2,"Longs saturados (65%+): una caída puede acelerarse");
+ ad(0,"En short la pérdida no tiene tope: usa siempre stop");
+ W.sort(function(x,y){return y[0]-x[0];});
+ /* velocidad del capital */
+ var oiv=oi&&oi.length>12?oi.map(function(z){return +z.sumOpenInterestValue;}):null,C={um:oiv?(oiv[oiv.length-1]-oiv[oiv.length-4])/15:null,fl:tk&&tk.length>=3?tk.slice(-3).reduce(function(x,z){return x+(+z.buyVol-+z.sellVol);},0)*last:null};
+ return{N:N,V:V,W:W,C:C};}
+function pp(x){return x>=10?x.toFixed(3):x>=1?x.toFixed(4):x.toPrecision(4);}
+function vBig(a,sz){var X=a.X;if(!X)return "";var V=X.V,col=V.dir=="LONG"?"#0ecb81":V.dir=="SHORT"?"#ff4d6d":"#f3ba2f",ar=V.dir=="LONG"?"↑":V.dir=="SHORT"?"↓":"↔";
+ return "<div style='display:flex;align-items:center;gap:10px;margin:2px 0 4px'><div style='font:800 "+sz+"px/1 Inter,Arial;color:"+col+"'>"+ar+" "+V.share+"%</div><div><div style='font:800 15px Inter,Arial;color:"+col+"'>"+(V.dir=="ESPERAR"?"ESPERAR · sin ventaja clara":"VEREDICTO: "+V.dir)+"</div><div style='font-size:10px;color:#94a3b8'>Short "+V.sh+"% · Long "+V.lg+"% · confianza "+V.conf+"</div></div></div>"+
+ "<div style='display:flex;height:6px;border-radius:3px;overflow:hidden;margin-bottom:5px'><div style='width:"+V.sh+"%;background:#ff4d6d'></div><div style='width:"+V.lg+"%;background:#0ecb81'></div></div>";}
+function vNivMini(a){var X=a.X;if(!X)return "";var N=X.N;return "<div style='font-size:11px;margin-top:3px;color:#94a3b8'>Máx 24h <b>"+pp(N.hi)+"</b> ("+(N.d<=0.05?"en el máximo":"+"+N.d.toFixed(1)+"%")+", "+N.vis+" visita"+(N.vis==1?"":"s")+")"+(N.R[0]?" · Resist. <b style='color:#ff7a8a'>"+pp(N.R[0].p)+"</b>":"")+(N.S[0]?" · Soporte <b style='color:#7fe9a8'>"+pp(N.S[0].p)+"</b> (-"+N.ds.toFixed(1)+"%)":"")+" · niveles: <b>"+(N.sc<=-1.5?"favorecen CAÍDA":N.sc>=1?"favorecen SUBIDA":"no deciden")+"</b></div>";}
+function vNiv(a){var X=a.X;if(!X)return "";var N=X.N,rows=N.R.slice().reverse().map(function(x){return "<span style='color:#ff7a8a'>R "+pp(x.p)+" (+"+((x.p/a.price-1)*100).toFixed(1)+"%)"+(x.t?" "+x.t:"")+"</span>";}).concat(["<b>▶ "+pp(a.price)+"</b>"],N.S.map(function(x){return "<span style='color:#7fe9a8'>S "+pp(x.p)+" (-"+((1-x.p/a.price)*100).toFixed(1)+"%)"+(x.t?" "+x.t:"")+"</span>";}));
+ var rb=N.ds&&N.dr?" · Riesgo/beneficio por niveles <b>"+(N.ds/N.dr).toFixed(1)+"</b> (objetivo en soporte, stop sobre resistencia)":"";
+ return "<div style='margin-top:4px;padding-top:4px;border-top:1px solid #1e293b'><b style='font-size:12px;color:"+(N.sc<=-1.5?"#ff4d6d":N.sc>=1?"#0ecb81":"#f3ba2f")+"'>NIVELES: "+(N.sc<=-1.5?"favorecen CAÍDA":N.sc>=1?"favorecen SUBIDA":"no deciden")+"</b> <span style='color:#94a3b8'>· máx 24h "+pp(N.hi)+" ("+(N.d<=0.05?"en el máximo":"+"+N.d.toFixed(1)+"%")+", "+N.vis+" visita"+(N.vis==1?"":"s")+", hace "+Math.floor(N.mins/60)+"h "+N.mins%60+"m)</span><br>"+rows.join(" · ")+rb+
+ (N.rs.length?"<br>"+N.rs.map(function(r){return "<span style='color:"+(r[0]<0?"#ff7a8a":"#7fe9a8")+"'>"+(r[0]<0?"▼":"▲")+" "+r[1]+"</span>";}).join("<br>"):"")+"</div>";}
+function vCap(a){var X=a.X;if(!X||(X.C.um==null&&X.C.fl==null))return "";var C=X.C,m=function(x){return (x>=0?"+":"-")+"$"+Math.abs(Math.round(x)).toLocaleString("en-US");};
+ return "<div style='margin-top:4px;font-size:11px;color:#cbd5e1'>💧 <b>Capital:</b> "+(C.um!=null?(C.um>=0?"entran ":"salen ")+"<b>$"+Math.abs(Math.round(C.um)).toLocaleString("en-US")+"/min</b> en contratos (15m)":"")+(C.fl!=null?" · compras−ventas (15m) <b style='color:"+(C.fl>=0?"#7fe9a8":"#ff7a8a")+"'>"+m(C.fl)+"</b>":"")+"</div>";}
+function vAdv(a,n){var X=a.X;if(!X)return "";var ic=["ℹ️","🟡","🟠","🔴"],co=["#94a3b8","#ffb86b","#ff9a5a","#ff4d6d"],L2=X.W.filter(function(z){return z[0]>=1;}).slice(0,n||4);if(!L2.length)return (n||4)>=4?"<div style='margin-top:4px;font-size:11px;color:#94a3b8'>✔ Sin advertencias especiales ahora</div>":"";
+ return "<div style='margin-top:4px;padding-top:4px;border-top:1px solid #1e293b;font-size:11px'><b>ADVERTENCIAS:</b>"+L2.map(function(z){return "<br><span style='color:"+co[z[0]]+"'>"+ic[z[0]]+" "+z[1]+"</span>";}).join("")+"</div>";}
 async function analizar(s){
  var r=await Promise.all([
   jf(B+"/fapi/v1/klines?symbol="+encodeURIComponent(s)+"&interval=5m&limit=30").catch(function(){return null;}),
   jf(B+"/fapi/v1/premiumIndex?symbol="+s).catch(function(){return null;}),
   jf(B+"/futures/data/openInterestHist?symbol="+encodeURIComponent(s)+"&period=5m&limit=30").catch(function(){return null;}),
-  jf(B+"/futures/data/takerlongshortRatio?symbol="+encodeURIComponent(s)+"&period=5m&limit=6").catch(function(){return null;})]);
- var k=r[0],pi=r[1],oi=r[2],tk=r[3];if(!k||k.length<13)return null;
+  jf(B+"/futures/data/takerlongshortRatio?symbol="+encodeURIComponent(s)+"&period=5m&limit=6").catch(function(){return null;}),jf(B+"/fapi/v1/ticker/24hr?symbol="+s).catch(function(){return null;}),jf(B+"/fapi/v1/depth?symbol="+s+"&limit=20").catch(function(){return null;}),lvx(s).catch(function(){return null;})]);
+ var k=r[0],pi=r[1],oi=r[2],tk=r[3],t24=r[4],dp=r[5],LX=r[6];if(!k||k.length<13)return null;
  var c=k.map(function(x){return +x[4];}),n=c.length-1;
  var hi=k.slice(-12).map(function(x){return +x[2];}),lo=k.map(function(x){return +x[3];}),hi60=Math.max.apply(null,hi),lo30=Math.min.apply(null,lo),red=(+k[n][4])<(+k[n][1]),g3=[n,n-1,n-2].every(function(i){return +k[i][4]>+k[i][1];}),dh=pct(c[n],hi60);
  var p15=pct(c[n],c[n-3]),p60=pct(c[n],c[n-12]),fr=pi?+pi.lastFundingRate*100:0,o15=0,o60=0,hasOI=false;
@@ -17614,7 +17695,8 @@ async function analizar(s){
  else if(emp){v2=["▲ SIGUE SUBIENDO · sin señal de caída","#7fe9ff"];}
  else{v2=["◆ SIN SEÑAL DE CAÍDA aún · "+Math.max(nc,np)+"/6","#f3ba2f"];}
  var dn=!hasOI?"sin datos de OI":o15>1?"ENTRA dinero":o15<-1?"SALE dinero":"flujo estable";
- return{hi60:hi60,lo30:lo30,red:red,g3:g3,dh:dh,s:s,price:c[n],p15:p15,p60:p60,fr:fr,o15:o15,o60:o60,hasOI:hasOI,tr:tr,sc:sc,v:v2,dn:dn,why:why,lab:lab,nc:nc,np:np,fuerte:!!((conf[0][0]&&conf[1][0]&&nc>=3)||(!emp&&Math.max(nc,np)>=3)),t:Date.now()};}
+ var X=null;try{X=extra({price:c[n],p15:p15,p60:p60,fr:fr,o15:o15,o60:o60,tr:tr,sc:sc},LX,t24,dp,pi,oi,tk);}catch(e){}
+  return{hi60:hi60,lo30:lo30,X:X,red:red,g3:g3,dh:dh,s:s,price:c[n],p15:p15,p60:p60,fr:fr,o15:o15,o60:o60,hasOI:hasOI,tr:tr,sc:sc,v:v2,dn:dn,why:why,lab:lab,nc:nc,np:np,fuerte:!!((conf[0][0]&&conf[1][0]&&nc>=3)||(!emp&&Math.max(nc,np)>=3)||(X&&X.V.dir==="SHORT"&&X.V.share>=65)),t:Date.now()};}
 function shortEval(a){
  var sc=0,pro=[],con=[],blk=false;
  if(a.p15>=4||a.p60>=3){sc+=1;pro.push("subida extendida (posible agotamiento)");}
@@ -17634,14 +17716,14 @@ function shortEval(a){
 function pintar(box,a){
  if(!a){box.innerHTML="<span style='color:#ff4d6d'>No encontré datos de futuros para esa moneda en Binance.</span>";return;}
  var nm=a.s.replace("USDT","");
- box.innerHTML="<b style='color:"+a.v[1]+";font-size:13px'>"+nm+" · "+a.v[0]+"</b> <span style='color:#94a3b8'>($"+a.price+")</span><br>"+
+ box.innerHTML=vBig(a,38)+"<b style='color:"+a.v[1]+";font-size:13px'>"+nm+" · "+a.v[0]+"</b> <span style='color:#94a3b8'>($"+a.price+")</span><br>"+
  "Precio 15m <b>"+f(a.p15)+"</b> · 1h <b>"+f(a.p60)+"</b> · "+(a.hasOI?"OI 15m <b>"+f(a.o15)+"</b> · OI 1h <b>"+f(a.o60)+"</b> → <b style='color:#f3ba2f'>"+a.dn+"</b>":"<b>"+a.dn+"</b>")+
  "<br>Funding <b>"+a.fr.toFixed(3)+"%</b> · Compras/ventas agresivas <b>"+a.tr.toFixed(2)+"</b>"+(a.lab?" · Cerebro: <b>"+a.lab+"</b>":"")+
  (a.why.length?"<br><span style='color:#cbd5e1'>"+a.why.join(" · ")+"</span>":"")+
  (function(){var q=shortEval(a);return "<div style='margin-top:4px;padding-top:4px;border-top:1px solid #1e293b'><b style='color:"+q.v[1]+";font-size:12px'>SHORT: "+q.v[0]+"</b><br>"+
  (q.pro.length?"<span style='color:#7fe9ff'>A favor:</span> "+q.pro.join(" · ")+"<br>":"")+(q.con.length?"<span style='color:#ffb86b'>En contra:</span> "+q.con.join(" · ")+"<br>":"")+
  "Stop sugerido sobre <b>"+q.stop.toPrecision(5)+"</b> · Objetivo cerca de <b>"+q.tg.toPrecision(5)+"</b> · Riesgo/beneficio <b>"+(isFinite(q.rr)&&q.rr>0?q.rr.toFixed(1):"—")+"</b>"+(q.rr<1.5?" <span style='color:#ffb86b'>(poco atractivo)</span>":"")+"</div>";})()+
- "<br><span style='color:#64748b;font-size:10px'>Estimación de corto plazo según posicionamiento, no es garantía ni consejo financiero.</span>";}
+ vNiv(a)+vCap(a)+vAdv(a,6)+"<br><span style='color:#64748b;font-size:10px'>Estimación de corto plazo según posicionamiento y niveles, no es garantía ni consejo financiero.</span>";}
 function mount(){
  var w=document.getElementById("cdcBrainEmbed");
  if(!w){setTimeout(mount,500);return;}if(document.getElementById("cdcMonedaBar"))return;
@@ -17662,15 +17744,15 @@ function resumen(a){var nm=a.s.replace("USDT",""),p=0;
   var rs=[];try{rs=shortEval(a).pro.slice(0,3);}catch(e){}
   var n=Math.max(a.nc||0,a.np||0);
   return "<div style='font:900 17px Inter,Arial;color:#ff4d6d'>🔻 "+nm+" · EN SU MÁXIMO Y CON SEÑALES DE CAÍDA</div><div style='font-size:12px;margin-top:2px'><b>"+(p?p+"% el modelo · ":"")+n+"/6 señales</b>"+(rs.length?" · "+rs.join(" · "):"")+"</div><div style='font-size:10px;color:#64748b;margin-top:4px'>🧠 Cerebro Neuronal · estimación, no es consejo financiero</div>";}
- function informe(a){var nm=a.s.replace("USDT",""),cae=false;try{cae=typeof _cdcCaidaLista==="function"&&_cdcCaidaLista(a.s);}catch(e){}
+ function informe(a){var nm=a.s.replace("USDT",""),cae=false,mx=true;try{mx=typeof _enMaximo24!=="function"||_enMaximo24(a.s);}catch(e){}try{cae=typeof _cdcCaidaLista==="function"&&_cdcCaidaLista(a.s);}catch(e){}
   var q=null;try{q=shortEval(a);}catch(e){}
   var n=Math.max(a.nc||0,a.np||0),pos=[],neg=[];
   try{pos=(q&&q.pro?q.pro:[]).slice(0,3);neg=(q&&q.con?q.con:[]).slice(0,2);}catch(e){}
   var tit=cae?"🔻 "+nm+" · VA A CAER":(n>=2?"⚠️ "+nm+" · POSIBLE CAÍDA":"▲ "+nm+" · SIGUE SUBIENDO, NO CAE AÚN");
   var col=cae?"#ff4d6d":(n>=2?"#ffb86b":"#94a3b8");
-  return "<div "+(cae?"data-cae='1' ":"")+"style='font:900 16px Inter,Arial;color:"+col+"'>"+tit+" <span style='font:700 11px Inter,Arial;color:#94a3b8'>"+n+"/6 señales</span></div>"
+  return (mx?"":"<div style='color:#ffb86b;font:800 12px Inter,Arial;margin-bottom:4px'>⚠️ "+nm+" no está en su máximo de 24h</div>")+vBig(a,54)+"<div "+(cae?"data-cae='1' ":"")+"style='font:900 16px Inter,Arial;color:"+col+"'>"+tit+" <span style='font:700 11px Inter,Arial;color:#94a3b8'>"+n+"/6 señales</span></div>"
    +"<div style='font:12px/1.45 Inter,Arial,sans-serif;margin-top:3px'>"+(pos.length?"<span style='color:#7fe9ff'>Cae:</span> "+pos.join(" · "):"")+(neg.length?"<br><span style='color:#ffb86b'>Frena:</span> "+neg.join(" · "):"")+"</div>"
-   +"<div style='font-size:11px;color:#94a3b8;margin-top:3px'>Precio 15m <b>"+f(a.p15)+"</b> · 1h <b>"+f(a.p60)+"</b> · "+a.dn+" · Stop <b>"+(q?q.stop.toPrecision(5):"—")+"</b> · Obj. <b>"+(q?q.tg.toPrecision(5):"—")+"</b></div>";}
+   +"<div style='font-size:11px;color:#94a3b8;margin-top:3px'>Precio 15m <b>"+f(a.p15)+"</b> · 1h <b>"+f(a.p60)+"</b> · "+a.dn+" · Stop <b>"+(q?q.stop.toPrecision(5):"—")+"</b> · Obj. <b>"+(q?q.tg.toPrecision(5):"—")+"</b></div>"+vNivMini(a)+vCap(a)+vAdv(a,3);}
  function espejo(a){try{var h=a?informe(a):"<b style='color:#f3ba2f'>🧠 Analizando "+SYM.replace("USDT","")+"…</b>";window.__cdcCerebroLast={sym:SYM,html:h};var pn=document.getElementById("cdcCerebroEnPanel");if(pn&&pn.getAttribute("data-sym")===SYM)pn.innerHTML=cdcWrapPanel(SYM,h);}catch(e){}}
  async function run(){if(!SYM)return;var s0=SYM;try{var a0=await analizar(s0);if(s0!==SYM)return;window.__cdcA={sym:s0,a:a0,t:Date.now()};pintar(out,a0);espejo(a0);try{if(typeof _vozPanelVeredicto==="function")_vozPanelVeredicto(a0);}catch(e){}}catch(e){if(s0!==SYM)return;out.textContent="Error consultando Binance. Reintentando…";espejo();}}
  function go(skipSel){var t=(inp.value||"").trim().toUpperCase().replace(/[^\p{L}\p{N}]/gu,"");if(!t)return;if(!/USDT$/.test(t))t+="USDT";
