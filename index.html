@@ -10799,8 +10799,8 @@ function _actualizarBanderaBolivianaGlobal() {
     if (mejor.symbol === _ultimoBanderaBolivianaSymbol) return;
     if (Date.now() - _ultimaSeleccionManualTs < 15000) return;
 
-    _ultimoBanderaBolivianaSymbol = mejor.symbol;
     seleccionarMoneda(mejor.symbol, true, 'BANDERA');
+    if (selectedCoin !== mejor.symbol) { _ultimoBanderaBolivianaSymbol = null; return; } _ultimoBanderaBolivianaSymbol = mejor.symbol;
 }
 
 function _bbAbrirDesdeAlarma() {
@@ -10872,8 +10872,8 @@ function autoAbrirMonedaBingo() {
     if (mejor.symbol === _ultimoBingoSymbol) return; // ya se abrió sola antes, no repetir
     if (Date.now() - _ultimaSeleccionManualTs < 15000) return; // no pisar una elección manual reciente
 
-    _ultimoBingoSymbol = mejor.symbol;
     seleccionarMoneda(mejor.symbol, true, 'BINGO');
+    if (selectedCoin !== mejor.symbol) { _ultimoBingoSymbol = null; return; } _ultimoBingoSymbol = mejor.symbol;
 }
 
 // ══════════════════════════════════════════════════════════════════
@@ -10902,8 +10902,8 @@ function autoAbrirMonedaBombaMaxima() {
     if (Date.now() - _ultimaSeleccionManualTs < 15000) return; // no pisar una elección manual reciente
     if (!_cerebroAprueba(mejor.symbol)) return; // 🧠 el cerebro manda
 
-    _ultimoBombaMaximaSymbol = mejor.symbol;
     seleccionarMoneda(mejor.symbol, true, 'BOMBA');
+    if (selectedCoin !== mejor.symbol) { _ultimoBombaMaximaSymbol = null; return; } _ultimoBombaMaximaSymbol = mejor.symbol;
 
     // 🔊 Aviso de voz, igual que el resto de las alertas fuertes del panel.
     // Si además tiene confirmación fuerte (EMAs desplegadas y/o techo roto
@@ -10932,8 +10932,8 @@ function autoAbrirMonedaDorada() {
     if (mejor.symbol === _ultimoDoradoSymbol) return; // ya se abrió sola antes, no repetir
     if (Date.now() - _ultimaSeleccionManualTs < 15000) return; // no pisar una elección manual reciente
 
-    _ultimoDoradoSymbol = mejor.symbol;
     seleccionarMoneda(mejor.symbol, true, 'DORADO');
+    if (selectedCoin !== mejor.symbol) { _ultimoDoradoSymbol = null; return; } _ultimoDoradoSymbol = mejor.symbol;
 }
 
 function autoAbrirMejorCandidataFuerte() {
@@ -10951,8 +10951,8 @@ function autoAbrirMejorCandidataFuerte() {
     if (mejor.symbol === _ultimoAutoPanelSymbol) return; // ya se abrió sola antes, no repetir
     if (Date.now() - _ultimaSeleccionManualTs < 15000) return; // no pisar una elección manual reciente
 
-    _ultimoAutoPanelSymbol = mejor.symbol;
     seleccionarMoneda(mejor.symbol, true, 'CANDIDATA');
+    if (selectedCoin !== mejor.symbol) { _ultimoAutoPanelSymbol = null; return; } _ultimoAutoPanelSymbol = mejor.symbol;
 }
 
 let _ultimaSeleccionManualTs = 0; // se actualiza SOLO con clicks reales del usuario, no con el auto-cambio por techo
@@ -13365,7 +13365,6 @@ function actualizarPanelCentral() {
     try { if (window.CDC_CEREBRO_SYNC) window.CDC_CEREBRO_SYNC(selectedCoin); } catch (e) {}
     document.getElementById("detailView").innerHTML = `
         <!-- 🏷️ JEFE DE LISTA: de cuál botón/lista vino esta moneda -->
-        <div id="cdcCerebroEnPanel" data-sym="${selectedCoin}">${(window.CDC_CEREBRO_HTML ? window.CDC_CEREBRO_HTML(selectedCoin) : '')}</div>
         <!-- 🔴 y 🟡 ocultas a pedido del usuario: ya se ven en la lista de 24h de la izquierda -->
         
         
@@ -13477,6 +13476,7 @@ function actualizarPanelCentral() {
             })()}
         </div>
 
+        <div id="cdcCerebroEnPanel" data-sym="${selectedCoin}">${(window.CDC_CEREBRO_HTML ? window.CDC_CEREBRO_HTML(selectedCoin) : '')}</div>
         <!-- BLOQUE MEMORIA IA AVANZADA (colapsable) -->
         <div style="background:rgba(14,203,129,0.05); border:1px solid rgba(14,203,129,0.18); border-radius:12px; padding:14px; margin-bottom:14px;">
             <div onclick="_toggleMemoriaIA()" style="display:flex;align-items:center;justify-content:space-between;margin-bottom:${window._memoriaIaAbierta ? '10px' : '0px'};cursor:pointer;">
@@ -17343,7 +17343,7 @@ function _actualizarVentanitaTecho4Ema() {
     // archivo completo sin caer en la paradoja de "el hash contiene su
     // propio hash". No cambiar este texto.
     var _PLACEHOLDER = "%%CDC_INTEGRITY_HASH%%";
-    var _HASH_ESPERADO = "8445546257fd7c8b02fd0b0824124ef6f595b184e93ecc8c444537434284f9c6"; // ← se reemplaza por el hash real en el paso final
+    var _HASH_ESPERADO = "42a9d3fce2d1fd657bf079b2df3659c0e6fd255ecc889173a16afeaa3f55393f"; // ← se reemplaza por el hash real en el paso final
 
     function _bloquear(motivo) {
         try {
