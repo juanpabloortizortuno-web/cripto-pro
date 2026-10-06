@@ -1517,7 +1517,7 @@
 <script>
 (function(){
   var el=document.getElementById('cdcIntro'); if(!el) return;
-  var DUR=10000, t0=Date.now(), fin=false, habl=false;
+  var DUR=(function(){try{var _p=+localStorage.getItem('cdc_intro_ts')||0;localStorage.setItem('cdc_intro_ts',String(Date.now()));return (Date.now()-_p<43200000)?1500:10000;}catch(e){return 10000;}})(), t0=Date.now(), fin=false, habl=false;
   var fill=document.getElementById('ciFill'), pct=document.getElementById('ciPct'), msg=document.getElementById('ciMsg'); var msEl=document.getElementById('ciMs');
   var MSGS=[[0,'Iniciando sistema…'],[12,'Despertando el cerebro neuronal…'],[28,'Conectando con Binance Futuros…'],[45,'Calibrando radar de techos y pisos…'],[62,'Cargando estudio de tiempo y velocidad…'],[80,'Sincronizando señales y voz…'],[93,'Sistema listo']];
   function hablar(){
@@ -17343,7 +17343,7 @@ function _actualizarVentanitaTecho4Ema() {
     // archivo completo sin caer en la paradoja de "el hash contiene su
     // propio hash". No cambiar este texto.
     var _PLACEHOLDER = "%%CDC_INTEGRITY_HASH%%";
-    var _HASH_ESPERADO = "42a9d3fce2d1fd657bf079b2df3659c0e6fd255ecc889173a16afeaa3f55393f"; // ← se reemplaza por el hash real en el paso final
+    var _HASH_ESPERADO = "3c04a2ad8f0f8bbe21d32f21fd26ac9ecb3e7037098ede7ea264c15cd805c12c"; // ← se reemplaza por el hash real en el paso final
 
     function _bloquear(motivo) {
         try {
@@ -18239,5 +18239,9 @@ dbOpen(function(){dbGet("ds",function(v){if(v&&v.length)DS=v.concat(DS);dbGet("p
   limpiar();
   window.addEventListener('load', limpiar);
 })();
+</script>
+<script>
+/* Caché offline/rápida: registra el service worker (sw.js debe estar junto a index.html) */
+if('serviceWorker' in navigator && (location.protocol==='https:'||location.hostname==='localhost')){window.addEventListener('load',function(){navigator.serviceWorker.register('sw.js').catch(function(){});});}
 </script>
 </body></html>
