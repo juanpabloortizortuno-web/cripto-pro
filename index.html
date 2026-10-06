@@ -17343,7 +17343,7 @@ function _actualizarVentanitaTecho4Ema() {
     // archivo completo sin caer en la paradoja de "el hash contiene su
     // propio hash". No cambiar este texto.
     var _PLACEHOLDER = "%%CDC_INTEGRITY_HASH%%";
-    var _HASH_ESPERADO = "3c04a2ad8f0f8bbe21d32f21fd26ac9ecb3e7037098ede7ea264c15cd805c12c"; // ← se reemplaza por el hash real en el paso final
+    var _HASH_ESPERADO = "d5ea086843ee0b142f85c3fa078c0c7e92b1f93735862705bbc12032bacf2e4f"; // ← se reemplaza por el hash real en el paso final
 
     function _bloquear(motivo) {
         try {
@@ -18226,7 +18226,8 @@ dbOpen(function(){dbGet("ds",function(v){if(v&&v.length)DS=v.concat(DS);dbGet("p
         d.innerHTML = '<div style="text-align:center;padding:46px 16px;color:#94a3b8;font-family:Inter,Arial,sans-serif;">'
           + '<div style="font-size:34px;margin-bottom:10px;">🧠</div>'
           + '<div style="font-size:14px;font-weight:900;letter-spacing:2px;color:#f3ba2f;">ESPERANDO AL CEREBRO NEURONAL</div>'
-          + '<div style="font-size:11px;margin-top:8px;color:#64748b;">La moneda del panel la elige el cerebro cuando detecta techo y caída.</div></div>';
+          + '<div style="font-size:11px;margin-top:8px;color:#64748b;">La moneda del panel la elige el cerebro cuando detecta techo y caída.</div>'
+          + '<div id="cdcEsperaEstado" style="margin:14px auto 0;max-width:420px;font-size:12px;line-height:1.5;color:#cbd5e1;"></div></div>';
       }
       var t = document.getElementById('alarmaUnifTitulo');
       if (t && /LRCX/.test(t.textContent)) t.textContent = 'SIN SEÑAL';
@@ -18243,5 +18244,38 @@ dbOpen(function(){dbGet("ds",function(v){if(v&&v.length)DS=v.concat(DS);dbGet("p
 <script>
 /* Caché offline/rápida: registra el service worker (sw.js debe estar junto a index.html) */
 if('serviceWorker' in navigator && (location.protocol==='https:'||location.hostname==='localhost')){window.addEventListener('load',function(){navigator.serviceWorker.register('sw.js').catch(function(){});});}
+</script>
+<script>
+/* Estado del panel central: explica por qué sigue en espera y permite abrir la mejor candidata a mano */
+(function(){
+  function tick(){
+    try{
+      if (typeof selectedCoin !== 'undefined' && selectedCoin) return;
+      var el=document.getElementById('cdcEsperaEstado'); if(!el) return;
+      var C=(typeof cachedData!=='undefined')?cachedData:null;
+      var keys=C?Object.keys(C):[];
+      if(!keys.length){ el.innerHTML='⏳ Cargando monedas de Binance… si pasa de 1 minuto, revisa tu conexión (algunas redes móviles bloquean Binance).'; return; }
+      var modo=(typeof modoMercado!=='undefined')?modoMercado:'?';
+      var techo=[],i,c,n,best=null,aprob=0;
+      for(i=0;i<keys.length;i++){ c=C[keys[i]]; if(c&&(c.posicionPorcentaje||0)>=95) techo.push(keys[i]); }
+      for(i=0;i<techo.length;i++){
+        var k=techo[i], p=0;
+        try{ n=(window.CDC_NEURO&&CDC_NEURO.panel)?CDC_NEURO.panel(k):null; p=n?n.p:0; }catch(e){}
+        try{ if(typeof _cerebroAprueba==='function'&&_cerebroAprueba(k)) aprob++; }catch(e){}
+        if(!best||p>best.p) best={s:k,p:p,pos:C[k].posicionPorcentaje||0};
+      }
+      var h='🔍 <b>'+keys.length+'</b> monedas escaneadas · <b>'+techo.length+'</b> al 95%+ del rango · <b>'+aprob+'</b> aprobadas por el cerebro (necesita caída ≥ '+(typeof CEREBRO_UMBRAL_CAIDA!=='undefined'?CEREBRO_UMBRAL_CAIDA:50)+'%)<br>Modo: <b>'+modo+'</b>';
+      if(best){
+        var nm=best.s.replace('USDT','');
+        h+='<br>Más cercana: <b>'+nm+'</b> · rango '+best.pos.toFixed(1)+'% · caída según cerebro '+best.p+'%';
+        h+='<br><button onclick="seleccionarMoneda(\''+best.s+'\')" style="margin-top:8px;background:#f3ba2f;color:#000;font-weight:900;border:0;border-radius:8px;padding:8px 14px;">ABRIR '+nm+' IGUAL</button>';
+      } else {
+        h+='<br>Ninguna moneda está en el techo ahora mismo. Es normal: el panel espera una señal real de caída.';
+      }
+      el.innerHTML=h;
+    }catch(e){}
+  }
+  setInterval(tick,3000); setTimeout(tick,1500);
+})();
 </script>
 </body></html>
