@@ -6593,7 +6593,7 @@ function _vozInitPanel() {
             '<label>Explicación</label><select id="cdcVozDetalle" style="' + est + '"><option value="completo">Completa (razones + conclusión)</option><option value="breve">Breve (una razón + conclusión)</option></select>' +
             '<div style="display:flex;gap:6px;"><button id="cdcVozProbar" type="button" style="' + bt + '">▶ Probar</button><button id="cdcVozReset" type="button" style="' + bt + '">↺ Restablecer</button><button id="cdcVozCerrar" type="button" style="' + bt + '">✕</button></div>';
         document.body.appendChild(panel);
-        document.body.appendChild(btn);
+        /* 🎙️ botón de micrófono retirado a pedido del autor (el panel de voz sigue configurado por defecto) */
         const $ = function (id) { return document.getElementById(id); };
         btn.onclick = function () { const ab = panel.style.display === 'none'; panel.style.display = ab ? 'block' : 'none'; if (ab) _vozRefrescarPanel(); };
         $('cdcVozCerrar').onclick = function () { panel.style.display = 'none'; };
@@ -9159,10 +9159,49 @@ function hayErrorEscaneo72h(symbol) {
 }
 
 
+// ══════════════════════════════════════════════════════════════════
+// 🧠 PRIORIDAD DE CÁLCULO DE EMAs — EL CEREBRO TOMA EL MANDO
+// Las monedas que están en lo más alto de su rango 24h (cerca del 100%)
+// calculan sus EMAs PRIMERO, y entre ellas el cerebro neuronal adelanta
+// las que tienen mayor probabilidad de caída. Así el gráfico de EMAs de
+// las monedas que importan aparece antes y no al final de la rotación.
+// ══════════════════════════════════════════════════════════════════
+let _emaCicloEnCurso = false;
+function _prioridadEMA(sym) {
+    try {
+        const c = cachedData[sym];
+        if (!c) return -1;
+        const pos = c.posicionPorcentaje || 0;
+        let score = pos * 10;                                   // 0..1000: más cerca del techo = antes
+        if (pos >= 95) score += 500;                            // pegadas al máximo
+        if (typeof _esReventadaCayendo === 'function' && _esReventadaCayendo(c)) score += 400;
+        if (sym === selectedCoin) score += 100000;              // la moneda abierta siempre primero
+        if (pos >= 80 && window.CDC_NEURO && CDC_NEURO.panel) { // el cerebro afina el orden entre las altas
+            const n = CDC_NEURO.panel(sym);
+            if (n && typeof n.p === 'number') score += n.p * 5; // 0..500
+        }
+        const e = datosEMA[sym];
+        if (!e || !e.actualizado) score += 150;                 // sin EMAs todavía: adelantar
+        else if (Date.now() - e.actualizado < 60000) score -= 800; // recién calculadas: no repetir
+        return score;
+    } catch (err) { return 0; }
+}
+function _ordenarColaEMA() {
+    try {
+        const pr = {};
+        colaSimbolosEMA.forEach(sym => { pr[sym] = _prioridadEMA(sym); });
+        colaSimbolosEMA.sort((a, b) => pr[b] - pr[a]);
+    } catch (err) {}
+}
+
 async function cicloActualizacionEMA() {
+    if (_emaCicloEnCurso) return; // evita ciclos solapados (carga más rápida sin saturar a Binance)
+    _emaCicloEnCurso = true;
+    try {
     const symbols = Object.keys(cachedData);
     if (symbols.length === 0) return;
     if (colaSimbolosEMA.length === 0) colaSimbolosEMA = [...symbols]; // rellenar cola al vaciarse
+    _ordenarColaEMA(); // 🧠 el cerebro manda: primero las que están en el máximo
 
     // ── RÁFAGA INICIAL: los primeros ciclos tras abrir la app usan un lote
     // más grande para que el "calculando…" desaparezca lo antes posible. Después
@@ -9180,6 +9219,8 @@ async function cicloActualizacionEMA() {
     await Promise.all(lote.map(symbol => actualizarEMASimbolo(symbol)));
 
     actualizarTablaIzquierda(); // refrescar tabla con los nuevos datos EMA disponibles
+    if (selectedCoin && lote.includes(selectedCoin)) actualizarPanelCentral();
+    } finally { _emaCicloEnCurso = false; }
 }
 
 // ── Escaneo 72h AUTOMÁTICO para TODA la lista de monedas (no solo la
@@ -15346,7 +15387,7 @@ if (!_origActualizarTablaIzq2) {
 
     // Sistema de despegue real (EMA7/25/99 + 15% desde mínimo 48h): arranca tras el primer
     // ciclo de precios (necesita cachedData lleno) y luego rota un lote de monedas cada 20s.
-    setTimeout(() => { cicloActualizacionEMA(); }, 1200);
+    [300, 3500, 7000, 10500].forEach(ms => setTimeout(() => { cicloActualizacionEMA(); }, ms)); // ráfaga inicial rápida, las del máximo primero
     setInterval(() => cicloActualizacionEMA(), EMA_INTERVALO_MS);
     setInterval(() => cargarSimbolosFuturosUSDTM(), 30 * 60 * 1000); // refrescar lista de contratos cada 30 min
 
@@ -16930,7 +16971,7 @@ function _dibujarMiniChart(canvasId, symbol) {
         ctx.fillStyle = '#475569';
         ctx.font = '10px Inter, sans-serif';
         ctx.textAlign = 'center';
-        ctx.fillText('esperando datos…', w / 2, h / 2 + 3);
+        ctx.fillText('cargando EMAs…', w / 2, h / 2 + 3);
         return;
     }
     // La base real (velas de Binance) nunca se toca — se le agrega la
@@ -17302,7 +17343,7 @@ function _actualizarVentanitaTecho4Ema() {
     // archivo completo sin caer en la paradoja de "el hash contiene su
     // propio hash". No cambiar este texto.
     var _PLACEHOLDER = "%%CDC_INTEGRITY_HASH%%";
-    var _HASH_ESPERADO = "200fbb6e6d6ac2110967bb8845bd261834e642ea84ec92d10a0d8f45dd45db47"; // ← se reemplaza por el hash real en el paso final
+    var _HASH_ESPERADO = "8445546257fd7c8b02fd0b0824124ef6f595b184e93ecc8c444537434284f9c6"; // ← se reemplaza por el hash real en el paso final
 
     function _bloquear(motivo) {
         try {
@@ -17544,6 +17585,8 @@ function tickAll(){GR=requestAnimationFrame(tickAll);var now=Date.now(),t=now/10
 function head(st){if(!BR.hd&&!BR.hd2)return;var F=window.CDC_FUT&&st.sym?CDC_FUT.get(st.sym):null,nt=st.nt,h="<b style='color:#f3ba2f;font-size:14px'>🧠 CEREBRO NEURONAL</b> · <b>"+(st.sym||"—").replace("USDT","")+"</b> · ";
  h+=st.p!=null?"prob. caída <b style='color:"+(st.p>.5?"#ff4d6d":"#0ecb81")+"'>"+Math.round(st.p*100)+"%</b>":"<span style='color:#7fe9ff'>aprendiendo ("+nt.n+"/200 muestras)</span>";
  h+=" · células <b>"+st.cells.length+"/8</b> · monedas en estudio <b>"+Object.keys(CN).length+"</b>";
+ try{var _de=typeof datosEMA!=="undefined"?datosEMA:{},_cd=typeof cachedData!=="undefined"?cachedData:{},_tot=Object.keys(_cd).length,_ok=Object.keys(_cd).filter(function(k){return _de[k]&&_de[k].ema7!=null;}).length;
+  if(_tot)h+=" · 📡 EMAs <b style='color:"+(_ok>=_tot*.9?"#0ecb81":"#f3ba2f")+"'>"+_ok+"/"+_tot+"</b> (techo primero)";}catch(_e){}
  if(F)h+=" · Funding <b style='color:"+(F.fr<0?"#ff4d6d":"#0ecb81")+"'>"+F.fr.toFixed(3)+"%</b> · OI 15m <b>"+(F.c15>=0?"+":"")+F.c15.toFixed(1)+"%</b>";
  h+=clsHtml();var lg=st.E&&st.E.log&&st.E.log.length?"<div style='margin-top:3px;color:#b58cff'>🧬 "+st.E.log[st.E.log.length-1]+"</div>":"";
  var out=h+lg+(F&&F.q.tipo?"<div style='margin-top:3px;color:#f3ba2f'>"+F.q.txt+"</div>":"");if(BR.hd)BR.hd.innerHTML=out;if(BR.hd2)BR.hd2.innerHTML=out;}
@@ -18170,4 +18213,31 @@ dbOpen(function(){dbGet("ds",function(v){if(v&&v.length)DS=v.concat(DS);dbGet("p
 })();
 </script>
 
+<script>
+/* 🧹 Limpia la "foto" vieja de LRCX que quedó guardada en el panel central.
+   El panel solo lo llena el cerebro neuronal cuando aprueba una moneda. */
+(function(){
+  function limpiar(){
+    try{
+      if (typeof selectedCoin !== 'undefined' && selectedCoin) return;
+      var d = document.getElementById('detailView');
+      if (d && !d.getAttribute('data-cdc-limpio')) {
+        d.setAttribute('data-cdc-limpio','1');
+        d.innerHTML = '<div style="text-align:center;padding:46px 16px;color:#94a3b8;font-family:Inter,Arial,sans-serif;">'
+          + '<div style="font-size:34px;margin-bottom:10px;">🧠</div>'
+          + '<div style="font-size:14px;font-weight:900;letter-spacing:2px;color:#f3ba2f;">ESPERANDO AL CEREBRO NEURONAL</div>'
+          + '<div style="font-size:11px;margin-top:8px;color:#64748b;">La moneda del panel la elige el cerebro cuando detecta techo y caída.</div></div>';
+      }
+      var t = document.getElementById('alarmaUnifTitulo');
+      if (t && /LRCX/.test(t.textContent)) t.textContent = 'SIN SEÑAL';
+      var sb = document.getElementById('alarmaUnifSub');
+      if (sb && /NaN/.test(sb.textContent)) sb.textContent = 'esperando al cerebro neuronal';
+      var lb = document.getElementById('linkBinance');
+      if (lb && /LRCXUSDT/.test(lb.getAttribute('href')||'')) lb.setAttribute('href','https://www.binance.com/es-LA/futures');
+    }catch(e){}
+  }
+  limpiar();
+  window.addEventListener('load', limpiar);
+})();
+</script>
 </body></html>
