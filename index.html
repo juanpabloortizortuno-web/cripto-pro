@@ -17343,7 +17343,7 @@ function _actualizarVentanitaTecho4Ema() {
     // archivo completo sin caer en la paradoja de "el hash contiene su
     // propio hash". No cambiar este texto.
     var _PLACEHOLDER = "%%CDC_INTEGRITY_HASH%%";
-    var _HASH_ESPERADO = "d5ea086843ee0b142f85c3fa078c0c7e92b1f93735862705bbc12032bacf2e4f"; // ← se reemplaza por el hash real en el paso final
+    var _HASH_ESPERADO = "b533aaa0f5fb30ac63a77dff1962727116c78dbe00e53b4d1fb2ea38d709f50b"; // ← se reemplaza por el hash real en el paso final
 
     function _bloquear(motivo) {
         try {
@@ -18267,6 +18267,8 @@ if('serviceWorker' in navigator && (location.protocol==='https:'||location.hostn
       var h='🔍 <b>'+keys.length+'</b> monedas escaneadas · <b>'+techo.length+'</b> al 95%+ del rango · <b>'+aprob+'</b> aprobadas por el cerebro (necesita caída ≥ '+(typeof CEREBRO_UMBRAL_CAIDA!=='undefined'?CEREBRO_UMBRAL_CAIDA:50)+'%)<br>Modo: <b>'+modo+'</b>';
       if(best){
         var nm=best.s.replace('USDT','');
+        /* AUTO-ABRIR: abre sola la moneda más cercana, sin tocar el botón amarillo */
+        try{ if(typeof seleccionarMoneda==='function' && !(typeof selectedCoin!=='undefined' && selectedCoin)){ seleccionarMoneda(best.s); return; } }catch(e){}
         h+='<br>Más cercana: <b>'+nm+'</b> · rango '+best.pos.toFixed(1)+'% · caída según cerebro '+best.p+'%';
         h+='<br><button onclick="seleccionarMoneda(\''+best.s+'\')" style="margin-top:8px;background:#f3ba2f;color:#000;font-weight:900;border:0;border-radius:8px;padding:8px 14px;">ABRIR '+nm+' IGUAL</button>';
       } else {
