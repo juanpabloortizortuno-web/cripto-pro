@@ -5501,6 +5501,7 @@ function evaluarAprendizajeCDC() {
         if (!c) return; // ya no hay datos de esa moneda, descartar
 
         const cambioReal = ((c.price - p.precioEntrada) / p.precioEntrada) * 100;
+        if (Math.abs(cambioReal) < 0.05) return; // ruido: ni cuenta ni ajusta pesos
         const subioReal = cambioReal > 0;
         const acierto = (p.prediccionSubida === subioReal);
 
@@ -5521,7 +5522,7 @@ function evaluarAprendizajeCDC() {
                 if (!cfgKey || !(cfgKey in CDC_CONFIG)) return;
 
                 const signoFactor = Math.sign(valorFactor);
-                const ajuste = (signoFactor === signoReal) ? lr : -lr;
+                const ajuste = ((signoFactor === signoReal) ? lr : -lr) * Math.min(1, Math.abs(cambioReal) / 0.5);
 
                 let nuevoValor = CDC_CONFIG[cfgKey] + ajuste;
                 const [min, max] = LIMITES_PESOS[cfgKey] || [2, 50];
@@ -17353,7 +17354,7 @@ function _actualizarVentanitaTecho4Ema() {
     // archivo completo sin caer en la paradoja de "el hash contiene su
     // propio hash". No cambiar este texto.
     var _PLACEHOLDER = "%%CDC_INTEGRITY_HASH%%";
-    var _HASH_ESPERADO = "30f3fb8f478062b2249d9e51d5115d504a80a84c5f0aaceabba41738a5861ede"; // ← se reemplaza por el hash real en el paso final
+    var _HASH_ESPERADO = "855ff46a77a1c7413ca4ebfc6e4a869d4c4ddc69592513e070c202ad18da2513"; // ← se reemplaza por el hash real en el paso final
 
     function _bloquear(motivo) {
         try {
@@ -17419,9 +17420,9 @@ function _actualizarVentanitaTecho4Ema() {
 var B="https://fapi.binance.com",FR={},OI={},CD={};
 function ev(n){try{return (0,eval)("typeof "+n+"!=='undefined'?"+n+":undefined");}catch(e){}}
 async function jf(u){var r=await fetch(u);if(!r.ok)throw 0;return r.json();}
-async function loadFR(){try{(await jf(B+"/fapi/v1/premiumIndex")).forEach(function(x){FR[x.symbol]={fr:+x.lastFundingRate*100,next:+x.nextFundingTime};});}catch(e){}}
+async function loadFR(){try{(await jf(B+"/fapi/v1/premiumIndex")).forEach(function(x){FR[x.symbol]={fr:+x.lastFundingRate*100,next:+x.nextFundingTime,prem:(+x.indexPrice>0&&+x.markPrice>0)?(+x.markPrice/+x.indexPrice-1)*100:0};});}catch(e){}}
 async function loadOI(s){try{var h=await jf(B+"/futures/data/openInterestHist?symbol="+encodeURIComponent(s)+"&period=5m&limit=13");
- if(h&&h.length>4){var v=h.map(function(z){return +z.sumOpenInterestValue;}),n=v.length-1;OI[s]={now:v[n],c15:(v[n]/v[n-3]-1)*100,c60:(v[n]/v[0]-1)*100,t:Date.now()};}}catch(e){}}
+ if(h&&h.length>4){var v=h.map(function(z){return +z.sumOpenInterestValue;}),n=v.length-1;OI[s]={now:v[n],c15:(v[n]/v[n-3]-1)*100,c60:(v[n]/v[0]-1)*100,pk:(v[n]/Math.max.apply(null,v)-1)*100,ac:(v[n]/v[n-3]-1)*100-(v[n-3]/v[n-6]-1)*100,t:Date.now()};}}catch(e){}}
 function get(s){var f=FR[s],o=OI[s];if(!f&&!o)return null;var C=ev("cachedData")||{},c=C[s]||{},fr=f?f.fr:0,c15=o?o.c15:0,c60=o?o.c60:0,
  up=(c.cambioReal2Min||0)>0.05||(c.velocidad||0)>0,q={tipo:null,nivel:0,txt:""};
  if(fr<=-0.03&&c15>=2&&up){q.tipo="short";q.nivel=Math.min(1,(-fr/0.1)*.5+c15/10*.5);
@@ -17429,7 +17430,7 @@ function get(s){var f=FR[s],o=OI[s];if(!f&&!o)return null;var C=ev("cachedData")
  else if(fr>=0.05&&c15>=2&&(c.posicionPorcentaje||0)>=80){q.tipo="long";q.nivel=Math.min(1,(fr/0.1)*.5+c15/10*.5);
   q.txt="🔻 LONGS APALANCADOS EN TECHO · funding +"+fr.toFixed(3)+"% + OI +"+c15.toFixed(1)+"% → riesgo de caída (long squeeze)";}
  else if(c15<=-3&&up&&(c.posicionPorcentaje||0)>=70){q.tipo="debil";q.nivel=Math.min(1,-c15/10);q.txt="👀 Subida DÉBIL · el OI cae "+c15.toFixed(1)+"% mientras el precio sube (cierre de shorts, no dinero nuevo)";}
- return{fr:fr,c15:c15,c60:c60,oi:o?o.now:null,q:q,sqz:q.tipo==="long"?q.nivel:q.tipo==="short"?-q.nivel:q.tipo==="debil"?q.nivel*.5:0,next:f?f.next:0};}
+ return{fr:fr,c15:c15,c60:c60,pk:o?(o.pk||0):0,ac:o?(o.ac||0):0,prem:f?(f.prem||0):0,oi:o?o.now:null,q:q,sqz:q.tipo==="long"?q.nivel:q.tipo==="short"?-q.nivel:q.tipo==="debil"?q.nivel*.5:0,next:f?f.next:0};}
 function pri(){var C=ev("cachedData")||{},S=ev("selectedCoin"),a=Object.keys(C).filter(function(k){return C[k]&&C[k].posicionPorcentaje>=60&&(!OI[k]||Date.now()-OI[k].t>120000);});
  a.sort(function(x,y){return C[y].posicionPorcentaje-C[x].posicionPorcentaje;});
  if(S&&C[S]&&(!OI[S]||Date.now()-OI[S].t>60000))a.unshift(S);return a.slice(0,8);}
@@ -17516,9 +17517,9 @@ function state(){var now=Date.now();if(ST&&now-stT<600)return ST;stT=now;var sym
   CN[s].died=0;try{CN[s].p=E?CDC_NEURO.prob(s):null;}catch(e){}});
  Object.keys(CN).forEach(function(s){var c=CN[s];if(lst.indexOf(s)<0){if(!c.died){c.died=now;var f=null;L.life.forEach(function(z){if(z.sym===s)f=z;});c.y=f?f.y:null;}if(now-c.died>6000)delete CN[s];}});
  NL=[];var mx=1e-9,mv=1e-9;o.cells.forEach(function(c,ci){var W0=c.M[0].W,W1=c.M[1].W[0];mv=Math.max(mv,c.vit);
-  c.idx.forEach(function(fi,ps){var s2=0,ab=0;for(var j=0;j<W0.length;j++){s2+=W0[j][ps]*W1[j];ab+=Math.abs(W0[j][ps]);}ab/=W0.length;mx=Math.max(mx,ab);NL.push({a:N[fi],b:N[NF+ci],w:s2,s:ab});});});
+  c.idx.forEach(function(fi,ps){var s2=0,ab=0;for(var j=0;j<W0.length;j++){s2+=W0[j][ps]*W1[j];ab+=Math.abs(W0[j][ps]);}ab/=W0.length;mx=Math.max(mx,ab);if(ci<8&&fi<NF)NL.push({a:N[fi],b:N[NF+ci],w:s2,s:ab});});});
  NL.forEach(function(k){k.s/=mx;});
- o.cells.forEach(function(c,ci){NL.push({a:N[NF+ci],b:N[NF+8],w:o.ca[ci]?o.ca[ci][2][0]-.5:0,s:c.vit/mv});});
+ o.cells.forEach(function(c,ci){if(ci<8)NL.push({a:N[NF+ci],b:N[NF+8],w:o.ca[ci]?o.ca[ci][2][0]-.5:0,s:c.vit/mv});});
  ST=o;return o;}
 var VIEWS=[];
 function sizeView(v){var r=v.cv.getBoundingClientRect(),d=window.devicePixelRatio||1;v.CW=r.width;v.CH=r.height;v.cv.width=Math.max(1,v.CW*d);v.cv.height=Math.max(1,v.CH*d);v.S=Math.min(v.CW/750,v.CH/500)||.3;v.OX=(v.CW-750*v.S)/2;v.OY=(v.CH-500*v.S)/2;v.ctx.setTransform(d,0,0,d,0,0);}
@@ -17634,7 +17635,7 @@ tickAll();
    compara contra el núcleo del CDC con datos que la red NO vio (30% más reciente). */
 (function(){
 "use strict";
-var CFG={drop:1.5,up:1.0,mins:15,posMin:60,cada:60000,maxPend:1500,hid:[12,6],nIn:36};
+var CFG={drop:1.5,up:1.0,mins:15,posMin:60,cada:60000,maxPend:1500,hid:[12,6],nIn:54,hold:5,minChg:15};
 var MAXD=20000,MAXKEEP=40000,MINPOS=30,_lgTry=false,GC={},LS=localStorage,LIFE=[],VM={},DS=[], PEND=[], LAST={}, MODEL=null, MET=null, TRAIN=false, DB=null;
 try{var m=JSON.parse(LS.getItem("cdc_neuro_model")||"null"); if(m&&m.w&&m.w.cells){MODEL=m.w;MET=m.met;}}catch(e){}
 if(MET&&MET.indepPos==null){MET.gana=false;MET.legacy=1;} /* modelo viejo: se reevalúa con el criterio estricto */
@@ -17661,12 +17662,76 @@ function feats(sym){
   cl(c.cambioReal2Min,-3,3)/3, cl(c.velocidad,-3,3)/3, cl((c.velPromedio||0)*5,-1,1),
   (rsi==null?50:rsi)/100, cl((e.adx||0),0,50)/50, dir, cl(e.distVwapPct||0,-5,5)/5, cl(sma,-3,3)/3,
   cl(c.caidaDesdeMaximo,0,10)/10, cl(c.horasDesdeMaximo24h,0,24)/24, cl(c.vecesEnTechoActual,0,4)/4,
-  inf.btcCayendo?1:0, inf.ethCayendo?1:0, cl(c.change,-30,60)/60, cl(c.rangoPct24h,0,40)/40, Math.sin(h), Math.cos(h)].concat(fut(sym)).concat(est(sym)).concat(tvf(sym));
+  inf.btcCayendo?1:0, inf.ethCayendo?1:0, cl(c.change,-30,60)/60, cl(c.rangoPct24h,0,40)/40, Math.sin(h), Math.cos(h)].concat(fut(sym)).concat(est(sym)).concat(tvf(sym)).concat(nuevas(sym,c));
 }
 function est(sym){var E=((g("datosEMA")||{})[sym]||{}).estudiosTecho;if(!E)return [0,0,0,0,0,0];return [cl(E.fibo,-1,1),cl(E.rsiDiv,0,1),cl(E.bb,-1,1),cl(E.ext,-1,1),cl(E.rej,0,1),cl(E.cvd,-1,1)];}
 function tvf(sym){var E=((g("datosEMA")||{})[sym]||{}).estudioTV;if(!E)return [0,0,0,0,0,0];return [cl(E.pico30,0,1),cl(E.ahora30,-1,1),cl(E.retroceso,0,1),cl(E.velBajada,0,1),cl(E.desdePico,0,1),cl(E.horaCaliente,0,1)];}
+/* ═══ v2: escala logarítmica · volatilidad propia (σ15) · agotamiento · flujo · continuación ═══ */
+var LN301=Math.log(301),LN201=Math.log(201),EX={},EXBUSY=false;
+function ho(sym){var h=0;for(var i=0;i<sym.length;i++)h=(h*31+sym.charCodeAt(i))|0;return CFG.hold>0&&Math.abs(h)%CFG.hold===0;}
+function sig15(rg){rg=Math.max(+rg||0,1);return Math.max(.15,Math.log(1+rg/100)/1.665/Math.sqrt(96)*100);}
+function thr(rg){var s=sig15(rg),d=cl(1.5*s,1.2,6);return{d:+d.toFixed(2),u:+cl(d*.67,.8,4).toFixed(2)};}
+function jf2(u){return fetch(u).then(function(r){if(!r.ok)throw 0;return r.json();});}
+function rsiW(c,p){var r=new Array(c.length).fill(50),g=0,l=0,i;if(c.length<=p)return r;
+ for(i=1;i<=p;i++){var d=c[i]-c[i-1];if(d>0)g+=d;else l-=d;}g/=p;l/=p;r[p]=l===0?100:100-100/(1+g/l);
+ for(i=p+1;i<c.length;i++){var d2=c[i]-c[i-1];g=(g*(p-1)+(d2>0?d2:0))/p;l=(l*(p-1)+(d2<0?-d2:0))/p;r[i]=l===0?100:100-100/(1+g/l);}return r;}
+function loadEX(s){var B="https://fapi.binance.com",q=encodeURIComponent(s);
+ return Promise.all([jf2(B+"/fapi/v1/klines?symbol="+q+"&interval=5m&limit=40").catch(function(){return null;}),
+  jf2(B+"/futures/data/takerlongshortRatio?symbol="+q+"&period=5m&limit=6").catch(function(){return null;}),
+  jf2(B+"/futures/data/globalLongShortAccountRatio?symbol="+q+"&period=5m&limit=1").catch(function(){return null;}),
+  jf2(B+"/fapi/v1/depth?symbol="+q+"&limit=20").catch(function(){return null;})]).then(function(r){
+  var k=r[0];if(!k||k.length<30)return;var n=k.length-1,o=[],h=[],l=[],c=[],v=[],i;
+  for(i=0;i<=n;i++){o.push(+k[i][1]);h.push(+k[i][2]);l.push(+k[i][3]);c.push(+k[i][4]);v.push(+k[i][5]);}
+  var rs=rsiW(c,14),e={t:Date.now(),p15:(c[n]/c[n-3]-1)*100,p60:(c[n]/c[n-12]-1)*100,rsi:isFinite(rs[n])?rs[n]:50,vd:0,uw:0,dv:0,ti:0,tt:0,ls:0,di:0};
+  var l3=v[n-1]+v[n-2]+v[n-3],p3=v[n-4]+v[n-5]+v[n-6];e.vd=cl(Math.log((l3+1e-9)/(p3+1e-9)),-1.5,1.5)/1.5;
+  var uw=0;for(i=n-3;i<=n-1;i++)uw+=(h[i]-Math.max(o[i],c[i]))/(h[i]-l[i]+1e-12);e.uw=cl(uw/3,0,1);
+  var ip=n-12;for(i=n-12;i<=n-3;i++)if(c[i]>c[ip])ip=i;
+  if(c[n]>=c[ip]*.997)e.dv=cl((rs[ip]-rs[n])/20,0,1);
+  var tk=r[1];if(tk&&tk.length>=3){var a3=0,m=Math.min(3,tk.length);for(i=tk.length-m;i<tk.length;i++)a3+=+tk[i].buySellRatio;a3/=m;if(a3>0)e.ti=cl(Math.log(a3),-.7,.7)/.7;
+   if(tk.length>=6){var f3=((+tk[0].buySellRatio)+(+tk[1].buySellRatio)+(+tk[2].buySellRatio))/3;if(f3>0&&a3>0)e.tt=cl(Math.log(a3/f3),-.5,.5)/.5;}}
+  var ls=r[2];if(ls&&ls.length&&+ls[0].longAccount>0)e.ls=cl((+ls[0].longAccount-.5)*4,-1,1);
+  var dp=r[3];if(dp&&dp.bids&&dp.asks){var bs=0,as=0;dp.bids.forEach(function(z){bs+=z[0]*z[1];});dp.asks.forEach(function(z){as+=z[0]*z[1];});if(bs+as>0)e.di=(bs-as)/(bs+as);}
+  EX[s]=e;}).catch(function(){});}
+function exTick(){var C=g("cachedData");if(!C||EXBUSY)return;var now=Date.now(),S=g("selectedCoin"),a=Object.keys(C).filter(function(k){var c=C[k];return c&&c.price&&c.posicionPorcentaje>=CFG.posMin&&(!EX[k]||now-EX[k].t>180000);});
+ a.sort(function(x,y){return (+C[y].change||0)-(+C[x].change||0);});a=a.slice(0,3);
+ if(S&&C[S]&&(!EX[S]||now-EX[S].t>60000)&&a.indexOf(S)<0)a.unshift(S);if(!a.length)return;
+ EXBUSY=true;Promise.all(a.map(loadEX)).then(function(){EXBUSY=false;},function(){EXBUSY=false;});setTimeout(function(){EXBUSY=false;},15000);}
+function nuevas(sym,c){var s=sig15(c.rangoPct24h),X=EX[sym],F=window.CDC_FUT?CDC_FUT.get(sym):null,ok=!!(X&&Date.now()-X.t<600000);
+ return [cl(Math.log(1+Math.max(+c.change||0,0))/LN301,0,1),cl(Math.log(1+Math.max(+c.rangoPct24h||0,0))/LN201,0,1),cl((c.cambioReal2Min||0)/(s*.365),-4,4)/4,cl((c.caidaDesdeMaximo||0)/s,0,4)/4,
+  ok?cl(X.p15/s,-4,4)/4:0,ok?cl(X.p60/(s*2),-4,4)/4:0,ok?X.vd:0,ok?X.uw:0,ok?X.rsi/100:0,ok?X.dv:0,ok?X.ti:0,ok?X.tt:0,
+  F?cl(-(F.pk||0),0,10)/10:0,F?cl(F.ac||0,-10,10)/10:0,F?cl(F.prem||0,-.5,.5)/.5:0,ok?X.ls:0,ok?X.di:0,ok?1:0];}
+/* Modelo de continuación: P(sube antes de caer) — regresión logística (estable, 54 pesos) */
+function upLab(s){return s.up!=null?(s.up?1:0):((s.y===0&&s.maxRet>=1)?1:0);}
+function lin(U,x){var z=U.b;for(var i=0;i<U.w.length;i++)z+=U.w[i]*(x[i]||0);return 1/(1+Math.exp(-z));}
+function probUp(sym){var U=MODEL&&MODEL.U;if(!U)return null;var x=feats(sym);return x?lin(U,x):null;}
+function trainU(E,TR,VAL,TE){try{var n=CFG.nIn,sm=function(a,b){return a+b;},yT=TR.map(upLab),yV=VAL.map(upLab),yE=TE.map(upLab),pos=yT.reduce(sm,0),pe=yE.reduce(sm,0);
+ if(pos<20||pe<5||yV.reduce(sm,0)<5){MET.U=null;return;}
+ var U={w:new Array(n).fill(0),b:0},Vw=new Array(n).fill(0),Vb=0,wp=Math.min(10,(TR.length-pos)/pos),best=null,bA=0,idx=TR.map(function(_,i){return i;}),ep,b,i,j;
+ for(ep=0;ep<60;ep++){for(j=idx.length-1;j>0;j--){var k=Math.floor(Math.random()*(j+1)),tm=idx[j];idx[j]=idx[k];idx[k]=tm;}
+  for(b=0;b<idx.length;b+=64){var gw=new Array(n).fill(0),gb=0,m=Math.min(64,idx.length-b);
+   for(i=b;i<b+m;i++){var s=TR[idx[i]],y=yT[idx[i]],er=(lin(U,s.x)-y)*(y?wp:1);gb+=er;for(j=0;j<n;j++)gw[j]+=er*(s.x[j]||0);}
+   for(j=0;j<n;j++){Vw[j]=.9*Vw[j]-.03*(gw[j]/m+1e-3*U.w[j]);U.w[j]+=Vw[j];}Vb=.9*Vb-.03*gb/m;U.b+=Vb;}
+  if((ep+1)%4===0){var a=auc(VAL.map(function(s){return lin(U,s.x);}),yV);if(a>bA){bA=a;best=JSON.stringify(U);}}}
+ if(best)U=JSON.parse(best);var aU=auc(TE.map(function(s){return lin(U,s.x);}),yE);
+ E.U=U;MET.U={aucU:aU,base:pe/TE.length,nPos:pe,n:TE.length,gana:aU>=.56&&pe>=30};}catch(e){MET.U=null;}}
+/* Candidatas: subió mucho (24h) y el cerebro ve caída pronto y poca continuación */
+function cand(nmax){var C=g("cachedData")||{},o=[];if(!MODEL||!MODEL.cells)return o;
+ for(var k in C){var c=C[k];if(!c||!c.price||c.posicionPorcentaje<80||(+c.change||0)<CFG.minChg)continue;
+  var p=prob(k);if(p==null)continue;var pc=probCal(k),pr=pc!=null?pc:p,pu=probUp(k),pa=(pu!=null&&MET&&MET.U&&MET.U.gana)?pu:null;
+  o.push({sym:k,chg:+c.change,pCaida:pr,pSube:pa,score:pr*(1-(pa==null?.25:pa))});}
+ o.sort(function(a,b){return b.score-a.score;});return o.slice(0,nmax||5);}
+function candHtml(){if(!MODEL||!MODEL.cells)return "";var a=cand(5),ok=!!(MET&&MET.gana);
+ return "<div style='margin-top:4px;border-top:1px solid #1e293b;padding-top:4px'><b style='color:#ff7a8a'>🎯 Subió mucho y puede caer</b> <span style='color:#94a3b8'>(24h ≥ +"+CFG.minChg+"%"+(ok?"":" · red sin validar")+")</span><br>"+
+  (a.length?a.map(function(r){return r.sym.replace("USDT","")+" <b>+"+r.chg.toFixed(0)+"%</b> → caída <b>"+Math.round(r.pCaida*100)+"%</b>"+(r.pSube!=null?" · sube <b>"+Math.round(r.pSube*100)+"%</b>":"");}).join("<br>"):"<span style='color:#94a3b8'>ninguna ahora</span>")+"</div>";}
+function extraMet(){if(!MET)return "";var s="Monedas nuevas (no vistas): "+(MET.aucCoins==null?"sin datos aún":"AUC <b>"+MET.aucCoins.toFixed(3)+"</b> (n="+MET.nCoins+")")+"<br>";
+ if(MET.U)s+="¿Sigue subiendo?: AUC <b>"+MET.U.aucU.toFixed(3)+"</b> "+(MET.U.gana?"✅":"❌ sin validar")+"<br>";
+ if(MET.wN!=null)s+="Peso de la red vs CDC: <b>"+Math.round(MET.wN*100)+"%</b><br>";return s;}
 function fut(sym){var F=window.CDC_FUT?CDC_FUT.get(sym):null;return F?[cl(F.fr,-0.3,0.3)/0.3,cl(F.c15,-15,15)/15,cl(F.c60,-30,30)/30,F.sqz,1]:[0,0,0,0,0];}
-function padX(s){while(s.x.length<CFG.nIn)s.x.push(0);return s;}
+function padX(s){var x=s.x;while(x.length<36)x.push(0);
+ if(x.length<CFG.nIn){var rg=Math.max(x[16]*40,1),sg=sig15(rg);
+  x[36]=cl(Math.log(1+Math.max(x[15]*60,0))/LN301,0,1);x[37]=cl(Math.log(1+rg)/LN201,0,1);x[38]=cl(x[2]*3/(sg*.365),-4,4)/4;x[39]=cl(x[10]*10/sg,0,4)/4;
+  while(x.length<CFG.nIn)x.push(0);}
+ return s;}
 /* Núcleo del CDC (misma fórmula y pesos CDC_CONFIG: rango+momentum+RSI+DMI+VWAP) → % caída */
 function cdcCaida(sym){
  var w=g("CDC_CONFIG"),c=g("cachedData")[sym],e=(g("datosEMA")||{})[sym]||{},s=0,rsi=null;
@@ -17707,9 +17772,9 @@ function evalSet(M,T){var y=T.map(function(s){return s.y;});
  var base=y.reduce(function(a,b){return a+b;},0)/y.length;
  return{n:T.length,base:base,aucN:auc(pn,y),aucC:auc(pc,y),p20N:prec(pn,y,.2),p20C:prec(pc,y,.2)};}
 function zr(M){return M.map(function(L){return{W:L.W.map(function(r){return r.map(function(){return 0;});}),b:L.b.map(function(){return 0;})};});}
-var CELLS_DEF=[["Techo",[0,1,10,11,12,16]],["Momentum",[2,3,4,5,6,7,8,9]],["Futuros",[19,20,21,22,23]],["Contexto",[13,14,15,16,17,18]],["Estudios de techo",[24,25,26,27,28,29]],["Tiempo y velocidad",[30,31,32,33,34,35]]],MAXC=8,MAXH=24;
-if(MODEL&&MODEL.cells&&!MODEL.cells.some(function(c){return c.n==="Estudios de techo";})){var _cn=mkCell("Estudios de techo",[24,25,26,27,28,29]);_cn.vit=.1;MODEL.cells.push(_cn);if(MET){MET.gana=false;MET.legacy=1;}usar=false;}
-if(MODEL&&MODEL.cells&&!MODEL.cells.some(function(c){return c.n==="Tiempo y velocidad";})){var _ct=mkCell("Tiempo y velocidad",[30,31,32,33,34,35]);_ct.vit=.1;MODEL.cells.push(_ct);if(MET){MET.gana=false;MET.legacy=1;}usar=false;}
+var CELLS_DEF=[["Techo",[0,1,10,11,12,16]],["Momentum",[2,3,4,5,6,7,8,9]],["Futuros",[19,20,21,22,23]],["Contexto",[13,14,15,16,17,18]],["Estudios de techo",[24,25,26,27,28,29]],["Tiempo y velocidad",[30,31,32,33,34,35]],["Escala y volatilidad",[36,37,38,39,40,41]],["Agotamiento",[42,43,44,45,53]],["Flujo y libro",[46,47,51,52,53]],["Apalancamiento",[19,20,22,48,49,50]]],MAXC=12,MAXH=24;
+if(MODEL&&MODEL.cells){CDC_DEF_SYNC();}
+function CDC_DEF_SYNC(){CELLS_DEF.forEach(function(d){if(!MODEL.cells.some(function(c){return c.n===d[0];})){var cn=mkCell(d[0],d[1]);cn.vit=.1;MODEL.cells.push(cn);if(MET){MET.gana=false;MET.legacy=1;}usar=false;}});}
 function pj(c,x){return c.idx.map(function(i){return x[i];});}
 function mkCell(n,idx){return{n:n,idx:idx,h:6,M:init(idx.length,[6]),vit:1,ema:.5};}
 function pens(E,x){var s=0,w=0;E.cells.forEach(function(c){s+=c.vit*fwd(c.M,pj(c,x));w+=c.vit;});return w?s/w:.5;}
@@ -17751,7 +17816,7 @@ function train(ui){
  if(TRAIN)return;var D=DS.filter(function(s){return s.y===0||s.y===1;});
  if(D.length<200){ui("Faltan datos: "+D.length+"/200 mínimo (ideal 2000+).");return;}
  D.sort(function(a,b){return a.ts-b.ts;});if(D.length>MAXD)D=D.slice(-MAXD);
- var gap=CFG.mins*60000,c1=Math.floor(D.length*.56),c2=Math.floor(D.length*.7),TE=D.slice(c2),VAL=D.slice(c1,c2).filter(function(s){return s.ts<=TE[0].ts-gap;}),TR=D.slice(0,c1).filter(function(s){return VAL.length&&s.ts<=VAL[0].ts-gap;});
+ var gap=CFG.mins*60000,c1=Math.floor(D.length*.56),c2=Math.floor(D.length*.7),TE=D.slice(c2),VAL=D.slice(c1,c2).filter(function(s){return s.ts<=TE[0].ts-gap&&!ho(s.sym);}),TR=D.slice(0,c1).filter(function(s){return VAL.length&&s.ts<=VAL[0].ts-gap&&!ho(s.sym);});
  var pos=TR.filter(function(s){return s.y;}).length;if(pos<10||TE.filter(function(s){return s.y;}).length<5||VAL.filter(function(s){return s.y;}).length<5){ui("Muy pocos ejemplos de caída ("+pos+"). Sigue recolectando.");return;}
  var wp=Math.min(20,(TR.length-pos)/pos);if(!MODEL||!MODEL.cells)MODEL={cells:CELLS_DEF.map(function(d){return mkCell(d[0],d[1]);}),log:[]};
  var E=MODEL,first=E.cells.some(function(c){return c.aucTe==null;}),EP=first?120:70,FR=.6,PAT=8,finished=false,gotMsg=false,w=null;TRAIN=true;
@@ -17763,10 +17828,10 @@ function train(ui){
     c.vit=Math.max(.1,(c.aucTe-.45)*6);c.ema=Math.min(.6,Math.max(.2,1-c.aucTe));
     if(c.aucTr<.62&&c.h<MAXH){grow(c,4);E.log.push(c.n+" crece a "+c.h+" neuronas");}
     else if(c.aucTr-c.aucTe>.15&&c.h>4){shrink(c,2);E.log.push(c.n+" poda a "+c.h+" (memorizaba)");}});
-   MET=evalSet(E,TE);MET.indepPos=indep(TE);var bt=boot(E,TE);MET.boot=bt?bt.lo:null;MET.legacy=0;var sv=VAL.map(function(s){return pens(E,s.x);}),ov=VAL.map(function(s){return s.y;}),ix2=sv.map(function(_,i){return i;}).sort(function(a,b){return sv[a]-sv[b];}),cal=[],mxr=0;for(var bq=0;bq<6;bq++){var lo=Math.floor(ix2.length*bq/6),hi=Math.floor(ix2.length*(bq+1)/6),ss=0;if(hi<=lo)continue;for(var q=lo;q<hi;q++)ss+=ov[ix2[q]];mxr=Math.max(mxr,ss/(hi-lo));cal.push([sv[ix2[hi-1]],mxr]);}MET.cal=cal;
+   MET=evalSet(E,TE);MET.indepPos=indep(TE);var bt=boot(E,TE);MET.boot=bt?bt.lo:null;MET.legacy=0;var TC=TE.filter(function(s){return ho(s.sym);}),yc=TC.map(function(s){return s.y;});MET.nCoins=TC.length;MET.aucCoins=(TC.length>=100&&yc.reduce(function(a,b){return a+b;},0)>=8)?auc(TC.map(function(s){return pens(E,s.x);}),yc):null;var sv=VAL.map(function(s){return pens(E,s.x);}),ov=VAL.map(function(s){return s.y;}),ix2=sv.map(function(_,i){return i;}).sort(function(a,b){return sv[a]-sv[b];}),cal=[],mxr=0;for(var bq=0;bq<6;bq++){var lo=Math.floor(ix2.length*bq/6),hi=Math.floor(ix2.length*(bq+1)/6),ss=0;if(hi<=lo)continue;for(var q=lo;q<hi;q++)ss+=ov[ix2[q]];mxr=Math.max(mxr,ss/(hi-lo));cal.push([sv[ix2[hi-1]],mxr]);}MET.cal=cal;var wb=.4,wbA=-1;for(var wi=0;wi<=10;wi++){var ww=wi/10,bl=VAL.map(function(s,i){return (1-ww)*s.cdc/100+ww*sv[i];}),aw=auc(bl,ov);if(aw>wbA+1e-9){wbA=aw;wb=ww;}}MET.wN=Math.max(.2,Math.min(.7,wb));trainU(E,TR,VAL,TE);
    if(E.cells.length<MAXC&&MET.aucN<.58&&D.length>=E.cells.length*300){var ix=[];while(ix.length<7){var r=Math.floor(Math.random()*CFG.nIn);if(ix.indexOf(r)<0)ix.push(r);}
     E.cells.push(mkCell("Célula "+(E.cells.length+1),ix.sort(function(a,b){return a-b;})));E.log.push("Nace Célula "+E.cells.length+" (faltaba capacidad)");}
-   E.log=E.log.slice(-6);MET.trainN=TR.length;MET.totalN=D.length;MET.ts=Date.now();MET.lift=MET.base>0?MET.p20N/MET.base:0;MET.gana=MET.aucN>Math.max(MET.aucC,.5)+.03&&MET.lift>=1.5&&MET.n>=300&&MET.indepPos>=MINPOS&&MET.boot!=null&&MET.boot>0;
+   E.log=E.log.slice(-6);MET.trainN=TR.length;MET.totalN=D.length;MET.ts=Date.now();MET.lift=MET.base>0?MET.p20N/MET.base:0;MET.gana=MET.aucN>Math.max(MET.aucC,.5)+.03&&MET.lift>=1.5&&MET.n>=300&&MET.indepPos>=MINPOS&&MET.boot!=null&&MET.boot>0&&(MET.aucCoins==null||MET.aucCoins>=.52);
   TRAIN=false;if(!MET.gana){usar=false;LS.setItem("cdc_neuro_on","0");}save();ui("Listo.");}
  function main(){var tr=mkTrainer(E.cells.map(function(c){return{n:c.n,idx:c.idx,M:c.M};}),sTR,sVAL,wp,EP,FR,PAT);
   (function loop(){var r=tr.run(12);ui("Entrenando… "+r.pct+"%");if(!r.done)return setTimeout(loop,4);finished=false;fin(tr.result());})();}
@@ -17784,20 +17849,20 @@ function prob(sym){if(!MODEL||!MODEL.cells)return null;var x=feats(sym);return x
 function tick(){var C=g("cachedData");if(!C)return;var now=Date.now(),k;
  for(k in C){var c=C[k];if(!c||!c.price||c.posicionPorcentaje<CFG.posMin)continue;
   if(now-(LAST[k]||0)<CFG.cada||PEND.length>=CFG.maxPend)continue;
-  var x=feats(k);if(!x)continue;LAST[k]=now;PEND.push({sym:k,ts:now,p0:c.price,x:x,cdc:cdcCaida(k),mn:0,mx:0,up:false});}
+  var x=feats(k);if(!x)continue;LAST[k]=now;var th=CFG.adapt===0?{d:CFG.drop,u:CFG.up}:thr(c.rangoPct24h);PEND.push({sym:k,ts:now,p0:c.price,x:x,cdc:cdcCaida(k),mn:0,mx:0,up:false,d:th.d,u:th.u});}
  PEND=PEND.filter(function(p){var c=C[p.sym];if(!c||!c.price)return true;var r=(c.price/p.p0-1)*100,y=null;
   p.mn=Math.min(p.mn,r);p.mx=Math.max(p.mx,r);
-  if(r>=CFG.up)p.up=true;
-  if(r<=-CFG.drop&&!p.up)y=1; else if(p.up)y=0; else if(now-p.ts>=CFG.mins*60000)y=0;
+  if(r>=(p.u||CFG.up))p.up=true;
+  if(r<=-(p.d||CFG.drop)&&!p.up)y=1; else if(p.up)y=0; else if(now-p.ts>=CFG.mins*60000)y=0;
   if(y===null)return true;
-  var s={sym:p.sym,ts:p.ts,x:p.x,cdc:p.cdc,y:y,minRet:+p.mn.toFixed(3),maxRet:+p.mx.toFixed(3)};DS.push(s);dbAdd(s);vitUpd(s);LIFE.push({sym:s.sym,y:s.y,t:now});if(LIFE.length>80)LIFE.shift();return false;});}
+  var s={sym:p.sym,ts:p.ts,x:p.x,cdc:p.cdc,y:y,minRet:+p.mn.toFixed(3),maxRet:+p.mx.toFixed(3),up:p.up?1:0,d:p.d,u:p.u};DS.push(s);dbAdd(s);vitUpd(s);LIFE.push({sym:s.sym,y:s.y,t:now});if(LIFE.length>80)LIFE.shift();return false;});}
 /* ── Integración opcional al score del CDC (solo si la red ganó en validación) ── */
 var orig=window.calcularPrediccionCDC;
 if(typeof orig==="function")window.calcularPrediccionCDC=function(sym){
  var r=orig.apply(this,arguments);
  try{if(usar&&MET&&MET.gana){var pr=prob(sym),P=g("prediccionCDC");
   if(pr!=null&&P&&P[sym]){var cd=P[sym].caida;P[sym].caidaCDC=cd;P[sym].probNeuro=Math.round(pr*100);
-   var n=cl(Math.round(cd*.6+pr*100*.4),5,95);P[sym].caida=n;P[sym].subida=100-n;}}}catch(e){}
+   var wn=(MET.wN!=null)?MET.wN:.4,n=cd*(1-wn)+pr*100*wn,pu=probUp(sym);if(pu!=null&&MET.U&&MET.U.gana){n-=cl((pu-MET.U.base)*40,-8,12);P[sym].probSube=Math.round(pu*100);}n=cl(Math.round(n),5,95);P[sym].caida=n;P[sym].subida=100-n;}}}catch(e){}
  return r;};
 /* ── Panel ── */
 function ui(){
@@ -17816,12 +17881,12 @@ function ui(){
     h+="<div style='margin-top:5px'>AUC red <b style='color:"+col+"'>"+MET.aucN.toFixed(3)+"</b> · CDC <b>"+MET.aucC.toFixed(3)+"</b><br>Top 20%: red <b>"+f(MET.p20N)+"</b> · CDC "+f(MET.p20C)+"<br>Base "+f(MET.base)+" · la red acierta <b style='color:"+col+"'>x"+lift.toFixed(1)+"</b></div>"+
     "<div style='margin-top:4px;color:#94a3b8;font-size:10px'>Casos de caída independientes: <b>"+(MET.indepPos==null?"?":MET.indepPos)+"</b>/"+MINPOS+" · ventaja sobre CDC (peor caso 90%): <b>"+(MET.boot==null?"—":(MET.boot>=0?"+":"")+MET.boot.toFixed(3))+"</b>"+(MET.legacy?" · reevaluando con criterio estricto":"")+"</div>"+
     "<div style='margin-top:4px'><b style='color:"+col+"'>"+(MET.gana?"✅ Supera al CDC":"❌ No supera al CDC")+"</b></div>"+
-    "<label style='display:block;margin-top:2px'><input type='checkbox' id='nUsar' "+(usar?"checked":"")+(MET.gana?"":" disabled")+"> Usar como factor (40%)</label>";}
+    "<label style='display:block;margin-top:2px'><input type='checkbox' id='nUsar' "+(usar?"checked":"")+(MET.gana?"":" disabled")+"> Usar como factor ("+Math.round((MET.wN!=null?MET.wN:.4)*100)+"%)</label>";}
    h+="<div style='margin:6px 0 4px;display:flex;gap:4px;flex-wrap:wrap'><button id='nT'>Entrenar</button><button id='nE'>CSV</button><button id='nC'>Borrar</button></div>"+(msg?"<i style='color:#94a3b8'>"+msg+"</i>":"");
    if(MODEL){var rows=[],C=g("cachedData")||{};for(var k in C){if(C[k].posicionPorcentaje>=CFG.posMin){var q=prob(k);if(q!=null)rows.push([k,q,probCal(k)]);}}
     rows.sort(function(a,b){return b[1]-a[1];});
     h+="<div style='margin-top:4px;border-top:1px solid #1e293b;padding-top:4px'><b>Más probables de caer</b> <span style='color:#94a3b8'>(prob. real)</span><br>"+rows.slice(0,5).map(function(r){return r[0].replace("USDT","")+" <b>"+(r[2]!=null?Math.round(r[2]*100):Math.round(r[1]*100))+"%</b>";}).join(" · ")+"</div>";}
-   h+="<details id='nD' "+(det?"open":"")+" style='margin-top:4px'><summary style='cursor:pointer;color:#7fe9ff'>Detalles</summary>caída ≥"+CFG.drop+"% en "+CFG.mins+" min antes de +"+CFG.up+"%<br>Caídas: "+pos+" · pendientes: "+PEND.length+"<br>"+cellInfo()+(MET?"Validación n="+MET.n+"<br>":"")+"<span style='color:#94a3b8'>El % calibrado es la frecuencia real observada con ese puntaje; el % grande del cerebro es un puntaje de ranking.</span></details>";}
+   h+=candHtml();h+="<details id='nD' "+(det?"open":"")+" style='margin-top:4px'><summary style='cursor:pointer;color:#7fe9ff'>Detalles</summary>caída ≥ umbral adaptativo (mín "+CFG.drop+"%, según la volatilidad) en "+CFG.mins+" min antes de subir ⅔ de eso<br>"+extraMet()+"Caídas: "+pos+" · pendientes: "+PEND.length+"<br>"+cellInfo()+(MET?"Validación n="+MET.n+"<br>":"")+"<span style='color:#94a3b8'>El % calibrado es la frecuencia real observada con ese puntaje; el % grande del cerebro es un puntaje de ranking.</span></details>";}
   p.innerHTML=h;
   var bm=p.querySelector("#nMin");bm.onclick=function(){mini=!mini;LS.setItem("cdc_neuro_mini",mini?"1":"0");draw();};
   if(mini)return;
@@ -17833,8 +17898,8 @@ function ui(){
 function exp(){var h="ts,symbol,y,minRet,maxRet,cdcCaida,"+Array.from({length:CFG.nIn},function(_,i){return "f"+i;}).join(",");
  var t=[h].concat(DS.map(function(s){return [s.ts,s.sym,s.y,s.minRet,s.maxRet,s.cdc.toFixed(1)].concat(s.x.map(function(v){return v.toFixed(4);})).join(",");})).join("\n");
  var a=document.createElement("a");a.href=URL.createObjectURL(new Blob([t],{type:"text/csv"}));a.download="cdc_neuro_dataset.csv";a.click();}
-window.CDC_NEURO={panel:function(sym){if(!MODEL||!MODEL.cells)return null;var p=prob(sym);if(p==null)return null;var pc=probCal(sym);return{p:Math.round(p*100),real:pc==null?null:Math.round(pc*100),valida:!!(MET&&MET.gana)};},life:function(){return{pend:PEND,life:LIFE};},net:function(){return{M:MODEL,met:MET,n:DS.length};},feats:feats,fwd:fwd,prob:prob,probCal:probCal,train:function(){train(console.log);},muestras:function(){return DS.length;}};
-function start(){dbOpen(function(){dbLoad(function(){ui();setInterval(tick,10000);setInterval(function(){var n=DS.length;var tN=(MET&&MET.totalN)||0,due=(n-tN>=200&&Date.now()-((MET&&MET.ts)||0)>=6e5)||(MET&&MET.legacy&&!_lgTry);if(!TRAIN&&n>=200&&due){if(MET&&MET.legacy)_lgTry=true;train(function(m){window.CDC_BRAIN.burst(m);});}else save();},60000);});});}
+window.CDC_NEURO={panel:function(sym){if(!MODEL||!MODEL.cells)return null;var p=prob(sym);if(p==null)return null;var pc=probCal(sym);var pu=probUp(sym);return{p:Math.round(p*100),real:pc==null?null:Math.round(pc*100),valida:!!(MET&&MET.gana),sube:pu==null?null:Math.round(pu*100)};},life:function(){return{pend:PEND,life:LIFE};},net:function(){return{M:MODEL,met:MET,n:DS.length};},feats:feats,fwd:fwd,prob:prob,probCal:probCal,probSube:probUp,cand:cand,train:function(){train(console.log);},muestras:function(){return DS.length;}};
+function start(){dbOpen(function(){dbLoad(function(){ui();setInterval(tick,10000);setInterval(exTick,6000);setInterval(function(){var n=DS.length;var tN=(MET&&MET.totalN)||0,due=(n-tN>=200&&Date.now()-((MET&&MET.ts)||0)>=6e5)||(MET&&MET.legacy&&!_lgTry);if(!TRAIN&&n>=200&&due){if(MET&&MET.legacy)_lgTry=true;train(function(m){window.CDC_BRAIN.burst(m);});}else save();},60000);});});}
 if(document.readyState==="loading")document.addEventListener("DOMContentLoaded",start);else start();
 })();
 </script>
