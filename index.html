@@ -1,0 +1,498 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Cerebro neuronal v2 · CDC FUTURO-PRO</title>
+<!--
+  Cerebro neuronal v2 — autor: Juan Pablo Ortiz Ortuño (CDC FUTURO-PRO)
+  Mejoras sobre la versión anterior:
+   GRÁFICOS  · render por lotes (menos llamadas al canvas), sin gradientes por señal
+             · calidad adaptativa (baja la resolución sola si el equipo va lento)
+             · se pausa si la pestaña o el panel no se ven (ahorra batería)
+             · inercia al girar, zoom con pellizco / Ctrl+rueda, hover con cursor
+             · respeta "reducir movimiento" del sistema
+   NEURONAL  · periodo refractario: una neurona no puede dispararse en bucle
+             · las señales pierden energía en cada salto (ya no explotan)
+             · sinapsis con aprendizaje: los caminos más usados se refuerzan y brillan
+             · sesgo direccional: alcista sube por la red, bajista baja
+             · API para conectarlo a datos reales:  CerebroNeuronal.setCoins([...])
+-->
+<style>
+  :root{
+    --bg:#050914; --panel:#070d1c; --line:rgba(120,165,215,.16);
+    --txt:#dbe6f5; --dim:#7f95b3; --hot:#ffb066; --focus:#8fc3ff;
+    color-scheme:dark;
+  }
+  *{box-sizing:border-box}
+  html,body{height:100%}
+  body{
+    margin:0; padding:16px; padding-top:max(16px,env(safe-area-inset-top));
+    padding-bottom:max(16px,env(safe-area-inset-bottom));
+    background:var(--bg); color:var(--txt);
+    font:14px/1.5 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;
+  }
+  .wrap{max-width:920px;margin:0 auto}
+  h1{font-size:17px;font-weight:600;margin:0 0 10px;letter-spacing:.2px}
+  .stage{position:relative;background:var(--panel);border:1px solid var(--line);border-radius:14px;overflow:hidden}
+  canvas{display:block;width:100%;height:min(62vh,500px);min-height:320px;touch-action:none;cursor:grab;outline:none}
+  canvas:focus-visible{box-shadow:inset 0 0 0 2px var(--focus)}
+  .hud{position:absolute;left:14px;top:12px;font-size:12px;line-height:1.65;color:var(--dim);pointer-events:none}
+  .hud b{color:var(--txt);font-weight:600}
+  .key{position:absolute;right:14px;top:12px;font-size:12px;line-height:1.65;color:var(--dim);text-align:right;pointer-events:none}
+  .hint{position:absolute;right:14px;bottom:10px;font-size:12px;color:#5d7391;pointer-events:none}
+  .bar{display:flex;gap:8px;flex-wrap:wrap;margin:12px 0 0;align-items:center}
+  button{
+    font:inherit;color:var(--txt);background:#0b1426;border:1px solid var(--line);
+    border-radius:9px;padding:7px 14px;cursor:pointer;min-height:36px;
+    transition:background .15s,border-color .15s;
+  }
+  button:hover{background:#101c36}
+  button:focus-visible{outline:2px solid var(--focus);outline-offset:2px}
+  button[aria-pressed="true"]{border-color:#5f87b8;background:#112043;font-weight:600}
+  #n_names{margin-left:auto}
+  .tip{
+    position:absolute;pointer-events:none;font-size:12px;padding:5px 9px;border-radius:8px;
+    background:rgba(5,9,20,.92);border:1px solid var(--line);color:var(--txt);
+    transform:translate(-50%,-130%);white-space:nowrap;display:none
+  }
+  @media (max-width:560px){ .key{display:none} .hint{left:14px;right:auto} }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>Cerebro neuronal</h1>
+  <div class="stage" id="stage">
+    <canvas id="nb" tabindex="0" role="img"
+      aria-label="Cerebro neuronal en 3D con monedas sobre las neuronas. Arrastra para girar, toca una moneda para activarla."></canvas>
+    <div class="hud" id="hud" aria-live="off"></div>
+    <div class="key"><span style="color:#ff9a3c">●</span> Alta velocidad<br><span style="color:#9fb8d8">●</span> Moneda normal</div>
+    <div class="hint">Arrastra para girar · toca una moneda</div>
+    <div class="tip" id="tip"></div>
+  </div>
+  <div class="bar">
+    <button id="n_calma" aria-pressed="true">Calma</button>
+    <button id="n_alcista" aria-pressed="false">Señal alcista</button>
+    <button id="n_bajista" aria-pressed="false">Señal bajista</button>
+    <button id="n_names" aria-pressed="true">Nombres: sí</button>
+  </div>
+</div>
+
+<script>
+(function(){
+"use strict";
+
+/* ═══════════════ 1 · CONFIGURACIÓN ═══════════════ */
+var CFG={
+  NEURONS:780, CEREBELO:130, TRONCO:30,      // cantidad de neuronas por región
+  LINK_DIST:0.23, LINK_K:3, LONG_LINKS:34,   // conexiones
+  MAX_PULSES:170,                            // tope de señales simultáneas
+  REFRACT:0.32,                              // segundos de descanso tras disparar
+  HOP_LOSS:0.80,                             // energía que conserva una señal por salto
+  MIN_ENERGY:0.20,                           // por debajo, la señal se apaga
+  LEARN:0.05, FORGET:0.9994,                 // aprendizaje y olvido de sinapsis
+  W_BASE:0.28,                               // fuerza base de una sinapsis
+  HOT_EVERY:1.1,                             // cada cuánto emiten las monedas en alta
+  AUTOSPIN:0.24
+};
+var REDUCED=window.matchMedia&&matchMedia('(prefers-reduced-motion: reduce)').matches;
+if(REDUCED){CFG.MAX_PULSES=60;}
+
+/* ═══════════════ 2 · UTILIDADES ═══════════════ */
+var seed=23;
+function rnd(){seed=(seed*16807)%2147483647;return seed/2147483647;}   // determinista: mismo cerebro siempre
+function clamp(v,a,b){return v<a?a:v>b?b:v;}
+
+/* ═══════════════ 3 · ANATOMÍA (neuronas y sinapsis) ═══════════════ */
+var N=[],E=[],EW=[],P=[];          // neuronas, aristas, pesos sinápticos, señales
+function add(x,y,z){N.push({x:x,y:y,z:z,f:0,c:null,ref:0,nb:[],coin:null,X:0,Y:0,d:0,k:1});}
+var i,u,t,s,dx,dy,dz,k,bump,dep;
+for(i=0;i<CFG.NEURONS;i++){            // corteza: esfera deformada con surcos
+  u=rnd()*2-1;t=rnd()*6.2832;s=Math.sqrt(1-u*u);dx=s*Math.cos(t);dy=u;dz=s*Math.sin(t);
+  bump=0.07*(Math.sin(9*dx+3*dy)*Math.sin(8*dz+2*dx)+0.5*Math.sin(14*dy+11*dz));
+  k=1+bump; if(dy>0)k*=1-0.2*Math.exp(-Math.pow(dx/0.13,2));          // surco interhemisférico
+  dep=rnd()<0.72?1-rnd()*0.06:0.45+rnd()*0.45;                          // capa externa densa + núcleo
+  add(dx*0.62*k*dep+(dx>0?0.025:-0.025),(dy*(dy<0?0.40:0.58)*k*dep)+0.05,dz*0.92*k*dep);
+}
+for(i=0;i<CFG.CEREBELO;i++){           // cerebelo
+  u=rnd()*2-1;t=rnd()*6.2832;s=Math.sqrt(1-u*u);dx=s*Math.cos(t);dy=u;dz=s*Math.sin(t);
+  add(dx*0.4,-0.4+dy*0.17+0.014*Math.sin(26*dy),-0.74+dz*0.27);
+}
+for(i=0;i<CFG.TRONCO;i++){var q=rnd();add((rnd()-0.5)*0.1,-0.34-q*0.5,-0.2-q*0.16);}  // tronco
+
+var seen={};
+function link(a,b){
+  var key=a<b?a+'-'+b:b+'-'+a; if(seen[key])return;seen[key]=1;
+  E.push([a,b]);EW.push(CFG.W_BASE);
+  N[a].nb.push(E.length-1);N[b].nb.push(E.length-1);
+}
+// Búsqueda de vecinos con rejilla espacial (antes era O(n²) = 880k comparaciones)
+(function(){
+  var cell=CFG.LINK_DIST,grid={};
+  function key(x,y,z){return Math.floor(x/cell)+','+Math.floor(y/cell)+','+Math.floor(z/cell);}
+  N.forEach(function(n,idx){var kk=key(n.x,n.y,n.z);(grid[kk]||(grid[kk]=[])).push(idx);});
+  N.forEach(function(n,a){
+    var cx=Math.floor(n.x/cell),cy=Math.floor(n.y/cell),cz=Math.floor(n.z/cell),arr=[];
+    for(var ox=-1;ox<=1;ox++)for(var oy=-1;oy<=1;oy++)for(var oz=-1;oz<=1;oz++){
+      var cellList=grid[(cx+ox)+','+(cy+oy)+','+(cz+oz)];if(!cellList)continue;
+      for(var m=0;m<cellList.length;m++){var b=cellList[m];if(b===a)continue;
+        var d=Math.hypot(n.x-N[b].x,n.y-N[b].y,n.z-N[b].z);if(d<CFG.LINK_DIST)arr.push([d,b]);}
+    }
+    arr.sort(function(p,r){return p[0]-r[0];});
+    for(var j=0;j<Math.min(CFG.LINK_K,arr.length);j++)link(a,arr[j][1]);
+  });
+})();
+(function(){                           // conexiones largas entre hemisferios
+  for(var q=0;q<CFG.LONG_LINKS;q++){
+    var a=(rnd()*CFG.NEURONS)|0,b=(rnd()*CFG.NEURONS)|0;
+    if(N[a].x*N[b].x<0&&N[a].y>0.15&&N[b].y>0.15&&Math.abs(N[a].z-N[b].z)<0.3)link(a,b);
+  }
+})();
+
+/* ═══════════════ 4 · MONEDAS ═══════════════ */
+var COINS=[['OP',1],['ACE',1],['DOS',1],['BTC',0],['ETH',0],['SOL',0],['DOGE',0],['XRP',0],['ADA',0],['AVAX',0],
+  ['LINK',0],['ARB',0],['SUI',0],['APT',0],['NEAR',0],['INJ',0],['TIA',0],['SEI',0],['PEPE',0],['WIF',0],
+  ['FET',0],['GALA',0],['TON',0],['LTC',0],['BNB',0],['DOT',0]];
+var CN=[];                              // índices de neuronas que llevan moneda
+(function(){
+  var tries=0,ci=0;
+  while(ci<COINS.length&&tries<6000){
+    tries++;var id=(rnd()*CFG.NEURONS)|0,nd=N[id],ok=true;
+    for(var m=0;m<CN.length;m++){if(Math.hypot(nd.x-N[CN[m]].x,nd.y-N[CN[m]].y,nd.z-N[CN[m]].z)<0.34){ok=false;break;}}
+    if(!ok||nd.nb.length<2)continue;
+    nd.coin={n:COINS[ci][0],hot:!!COINS[ci][1],p:null};CN.push(id);ci++;
+  }
+})();
+
+/* ═══════════════ 5 · ESTADO Y COLORES ═══════════════ */
+var MODES={
+  calma:  {cols:[[95,195,230],[225,185,115]],act:0.60,bias:0,  rate:0.30},
+  alcista:{cols:[[75,200,150],[225,185,115]],act:0.80,bias:1,  rate:0.42},
+  bajista:{cols:[[230,95,108],[235,150,100]],act:0.80,bias:-1, rate:0.42}
+};
+var ORANGE=[255,150,50];
+var mode='calma',names=true,sel=-1,hov=-1;
+var rgbCache={};
+function rgb(c){var k=c.join();return rgbCache[k]||(rgbCache[k]=k);}
+var sprites={};
+function sprite(c){                      // halo suave precalculado (se reutiliza, no se recrea por frame)
+  var key=rgb(c),el=sprites[key];if(el)return el;
+  el=document.createElement('canvas');el.width=el.height=48;
+  var g=el.getContext('2d'),gr=g.createRadialGradient(24,24,0,24,24,24);
+  gr.addColorStop(0,'rgba('+key+',0.85)');gr.addColorStop(0.3,'rgba('+key+',0.3)');gr.addColorStop(1,'rgba('+key+',0)');
+  g.fillStyle=gr;g.fillRect(0,0,48,48);sprites[key]=el;return el;
+}
+function pickColor(){var L=MODES[mode].cols;return rnd()<0.8?L[0]:L[1];}
+
+/* ═══════════════ 6 · DINÁMICA NEURONAL ═══════════════ */
+// Elige hacia qué sinapsis sigue la señal: más fuerte = más probable; el modo añade sesgo vertical.
+function chooseEdge(node,from){
+  var nb=N[node].nb,bias=MODES[mode].bias,tot=0,w=[],j,e,other,wt;
+  for(j=0;j<nb.length;j++){
+    e=nb[j];other=E[e][0]===node?E[e][1]:E[e][0];
+    wt=EW[e];
+    if(bias)wt*=clamp(1+bias*(N[other].y-N[node].y)*9,0.15,3);
+    if(other===from)wt*=0.15;            // evita rebotar hacia atrás
+    w[j]=wt;tot+=wt;
+  }
+  if(!tot)return -1;
+  var r=rnd()*tot;for(j=0;j<nb.length;j++){r-=w[j];if(r<=0)return nb[j];}
+  return nb[nb.length-1];
+}
+function spawn(ei,from,col,energy){
+  if(P.length>=CFG.MAX_PULSES||ei<0)return;
+  var e=E[ei];
+  P.push({e:ei,dir:e[0]===from?1:-1,t:0,v:0.014+rnd()*0.02,c:col,cs:rgb(col),en:energy});
+}
+function fireNode(id,col,energy){        // dispara una neurona (si no está descansando)
+  var n=N[id];if(n.ref>0)return false;
+  n.f=1;n.c=col;n.ref=CFG.REFRACT;
+  var kk=rnd()<0.4?2:1;
+  for(var j=0;j<kk;j++)spawn(chooseEdge(id,-1),id,col,energy);
+  return true;
+}
+function burst(n){for(var q=0;q<n;q++){var id=(rnd()*N.length)|0;fireNode(id,pickColor(),1);}}
+
+/* ═══════════════ 7 · CANVAS, TAMAÑO Y CALIDAD ═══════════════ */
+var cv=document.getElementById('nb'),ctx=cv.getContext('2d',{alpha:false}),
+    hud=document.getElementById('hud'),tip=document.getElementById('tip'),stage=document.getElementById('stage');
+var W=680,H=440,dpr=Math.min(2,window.devicePixelRatio||1),maxDpr=dpr;
+function size(){
+  var r=cv.getBoundingClientRect();W=Math.max(200,r.width);H=Math.max(200,r.height);
+  cv.width=Math.round(W*dpr);cv.height=Math.round(H*dpr);ctx.setTransform(dpr,0,0,dpr,0,0);
+}
+size();
+if(window.ResizeObserver)new ResizeObserver(size).observe(cv);else window.addEventListener('resize',size);
+
+/* ═══════════════ 8 · INTERACCIÓN ═══════════════ */
+var yaw=0.5,pit=0.28,vyaw=0,zoom=1,drag=false,lx=0,ly=0,moved=0;
+var ptrs={},pinch0=0,zoom0=1;
+cv.addEventListener('pointerdown',function(e){
+  ptrs[e.pointerId]=e;cv.setPointerCapture(e.pointerId);
+  var ids=Object.keys(ptrs);
+  if(ids.length===2){pinch0=Math.hypot(ptrs[ids[0]].clientX-ptrs[ids[1]].clientX,ptrs[ids[0]].clientY-ptrs[ids[1]].clientY);zoom0=zoom;drag=false;return;}
+  drag=true;moved=0;lx=e.clientX;ly=e.clientY;vyaw=0;cv.style.cursor='grabbing';
+});
+cv.addEventListener('pointermove',function(e){
+  if(ptrs[e.pointerId])ptrs[e.pointerId]=e;
+  var ids=Object.keys(ptrs);
+  if(ids.length===2&&pinch0){
+    var d=Math.hypot(ptrs[ids[0]].clientX-ptrs[ids[1]].clientX,ptrs[ids[0]].clientY-ptrs[ids[1]].clientY);
+    zoom=clamp(zoom0*d/pinch0,0.6,2);return;
+  }
+  if(drag){
+    var ddx=e.clientX-lx,ddy=e.clientY-ly;
+    yaw+=ddx*0.009;vyaw=ddx*0.009;pit=clamp(pit+ddy*0.005,-0.5,0.9);
+    moved+=Math.abs(ddx)+Math.abs(ddy);lx=e.clientX;ly=e.clientY;
+  }else{hoverAt(e);}
+});
+function endPtr(e){
+  delete ptrs[e.pointerId];pinch0=0;
+  if(Object.keys(ptrs).length)return;
+  var wasDrag=drag;drag=false;cv.style.cursor=hov>=0?'pointer':'grab';
+  if(wasDrag&&moved<6&&e.type==='pointerup')selectAt(e);
+}
+cv.addEventListener('pointerup',endPtr);cv.addEventListener('pointercancel',endPtr);
+cv.addEventListener('pointerleave',function(){hov=-1;tip.style.display='none';});
+cv.addEventListener('wheel',function(e){
+  if(!(e.ctrlKey||e.metaKey))return;       // sin Ctrl la rueda sigue haciendo scroll en la página
+  e.preventDefault();zoom=clamp(zoom*(e.deltaY<0?1.08:0.92),0.6,2);
+},{passive:false});
+cv.addEventListener('keydown',function(e){  // teclado: ← → giran, +/- zoom, Enter dispara
+  if(e.key==='ArrowLeft')yaw-=0.12;else if(e.key==='ArrowRight')yaw+=0.12;
+  else if(e.key==='ArrowUp')pit=clamp(pit-0.06,-0.5,0.9);else if(e.key==='ArrowDown')pit=clamp(pit+0.06,-0.5,0.9);
+  else if(e.key==='+')zoom=clamp(zoom*1.1,0.6,2);else if(e.key==='-')zoom=clamp(zoom*0.9,0.6,2);
+  else if(e.key==='Escape')sel=-1;else return;
+  e.preventDefault();
+});
+function nearestCoin(e,radius){
+  var r=cv.getBoundingClientRect(),mx=e.clientX-r.left,my=e.clientY-r.top,best=-1,bd=radius;
+  CN.forEach(function(id){var n=N[id],dd=Math.hypot(n.X-mx,n.Y-my);if(dd<bd&&n.d<0.5){bd=dd;best=id;}});
+  return best;
+}
+function hoverAt(e){
+  hov=nearestCoin(e,20);cv.style.cursor=hov>=0?'pointer':'grab';
+  if(hov>=0){var n=N[hov],c=n.coin,r=cv.getBoundingClientRect();
+    tip.textContent=c.n+(c.hot?' · alta velocidad':'')+(c.p!=null?' · caída '+Math.round(c.p*100)+'%':'');
+    tip.style.left=(n.X+(r.left-stage.getBoundingClientRect().left))+'px';
+    tip.style.top=(n.Y+(r.top-stage.getBoundingClientRect().top))+'px';tip.style.display='block';
+  }else tip.style.display='none';
+}
+function selectAt(e){
+  var b=nearestCoin(e,26);sel=b;
+  if(b>=0){                              // cascada: la moneda se enciende y dispara por todas sus sinapsis
+    var n=N[b],col=n.coin.hot?ORANGE:MODES[mode].cols[0];
+    n.f=1;n.c=col;n.ref=0;
+    n.nb.forEach(function(ei){spawn(ei,b,col,1.4);});
+  }
+}
+function setMode(m){
+  mode=m;
+  ['calma','alcista','bajista'].forEach(function(x){
+    document.getElementById('n_'+x).setAttribute('aria-pressed',x===m);
+  });
+  burst(22);
+}
+['calma','alcista','bajista'].forEach(function(x){document.getElementById('n_'+x).onclick=function(){setMode(x);};});
+document.getElementById('n_names').onclick=function(){
+  names=!names;this.textContent='Nombres: '+(names?'sí':'no');this.setAttribute('aria-pressed',names);
+};
+
+/* ═══════════════ 9 · PAUSA INTELIGENTE ═══════════════ */
+var running=true,visible=true,last=performance.now(),fr=0,hotT=0,emaDt=16,slowFrames=0;
+document.addEventListener('visibilitychange',function(){visible=!document.hidden;resume();});
+if(window.IntersectionObserver)new IntersectionObserver(function(en){visible=en[0].isIntersecting&&!document.hidden;resume();}).observe(cv);
+function resume(){if(visible&&!running){running=true;last=performance.now();requestAnimationFrame(frame);}}
+
+/* ═══════════════ 10 · BUCLE PRINCIPAL ═══════════════ */
+var S0=235,FOC=3.4;
+ctx.textAlign='center';
+burst(18);setMode('calma');
+
+function frame(now){
+  if(!visible){running=false;return;}
+  var rawDt=(now-last)/1000;last=now;
+  var dt=Math.min(0.05,rawDt);fr++;
+  var M=MODES[mode],j,n,e,A,B,p;
+
+  // calidad adaptativa: si el promedio supera ~30 ms (≈33 fps) baja la resolución interna
+  emaDt=emaDt*0.95+rawDt*1000*0.05;
+  if(emaDt>30&&dpr>1){if(++slowFrames>45){dpr=Math.max(1,dpr-0.5);size();slowFrames=0;emaDt=16;}}else slowFrames=0;
+
+  // rotación con inercia + giro automático suave
+  if(!drag){yaw+=vyaw;vyaw*=0.94;if(Math.abs(vyaw)<0.0004)vyaw=0;}
+  yaw+=dt*CFG.AUTOSPIN;                                              // gira SIEMPRE, también con una moneda seleccionada
+  var cyw=Math.cos(yaw),syw=Math.sin(yaw),cp=Math.cos(pit),sp=Math.sin(pit),
+      cx0=W/2,cy0=H/2+14,sS=S0*Math.min(1,W/680)*Math.min(1.25,H/440)*zoom,kS=sS/235;
+
+  // proyección + decaimiento de brillo y descanso
+  var fDecay=Math.pow(0.92,dt*60);
+  for(j=0;j<N.length;j++){
+    n=N[j];
+    var x1=n.x*cyw+n.z*syw,z1=-n.x*syw+n.z*cyw,y1=n.y*cp-z1*sp,z2=n.y*sp+z1*cp,sc=FOC/(FOC+z2);
+    n.X=cx0+x1*sc*sS;n.Y=cy0-y1*sc*sS;n.d=z2;n.k=sc;
+    n.f*=fDecay;if(n.ref>0)n.ref-=dt;
+  }
+
+  // sinapsis: olvido lento hacia el peso base
+  for(j=0;j<EW.length;j++){var w=EW[j];if(w>CFG.W_BASE)EW[j]=CFG.W_BASE+(w-CFG.W_BASE)*CFG.FORGET;}
+
+  /* —— fondo —— */
+  ctx.globalCompositeOperation='source-over';ctx.globalAlpha=1;
+  var bg=ctx.createRadialGradient(W/2,H/2,20,W/2,H/2,W*0.6);
+  bg.addColorStop(0,'#0a1222');bg.addColorStop(1,'#050914');
+  ctx.fillStyle=bg;ctx.fillRect(0,0,W,H);
+
+  /* —— sinapsis en lotes: 2 profundidades × 3 niveles de fuerza = 6 trazos en total —— */
+  ctx.lineWidth=0.7;
+  var pass,lv,lo,hi;
+  for(pass=0;pass<2;pass++){
+    for(lv=0;lv<3;lv++){
+      lo=lv===0?0:lv===1?0.36:0.62;hi=lv===0?0.36:lv===1?0.62:9;
+      ctx.beginPath();
+      for(j=0;j<E.length;j++){
+        e=E[j];A=N[e[0]];B=N[e[1]];
+        if(((A.d+B.d)>0)!==(pass===0))continue;
+        var ww=EW[j];if(ww<lo||ww>=hi)continue;
+        ctx.moveTo(A.X,A.Y);ctx.lineTo(B.X,B.Y);
+      }
+      var base=pass===0?0.08:0.2,boost=lv*0.16;
+      ctx.strokeStyle=lv===2?'rgba(150,205,255,'+(base+boost)+')':'rgba('+(pass===0?'70,115,170':'100,160,220')+','+(base+boost)+')';
+      ctx.lineWidth=lv===2?1.1:0.7;
+      ctx.stroke();
+    }
+  }
+  ctx.lineWidth=0.7;
+
+  /* —— neuronas apagadas (puntos) en 2 lotes —— */
+  for(pass=0;pass<2;pass++){
+    ctx.beginPath();
+    for(j=0;j<N.length;j++){
+      n=N[j];if(n.coin||(n.d>0)!==(pass===0))continue;
+      var r=(pass===0?0.8:1.4)*n.k*kS;ctx.moveTo(n.X+r,n.Y);ctx.arc(n.X,n.Y,r,0,6.2832);
+    }
+    ctx.fillStyle=pass===0?'rgba(120,165,215,0.35)':'rgba(150,195,240,0.7)';ctx.fill();
+  }
+
+  /* —— monedas en alta velocidad emiten señales naranjas con más energía —— */
+  hotT+=dt;
+  if(hotT>CFG.HOT_EVERY){hotT=0;CN.forEach(function(id){var nd=N[id];if(nd.coin.hot&&nd.nb.length)spawn(chooseEdge(id,-1),id,ORANGE,1.5);});}
+  if(Math.random()<M.rate)burst(1);                                    // actividad espontánea
+
+  /* —— señales: avanzan, aprenden y se propagan con pérdida de energía —— */
+  var act=0;
+  for(j=P.length-1;j>=0;j--){
+    p=P[j];p.t+=p.v*dt*60;
+    if(p.t>=1){
+      e=E[p.e];var to=p.dir>0?e[1]:e[0],from=p.dir>0?e[0]:e[1],tn=N[to];
+      // swap-remove (más rápido que splice)
+      P[j]=P[P.length-1];P.pop();
+      if(tn.ref>0)continue;                                            // neurona descansando: la señal se absorbe
+      tn.f=1;tn.c=p.c;tn.ref=CFG.REFRACT;
+      EW[p.e]=Math.min(1,EW[p.e]+CFG.LEARN);                           // aprendizaje: el camino usado se refuerza
+      var en=p.en*CFG.HOP_LOSS;
+      if(en>=CFG.MIN_ENERGY&&rnd()<M.act*Math.min(1,en+0.3)){
+        var kk=rnd()<0.4*en?2:1;
+        for(var q=0;q<kk;q++)spawn(chooseEdge(to,from),to,p.c,en);
+      }
+      continue;
+    }
+    e=E[p.e];A=N[p.dir>0?e[0]:e[1]];B=N[p.dir>0?e[1]:e[0]];
+    var tt=p.t,t0=Math.max(0,tt-0.28),
+        hx=A.X+(B.X-A.X)*tt,hy=A.Y+(B.Y-A.Y)*tt,tx=A.X+(B.X-A.X)*t0,ty=A.Y+(B.Y-A.Y)*t0,
+        kk2=(A.k+B.k)/2*kS,al=Math.min(0.9,0.25+p.en*0.5);
+    ctx.strokeStyle='rgba('+p.cs+','+(al*0.55)+')';                    // sin gradiente por señal: mucho más barato
+    ctx.lineWidth=Math.max(0.9,1.4*kk2);
+    ctx.beginPath();ctx.moveTo(tx,ty);ctx.lineTo(hx,hy);ctx.stroke();
+    ctx.fillStyle='rgba('+p.cs+','+al+')';
+    ctx.beginPath();ctx.arc(hx,hy,Math.max(1,1.7*kk2),0,6.2832);ctx.fill();
+  }
+
+  /* —— halos de neuronas encendidas (aditivo = luz suave) —— */
+  ctx.globalCompositeOperation='lighter';
+  for(j=0;j<N.length;j++){
+    n=N[j];if(n.f<0.04||!n.c)continue;if(n.f>0.25)act++;
+    var sz=(8+16*n.f)*n.k*kS;ctx.globalAlpha=Math.min(0.8,n.f);
+    ctx.drawImage(sprite(n.c),n.X-sz/2,n.Y-sz/2,sz,sz);
+  }
+  ctx.globalCompositeOperation='source-over';ctx.globalAlpha=1;
+
+  /* —— monedas (de atrás hacia adelante) —— */
+  var order=CN.slice().sort(function(m1,m2){return N[m2].d-N[m1].d;});
+  order.forEach(function(id){
+    var nd=N[id],cn=nd.coin,
+        a=Math.max(0.1,Math.min(1,0.6-nd.d*0.75)),
+        col=cn.hot?ORANGE:[150,190,235],
+        isSel=id===sel,isHov=id===hov,
+        rr=((cn.hot?3.6:2.6)+(isHov?0.8:0))*nd.k*kS;
+    ctx.globalAlpha=a;
+    ctx.fillStyle='rgba('+col.join()+',0.95)';ctx.beginPath();ctx.arc(nd.X,nd.Y,rr,0,6.2832);ctx.fill();
+    ctx.strokeStyle='rgba('+col.join()+',0.55)';ctx.lineWidth=1;
+    ctx.beginPath();ctx.arc(nd.X,nd.Y,rr+3.5*kS+(cn.hot&&!REDUCED?2*Math.sin(now/260):0),0,6.2832);ctx.stroke();
+    if(cn.p!=null){                                                    // arco = probabilidad de caída (si hay datos)
+      ctx.strokeStyle=cn.p>=0.6?'rgba(235,100,110,.95)':cn.p>=0.4?'rgba(235,185,100,.95)':'rgba(90,205,150,.95)';
+      ctx.lineWidth=2;ctx.beginPath();
+      ctx.arc(nd.X,nd.Y,rr+7*kS,-1.5708,-1.5708+6.2832*cn.p);ctx.stroke();
+    }
+    if(names||isSel||isHov){
+      var fs=Math.round(11+(isSel?2:0)+(cn.hot?1:0));
+      ctx.font=(cn.hot||isSel?'600 ':'400 ')+fs+'px system-ui,sans-serif';
+      ctx.lineWidth=3;ctx.strokeStyle='rgba(5,9,20,0.85)';ctx.strokeText(cn.n,nd.X,nd.Y-rr-9);
+      ctx.fillStyle=cn.hot?'#ffb066':(isSel?'#ffffff':'#b8cde8');ctx.fillText(cn.n,nd.X,nd.Y-rr-9);
+    }
+    if(isSel){ctx.globalAlpha=1;ctx.strokeStyle='rgba(255,255,255,0.8)';ctx.lineWidth=1;
+      ctx.beginPath();ctx.arc(nd.X,nd.Y,rr+11*kS,0,6.2832);ctx.stroke();}
+  });
+  ctx.globalAlpha=1;
+
+  /* —— HUD (se actualiza cada 10 frames para no tocar el DOM en cada uno) —— */
+  if(fr%10===0){
+    var extra='';
+    if(sel>=0){var c2=N[sel].coin;
+      extra='<br><b style="color:'+(c2.hot?'#ffb066':'#e6edf7')+'">'+c2.n+'</b> '+(c2.hot?'en alta velocidad':'sin alerta')+
+            ' · '+N[sel].nb.length+' conexiones'+(c2.p!=null?' · caída '+Math.round(c2.p*100)+'%':'');}
+    hud.innerHTML='Neuronas activas <b>'+act+'</b> · señales <b>'+P.length+'</b>'+extra;
+  }
+  requestAnimationFrame(frame);
+}
+requestAnimationFrame(frame);
+
+/* ═══════════════ 11 · API PARA DATOS REALES ═══════════════
+   Conéctalo a tu sistema principal sin tocar este archivo:
+
+     CerebroNeuronal.setCoins([
+       {n:'BTC',  hot:false, p:0.31},    // p = probabilidad de caída 0..1 (opcional)
+       {n:'OP',   hot:true,  p:0.74},
+       ...
+     ]);
+     CerebroNeuronal.fire('OP');          // dispara una moneda (p. ej. al llegar una alerta)
+     CerebroNeuronal.setMode('bajista');  // 'calma' | 'alcista' | 'bajista'
+
+   También escucha el evento:  window.dispatchEvent(new CustomEvent('cdc-coins',{detail:[...]}))
+*/
+function setCoins(list){
+  if(!Array.isArray(list))return;
+  var sorted=list.filter(function(c){return c&&c.n;}).slice().sort(function(a,b){        // las "hot" ocupan los primeros lugares
+    return (b.hot?1:0)-(a.hot?1:0)||(b.p||0)-(a.p||0);});
+  CN.forEach(function(id,idx){
+    var c=sorted[idx];if(!c){return;}
+    N[id].coin={n:String(c.n).toUpperCase().replace(/USDT$/,''),hot:!!c.hot,p:c.p==null?null:clamp(+c.p,0,1)};
+  });
+  if(sel>=0&&!N[sel].coin)sel=-1;
+}
+function fireByName(name){
+  name=String(name).toUpperCase().replace(/USDT$/,'');
+  for(var q=0;q<CN.length;q++){
+    var n=N[CN[q]];
+    if(n.coin.n===name){var col=n.coin.hot?ORANGE:MODES[mode].cols[0];n.f=1;n.c=col;n.ref=0;
+      n.nb.forEach(function(ei){spawn(ei,CN[q],col,1.4);});return true;}
+  }
+  return false;
+}
+window.CerebroNeuronal={setCoins:setCoins,fire:fireByName,setMode:function(m){if(MODES[m])setMode(m);},
+  stats:function(){return{neuronas:N.length,sinapsis:E.length,señales:P.length,monedas:CN.length};}};
+window.addEventListener('cdc-coins',function(ev){setCoins(ev.detail);});
+})();
+</script>
+</body>
+</html>
