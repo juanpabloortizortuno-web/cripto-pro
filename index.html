@@ -17633,7 +17633,7 @@ setTimeout(function(){setInterval(tick,CFG.TICK_MS);},CFG.ARRANQUE_MS);
     // archivo completo sin caer en la paradoja de "el hash contiene su
     // propio hash". No cambiar este texto.
     var _PLACEHOLDER = "%%CDC_INTEGRITY_HASH%%";
-    var _HASH_ESPERADO = "13fc7215a2dada5a0093de1f4f9df5ecc2980917575194f5bdb6075001c408b8"; // ← se reemplaza por el hash real en el paso final
+    var _HASH_ESPERADO = "1e19a4085904f357b19e533e1acff318f52d10a85218729c2c0dcd7af074a4bb"; // ← se reemplaza por el hash real en el paso final
 
     function _bloquear(motivo) {
         try {
@@ -18736,4 +18736,126 @@ if('serviceWorker' in navigator && (location.protocol==='https:'||location.hostn
   setInterval(tick,3000); setTimeout(tick,1500);
 })();
 </script>
+<script>
+/* ═══════════════════════════════════════════════════════════════════
+   CDC-BAJO1 · MONEDAS < 1 USDT CON EXPLOSIÓN
+   Autor del sistema: Juan Pablo Ortiz Ortuño · CDC FUTURO-PRO
+   ───────────────────────────────────────────────────────────────────
+   Qué hace:
+   1) Busca EN VIVO (sobre los datos que ya baja el CDC de Binance Futuros)
+      todas las monedas que cuestan MENOS de 1 USDT y se están moviendo fuerte:
+      rango 24h alto, pegadas al techo y subiendo ahora mismo (explosión).
+   2) Les da PRIORIDAD en el cerebro neuronal: se enganchan a CDC_VEL.es(),
+      que el cerebro, el puntaje y el ordenamiento ya consultan.
+   3) Muestra un cartel CLARO sobre el panel central con la #1 y las siguientes.
+   4) Carga sola la #1 en el panel central cuando aparece una explosión nueva.
+   Ajustes: CDC_BAJO1.cfg.X = valor · Apagar: CDC_BAJO1.cfg.ON = false
+   Probar: CDC_BAJO1.probar('DOSUSDT') en la consola.
+   ═══════════════════════════════════════════════════════════════════ */
+(function(){"use strict";
+var CFG={ON:true,PRECIO_MAX:1,VOL_MIN:1000000,RANGO_MIN:8,SCORE_MIN:45,POS_MIN:70,
+ TICK_MS:5000,ARRANQUE_MS:20000,TOP:5,GRACIA_MS:30000,
+ PANEL_AUTO:true,PANEL_DWELL_MS:60000,COOLDOWN_MS:180000,SONIDO:true};
+var CACHE={},ACTIVAS={},ALERTADAS={},AC=null,LASTLOAD=0,LASTSYM=null,FLASH=0;
+function num(v){v=+v;return isFinite(v)?v:0;}
+function dataC(){try{return cachedData;}catch(e){return null;}}
+function evaluar(sym){
+ var no={activo:false,score:0,razones:[],rango:0,pos:0,price:0,ch:0};
+ try{
+  var C=dataC(),c=C&&C[sym];
+  if(!c||!(c.price>0)||c.price>=CFG.PRECIO_MAX)return no;
+  var rango=num(c.rangoPct24h),pos=Math.max(num(c.posicionPorcentaje),num(c.posicionExtendida)),
+      c2=num(c.cambioReal2Min),vp=num(c.velPromedio),vi=num(c.velocidad),cs=num(c.ciclosSubiendo),
+      ch=num(c.change),vol=num(c.volume),s=0,R=[];
+  if(rango>=60)s+=35;else if(rango>=40)s+=30;else if(rango>=25)s+=24;else if(rango>=15)s+=16;else if(rango>=CFG.RANGO_MIN)s+=8;
+  if(rango>=CFG.RANGO_MIN)R.push('rango 24h '+rango.toFixed(0)+'%');
+  if(pos>=98)s+=20;else if(pos>=90)s+=16;else if(pos>=80)s+=12;else if(pos>=CFG.POS_MIN)s+=7;
+  if(pos>=CFG.POS_MIN)R.push('al '+pos.toFixed(0)+'% del techo');
+  if(c2>=1)s+=25;else if(c2>=0.6)s+=20;else if(c2>=0.3)s+=14;else if(c2>=0.15)s+=8;
+  if(c2>=0.15)R.push('+'+c2.toFixed(2)+'% en 2 min');
+  if(vp>=0.03)s+=6;else if(vp>=0.015)s+=3;
+  if(cs>=4)s+=5;else if(cs>=3)s+=3;
+  if(cs>=3)R.push(cs+'/5 ciclos subiendo');
+  if(ch>=30)s+=10;else if(ch>=15)s+=7;else if(ch>=5)s+=4;
+  if(ch>=5)R.push('+'+ch.toFixed(1)+'% en 24h');
+  s=Math.min(100,Math.round(s));
+  /* EXPLOSIÓN: sube AHORA (nunca una que cae), pegada al techo, con rango y volumen reales */
+  var sube=(c2>=0.15&&(vp>0||vi>0)&&cs>=2);
+  return{activo:(sube&&pos>=CFG.POS_MIN&&rango>=CFG.RANGO_MIN&&vol>=CFG.VOL_MIN&&s>=CFG.SCORE_MIN),
+   score:s,razones:R,rango:rango,pos:pos,price:c.price,ch:ch};
+ }catch(e){return no;}
+}
+function es(sym){var t=Date.now(),k=CACHE[sym];if(k&&t-k.t<2000)return k.r.activo;var r=evaluar(sym);CACHE[sym]={t:t,r:r};return r.activo;}
+function ranking(){
+ return Object.keys(ACTIVAS).map(function(k){return{s:k,r:ACTIVAS[k]};})
+  .sort(function(a,b){return (b.r.score-a.r.score)||((b.r.pos||0)-(a.r.pos||0));});
+}
+function fmt(p){return p<0.01?p.toFixed(6):p<0.1?p.toFixed(5):p.toFixed(4);}
+function css(){if(document.getElementById('cdcB1Css'))return;var st=document.createElement('style');st.id='cdcB1Css';
+ st.textContent='@keyframes cdcB1P{from{box-shadow:0 0 10px #ff2a3b99,0 0 22px #f3ba2f66}to{box-shadow:0 0 24px #ff2a3b,0 0 44px #f3ba2f}}';
+ document.head.appendChild(st);}
+function pintar(){
+ try{
+  var dv=document.getElementById('detailView');if(!dv||!dv.parentNode)return;
+  css();
+  var el=document.getElementById('cdcB1');
+  if(!el){el=document.createElement('div');el.id='cdcB1';el.style.cssText='width:100%;box-sizing:border-box;margin-bottom:10px;';dv.parentNode.insertBefore(el,dv);}
+  var L=ranking();
+  if(!L.length){el.style.display='none';el.innerHTML='';return;}
+  el.style.display='block';
+  var m=L[0],r=m.r,nm=m.s.replace(/USDT$/,'');
+  var h='<div onclick="CDC_BAJO1.abrir(\''+m.s+'\')" title="Clic para abrir en el panel" style="cursor:pointer;text-align:center;padding:12px 14px;border-radius:14px;border:2px solid #f3ba2f;'
+   +'background:linear-gradient(90deg,rgba(255,42,59,0.20),rgba(243,186,47,0.20));animation:cdcB1P 0.8s ease-in-out infinite alternate;">'
+   +'<div style="font:900 11px Arial;color:#f3ba2f;letter-spacing:1px">💥 EXPLOSIÓN · MONEDA BAJO 1 USDT · PRIORIDAD DEL CEREBRO</div>'
+   +'<div style="font:900 22px Arial;color:#fff;margin:3px 0"><b>'+nm+'</b> ▲ <span style="color:#0ecb81">$'+fmt(r.price)+'</span> · puntaje '+r.score+'/100'+(r.gracia?' ⏳':'')+'</div>'
+   +'<div style="font:700 11px Arial;color:#cbd5e1">'+r.razones.join(' · ')+'</div></div>';
+  if(L.length>1){h+='<div style="display:flex;gap:6px;flex-wrap:wrap;justify-content:center;margin-top:6px">';
+   L.slice(1,CFG.TOP).forEach(function(o){
+    h+='<span onclick="CDC_BAJO1.abrir(\''+o.s+'\')" title="'+o.r.razones.join(' · ')+'" style="cursor:pointer;background:#060b16;border:1px solid #f3ba2f99;border-radius:8px;padding:3px 10px;font:700 11px Arial;color:#fff">'
+     +'<b>'+o.s.replace(/USDT$/,'')+'</b> ▲ <span style="color:#f3ba2f">'+o.r.score+'</span> · <span style="color:#0ecb81">$'+fmt(o.r.price)+'</span></span>';});
+   h+='</div>';}
+  el.innerHTML=h;
+ }catch(e){}
+}
+function pitido(){if(!CFG.SONIDO)return;try{var A=window.AudioContext||window.webkitAudioContext;if(!A)return;if(!AC)AC=new A();if(AC.state==='suspended')AC.resume();
+ [660,990,1320].forEach(function(f,i){var o=AC.createOscillator(),g=AC.createGain(),t=AC.currentTime+i*0.14;o.type='triangle';o.frequency.value=f;
+  g.gain.setValueAtTime(0.0001,t);g.gain.exponentialRampToValueAtTime(0.12,t+0.02);g.gain.exponentialRampToValueAtTime(0.0001,t+0.12);
+  o.connect(g);g.connect(AC.destination);o.start(t);o.stop(t+0.13);});}catch(e){}}
+function cargar(sym){
+ try{
+  if(!CFG.PANEL_AUTO||typeof seleccionarMoneda!=='function')return;
+  var cur=null;try{cur=selectedCoin;}catch(e){}
+  if(cur===sym)return;
+  var now=Date.now();
+  /* si el panel ya muestra otra explosión <1 igual o mejor, no la saca; y respeta el tiempo mínimo */
+  if(cur&&ACTIVAS[cur]&&ACTIVAS[cur].score>=ACTIVAS[sym].score)return;
+  if(now-LASTLOAD<CFG.PANEL_DWELL_MS)return;
+  LASTLOAD=now;seleccionarMoneda(sym);
+ }catch(e){}
+}
+function tick(){
+ if(!CFG.ON)return;var C=dataC();if(!C)return;
+ var now=Date.now(),act={},mejor=null;
+ for(var s in C){var r=evaluar(s);CACHE[s]={t:now,r:r};if(!r.activo)continue;r.ts=now;act[s]=r;
+  if(now-(ALERTADAS[s]||0)<CFG.COOLDOWN_MS)continue;
+  if(!mejor||r.score>mejor.r.score)mejor={s:s,r:r};}
+ for(var g in ACTIVAS){var o=ACTIVAS[g];if(!act[g]&&o.ts&&now-o.ts<CFG.GRACIA_MS){o.gracia=true;act[g]=o;}}
+ ACTIVAS=act;pintar();
+ if(mejor){ALERTADAS[mejor.s]=now;pitido();cargar(mejor.s);}
+}
+/* ── PRIORIDAD EN EL CEREBRO: engancha CDC_VEL.es (lo usan el cerebro, el puntaje y los ordenamientos) ── */
+function enganchar(){
+ try{var V=window.CDC_VEL;if(!V||typeof V.es!=='function'||V.es.__b1)return false;
+  var o=V.es;var w=function(sym){return o(sym)||es(sym);};w.__b1=1;V.es=w;return true;}catch(e){return false;}
+}
+var _n=0,_iv=setInterval(function(){if(enganchar()||++_n>30)clearInterval(_iv);},1000);
+window.CDC_BAJO1={version:'1',cfg:CFG,es:es,evaluar:evaluar,
+ lista:function(){return ranking().map(function(o){return{sym:o.s,score:o.r.score,precio:o.r.price,razones:o.r.razones};});},
+ abrir:function(s){try{if(typeof seleccionarMoneda==='function')seleccionarMoneda(s);}catch(e){}},
+ probar:function(sym){sym=String(sym||'').toUpperCase();var r=evaluar(sym);if(!r.price)return console.warn('CDC-BAJO1: '+sym+' no está en cachedData o vale 1 USDT o más');
+  r.activo=true;r.ts=Date.now();ACTIVAS[sym]=r;pintar();pitido();}};
+setTimeout(function(){setInterval(tick,CFG.TICK_MS);},CFG.ARRANQUE_MS);
+})();
+</script>
+
 </body></html>
