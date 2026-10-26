@@ -17651,7 +17651,7 @@ setTimeout(function(){setInterval(tick,CFG.TICK_MS);},CFG.ARRANQUE_MS);
     // archivo completo sin caer en la paradoja de "el hash contiene su
     // propio hash". No cambiar este texto.
     var _PLACEHOLDER = "%%CDC_INTEGRITY_HASH%%";
-    var _HASH_ESPERADO = "0b0a4a006d2791c52a6a98e788e409ac31a29ccb8594cf5e344e3f3deef57c70"; // ← se reemplaza por el hash real en el paso final
+    var _HASH_ESPERADO = "635f0cd4bd1c8d6f8afeb776f7e55fd60b2ee6272df2b2d89689be82b31b977e"; // ← se reemplaza por el hash real en el paso final
 
     function _bloquear(motivo) {
         try {
@@ -18884,11 +18884,11 @@ setTimeout(function(){setInterval(tick,CFG.TICK_MS);},CFG.ARRANQUE_MS);
    Las alertas fuertes abren el panel central y todas entran a la lista de 24h. ═══ */
 (function () {
     "use strict";
-    var CFG = { TICK_MS: 6000, RT_DD_MIN: 1.5, RT_DD_MAX: 6, RT_RUN_MIN: 1.5, RT_VOL_MIN: 3, RT_RED_MIN: 1.0, RT_AUTO: true, RT_MIN: 40, RT_RESERVA_MS: 90000, VELAS: 180, EXCL: 6, BASE_RANGO_MAX: 6, VOL_RATIO_MIN: 5, GAIN3_MIN: 1.0, RAP_GAIN5_MIN: 2.5, RAP_VOL_MIN: 3,
+    var CFG = { TICK_MS: 6000, RT_DD_MIN: 1.5, RT_DD_MAX: 6, RT_RUN_MIN: 1.5, RT_VOL_MIN: 3, RT_RED_MIN: 1.0, RT_AUTO: true, CA_CAMBIO_MIN: 30, CA_DD_MIN: 6, CA_DD_MAX: 30, CA_VOLAT_MIN: 0.7, CA_RED_MIN: 1.5, CA_RAPIDA: 5, CA_AUTO: true, RT_MIN: 40, RT_RESERVA_MS: 90000, VELAS: 180, EXCL: 6, BASE_RANGO_MAX: 6, VOL_RATIO_MIN: 5, GAIN3_MIN: 1.0, RAP_GAIN5_MIN: 2.5, RAP_VOL_MIN: 3,
         DROP3: 2.0, DROP5: 3.0, DROP_VOL: 3, BRUTAL5: 5, BRUTAL_MAX30: 8, TARDE_PCT: 15, LIQ_MIN: 300000, MAX_CAND: 16, CACHE_MS: 15000,
         VIDA_MS: 10 * 60 * 1000, AUTO_MIN_SCORE: 60, AUTO_ABRIR: false, CAIDA_ABRIR: true, ESPACIO_AUTO_MS: 20000, SONIDO: true, BOTON: true, UP: 1.5, DN: 1.5, MAX_MIN: 20 };
     var ACT = {}, CK = {}, AV = {}, PEND = [], ultAbierta = null, ultAutoTs = 0, ultRt = null, ultRtTs = 0, ultAviso = {}, abierto = false, busy = false, KEY = "cdc_despertar_net";
-    var ICONO = { DESPERTAR: "🚀", RAPIDA: "⚡", DESMAYO: "🔻", CAIDA_BRUTAL: "💥", RETROCESO: "🎯" };
+    var ICONO = { DESPERTAR: "🚀", RAPIDA: "⚡", DESMAYO: "🔻", CAIDA_BRUTAL: "💥", RETROCESO: "🎯", CAIDA_ALCISTA: "🌋" };
     function med(a) { var s = 0; for (var i = 0; i < a.length; i++) s += a[i]; return a.length ? s / a.length : 0; }
     function sma(a, n) { return a.length >= n ? med(a.slice(-n)) : null; }
     function cl(v, a, b) { return Math.max(a, Math.min(b, +v || 0)); }
@@ -18900,7 +18900,7 @@ setTimeout(function(){setInterval(tick,CFG.TICK_MS);},CFG.ARRANQUE_MS);
         if (!N) { var W1 = [], W2 = []; for (j = 0; j < NH; j++) { W1.push([]); for (i = 0; i < NI; i++) W1[j].push(rnd() * 0.6); W2.push(rnd() * 0.4); }
             N = { W1: W1, b1: new Array(NH).fill(0), W2: W2, b2: 0, n: 0, ok: 0 }; }
         N.key = key; return N; }
-    var NET = mkNet(KEY), NETD = mkNet(KEY + "_dn"), NETR = mkNet(KEY + "_rt");
+    var NET = mkNet(KEY), NETD = mkNet(KEY + "_dn"), NETR = mkNet(KEY + "_rt"), NETB = mkNet(KEY + "_ca");
     function fwd(x, N) { var h = [], z = N.b2, j, i; for (j = 0; j < NH; j++) { var a = N.b1[j]; for (i = 0; i < NI; i++) a += N.W1[j][i] * x[i]; h.push(Math.tanh(a)); z += N.W2[j] * h[j]; }
         return { h: h, p: 1 / (1 + Math.exp(-z)) }; }
     function aprender(x, y, N) { for (var ep = 0; ep < 3; ep++) { var f = fwd(x, N), d = f.p - y, lr = 0.06, j, i;
@@ -18938,6 +18938,36 @@ setTimeout(function(){setInterval(tick,CFG.TICK_MS);},CFG.ARRANQUE_MS);
                  g3: (p - C[n - 4]) / C[n - 4] * 100, g5: (p - C[n - 6]) / C[n - 6] * 100, cmax: dd, sob: 0, tarde: false, sl: sl, riesgo: (p - sl) / p * 100, c24: c.change, x: x, ts: Date.now() };
     }
 
+    /* ── 🌋 CAÍDA BRUTAL EN ALCISTA: subió altísimo, cae fuerte y notorio, pero la estructura sigue alcista y la moneda es muy volátil ── */
+    function caidaAlcista(k, c, sym) {
+        var n = k.length, i; if (n < 120 || !c) return null;
+        var ch = c.change || 0; if (ch < CFG.CA_CAMBIO_MIN) return null;                                        // subió altísimo en el día
+        var O = k.map(function (x) { return +x[1]; }), Hh = k.map(function (x) { return +x[2]; }), Ll = k.map(function (x) { return +x[3]; }),
+            C = k.map(function (x) { return +x[4]; }), V = k.map(function (x) { return +x[7]; });
+        var ip = n - 60; for (i = n - 60; i < n; i++) if (Hh[i] > Hh[ip]) ip = i;
+        var peak = Hh[ip], p = C[n - 1];
+        if (ip >= n - 1 || !(c.high && peak >= c.high * 0.99)) return null;                                      // el pico es su máximo de 24h
+        var dd = (peak - p) / peak * 100; if (dd < CFG.CA_DD_MIN || dd > CFG.CA_DD_MAX) return null;           // caída notoria
+        var vol = 0; for (i = n - 30; i < n; i++) vol += (Hh[i] - Ll[i]) / C[i] * 100; vol /= 30;
+        if (vol < CFG.CA_VOLAT_MIN) return null;                                                                 // bien volátil
+        var rb = 0, ri = -1, b; for (i = ip; i < n; i++) { b = (O[i] - C[i]) / O[i] * 100; if (b > rb) { rb = b; ri = i; } }
+        var mx10 = Math.max.apply(null, Hh.slice(n - 10)), dd10 = (mx10 - p) / mx10 * 100;   // o una caída rápida repartida en varias velas
+        if (ri < 0 || (rb < CFG.CA_RED_MIN && dd10 < CFG.CA_RAPIDA)) return null;                                                          // vela roja grande
+        var e25 = ema(C, 25)[n - 1], e99 = ema(C, 99)[n - 1];
+        if (!(e25 > e99 && p > e99)) return null;                                                                // sigue alcista
+        var vb = med(V.slice(0, n - 40)), vr = vb > 0 ? Math.max.apply(null, V.slice(ip, n)) / vb : 0;
+        var verde = ri < n - 1 && C[n - 1] > O[n - 1] && C[n - 1] > C[n - 2], seco = ri < n - 2 && V[n - 2] < V[ri] * 0.5, estado = (verde || seco) ? "FRENANDO" : "CAYENDO";
+        var spread = (e25 - e99) / e99 * 100;
+        var reglas = Math.min(ch, 100) / 100 * 20 + Math.min(dd, 15) / 15 * 20 + Math.min(vol, 3) / 3 * 15 + Math.min(rb, 6) / 6 * 15 + Math.min(vr, 15) / 15 * 10 + cl(spread, 0, 5) / 5 * 10 + (estado === "FRENANDO" ? 10 : 0);
+        var x = [Math.min(Math.log(Math.max(vr, 1)), 3.5) / 3.5, Math.min(ch, 100) / 100, Math.min(dd, 30) / 30, Math.min(rb, 6) / 6, Math.min(vol, 3) / 3, cl(spread, 0, 5) / 5, cl(c.cambioReal2Min, -3, 3) / 3, estado === "FRENANDO" ? 1 : 0];
+        var w = Math.min(0.6, NETB.n / 150), pn = fwd(x, NETB).p * 100, sc = reglas * (1 - w) + pn * w, cerebro = null, nn = null;
+        try { nn = window.CDC_NEURO && CDC_NEURO.panel ? CDC_NEURO.panel(sym) : null; } catch (e) {}
+        if (nn && nn.valida) { if (nn.sube != null) { sc = sc * 0.8 + nn.sube * 0.2; cerebro = nn.sube; } if (nn.p >= 80) sc -= 10; }
+        sc = Math.round(cl(sc, 0, 100)); var sl = Math.min.apply(null, Ll.slice(n - 5)) * 0.99;
+        return { symbol: sym, tipo: "CAIDA_ALCISTA", estado: estado, dir: 1, price: p, score: sc, reglas: Math.round(reglas), red: Math.round(pn), cerebro: cerebro, vr: vr, rb: rb, vola: vol,
+                 g3: (p - C[n - 4]) / C[n - 4] * 100, g5: (p - C[n - 6]) / C[n - 6] * 100, cmax: dd, sob: 0, tarde: false, sl: sl, riesgo: (p - sl) / p * 100, c24: ch, x: x, ts: Date.now() };
+    }
+
     /* ── Evaluación con velas de 1 minuto ── */
     function evaluar(sym, k, c) {
         if (!k || k.length < 60) return null;
@@ -18951,7 +18981,7 @@ setTimeout(function(){setInterval(tick,CFG.TICK_MS);},CFG.ARRANQUE_MS);
         var m7 = sma(cie, 7), m25 = sma(cie, 25), m7p = sma(cie.slice(0, -2), 7), okm = m7 !== null && m25 !== null && m7p !== null;
         var medias = okm && m7 > m25 && m7 > m7p, mBaj = okm && m7 < m25 && m7 < m7p;
         var mx30 = Math.max.apply(null, k.slice(-30).map(function (x) { return +x[2]; })), cmax = (mx30 - p) / mx30 * 100;
-        var rt = retroceso(k, c, sym); if (rt) return rt;   // 🎯 prioridad 1
+        var rt = retroceso(k, c, sym) || caidaAlcista(k, c, sym); if (rt) return rt;   // 🎯 prioridad 1
         var tipo = null;
         if (g5 <= -CFG.BRUTAL5 || (cmax >= CFG.BRUTAL_MAX30 && g3 <= -CFG.DROP3)) tipo = "CAIDA_BRUTAL";
         else if ((g3 <= -CFG.DROP3 && vr >= CFG.DROP_VOL) || (g5 <= -CFG.DROP5 && vr >= 2)) tipo = "DESMAYO";
@@ -18991,21 +19021,21 @@ setTimeout(function(){setInterval(tick,CFG.TICK_MS);},CFG.ARRANQUE_MS);
             var r = (c.price - q.p0) / q.p0 * 100, fin = null, old = now - q.t > CFG.MAX_MIN * 60000; q.hi = Math.max(q.hi, r); q.lo = Math.min(q.lo, r);
             if (q.d < 0) { if (q.lo <= -CFG.UP) fin = 1; else if (q.hi >= CFG.DN) fin = 0; else if (old) fin = r < -0.5 ? 1 : 0; }   // 1 = siguió cayendo
             else { if (q.hi >= CFG.UP) fin = 1; else if (q.lo <= -CFG.DN) fin = 0; else if (old) fin = r > 0.5 ? 1 : 0; }              // 1 = siguió subiendo
-            if (fin === null) vivos.push(q); else aprender(q.x, fin, q.d < 0 ? NETD : (q.rt ? NETR : NET)); });
+            if (fin === null) vivos.push(q); else aprender(q.x, fin, q.d < 0 ? NETD : (q.ca ? NETB : q.rt ? NETR : NET)); });
         PEND = vivos; }
 
-    function aprueba(sym) { var r = ACT[sym]; return !!(r && r.score >= CFG.AUTO_MIN_SCORE && !r.tarde && (r.tipo === "DESPERTAR" || (CFG.CAIDA_ABRIR && r.dir < 0) || (r.tipo === "RETROCESO" && r.estado === "IMPULSO" && r.score >= CFG.RT_MIN))); }
-    function prioridad(sym) { var r = ACT[sym]; return r ? 1000 + r.score + (r.tipo === "RETROCESO" ? 1000 + (r.estado === "IMPULSO" ? 200 : 0) : r.tipo === "DESPERTAR" ? 100 : r.dir < 0 ? 90 : 0) : 0; }
+    function aprueba(sym) { var r = ACT[sym]; return !!(r && r.score >= CFG.AUTO_MIN_SCORE && !r.tarde && (r.tipo === "DESPERTAR" || (CFG.CAIDA_ABRIR && r.dir < 0) || (r.tipo === "RETROCESO" && r.estado === "IMPULSO" && r.score >= CFG.RT_MIN) || (CFG.CA_AUTO && r.tipo === "CAIDA_ALCISTA" && r.score >= CFG.RT_MIN))); }
+    function prioridad(sym) { var r = ACT[sym]; return r ? 1000 + r.score + (r.tipo === "RETROCESO" ? 1000 + (r.estado === "IMPULSO" ? 200 : 0) : r.tipo === "CAIDA_ALCISTA" ? 800 : r.tipo === "DESPERTAR" ? 100 : r.dir < 0 ? 90 : 0) : 0; }
 
     function autoAbrir() {
         if (typeof seleccionarMoneda !== "function") return;
         var now = Date.now(), S = typeof selectedCoin !== "undefined" ? selectedCoin : null, rs = S && ACT[S];
         if (rs && rs.dir < 0 && now - (ultAviso[S] || 0) > 120000) { ultAviso[S] = now; beep(true); try { hablar("Moneda con desmayo, " + S.replace("USDT", "") + ", cuidado", true, { sym: S, dir: "SHORT" }); } catch (e) {} }
         if (CFG.RT_AUTO) {   // 🎯 RETROCESO CON IMPULSO: siempre abre solo, prioridad número 1
-            var rt = Object.values(ACT).filter(function (r) { return r.tipo === "RETROCESO" && r.estado === "IMPULSO" && r.score >= CFG.RT_MIN; }).sort(function (a, b) { return b.score - a.score; })[0];
+            var rt = Object.values(ACT).filter(function (r) { return ((r.tipo === "RETROCESO" && r.estado === "IMPULSO") || (CFG.CA_AUTO && r.tipo === "CAIDA_ALCISTA")) && r.score >= CFG.RT_MIN; }).sort(function (a, b) { return prioridad(b.symbol) - prioridad(a.symbol); })[0];
             if (!rt) ultRt = null;
             else if (rt.symbol !== S && rt.symbol !== ultRt) { var manual = false; try { manual = now - _ultimaSeleccionManualTs < 15000; } catch (e) {}
-                if (!manual) { seleccionarMoneda(rt.symbol, true, "RETROCESO"); if (selectedCoin === rt.symbol) { ultRt = rt.symbol; ultRtTs = now; ultAbierta = rt.symbol; ultAutoTs = now; anunciar(rt); } } }
+                if (!manual) { seleccionarMoneda(rt.symbol, true, rt.tipo); if (selectedCoin === rt.symbol) { ultRt = rt.symbol; ultRtTs = now; ultAbierta = rt.symbol; ultAutoTs = now; anunciar(rt); } } }
             if (ultRtTs && now - ultRtTs < CFG.RT_RESERVA_MS) return; }
         if (!CFG.AUTO_ABRIR || now - ultAutoTs < CFG.ESPACIO_AUTO_MS) return;
         var m = Object.values(ACT).filter(function (r) { return aprueba(r.symbol); }).sort(function (a, b) { return prioridad(b.symbol) - prioridad(a.symbol); })[0];
@@ -19020,11 +19050,11 @@ setTimeout(function(){setInterval(tick,CFG.TICK_MS);},CFG.ARRANQUE_MS);
         try {
             if (typeof cachedData === "undefined" || typeof obtenerKlines !== "function") return;
             resolver();
-            var lista = Object.values(cachedData).filter(function (c) { return c && c.volume >= CFG.LIQ_MIN && (c.cambioReal2Min >= 0.3 || c.ciclosSubiendo >= 3 || c.cambioReal2Min <= -0.5 || c.ciclosBajando >= 3 || (c.posicionPorcentaje >= 85 && Math.abs(c.cambioReal2Min || 0) >= 0.2)); })
+            var lista = Object.values(cachedData).filter(function (c) { return c && c.volume >= CFG.LIQ_MIN && (c.cambioReal2Min >= 0.3 || c.ciclosSubiendo >= 3 || c.cambioReal2Min <= -0.5 || c.ciclosBajando >= 3 || (c.posicionPorcentaje >= 85 && Math.abs(c.cambioReal2Min || 0) >= 0.2) || (c.change >= CFG.CA_CAMBIO_MIN && (c.cambioReal2Min || 0) <= -0.2)); })
                 .sort(function (a, b) { return Math.abs(b.cambioReal2Min || 0) - Math.abs(a.cambioReal2Min || 0); }).slice(0, CFG.MAX_CAND), nuevo = false;
             for (var i = 0; i < lista.length; i++) { var c = lista[i], r = evaluar(c.symbol, await klines(c.symbol), c);
                 if (r) { var prev = ACT[c.symbol];
-                    if (!prev || prev.tipo !== r.tipo || prev.estado !== r.estado) { nuevo = true; PEND.push({ s: c.symbol, p0: r.price, t: Date.now(), hi: 0, lo: 0, x: r.x, d: r.dir, rt: r.tipo === "RETROCESO" });
+                    if (!prev || prev.tipo !== r.tipo || prev.estado !== r.estado) { nuevo = true; PEND.push({ s: c.symbol, p0: r.price, t: Date.now(), hi: 0, lo: 0, x: r.x, d: r.dir, rt: r.tipo === "RETROCESO", ca: r.tipo === "CAIDA_ALCISTA" });
                         var ak = c.symbol + (r.tipo === "RETROCESO" ? "_rt" : ""), anun = r.tipo !== "RETROCESO" || r.estado === "IMPULSO";
                         if (anun && Date.now() - (AV[ak] || 0) > CFG.VIDA_MS) { AV[ak] = Date.now(); if (r.tipo !== "RAPIDA") beep(r.dir < 0); anunciar(r); } }
                     ACT[c.symbol] = r; } }
@@ -19037,17 +19067,17 @@ setTimeout(function(){setInterval(tick,CFG.TICK_MS);},CFG.ARRANQUE_MS);
     /* ── Aviso por voz: "Moneda acelerada" / "Moneda con desmayo" ── */
     var ultVoz = 0;
     function anunciar(r) { var now = Date.now(); if (now - ultVoz < 8000) return; ultVoz = now;
-        try { hablar((r.tipo === "RETROCESO" ? "Retroceso con impulso, " : r.dir < 0 ? "Moneda con desmayo, " : "Moneda acelerada, ") + r.symbol.replace("USDT", ""), true, { sym: r.symbol, dir: r.dir < 0 ? "SHORT" : "LONG" }); } catch (e) {} }
+        try { hablar((r.tipo === "RETROCESO" ? "Retroceso con impulso, " : r.tipo === "CAIDA_ALCISTA" ? "Caída brutal en alcista, " : r.dir < 0 ? "Moneda con desmayo, " : "Moneda acelerada, ") + r.symbol.replace("USDT", ""), true, { sym: r.symbol, dir: r.dir < 0 ? "SHORT" : "LONG" }); } catch (e) {} }
 
     /* ── UI: barrita en el ENCABEZADO, en el espacio libre entre el logo y TikTok ── */
     function ui() { if (document.getElementById("dspHead")) return;
         var st = document.createElement("style");
         st.textContent = "#dspHead{position:relative;flex:1 1 auto;min-width:0;max-width:430px;margin:0 14px;display:flex;align-items:center;justify-content:center}" +
             "#dspPill{width:100%;box-sizing:border-box;height:36px;display:flex;align-items:center;justify-content:space-between;gap:10px;padding:0 12px;border-radius:10px;background:#090f1c;border:1px solid rgba(14,203,129,.4);color:#94a3b8;font:700 11px Inter,Arial,sans-serif;cursor:pointer;overflow:hidden;white-space:nowrap}" +
-            "#dspPill.alza{border-color:#0ecb81;color:#fff;box-shadow:0 0 12px rgba(14,203,129,.35)}#dspPill.baja{border-color:#ff2a3b;color:#fff;box-shadow:0 0 12px rgba(255,42,59,.4)}" +
+            "#dspPill.alza{border-color:#0ecb81;color:#fff;box-shadow:0 0 12px rgba(14,203,129,.35)}#dspPill.mixta{border-color:#f3ba2f;color:#fff;box-shadow:0 0 12px rgba(243,186,47,.4)}#dspPill.baja{border-color:#ff2a3b;color:#fff;box-shadow:0 0 12px rgba(255,42,59,.4)}" +
             "#dspTxt{overflow:hidden;text-overflow:ellipsis;min-width:0}#dspCnt{flex-shrink:0;font-weight:900}" +
             "#despertarPanel{position:fixed;top:64px;left:50%;transform:translateX(-50%);z-index:8500;width:min(340px,calc(100vw - 24px));max-height:60vh;overflow-y:auto;background:#090f1c;border:1px solid rgba(14,203,129,.4);border-radius:12px;padding:10px;display:none;font-family:Inter,Arial,sans-serif;color:#fff;box-shadow:0 10px 30px rgba(0,0,0,.6)}" +
-            ".dsp-card{background:#050914;border:1px solid rgba(255,255,255,.07);border-left:3px solid #0ecb81;border-radius:8px;padding:9px 10px;margin-bottom:7px;cursor:pointer}.dsp-card.rap{border-left-color:#00b4d8}.dsp-card.baj{border-left-color:#ff2a3b}.dsp-card.tarde{opacity:.75;border-left-color:#f3ba2f}" +
+            ".dsp-card{background:#050914;border:1px solid rgba(255,255,255,.07);border-left:3px solid #0ecb81;border-radius:8px;padding:9px 10px;margin-bottom:7px;cursor:pointer}.dsp-card.rap{border-left-color:#00b4d8}.dsp-card.baj{border-left-color:#ff2a3b}.dsp-card.mix{border-left-color:#f3ba2f}.dsp-card.tarde{opacity:.75;border-left-color:#f3ba2f}" +
             ".dsp-f{display:flex;justify-content:space-between;font-size:11px;margin-top:3px;color:#94a3b8}@media(max-width:760px){#dspHead{margin:0 6px;max-width:none}#dspTxt{display:none}}";
         document.head.appendChild(st);
         var box = document.createElement("div"); box.id = "dspHead";
@@ -19064,23 +19094,23 @@ setTimeout(function(){setInterval(tick,CFG.TICK_MS);},CFG.ARRANQUE_MS);
         document.getElementById("dspHead").style.display = CFG.BOTON === false ? "none" : "";
         document.getElementById("dspCnt").textContent = "🚀 " + (a.length - nb) + " · 🔻 " + nb;
         if (!a.length) { pill.className = ""; document.getElementById("dspTxt").textContent = "🚀 DESPERTAR · vigilando…"; }
-        else { var t = a[0], baja = t.dir < 0; pill.className = baja ? "baja" : "alza";
-            document.getElementById("dspTxt").textContent = (baja ? "MONEDA CON DESMAYO" : t.tipo === "RETROCESO" ? (t.estado === "IMPULSO" ? "RETROCESO CON IMPULSO" : "EN RETROCESO") : "MONEDA ACELERADA") + " · " + ICONO[t.tipo] + " " + t.symbol.replace("USDT", "") + (baja ? " ▼ " : " ▲ ") + t.score + "/100 · Vol x" + t.vr.toFixed(1) + (a.length > 1 ? " · +" + (a.length - 1) : ""); }
+        else { var t = a[0], baja = t.dir < 0; pill.className = baja ? "baja" : t.tipo === "CAIDA_ALCISTA" ? "mixta" : "alza";
+            document.getElementById("dspTxt").textContent = (baja ? "MONEDA CON DESMAYO" : t.tipo === "RETROCESO" ? (t.estado === "IMPULSO" ? "RETROCESO CON IMPULSO" : "EN RETROCESO") : t.tipo === "CAIDA_ALCISTA" ? (t.estado === "FRENANDO" ? "CAÍDA BRUTAL EN ALCISTA · FRENANDO" : "CAÍDA BRUTAL EN ALCISTA") : "MONEDA ACELERADA") + " · " + ICONO[t.tipo] + " " + t.symbol.replace("USDT", "") + (baja ? " ▼ " : " ▲ ") + t.score + "/100 · Vol x" + t.vr.toFixed(1) + (a.length > 1 ? " · +" + (a.length - 1) : ""); }
         if (!abierto) return;
         var pc = function (N) { return N.n + " (" + (N.n ? Math.round(N.ok / N.n * 100) : 0) + "%)"; };
-        var h = '<div style="font-size:10px;color:#64748b;margin-bottom:8px;font-weight:700">REDES: ↑ ' + pc(NET) + ' · ↓ ' + pc(NETD) + ' · 🎯 ' + pc(NETR) + ' alertas aprendidas · no es recomendación de inversión</div>' +
-            '<label style="display:flex;gap:8px;align-items:center;font-size:11px;color:#cbd5e1;margin-bottom:6px;cursor:pointer"><input type="checkbox" ' + (CFG.AUTO_ABRIR ? 'checked' : '') + ' onchange="CDC_DESPERTAR.CFG.AUTO_ABRIR=this.checked"> Abrir solas en el panel: DESPERTAR y caídas</label><div style="font-size:11px;color:#19d3a2;margin-bottom:8px">🎯 RETROCESO CON IMPULSO siempre abre solo (prioridad 1)</div>';
+        var h = '<div style="font-size:10px;color:#64748b;margin-bottom:8px;font-weight:700">REDES: ↑ ' + pc(NET) + ' · ↓ ' + pc(NETD) + ' · 🎯 ' + pc(NETR) + ' · 🌋 ' + pc(NETB) + ' alertas aprendidas · no es recomendación de inversión</div>' +
+            '<label style="display:flex;gap:8px;align-items:center;font-size:11px;color:#cbd5e1;margin-bottom:6px;cursor:pointer"><input type="checkbox" ' + (CFG.AUTO_ABRIR ? 'checked' : '') + ' onchange="CDC_DESPERTAR.CFG.AUTO_ABRIR=this.checked"> Abrir solas en el panel: DESPERTAR y caídas</label><div style="font-size:11px;color:#19d3a2;margin-bottom:8px">🎯 RETROCESO CON IMPULSO y 🌋 CAÍDA BRUTAL EN ALCISTA siempre abren solos (prioridad 1)</div>';
         if (!a.length) h += '<div style="font-size:12px;color:#94a3b8;padding:8px">Sin alertas ahora. Vigilando…</div>';
-        a.forEach(function (r) { h += '<div class="dsp-card' + (r.dir < 0 ? " baj" : r.tipo === "RAPIDA" ? " rap" : "") + (r.tarde ? " tarde" : "") + '" onclick="try{seleccionarMoneda(\'' + r.symbol + '\')}catch(e){}">' +
+        a.forEach(function (r) { h += '<div class="dsp-card' + (r.dir < 0 ? " baj" : r.tipo === "RAPIDA" ? " rap" : r.tipo === "CAIDA_ALCISTA" ? " mix" : "") + (r.tarde ? " tarde" : "") + '" onclick="try{seleccionarMoneda(\'' + r.symbol + '\')}catch(e){}">' +
             '<div style="display:flex;justify-content:space-between"><b style="font-size:13px">' + ICONO[r.tipo] + " " + r.symbol.replace("USDT", "") + (r.tarde ? " ⏳ TARDE" : "") + '</b><b style="color:' + (r.dir < 0 ? "#ff2a3b" : "#0ecb81") + '">' + r.score + '/100</b></div>' +
             '<div class="dsp-f"><span>' + r.tipo.replace("_", " ") + (r.estado ? " · " + r.estado : "") + ' · Vol x' + r.vr.toFixed(1) + '</span><span>' + sg(r.g3) + ' (3m) · ' + sg(r.g5) + ' (5m)</span></div>' +
-            '<div class="dsp-f"><span>Reglas ' + r.reglas + ' · Red ' + r.red + (r.cerebro != null ? ' · Cerebro ' + r.cerebro : '') + '</span><span>' + (r.dir < 0 || r.tipo === "RETROCESO" ? "-" + r.cmax.toFixed(1) + "% desde máx 30m" : "24h: " + (r.c24 != null ? r.c24.toFixed(1) + "%" : "-")) + '</span></div>' +
+            '<div class="dsp-f"><span>Reglas ' + r.reglas + ' · Red ' + r.red + (r.cerebro != null ? ' · Cerebro ' + r.cerebro : '') + '</span><span>' + (r.dir < 0 || r.tipo === "RETROCESO" || r.tipo === "CAIDA_ALCISTA" ? "-" + r.cmax.toFixed(1) + "% desde máx 30m" : "24h: " + (r.c24 != null ? r.c24.toFixed(1) + "%" : "-")) + '</span></div>' +
             '<div class="dsp-f"><span>SL sugerido ' + f4(r.sl) + (r.dir < 0 ? " (short)" : "") + '</span><span>riesgo ' + r.riesgo.toFixed(1) + '%</span></div></div>'; });
         document.getElementById("despertarPanel").innerHTML = h; }
 
     window.CDC_DESPERTAR = { CFG: CFG, reservaPanel: function () { return !!ultRtTs && Date.now() - ultRtTs < CFG.RT_RESERVA_MS; }, abrir: function (s) { try { seleccionarMoneda(s); } catch (e) {} }, evaluar: evaluar, aprueba: aprueba, prioridad: prioridad, activas: function () { return ACT; },
-        simbolosLista: function () { return Object.keys(ACT); }, red: function () { return { sube: NET, cae: NETD, retroceso: NETR }; },
-        reiniciarRed: function () { try { localStorage.removeItem(KEY); localStorage.removeItem(KEY + "_dn"); localStorage.removeItem(KEY + "_rt"); } catch (e) {} NET = mkNet(KEY); NETD = mkNet(KEY + "_dn"); NETR = mkNet(KEY + "_rt"); } };
+        simbolosLista: function () { return Object.keys(ACT); }, red: function () { return { sube: NET, cae: NETD, retroceso: NETR, caida: NETB }; },
+        reiniciarRed: function () { try { localStorage.removeItem(KEY); localStorage.removeItem(KEY + "_dn"); localStorage.removeItem(KEY + "_rt"); localStorage.removeItem(KEY + "_ca"); } catch (e) {} NET = mkNet(KEY); NETD = mkNet(KEY + "_dn"); NETR = mkNet(KEY + "_rt"); NETB = mkNet(KEY + "_ca"); } };
     setTimeout(function () { ui(); setInterval(tick, CFG.TICK_MS); }, 15000);
 })();
 </script>
