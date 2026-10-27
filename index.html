@@ -17652,7 +17652,7 @@ setTimeout(function(){setInterval(tick,CFG.TICK_MS);},CFG.ARRANQUE_MS);
     // archivo completo sin caer en la paradoja de "el hash contiene su
     // propio hash". No cambiar este texto.
     var _PLACEHOLDER = "%%CDC_INTEGRITY_HASH%%";
-    var _HASH_ESPERADO = "88f770e692ef38a6a236d79e601d5743d908d0dda5a492a067f4a2e92f761514"; // ← se reemplaza por el hash real en el paso final
+    var _HASH_ESPERADO = "918dc9db2662f9151ed90a23146107f4a3d855eaa27e499d892052a1bd8db2e7"; // ← se reemplaza por el hash real en el paso final
 
     function _bloquear(motivo) {
         try {
@@ -18885,7 +18885,7 @@ setTimeout(function(){setInterval(tick,CFG.TICK_MS);},CFG.ARRANQUE_MS);
    Las alertas fuertes abren el panel central y todas entran a la lista de 24h. ═══ */
 (function () {
     "use strict";
-    var CFG = { TICK_MS: 6000, RT_DD_MIN: 1.5, RT_DD_MAX: 6, RT_RUN_MIN: 1.5, RT_VOL_MIN: 3, RT_RED_MIN: 1.0, RT_AUTO: true, CA_CAMBIO_MIN: 30, CA_DD_MIN: 6, CA_DD_MAX: 30, CA_VOLAT_MIN: 0.7, CA_RED_MIN: 1.5, CA_RAPIDA: 5, FR_CAMBIO_MIN: 20, FR_DD_MIN: 5, FR_DD_MAX: 30, FR_REB_MIN: 0.4, FR_REB_MAX_RET: 0.5, FR_LOW_RECIENTE: 15, FR_VOLAT_MIN: 0.5, FR_POS_MIN: 50, FUEL_VETO_SHORT: true, CA_AUTO: true, RT_MIN: 40, RT_RESERVA_MS: 90000, VELAS: 180, EXCL: 6, BASE_RANGO_MAX: 6, VOL_RATIO_MIN: 5, GAIN3_MIN: 1.0, RAP_GAIN5_MIN: 2.5, RAP_VOL_MIN: 3,
+    var CFG = { TICK_MS: 6000, RT_DD_MIN: 1.5, RT_DD_MAX: 6, RT_RUN_MIN: 1.5, RT_VOL_MIN: 3, RT_RED_MIN: 1.0, RT_AUTO: true, CA_CAMBIO_MIN: 30, CA_DD_MIN: 6, CA_DD_MAX: 30, CA_VOLAT_MIN: 0.7, CA_RED_MIN: 1.5, CA_RAPIDA: 5, FR_CAMBIO_MIN: 20, FR_DD_MIN: 5, FR_DD_MAX: 30, FR_REB_MIN: 0.4, FR_REB_MAX_RET: 0.5, FR_LOW_RECIENTE: 15, RT2_CAMBIO_MIN: 3, RT2_DD_MIN: 1.2, RT2_DD_MAX: 8, RT2_LOW_RECIENTE: 12, RT2_REB_MIN: 0.2, RT2_RET_MAX: 0.6, PRECIO_BAJO: 1, SOLO_BARATAS: false, FR_VOLAT_MIN: 0.5, FR_POS_MIN: 50, FUEL_VETO_SHORT: true, CA_AUTO: true, RT_MIN: 40, RT_RESERVA_MS: 90000, VELAS: 180, EXCL: 6, BASE_RANGO_MAX: 6, VOL_RATIO_MIN: 5, GAIN3_MIN: 1.0, RAP_GAIN5_MIN: 2.5, RAP_VOL_MIN: 3,
         DROP3: 2.0, DROP5: 3.0, DROP_VOL: 3, BRUTAL5: 5, BRUTAL_MAX30: 8, TARDE_PCT: 15, LIQ_MIN: 300000, MAX_CAND: 40, CACHE_MS: 8000,
         VIDA_MS: 10 * 60 * 1000, AUTO_MIN_SCORE: 60, AUTO_ABRIR: false, CAIDA_ABRIR: true, ESPACIO_AUTO_MS: 20000, SONIDO: true, BOTON: true, UP: 1.5, DN: 1.5, MAX_MIN: 20 };
     var ACT = {}, CK = {}, AV = {}, PEND = [], ultAbierta = null, ultAutoTs = 0, ultRt = null, ultRtTs = 0, MISS = {}, PENDVOZ = null, ultAviso = {}, abierto = false, busy = false, KEY = "cdc_despertar_net";
@@ -18940,6 +18940,30 @@ setTimeout(function(){setInterval(tick,CFG.TICK_MS);},CFG.ARRANQUE_MS);
     }
 
     /* ── 🟢 FONDO DEL DERRUMBE → ENTRADA LONG: llegó a su máximo de 24h, cayó fuerte, marcó un mínimo y EMPIEZA a rebotar (mecha larga o velas verdes) ── */
+    /* ── 📈 RETROCESO EN TENDENCIA (monedas baratas y alcistas): sube ordenado, corrige hasta la zona de las medias, marca mínimo y EMPIEZA a recuperar → long ── */
+    function retroTend(k, c, sym) {
+        var n = k.length, i; if (n < 120 || !c) return null;
+        var ch = c.change || 0; if (ch < CFG.RT2_CAMBIO_MIN) return null;
+        var O = k.map(function (x) { return +x[1]; }), Hh = k.map(function (x) { return +x[2]; }), Ll = k.map(function (x) { return +x[3]; }), C = k.map(function (x) { return +x[4]; });
+        var E7 = ema(C, 7), E25 = ema(C, 25), E99 = ema(C, 99), p = C[n - 1];
+        if (!(E25[n - 1] > E99[n - 1] && E99[n - 1] > E99[n - 21])) return null;                       // tendencia alcista real
+        var ip = n - 120; for (i = n - 120; i < n; i++) if (Hh[i] > Hh[ip]) ip = i; if (ip > n - 6) return null;
+        var peak = Hh[ip], il = ip + 1; for (i = ip + 1; i < n; i++) if (Ll[i] < Ll[il]) il = i;
+        var low = Ll[il], dd = (peak - low) / peak * 100;
+        if (dd < CFG.RT2_DD_MIN || dd > CFG.RT2_DD_MAX || il < n - CFG.RT2_LOW_RECIENTE) return null;  // corrección sana y mínimo reciente
+        if (low > Math.min(E25[il], E7[il]) * 1.004 || low < E99[il] * 0.985) return null;               // tocó la zona de las medias sin romper la tendencia
+        var reb = (p - low) / low * 100, ret = (p - low) / (peak - low);
+        if (reb < CFG.RT2_REB_MIN || ret > CFG.RT2_RET_MAX) return null;                                 // ya recupera, sin perseguir
+        var verde = C[n - 1] > O[n - 1] && C[n - 1] > C[n - 2], dos = C[n - 1] > C[n - 2] && C[n - 2] >= C[n - 3]; if (!verde && !dos) return null;
+        var vol = 0; for (i = n - 30; i < n; i++) vol += (Hh[i] - Ll[i]) / C[i] * 100; vol /= 30; if (vol < 0.12) return null;
+        var barata = p <= CFG.PRECIO_BAJO, sep = (E25[n - 1] - E99[n - 1]) / E99[n - 1] * 100;
+        var reglas = Math.min(ch, 40) / 40 * 20 + Math.min(sep, 2) / 2 * 15 + Math.max(0, 1 - Math.abs(dd - 3) / 4) * 20 + Math.min(reb, 1.5) / 1.5 * 15 + (1 - ret / CFG.RT2_RET_MAX) * 10 + (verde ? 10 : 5) + (barata ? 10 : 0);
+        var sc = Math.round(cl(reglas, 0, 100)), sl = low * 0.997;
+        var x = [Math.min(Math.log(Math.max(vol / 0.1, 1)), 3.5) / 3.5, Math.min(dd, 30) / 30, Math.min(reb, 3) / 3, 0, Math.min(vol, 3) / 3, cl(ch, 0, 100) / 100, cl(c.posicionPorcentaje || 0, 0, 100) / 100, dos ? 1 : 0];
+        return { symbol: sym, tipo: "FONDO_REBOTE", estado: "RETRO. EN TENDENCIA", dir: 1, price: p, score: sc, reglas: Math.round(reglas), red: 0, cerebro: null, vr: 0, vola: vol,
+                 g3: (p - C[n - 4]) / C[n - 4] * 100, g5: (p - C[n - 6]) / C[n - 6] * 100, cmax: dd, reb: reb, sob: 0, tarde: false, sl: sl, obj: peak, riesgo: (p - sl) / p * 100, c24: ch, x: x, ts: Date.now() };
+    }
+
     function fondoRebote(k, c, sym) {
         var n = k.length, i, j; if (n < 120 || !c) return null;
         var ch = c.change || 0, pos = c.posicionPorcentaje || 0; if (ch < CFG.FR_CAMBIO_MIN || pos < CFG.FR_POS_MIN) return null;             // moneda fuerte del día
@@ -19009,7 +19033,7 @@ setTimeout(function(){setInterval(tick,CFG.TICK_MS);},CFG.ARRANQUE_MS);
         var m7 = sma(cie, 7), m25 = sma(cie, 25), m7p = sma(cie.slice(0, -2), 7), okm = m7 !== null && m25 !== null && m7p !== null;
         var medias = okm && m7 > m25 && m7 > m7p, mBaj = okm && m7 < m25 && m7 < m7p;
         var mx30 = Math.max.apply(null, k.slice(-30).map(function (x) { return +x[2]; })), cmax = (mx30 - p) / mx30 * 100;
-        var rt = retroceso(k, c, sym) || fondoRebote(k, c, sym) || caidaAlcista(k, c, sym); if (rt) return rt;   // 🎯 prioridad 1
+        var rt = retroceso(k, c, sym) || fondoRebote(k, c, sym) || retroTend(k, c, sym) || caidaAlcista(k, c, sym); if (rt) return rt;   // 🎯 prioridad 1
         var tipo = null;
         if (g5 <= -CFG.BRUTAL5 || (cmax >= CFG.BRUTAL_MAX30 && g3 <= -CFG.DROP3)) tipo = "CAIDA_BRUTAL";
         else if ((g3 <= -CFG.DROP3 && vr >= CFG.DROP_VOL) || (g5 <= -CFG.DROP5 && vr >= 2)) tipo = "DESMAYO";
@@ -19113,11 +19137,11 @@ setTimeout(function(){setInterval(tick,CFG.TICK_MS);},CFG.ARRANQUE_MS);
         var an = document.getElementById("alertaMonedaFija"); if (!an || !an.parentNode) return;
         var bx = document.getElementById("cdcRebotes");
         if (!bx) { bx = document.createElement("div"); bx.id = "cdcRebotes"; bx.style.cssText = "display:none;margin-bottom:12px;padding:8px 10px;border-radius:8px;background:#06210f;border:1px solid #0ecb81;"; an.parentNode.insertBefore(bx, an); }
-        var a = Object.values(ACT).filter(function (r) { return r.dir > 0 && (r.tipo === "FONDO_REBOTE" || r.tipo === "CAIDA_ALCISTA"); }).sort(function (x, y) { return y.score - x.score; }).slice(0, 8);
+        var a = Object.values(ACT).filter(function (r) { return r.dir > 0 && (r.tipo === "FONDO_REBOTE" || r.tipo === "CAIDA_ALCISTA" || (r.tipo === "RETROCESO" && r.estado === "IMPULSO")) && (!CFG.SOLO_BARATAS || r.price <= CFG.PRECIO_BAJO); }).sort(function (x, y) { return ((y.price <= CFG.PRECIO_BAJO) - (x.price <= CFG.PRECIO_BAJO)) || (y.score - x.score); }).slice(0, 8);
         if (!a.length) { bx.style.display = "none"; return; }
         bx.style.display = "block";
-        bx.innerHTML = '<div style="font-size:10px;font-weight:900;letter-spacing:1px;color:#0ecb81;margin-bottom:6px">🟢 REBOTES LONG — cayeron y están girando</div>' + a.map(function (r) {
-            return '<span style="display:inline-block;margin:2px 6px 2px 0;padding:5px 10px;border-radius:14px;background:#0b1a12;border:1px solid #0ecb81;color:#fff;font-size:12px;font-weight:800;cursor:pointer" onclick="try{seleccionarMoneda(\'' + r.symbol + '\',true,\'' + r.tipo + '\')}catch(e){}">' + r.symbol.replace("USDT", "") + ' · ' + r.score + ' · rebote ' + (r.reb != null ? r.reb.toFixed(1) : "-") + '% · SL ' + r.sl.toPrecision(4) + '</span>';
+        bx.innerHTML = '<div style="font-size:10px;font-weight:900;letter-spacing:1px;color:#0ecb81;margin-bottom:6px">🟢 REBOTES LONG — cayeron y están girando <label style="float:right;font-weight:700;letter-spacing:0;color:#cbd5e1;cursor:pointer"><input type="checkbox" ' + (CFG.SOLO_BARATAS ? 'checked' : '') + ' onchange="CDC_DESPERTAR.CFG.SOLO_BARATAS=this.checked"> solo baratas (≤ $' + CFG.PRECIO_BAJO + ')</label></div>' + a.map(function (r) {
+            return '<span style="display:inline-block;margin:2px 6px 2px 0;padding:5px 10px;border-radius:14px;background:#0b1a12;border:1px solid #0ecb81;color:#fff;font-size:12px;font-weight:800;cursor:pointer" onclick="try{seleccionarMoneda(\'' + r.symbol + '\',true,\'' + r.tipo + '\')}catch(e){}">' + (r.price <= CFG.PRECIO_BAJO ? "💎 " : "") + r.symbol.replace("USDT", "") + ' · ' + r.score + ' · rebote ' + (r.reb != null ? r.reb.toFixed(1) : "-") + '% · SL ' + r.sl.toPrecision(4) + '</span>';
         }).join("");
     }
 
@@ -19126,7 +19150,7 @@ setTimeout(function(){setInterval(tick,CFG.TICK_MS);},CFG.ARRANQUE_MS);
         try {
             if (typeof cachedData === "undefined" || typeof obtenerKlines !== "function") return;
             resolver(); resolverFuel();
-            var lista = Object.values(cachedData).filter(function (c) { return c && c.volume >= CFG.LIQ_MIN && (c.cambioReal2Min >= 0.3 || c.ciclosSubiendo >= 3 || c.cambioReal2Min <= -0.5 || c.ciclosBajando >= 3 || (c.posicionPorcentaje >= 85 && Math.abs(c.cambioReal2Min || 0) >= 0.2) || (c.change >= CFG.CA_CAMBIO_MIN && (c.cambioReal2Min || 0) <= -0.2) || (c.change >= CFG.FR_CAMBIO_MIN)); })
+            var lista = Object.values(cachedData).filter(function (c) { return c && c.volume >= CFG.LIQ_MIN && (c.cambioReal2Min >= 0.3 || c.ciclosSubiendo >= 3 || c.cambioReal2Min <= -0.5 || c.ciclosBajando >= 3 || (c.posicionPorcentaje >= 85 && Math.abs(c.cambioReal2Min || 0) >= 0.2) || (c.change >= CFG.CA_CAMBIO_MIN && (c.cambioReal2Min || 0) <= -0.2) || (c.change >= CFG.RT2_CAMBIO_MIN)); })
                 .sort(function (a, b) { return Math.abs(b.cambioReal2Min || 0) - Math.abs(a.cambioReal2Min || 0); }).slice(0, CFG.MAX_CAND), nuevo = false, nuevos = [];
             Object.keys(ACT).forEach(function (s) { if (cachedData[s] && !lista.some(function (z) { return z.symbol === s; })) lista.push(cachedData[s]); });   // las alertas activas se re-evalúan siempre
             try { if (selectedCoin && cachedData[selectedCoin] && !lista.some(function (z) { return z.symbol === selectedCoin; })) lista.push(cachedData[selectedCoin]); } catch (e) {}   // y la moneda del panel central
