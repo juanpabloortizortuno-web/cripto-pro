@@ -13484,7 +13484,7 @@ function actualizarPanelCentral() {
                 }
                 return `<div style="flex:0 0 auto; display:flex; flex-direction:column; align-items:center; gap:6px; width:300px;">
                     ${(window.CDC_DESPERTAR&&CDC_DESPERTAR.slotDesmayo)?CDC_DESPERTAR.slotDesmayo():''}${(window.CDC_VEL&&CDC_VEL.slotHTML)?CDC_VEL.slotHTML():''}
-                    <div id="cdcBadgeTecho" style="display:${((window.CDC_VEL&&CDC_VEL.hay&&CDC_VEL.hay())||(window.CDC_DESPERTAR&&CDC_DESPERTAR.hayDesmayo&&CDC_DESPERTAR.hayDesmayo()))?'none':'flex'}; flex-direction:column; align-items:center; gap:1px; background:${bgB}; border:1px solid ${colorB}55; border-radius:8px; padding:5px 9px; width:100%;">
+                    <div id="cdcBadgeTecho" style="display:${((window.CDC_VEL&&CDC_VEL.hay&&CDC_VEL.hay())||(window.CDC_DESPERTAR&&CDC_DESPERTAR.hayAlerta&&CDC_DESPERTAR.hayAlerta()))?'none':'flex'}; flex-direction:column; align-items:center; gap:1px; background:${bgB}; border:1px solid ${colorB}55; border-radius:8px; padding:5px 9px; width:100%;">
                         <span style="font-size:10px; font-weight:900; color:${colorB}; text-align:center; line-height:1.3;">${txtB}</span>
                         <span style="font-size:8.5px; color:#94a3b8;">EMAs: ${spreadTxt}</span>
                     </div>
@@ -16294,7 +16294,7 @@ setTimeout(() => {
             // ⏱️ PAUSA ENTRE MONEDAS: un cambio AUTOMÁTICO no entra si la moneda actual lleva menos de
             // PANEL_PAUSA_MS en el panel central (así el Cerebro la estudia con calma y concluye mejor).
             // El click manual y el que viene de la casilla del Cerebro pasan siempre. Para volver a lo anterior: 0.
-            const _esAutoCambio = (_a === true || (_o && _o !== 'cerebro') || window.__selAuto === true);
+            const _esAutoCambio = window.__selDesmayo !== true && (_a === true || (_o && _o !== 'cerebro') || window.__selAuto === true); // 🔻 el desmayo siempre entra al panel
             if (_esAutoCambio && SOLO_MAXIMO_24H && !_enMaximo24(symbol)) return; // 📈 solo monedas en su máximo de 24h
             if (_esAutoCambio && selectedCoin && symbol !== selectedCoin && _enMaximo24(selectedCoin) && (Date.now() - (window.__panelCambioTs || 0)) < PANEL_PAUSA_MS) return;
             if (symbol !== selectedCoin) window.__panelCambioTs = Date.now();
@@ -17653,7 +17653,7 @@ setTimeout(function(){setInterval(tick,CFG.TICK_MS);},CFG.ARRANQUE_MS);
     // archivo completo sin caer en la paradoja de "el hash contiene su
     // propio hash". No cambiar este texto.
     var _PLACEHOLDER = "%%CDC_INTEGRITY_HASH%%";
-    var _HASH_ESPERADO = "cc31533c3fb6ac8f9ea2709db3c50aa92b5db3f7a76ececad4ee9072015cb18c"; // ← se reemplaza por el hash real en el paso final
+    var _HASH_ESPERADO = "22b3138ccb0ca9d1fafd352ce2cc4e66e878a9690ca28f3a47aec4ab82415503"; // ← se reemplaza por el hash real en el paso final
 
     function _bloquear(motivo) {
         try {
@@ -19121,7 +19121,7 @@ setTimeout(function(){setInterval(tick,CFG.TICK_MS);},CFG.ARRANQUE_MS);
         var ix = dl.map(function (r) { return r.s; }).indexOf(S), go = null, ult = now - (window.__dmAbrirTs || 0);
         if (ix < 0 && ult > 4000) go = dl[0]; else if (ix >= 0 && dl.length > 1 && ult > 15000) go = dl[(ix + 1) % dl.length];
         if (go && now - _ultimaSeleccionManualTs > 15000) { window.__dmAbrirTs = now; window.__velHoldUntil = 0;   // el desmayo manda: libera la retención de alta velocidad
-            seleccionarMoneda(go.s, true, ACT[go.s] ? ACT[go.s].tipo : "CAIDA_BRUTAL"); if (selectedCoin === go.s) { ultAbierta = go.s; ultAutoTs = now; } } }
+            window.__selDesmayo = true; try { seleccionarMoneda(go.s, true, ACT[go.s] ? ACT[go.s].tipo : "CAIDA_BRUTAL"); } finally { window.__selDesmayo = false; } if (selectedCoin === go.s) { ultAbierta = go.s; ultAutoTs = now; } } }
     setInterval(function () { try { panelDesmayo(); } catch (e) {} }, 2000);
     function autoAbrir() {
         if (typeof seleccionarMoneda !== "function") return;
@@ -19146,17 +19146,26 @@ setTimeout(function(){setInterval(tick,CFG.TICK_MS);},CFG.ARRANQUE_MS);
         Object.values(ACT).forEach(function (r) { if (r.dir < 0) m[r.symbol] = { s: r.symbol, sc: r.score, p: Math.min(r.g5 || 0, r.g3 || 0), vx: r.vr || 0 }; });
         try { (window.CDC_CRASH ? CDC_CRASH.armadas() : []).forEach(function (a) { if (!m[a.sym]) m[a.sym] = { s: a.sym, sc: 95, p: a.caida, vx: a.volX || 0 }; }); } catch (e) {}
         return Object.values(m).sort(function (x, y) { return y.sc - x.sc; }); }
-    function slotInnerDes() { var a = listaDes(); if (!a.length) return ""; var m = a[0], S = typeof selectedCoin !== "undefined" ? selectedCoin : null,
-        h = '<div onclick="CDC_DESPERTAR.abrir(\'' + m.s + '\')" title="Clic para abrir la moneda en el panel" style="box-sizing:border-box;width:100%;cursor:pointer;background:rgba(246,70,93,0.16);border:2px solid #f6465d;border-radius:8px;padding:5px 8px;text-align:center;box-shadow:0 0 14px #f6465d88;margin-bottom:4px">' +
-            '<div style="font:900 10px Arial;color:#f6465d;letter-spacing:.4px">🔻 MONEDA CON DESMAYO' + (a.length > 1 ? ' · ' + a.length : '') + '</div>' +
-            '<div style="font:900 13px Arial;color:#fff"><b>' + m.s.replace("USDT", "") + '</b> ▼ · puntaje ' + Math.round(m.sc) + '/100' + (m.vx ? ' · Vol x' + m.vx.toFixed(1) : '') + '</div>' +
-            '<div style="font:600 9.5px Arial;color:#cbd5e1">' + (m.p ? m.p.toFixed(1) + '% en 5 min' : 'cayendo ahora') + '</div></div>';
-        if (a.length > 1) { h += '<div style="display:flex;gap:5px;flex-wrap:wrap;justify-content:center;margin-bottom:4px">'; a.slice(1, 5).forEach(function (o) { h += '<span onclick="CDC_DESPERTAR.abrir(\'' + o.s + '\')" style="cursor:pointer;background:' + (o.s === S ? '#f6465d' : '#1a0508') + ';border:1px solid #f6465d;border-radius:7px;padding:2px 8px;font:700 10px Arial;color:#fff"><b>' + o.s.replace("USDT", "") + '</b> ▼ ' + Math.round(o.sc) + '</span>'; }); h += '</div>'; }
+    function etiq(r) { return r.dir < 0 ? "MONEDA CON DESMAYO" : r.tipo === "RETROCESO" ? (r.estado === "IMPULSO" ? "RETROCESO CON IMPULSO" : "EN RETROCESO") : r.tipo === "FONDO_REBOTE" ? "ENTRADA LONG · FONDO DEL DERRUMBE" : r.tipo === "CAIDA_ALCISTA" ? (r.estado === "FRENANDO" ? "CAÍDA BRUTAL EN ALCISTA · FRENANDO" : "CAÍDA BRUTAL EN ALCISTA") : r.tipo === "REBOTE_CRASH" ? "ENTRADA LONG · REBOTE DE CAÍDA BRUTAL" : "MONEDA ACELERADA"; }
+    function colr(r) { return r.dir < 0 ? ["#f6465d", "rgba(246,70,93,0.16)"] : r.tipo === "CAIDA_ALCISTA" ? ["#f3ba2f", "rgba(243,186,47,0.16)"] : ["#0ecb81", "rgba(14,203,129,0.16)"]; }
+    function listaTodas() { var m = {};
+        Object.values(ACT).forEach(function (r) { m[r.symbol] = { s: r.symbol, r: r, pr: prioridad(r.symbol), sc: r.score, vx: r.vr || 0, p: r.dir < 0 ? Math.min(r.g5 || 0, r.g3 || 0) : (r.g3 || 0) }; });
+        try { (window.CDC_CRASH ? CDC_CRASH.armadas() : []).forEach(function (a) { if (!m[a.sym]) m[a.sym] = { s: a.sym, r: { dir: -1, tipo: "CAIDA_BRUTAL" }, pr: 9500, sc: 95, vx: a.volX || 0, p: a.caida }; }); } catch (e) {}
+        try { (window.CDC_CRASH ? CDC_CRASH.activas() : []).forEach(function (g) { if (!m[g.symbol]) m[g.symbol] = { s: g.symbol, r: { dir: 1, tipo: "REBOTE_CRASH" }, pr: 5000 + g.score, sc: g.score, vx: g.vx || 0, p: 0 }; }); } catch (e) {}
+        return Object.values(m).sort(function (x, y) { return y.pr - x.pr; }); }
+    function slotInnerDes() { var a = listaTodas(); if (!a.length) return ""; var m = a[0], c = colr(m.r), S = typeof selectedCoin !== "undefined" ? selectedCoin : null,
+        h = '<div onclick="CDC_DESPERTAR.abrir(\'' + m.s + '\')" title="Clic para abrir la moneda en el panel" style="box-sizing:border-box;width:100%;cursor:pointer;background:' + c[1] + ';border:2px solid ' + c[0] + ';border-radius:8px;padding:5px 8px;text-align:center;box-shadow:0 0 14px ' + c[0] + '88;margin-bottom:4px">' +
+            '<div style="font:900 10px Arial;color:' + c[0] + ';letter-spacing:.4px">' + (m.r.dir < 0 ? "🔻 " : "🚀 ") + etiq(m.r) + (a.length > 1 ? ' · ' + a.length : '') + '</div>' +
+            '<div style="font:900 13px Arial;color:#fff"><b>' + m.s.replace("USDT", "") + '</b> ' + (m.r.dir < 0 ? "▼" : "▲") + ' · puntaje ' + Math.round(m.sc) + '/100' + (m.vx ? ' · Vol x' + m.vx.toFixed(1) : '') + '</div>' +
+            (m.p ? '<div style="font:600 9.5px Arial;color:#cbd5e1">' + (m.p > 0 ? "+" : "") + m.p.toFixed(1) + '% en ' + (m.r.dir < 0 ? '5' : '3') + ' min</div>' : '') + '</div>';
+        h += '<div style="display:flex;gap:5px;flex-wrap:wrap;justify-content:center;margin-bottom:4px">';
+        a.slice(1, 6).forEach(function (o) { var k = colr(o.r); h += '<span onclick="CDC_DESPERTAR.abrir(\'' + o.s + '\')" title="' + etiq(o.r) + '" style="cursor:pointer;background:' + (o.s === S ? k[0] : '#0b1220') + ';border:1px solid ' + k[0] + ';border-radius:7px;padding:2px 8px;font:700 10px Arial;color:#fff"><b>' + o.s.replace("USDT", "") + '</b> ' + (o.r.dir < 0 ? "▼" : "▲") + ' ' + Math.round(o.sc) + '</span>'; });
+        h += '<span onclick="CDC_DESPERTAR.verTodas()" style="cursor:pointer;background:#0b1220;border:1px solid #64748b;border-radius:7px;padding:2px 8px;font:700 10px Arial;color:#cbd5e1">📋 ver todas</span></div>';
         return h; }
     function slotDesmayo() { return '<div id="cdcDesSlot" style="width:100%">' + slotInnerDes() + '</div>'; }
     function fijarDes() { try { var s = document.getElementById("cdcDesSlot"), b = document.getElementById("cdcBadgeTecho"), n = slotInnerDes();
         if (s && s.innerHTML !== n) s.innerHTML = n; if (b && n) b.style.display = "none";
-        var hd = document.getElementById("dspHead"); if (hd) hd.style.display = (CFG.BOTON === false || n) ? "none" : ""; } catch (e) {} }
+        var hd = document.getElementById("dspHead"); if (hd) hd.style.display = "none"; } catch (e) {} }
     setInterval(fijarDes, 1000);
 
     function chipsDesmayo() {
@@ -19243,7 +19252,7 @@ setTimeout(function(){setInterval(tick,CFG.TICK_MS);},CFG.ARRANQUE_MS);
     function sg(x) { return (x >= 0 ? "+" : "") + x.toFixed(2) + "%"; }
     function pintar() { ui(); var pill = document.getElementById("dspPill"); if (!pill) return;
         var a = Object.values(ACT).sort(function (x, y) { return prioridad(y.symbol) - prioridad(x.symbol); }), nb = a.filter(function (r) { return r.dir < 0; }).length;
-        document.getElementById("dspHead").style.display = (CFG.BOTON === false || listaDes().length) ? "none" : "";
+        document.getElementById("dspHead").style.display = "none";
         document.getElementById("dspCnt").textContent = "🚀 " + (a.length - nb) + " · 🔻 " + nb;
         if (!a.length) { pill.className = ""; document.getElementById("dspTxt").textContent = fuelTxt() || "🚀 DESPERTAR · vigilando…"; }
         else { var t = a[0], baja = t.dir < 0; pill.className = baja ? "baja" : t.tipo === "CAIDA_ALCISTA" ? "mixta" : "alza";
@@ -19263,7 +19272,7 @@ setTimeout(function(){setInterval(tick,CFG.TICK_MS);},CFG.ARRANQUE_MS);
 
     window.CDC_DESPERTAR = { CFG: CFG, estadoFuerza: function (s) { return FUEL[s] ? FUEL[s].estado : null; }, fuel: function (s) { return FUEL[s] || null; }, _combustible: combustible,
         vetoCorto: function (s) { return !!(CFG.FUEL_VETO_SHORT && FUEL[s] && FUEL[s].estado === "CARGANDO" && FUEL[s].fuerza >= 75); }, reservaPanel: function () { return (!!ultRtTs && Date.now() - ultRtTs < CFG.RT_RESERVA_MS) || (Date.now() - (window.__dmAbrirTs || 0) < 60000 && Object.values(ACT).some(function (r) { return r.dir < 0; })); }, abrir: function (s) { try { seleccionarMoneda(s); } catch (e) {} }, evaluar: evaluar, aprueba: aprueba, prioridad: prioridad, activas: function () { return ACT; },
-        simbolosLista: function () { return Object.keys(ACT); }, slotDesmayo: slotDesmayo, hayDesmayo: function () { return listaDes().length > 0; }, fijarDes: fijarDes, red: function () { return { sube: NET, cae: NETD, retroceso: NETR, caida: NETB, fondo: NETF, combustible: NETC }; },
+        simbolosLista: function () { return Object.keys(ACT); }, slotDesmayo: slotDesmayo, hayDesmayo: function () { return listaDes().length > 0; }, fijarDes: fijarDes, hayAlerta: function () { return listaTodas().length > 0; }, verTodas: function () { try { document.getElementById("dspPill").onclick(); } catch (e) {} }, red: function () { return { sube: NET, cae: NETD, retroceso: NETR, caida: NETB, fondo: NETF, combustible: NETC }; },
         reiniciarRed: function () { try { localStorage.removeItem(KEY); localStorage.removeItem(KEY + "_dn"); localStorage.removeItem(KEY + "_rt"); localStorage.removeItem(KEY + "_ca"); localStorage.removeItem(KEY + "_fr"); localStorage.removeItem(KEY + "_fu"); } catch (e) {} NET = mkNet(KEY); NETD = mkNet(KEY + "_dn"); NETR = mkNet(KEY + "_rt"); NETB = mkNet(KEY + "_ca"); NETF = mkNet(KEY + "_fr"); NETC = mkNet(KEY + "_fu"); } };
     setTimeout(function () { ui(); setInterval(tick, CFG.TICK_MS); }, 15000);
 })();
@@ -19312,7 +19321,7 @@ function desm(sym,h){setTimeout(function(){try{CDC_DESPERTAR.fijarDes();}catch(e
  try{if(CFG.VOZ&&typeof colaVoz!=="undefined"&&typeof procesarColaVoz==="function"){var t0="ALERTA. Moneda con desmayo, "+nom(sym)+". Cae "+Math.round(Math.abs(h.v))+" por ciento en "+h.w+" segundos. Cuidado.",
   t=(typeof _humanizarTexto==="function")?_humanizarTexto(t0,{sym:sym,dir:"SHORT"}):t0;colaVoz.unshift({texto:t,esMasculino:true});procesarColaVoz();}}catch(e){}
  if(CFG.PANEL_AUTO&&now-manualTs>15000&&now-(window.__crOpen||0)>20000){window.__crOpen=now;window.__velHoldUntil=0;abrir(sym);}}
-function abrir(sym){try{if(typeof seleccionarMoneda==="function")seleccionarMoneda(sym,true,"CAIDA_BRUTAL");}catch(e){}}
+function abrir(sym){try{if(typeof seleccionarMoneda==="function"){window.__selDesmayo=true;try{seleccionarMoneda(sym,true,"CAIDA_BRUTAL");}finally{window.__selDesmayo=false;}}}catch(e){}}
 function cartel(sym,r){try{var id="cdcCrashBox",b=document.getElementById(id);if(!b){b=document.createElement("div");b.id=id;
  b.style.cssText="position:fixed;top:70px;left:50%;transform:translateX(-50%);z-index:9500;width:min(360px,calc(100vw - 20px));background:#06210f;border:2px solid #0ecb81;border-radius:12px;padding:10px 12px;color:#fff;font:600 12px Arial;box-shadow:0 0 22px #0ecb8199;cursor:pointer";document.body.appendChild(b);}
  b.onclick=function(){abrir(sym);b.style.display="none";};
@@ -19359,7 +19368,7 @@ function evaluar(sym,now){var s=S[sym];if(!s||s.t.length<30)return;var n=s.t.len
   if(!o.ok){r.why=o.why;r.chk=false;r.t0=Math.max(r.t0,Date.now()-CFG.ARM_MS+60000);return;}
   var sc=30*Math.min(Math.abs(r.z)/6,1)+20*Math.min(r.vx/8,1)+20*Math.min(ret/CFG.REB_MAX,1)+15*(o.taker==null?0.4:Math.min(o.taker/0.65,1))+15*Math.min(rr/2.5,1);
   var sg={symbol:sym,w:r.w,v:r.v,z:r.z,vx:r.vx,ret:ret,taker:o.taker,spread:o.spread,entry:cur,sl:sl,tp1:tp1,tp2:tp2,riesgo:rg,rr:rr,score:Math.round(Math.min(100,sc)),ts:Date.now()};
-  s.est="SENAL";s.sig=sg;ACT[sym]=sg;alarma(sym,sg);});}
+  s.est="SENAL";s.sig=sg;ACT[sym]=sg;alarma(sym,sg);setTimeout(function(){try{CDC_DESPERTAR.fijarDes();}catch(e){}},80);});}
 function tick(now){if(!CFG.ON)return;now=now||Date.now();if(!wsOk||now-wsOk>6000)feedCache(now);for(var k in S)evaluar(k,now);}
 function feedCache(now){var c=cd();if(!c)return;for(var k in c){var x=c[k];if(x&&x.price>0)ingest(k,x.price,x.volume,now);}}
 function conectar(){if(!CFG.WS||!("WebSocket" in window))return;try{ws=new WebSocket("wss://fstream.binance.com/ws/!miniTicker@arr");
@@ -19373,6 +19382,7 @@ function enganchar(){var ok=0;try{var V=window.CDC_VEL;if(V&&typeof V.es==="func
   if(D.aprueba&&!D.aprueba.__cr){var q=D.aprueba,wq=function(x){return !!es(x)||q.apply(this,arguments);};wq.__cr=1;D.aprueba=wq;}ok++;}}catch(e){}return ok>=2;}
 try{var _sm=window.seleccionarMoneda;document.addEventListener("click",function(){manualTs=Date.now();},true);}catch(e){}
 var _n=0,_iv=setInterval(function(){if(enganchar()||++_n>40)clearInterval(_iv);},1500);
+window.CDC_BUILD="V8-DESMAYO-PANEL-31OCT2026";try{console.log("%c CDC BUILD "+window.CDC_BUILD,"background:#f6465d;color:#fff;font-weight:900");}catch(e){}
 window.CDC_CRASH={version:"1",cfg:CFG,es:es,stats:stats,log:function(){return LOG.slice();},activas:function(){return Object.keys(ACT).map(function(k){return ACT[k];});},
  armadas:function(){return Object.keys(S).filter(function(k){return S[k].est==="ARMADA";}).map(function(k){var r=S[k].cr;return{sym:k,caida:r.v,z:r.z,volX:r.vx,pico:r.peak,minimo:r.low,motivo:r.why||null};});},
  abrir:abrir,_ingest:ingest,_tick:tick,_S:S,
