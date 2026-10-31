@@ -17652,7 +17652,7 @@ setTimeout(function(){setInterval(tick,CFG.TICK_MS);},CFG.ARRANQUE_MS);
     // archivo completo sin caer en la paradoja de "el hash contiene su
     // propio hash". No cambiar este texto.
     var _PLACEHOLDER = "%%CDC_INTEGRITY_HASH%%";
-    var _HASH_ESPERADO = "b76e8687323cc47e67dc46815a3d4438476aaaa91ff9c0fb1140ed10730170aa"; // ← se reemplaza por el hash real en el paso final
+    var _HASH_ESPERADO = "bf5b6e74d03cea5cb4d09447f6de080bad37bad466af7bd2d2bbd145f15013bf"; // ← se reemplaza por el hash real en el paso final
 
     function _bloquear(motivo) {
         try {
@@ -19112,13 +19112,15 @@ setTimeout(function(){setInterval(tick,CFG.TICK_MS);},CFG.ARRANQUE_MS);
             if (fin === null) vivos.push(q); else aprender(q.x, fin, q.d < 0 ? NETD : (q.fr ? NETF : q.ca ? NETB : q.rt ? NETR : NET)); });
         PEND = vivos; }
 
-    function aprueba(sym) { var r = ACT[sym]; return !!(r && r.score >= CFG.AUTO_MIN_SCORE && !r.tarde && (r.tipo === "DESPERTAR" || (CFG.CAIDA_ABRIR && r.dir < 0) || (r.tipo === "RETROCESO" && r.estado === "IMPULSO" && r.score >= CFG.RT_MIN) || (CFG.CA_AUTO && r.tipo === "CAIDA_ALCISTA" && r.score >= CFG.RT_MIN) || (r.tipo === "FONDO_REBOTE" && r.score >= CFG.RT_MIN))); }
-    function prioridad(sym) { var r = ACT[sym]; return r ? 1000 + r.score + (r.tipo === "RETROCESO" ? 1000 + (r.estado === "IMPULSO" ? 200 : 0) : r.tipo === "FONDO_REBOTE" ? 1400 : r.tipo === "CAIDA_ALCISTA" ? 800 : r.tipo === "DESPERTAR" ? 100 : r.dir < 0 ? 90 : 0) : 0; }
+    function aprueba(sym) { var r = ACT[sym]; if (r && r.dir < 0) return true; return !!(r && r.score >= CFG.AUTO_MIN_SCORE && !r.tarde && (r.tipo === "DESPERTAR" || (CFG.CAIDA_ABRIR && r.dir < 0) || (r.tipo === "RETROCESO" && r.estado === "IMPULSO" && r.score >= CFG.RT_MIN) || (CFG.CA_AUTO && r.tipo === "CAIDA_ALCISTA" && r.score >= CFG.RT_MIN) || (r.tipo === "FONDO_REBOTE" && r.score >= CFG.RT_MIN))); }
+    function prioridad(sym) { var r = ACT[sym]; return r ? 1000 + r.score + (r.tipo === "RETROCESO" ? 1000 + (r.estado === "IMPULSO" ? 200 : 0) : r.tipo === "FONDO_REBOTE" ? 1400 : r.tipo === "CAIDA_ALCISTA" ? 800 : r.tipo === "DESPERTAR" ? 100 : r.dir < 0 ? 9000 : 0) : 0; }
 
     function autoAbrir() {
         if (typeof seleccionarMoneda !== "function") return;
         var now = Date.now(), S = typeof selectedCoin !== "undefined" ? selectedCoin : null, rs = S && ACT[S];
         if (rs && rs.dir < 0 && now - (ultAviso[S] || 0) > 120000) { ultAviso[S] = now; beep(true); try { hablar("Moneda con desmayo, " + S.replace("USDT", "") + ", cuidado", true, { sym: S, dir: "SHORT" }); } catch (e) {} }
+        try { var dm = Object.values(ACT).filter(function (r) { return r.dir < 0; }).sort(function (a, b) { return b.score - a.score; })[0];
+            if (dm) { desmayoVoz(dm); if (dm.symbol !== S && now - _ultimaSeleccionManualTs > 15000 && now - (window.__dmAbrirTs || 0) > 20000) { window.__dmAbrirTs = now; seleccionarMoneda(dm.symbol, true, dm.tipo); if (selectedCoin === dm.symbol) { ultAbierta = dm.symbol; ultAutoTs = now; } } } } catch (e) {}
         if (CFG.RT_AUTO) {   // 🎯 RETROCESO CON IMPULSO: siempre abre solo, prioridad número 1
             var rt = Object.values(ACT).filter(function (r) { return ((r.tipo === "RETROCESO" && r.estado === "IMPULSO") || (CFG.CA_AUTO && r.tipo === "CAIDA_ALCISTA") || r.tipo === "FONDO_REBOTE") && r.score >= CFG.RT_MIN; }).sort(function (a, b) { return prioridad(b.symbol) - prioridad(a.symbol); })[0];
             if (!rt) ultRt = null;
@@ -19172,7 +19174,12 @@ setTimeout(function(){setInterval(tick,CFG.TICK_MS);},CFG.ARRANQUE_MS);
 
     /* ── Aviso por voz: "Moneda acelerada" / "Moneda con desmayo" ── */
     var ultVoz = 0;
-    function anunciar(r) { var now = Date.now(); if (now - ultVoz < 8000) return; ultVoz = now;
+    var _vD = {};
+    function desmayoVoz(r) { var now = Date.now(); if (now - (_vD[r.symbol] || 0) < 45000) return true; _vD[r.symbol] = now;
+        try { var n = String(r.symbol).replace("USDT", ""), a = Math.abs(r.g5 < r.g3 ? r.g5 : r.g3), t0 = "ALERTA. Moneda con desmayo, " + n + ". Cae " + Math.round(a) + " por ciento. Cuidado.";
+            var tx = (typeof _humanizarTexto === "function") ? _humanizarTexto(t0, { sym: r.symbol, dir: "SHORT" }) : t0;
+            colaVoz.unshift({ texto: tx, esMasculino: true }); while (colaVoz.length > (typeof MAX_COLA_VOZ === "number" ? MAX_COLA_VOZ : 20)) colaVoz.pop(); procesarColaVoz(); } catch (e) {} return true; }
+    function anunciar(r) { var now = Date.now(); if (r.dir < 0) { desmayoVoz(r); return; } if (now - ultVoz < 8000) return; ultVoz = now;
         try { hablar((r.tipo === "RETROCESO" ? "Retroceso con impulso, " : r.tipo === "FONDO_REBOTE" ? "Entrada long en el fondo, " : r.tipo === "CAIDA_ALCISTA" ? "Caída brutal en alcista, " : r.dir < 0 ? "Moneda con desmayo, " : "Moneda acelerada, ") + r.symbol.replace("USDT", ""), true, { sym: r.symbol, dir: r.dir < 0 ? "SHORT" : "LONG" }); } catch (e) {} }
 
     /* ── UI: barrita en el ENCABEZADO, en el espacio libre entre el logo y TikTok ── */
@@ -19262,6 +19269,10 @@ function tono(){try{var A=window.AudioContext||window.webkitAudioContext;if(!A)r
 function voz(sym,r){if(!CFG.VOZ||!("speechSynthesis" in window))return;try{if(typeof colaVoz==="undefined"||typeof procesarColaVoz!=="function")return;
  var t0="ALERTA. Caída brutal con rebote confirmado. "+nom(sym)+". Entrada long. Stop debajo del mínimo.",t=(typeof _humanizarTexto==="function")?_humanizarTexto(t0,{sym:sym,dir:"LONG"}):t0;
  colaVoz.unshift({texto:t,esMasculino:true});var m=(typeof MAX_COLA_VOZ==="number")?MAX_COLA_VOZ:20;while(colaVoz.length>m)colaVoz.pop();procesarColaVoz();}catch(e){}}
+function desm(sym,h){var now=Date.now();if(now-(window.__crDm&&window.__crDm[sym]||0)<45000)return;(window.__crDm=window.__crDm||{})[sym]=now;tono();
+ try{if(CFG.VOZ&&typeof colaVoz!=="undefined"&&typeof procesarColaVoz==="function"){var t0="ALERTA. Moneda con desmayo, "+nom(sym)+". Cae "+Math.round(Math.abs(h.v))+" por ciento en "+h.w+" segundos. Cuidado.",
+  t=(typeof _humanizarTexto==="function")?_humanizarTexto(t0,{sym:sym,dir:"SHORT"}):t0;colaVoz.unshift({texto:t,esMasculino:true});procesarColaVoz();}}catch(e){}
+ if(CFG.PANEL_AUTO&&now-manualTs>15000&&now-(window.__crOpen||0)>20000){window.__crOpen=now;abrir(sym);}}
 function abrir(sym){try{if(typeof seleccionarMoneda==="function")seleccionarMoneda(sym,true,"CAIDA_BRUTAL");}catch(e){}}
 function cartel(sym,r){try{var id="cdcCrashBox",b=document.getElementById(id);if(!b){b=document.createElement("div");b.id=id;
  b.style.cssText="position:fixed;top:70px;left:50%;transform:translateX(-50%);z-index:9500;width:min(360px,calc(100vw - 20px));background:#06210f;border:2px solid #0ecb81;border-radius:12px;padding:10px 12px;color:#fff;font:600 12px Arial;box-shadow:0 0 22px #0ecb8199;cursor:pointer";document.body.appendChild(b);}
@@ -19291,7 +19302,7 @@ function evaluar(sym,now){var s=S[sym];if(!s||s.t.length<30)return;var n=s.t.len
  if(s.est==="SENAL"){var g=s.sig,px=cur,res=null;if(px<=g.sl)res="SL";else if(px>=g.tp2)res="TP";else if(now-g.ts>CFG.SIM_MS)res="TIEMPO";
   if(res){guardar(sym,g,res,px);delete ACT[sym];s.est="IDLE";s.cdUntil=now+CFG.COOLDOWN_MS;s.cr=null;}return;}
  if(s.est==="IDLE"){if(now<s.cdUntil||ts-s.t0<CFG.WARM_S*1000)return;var c=cd(),cc=c&&c[sym];if(!cc||!(cc.volume>=CFG.LIQ_MIN))return;
-  var h=crash(s,cur);if(h){s.est="ARMADA";s.cr={w:h.w,v:h.v,z:h.z,vx:h.vx,peak:h.peak,low:cur,tLow:ts,t0:now,pk10:0,chk:false};}return;}
+  var h=crash(s,cur);if(h){s.est="ARMADA";try{desm(sym,h);}catch(e){}s.cr={w:h.w,v:h.v,z:h.z,vx:h.vx,peak:h.peak,low:cur,tLow:ts,t0:now,pk10:0,chk:false};}return;}
  var r=s.cr;if(now-r.t0>CFG.ARM_MS||cur>=r.peak*0.995){s.est="IDLE";s.cr=null;s.cdUntil=now+60000;return;}
  if(cur<r.low){r.low=cur;r.tLow=ts;r.chk=false;}
  var q10=Math.max(0,s.q[n]-ago(s.q,s,10000));if(q10>r.pk10)r.pk10=q10;
