@@ -17652,7 +17652,7 @@ setTimeout(function(){setInterval(tick,CFG.TICK_MS);},CFG.ARRANQUE_MS);
     // archivo completo sin caer en la paradoja de "el hash contiene su
     // propio hash". No cambiar este texto.
     var _PLACEHOLDER = "%%CDC_INTEGRITY_HASH%%";
-    var _HASH_ESPERADO = "918dc9db2662f9151ed90a23146107f4a3d855eaa27e499d892052a1bd8db2e7"; // ← se reemplaza por el hash real en el paso final
+    var _HASH_ESPERADO = "b76e8687323cc47e67dc46815a3d4438476aaaa91ff9c0fb1140ed10730170aa"; // ← se reemplaza por el hash real en el paso final
 
     function _bloquear(motivo) {
         try {
@@ -19220,6 +19220,114 @@ setTimeout(function(){setInterval(tick,CFG.TICK_MS);},CFG.ARRANQUE_MS);
         simbolosLista: function () { return Object.keys(ACT); }, red: function () { return { sube: NET, cae: NETD, retroceso: NETR, caida: NETB, fondo: NETF, combustible: NETC }; },
         reiniciarRed: function () { try { localStorage.removeItem(KEY); localStorage.removeItem(KEY + "_dn"); localStorage.removeItem(KEY + "_rt"); localStorage.removeItem(KEY + "_ca"); localStorage.removeItem(KEY + "_fr"); localStorage.removeItem(KEY + "_fu"); } catch (e) {} NET = mkNet(KEY); NETD = mkNet(KEY + "_dn"); NETR = mkNet(KEY + "_rt"); NETB = mkNet(KEY + "_ca"); NETF = mkNet(KEY + "_fr"); NETC = mkNet(KEY + "_fu"); } };
     setTimeout(function () { ui(); setInterval(tick, CFG.TICK_MS); }, 15000);
+})();
+</script>
+
+<script>
+/* ═══ CDC-CRASH · 💥→🟢 CAÍDA BRUTAL POR VELOCIDAD → REBOTE LONG (tiempo real) — CDC FUTURO-PRO · Juan Pablo Ortiz Ortuño
+   1) Stream wss !miniTicker@arr (1 s, todas las monedas) → buffer de 180 s por moneda (fallback: cachedData).
+   2) CAÍDA: v60≤-4% (o v30≤-3% / v120≤-5%) + z≤-3 (normalizado por volatilidad propia) + volumen ≥3x.
+   3) REBOTE: no compra mientras cae. Espera: rebote 23.6–38% de la caída, mínimo ascendente, la velocidad deja de empeorar,
+      volumen que se seca, compra agresiva (taker) ≥50%, spread bajo y NO tendencia bajista previa (5m).
+   4) SL bajo el mínimo del crash · TP 38%/50% · cooldown · máx. simultáneas · bitácora simulada (CDC_CRASH.stats()).
+   PRIORIDAD TOTAL: cerebro neuronal (CDC_VEL.es), lista y panel central (CDC_DESPERTAR), voz, alarma y cartel.
+   Ajustes: CDC_CRASH.cfg.X=valor · Apagar: cfg.ON=false · Probar: CDC_CRASH.probar('SOPHUSDT'). No es asesoría financiera. */
+(function(){"use strict";
+var CFG={ON:true,WS:true,BUF_S:180,WARM_S:90,V30:3,V60:4,V120:5,Z_MIN:-3,VOL_X:3,LIQ_MIN:1000000,REB_MIN:0.236,REB_MAX:0.35,HL_S:6,
+ ARM_MS:600000,COOLDOWN_MS:900000,MAX_ACT:3,SL_BUF:0.0015,TP1:0.382,TP2:0.5,RIESGO_MAX:6,RR_MIN:0.7,SPREAD_MAX:0.3,TAKER_MIN:0.5,
+ TREND_SLOPE:0.6,SIM_MS:1800000,TICK_MS:1000,VOZ:true,PANEL_AUTO:true,PRIORIDAD:true,TOAST_MS:25000,PRIO_MS:1800000};
+var S={},ACT={},LOG=[],K="cdc_crash_log",AC=null,wsOk=0,ws=null,wsTry=0,manualTs=0;
+try{LOG=JSON.parse(localStorage.getItem(K)||"[]")||[];}catch(e){LOG=[];}
+function cd(){try{return cachedData;}catch(e){return null;}}
+function st(sym){return S[sym]||(S[sym]={t:[],p:[],q:[],ew:null,est:"IDLE",cdUntil:0});}
+function ingest(sym,p,q,ts){p=+p;q=+q;if(!(p>0))return;var s=st(sym),n=s.t.length;
+ if(n){var dt=(ts-s.t[n-1])/1000;if(dt<=0)return;var r=Math.log(p/s.p[n-1]),v=r*r/dt;s.ew=s.ew==null?v:s.ew+(1-Math.exp(-dt/600))*(v-s.ew);}
+ else s.t0=ts;
+ s.t.push(ts);s.p.push(p);s.q.push(q>0?q:(n?s.q[n-1]:0));
+ var lim=ts-CFG.BUF_S*1000;while(s.t.length>2&&s.t[0]<lim){s.t.shift();s.p.shift();s.q.shift();}}
+function ago(A,s,ms){var T=s.t,i=T.length-1,l=T[i]-ms;while(i>0&&T[i]>l)i--;return A[i];}
+function mx(s,a,b){var T=s.t,e=T[T.length-1],m=0;for(var i=T.length-1;i>=0;i--){var d=e-T[i];if(d>a)break;if(d>=b&&s.p[i]>m)m=s.p[i];}return m;}
+function mn(s,a,b){var T=s.t,e=T[T.length-1],m=Infinity;for(var i=T.length-1;i>=0;i--){var d=e-T[i];if(d>a)break;if(d>=b&&s.p[i]<m)m=s.p[i];}return m;}
+function volX(s,w){var n=s.q.length-1,dq=Math.max(0,s.q[n]-ago(s.q,s,w*1000)),b=s.q[n]/86400*w;return b>0?dq/b:0;}
+function crash(s,cur){var best=null,W=[[30,CFG.V30],[60,CFG.V60],[120,CFG.V120]],sg=Math.max(Math.sqrt(s.ew||0),0.00005);
+ for(var i=0;i<3;i++){var w=W[i][0],m=mx(s,w*1000,0);if(!(m>0))continue;var v=(cur-m)/m*100,z=(v/100)/(sg*Math.sqrt(w)),vx=volX(s,w);
+  if(v<=-W[i][1]&&z<=CFG.Z_MIN&&vx>=CFG.VOL_X&&(!best||z<best.z))best={w:w,v:v,z:z,vx:vx,peak:m};}
+ return best;}
+function bien(){return typeof window.CDC_NEURO==="undefined"||true;}
+function nom(x){try{return _nombreHablado(x);}catch(e){return String(x).replace(/USDT$/,"");}}
+function f4(x){return x>=1?x.toFixed(4):x.toPrecision(4);}
+function tono(){try{var A=window.AudioContext||window.webkitAudioContext;if(!A)return;if(!AC)AC=new A();if(AC.state==="suspended")AC.resume();
+ [523,659,784,1047].forEach(function(f,i){var o=AC.createOscillator(),g=AC.createGain(),t=AC.currentTime+i*0.13;o.type="triangle";o.frequency.value=f;
+  g.gain.setValueAtTime(0.0001,t);g.gain.exponentialRampToValueAtTime(0.16,t+0.02);g.gain.exponentialRampToValueAtTime(0.0001,t+0.12);o.connect(g);g.connect(AC.destination);o.start(t);o.stop(t+0.13);});}catch(e){}}
+function voz(sym,r){if(!CFG.VOZ||!("speechSynthesis" in window))return;try{if(typeof colaVoz==="undefined"||typeof procesarColaVoz!=="function")return;
+ var t0="ALERTA. Caída brutal con rebote confirmado. "+nom(sym)+". Entrada long. Stop debajo del mínimo.",t=(typeof _humanizarTexto==="function")?_humanizarTexto(t0,{sym:sym,dir:"LONG"}):t0;
+ colaVoz.unshift({texto:t,esMasculino:true});var m=(typeof MAX_COLA_VOZ==="number")?MAX_COLA_VOZ:20;while(colaVoz.length>m)colaVoz.pop();procesarColaVoz();}catch(e){}}
+function abrir(sym){try{if(typeof seleccionarMoneda==="function")seleccionarMoneda(sym,true,"CAIDA_BRUTAL");}catch(e){}}
+function cartel(sym,r){try{var id="cdcCrashBox",b=document.getElementById(id);if(!b){b=document.createElement("div");b.id=id;
+ b.style.cssText="position:fixed;top:70px;left:50%;transform:translateX(-50%);z-index:9500;width:min(360px,calc(100vw - 20px));background:#06210f;border:2px solid #0ecb81;border-radius:12px;padding:10px 12px;color:#fff;font:600 12px Arial;box-shadow:0 0 22px #0ecb8199;cursor:pointer";document.body.appendChild(b);}
+ b.onclick=function(){abrir(sym);b.style.display="none";};
+ b.innerHTML='<div style="font:900 11px Arial;letter-spacing:.5px;color:#0ecb81">💥→🟢 CAÍDA BRUTAL + REBOTE · ENTRADA LONG</div><div style="font:900 15px Arial;margin:3px 0"><b>'+sym.replace("USDT","")+'</b> · puntaje '+r.score+'/100</div>'+
+ '<div style="color:#cbd5e1;line-height:1.4">Caída '+r.v.toFixed(1)+'% en '+r.w+' s · z '+r.z.toFixed(1)+' · vol x'+r.vx.toFixed(1)+'<br>Rebote '+(r.ret*100).toFixed(0)+'% de la caída'+(r.taker!=null?' · taker compra '+(r.taker*100).toFixed(0)+'%':'')+
+ '<br>Entrada <b>'+f4(r.entry)+'</b> · SL <b style="color:#ff6b6b">'+f4(r.sl)+'</b> (−'+r.riesgo.toFixed(2)+'%) · TP <b style="color:#0ecb81">'+f4(r.tp1)+'</b> / <b style="color:#0ecb81">'+f4(r.tp2)+'</b></div>';
+ b.style.display="block";clearTimeout(b._h);b._h=setTimeout(function(){b.style.display="none";},CFG.TOAST_MS);}catch(e){}}
+function alarma(sym,r){tono();voz(sym,r);cartel(sym,r);
+ if(CFG.PANEL_AUTO&&Date.now()-manualTs>15000){abrir(sym);}
+ try{if(typeof actualizarTablaIzquierda==="function")actualizarTablaIzquierda();}catch(e){}}
+function guardar(sym,r,res,px){LOG.push({s:sym,t:Date.now(),e:r.entry,sl:r.sl,tp:r.tp2,res:res,pnl:(px-r.entry)/r.entry*100,sc:r.score});if(LOG.length>200)LOG.shift();try{localStorage.setItem(K,JSON.stringify(LOG));}catch(e){}}
+function stats(){var n=LOG.length,w=LOG.filter(function(x){return x.pnl>0;}).length,sum=0;LOG.forEach(function(x){sum+=x.pnl;});
+ return{operaciones:n,ganadas:w,aciertoPct:n?Math.round(w/n*100):0,pnlMedioPct:n?+(sum/n).toFixed(2):0,tp:LOG.filter(function(x){return x.res==="TP";}).length,sl:LOG.filter(function(x){return x.res==="SL";}).length,tiempo:LOG.filter(function(x){return x.res==="TIEMPO";}).length};}
+function jf(u){return fetch(u).then(function(r){if(!r.ok)throw 0;return r.json();});}
+function sma(C,n,e){if(e+1<n)return null;var a=0;for(var i=e-n+1;i<=e;i++)a+=C[i];return a/n;}
+function confirmar(sym,s,cr,cur,ts){var B="https://fapi.binance.com/fapi/v1/",kl=(typeof obtenerKlines==="function")?obtenerKlines(sym,"5m",120):jf(B+"klines?symbol="+sym+"&interval=5m&limit=120");
+ return Promise.all([kl.catch(function(){return null;}),jf(B+"aggTrades?symbol="+sym+"&limit=500").catch(function(){return null;}),jf(B+"ticker/bookTicker?symbol="+sym).catch(function(){return null;})]).then(function(a){
+  var o={ok:true,why:[],taker:null,spread:null},k=a[0],tr=a[1],bk=a[2];
+  if(tr&&tr.length){var T1=+tr[tr.length-1].T,b=0,t=0;tr.forEach(function(x){if(T1-x.T<=30000){var v=+x.p*+x.q;t+=v;if(x.m===false)b+=v;}});if(t>0)o.taker=b/t;}
+  if(o.taker!=null&&o.taker<CFG.TAKER_MIN){o.ok=false;o.why.push("compra agresiva débil "+(o.taker*100).toFixed(0)+"%");}
+  if(bk&&+bk.bidPrice>0){o.spread=(+bk.askPrice-+bk.bidPrice)/+bk.bidPrice*100;if(o.spread>CFG.SPREAD_MAX){o.ok=false;o.why.push("spread "+o.spread.toFixed(2)+"%");}}
+  if(k&&k.length>=110){var C=k.map(function(x){return +x[4];}),e=C.length-4,m7=sma(C,7,e),m25=sma(C,25,e),m99=sma(C,99,e),m99b=sma(C,99,e-12);
+   if(m7&&m25&&m99&&m99b&&m7<m25&&m25<m99&&(m99/m99b-1)*100<=-CFG.TREND_SLOPE){o.ok=false;o.why.push("tendencia bajista sostenida previa");}}
+  return o;});}
+function evaluar(sym,now){var s=S[sym];if(!s||s.t.length<30)return;var n=s.t.length-1,cur=s.p[n],ts=s.t[n];if(now-ts>8000)return;
+ if(s.est==="SENAL"){var g=s.sig,px=cur,res=null;if(px<=g.sl)res="SL";else if(px>=g.tp2)res="TP";else if(now-g.ts>CFG.SIM_MS)res="TIEMPO";
+  if(res){guardar(sym,g,res,px);delete ACT[sym];s.est="IDLE";s.cdUntil=now+CFG.COOLDOWN_MS;s.cr=null;}return;}
+ if(s.est==="IDLE"){if(now<s.cdUntil||ts-s.t0<CFG.WARM_S*1000)return;var c=cd(),cc=c&&c[sym];if(!cc||!(cc.volume>=CFG.LIQ_MIN))return;
+  var h=crash(s,cur);if(h){s.est="ARMADA";s.cr={w:h.w,v:h.v,z:h.z,vx:h.vx,peak:h.peak,low:cur,tLow:ts,t0:now,pk10:0,chk:false};}return;}
+ var r=s.cr;if(now-r.t0>CFG.ARM_MS||cur>=r.peak*0.995){s.est="IDLE";s.cr=null;s.cdUntil=now+60000;return;}
+ if(cur<r.low){r.low=cur;r.tLow=ts;r.chk=false;}
+ var q10=Math.max(0,s.q[n]-ago(s.q,s,10000));if(q10>r.pk10)r.pk10=q10;
+ var drop=r.peak-r.low,ret=drop>0?(cur-r.low)/drop:0;if(r.chk||ret<CFG.REB_MIN)return;
+ if(ret>CFG.REB_MAX){s.est="IDLE";s.cr=null;s.cdUntil=now+60000;return;}
+ var ml2=mn(s,CFG.HL_S*1000,0),ml1=mn(s,CFG.HL_S*2000,CFG.HL_S*1000),m60=mx(s,60000,0),p10=ago(s.p,s,10000),m60b=mx(s,70000,10000);
+ var vA=(cur-m60)/m60,vB=m60b>0?(p10-m60b)/m60b:-1;
+ if(!(ml2>r.low*1.0005&&ml2>=ml1*0.9995))return;                 // mínimo ascendente
+ if(!(vA>vB))return;                                               // la velocidad dejó de empeorar
+ if(r.pk10>0&&q10>r.pk10*0.7)return;                               // el volumen se está secando
+ if(Object.keys(ACT).length>=CFG.MAX_ACT)return;
+ var sl=r.low*(1-CFG.SL_BUF),tp1=r.low+CFG.TP1*drop,tp2=r.low+CFG.TP2*drop,rg=(cur-sl)/cur*100,rr=(tp2-cur)/(cur-sl);
+ if(rg>CFG.RIESGO_MAX||!(rr>=CFG.RR_MIN))return;
+ r.chk=true;confirmar(sym,s,r,cur,ts).then(function(o){if(s.est!=="ARMADA"||s.cr!==r)return;
+  if(!o.ok){r.why=o.why;r.chk=false;r.t0=Math.max(r.t0,Date.now()-CFG.ARM_MS+60000);return;}
+  var sc=30*Math.min(Math.abs(r.z)/6,1)+20*Math.min(r.vx/8,1)+20*Math.min(ret/CFG.REB_MAX,1)+15*(o.taker==null?0.4:Math.min(o.taker/0.65,1))+15*Math.min(rr/2.5,1);
+  var sg={symbol:sym,w:r.w,v:r.v,z:r.z,vx:r.vx,ret:ret,taker:o.taker,spread:o.spread,entry:cur,sl:sl,tp1:tp1,tp2:tp2,riesgo:rg,rr:rr,score:Math.round(Math.min(100,sc)),ts:Date.now()};
+  s.est="SENAL";s.sig=sg;ACT[sym]=sg;alarma(sym,sg);});}
+function tick(now){if(!CFG.ON)return;now=now||Date.now();if(!wsOk||now-wsOk>6000)feedCache(now);for(var k in S)evaluar(k,now);}
+function feedCache(now){var c=cd();if(!c)return;for(var k in c){var x=c[k];if(x&&x.price>0)ingest(k,x.price,x.volume,now);}}
+function conectar(){if(!CFG.WS||!("WebSocket" in window))return;try{ws=new WebSocket("wss://fstream.binance.com/ws/!miniTicker@arr");
+ ws.onmessage=function(m){try{var a=JSON.parse(m.data),c=cd();if(!c||!a.forEach)return;wsOk=Date.now();wsTry=0;a.forEach(function(x){if(c[x.s])ingest(x.s,x.c,x.q,x.E||wsOk);});}catch(e){}};
+ ws.onclose=ws.onerror=function(){ws=null;setTimeout(conectar,Math.min(30000,2000*(++wsTry)));};}catch(e){}}
+/* ── PRIORIDAD EN TODO EL CDC: cerebro (CDC_VEL.es), lista, orden y panel central (CDC_DESPERTAR) ── */
+function es(sym){return !!ACT[sym]||(S[sym]&&S[sym].est==="ARMADA"&&Date.now()-S[sym].cr.t0<CFG.PRIO_MS&&S[sym].cr.low<S[sym].cr.peak);}
+function enganchar(){var ok=0;try{var V=window.CDC_VEL;if(V&&typeof V.es==="function"){if(!V.es.__cr){var o=V.es,w=function(x){return (CFG.PRIORIDAD&&es(x))||o(x);};w.__cr=1;V.es=w;}ok++;}
+ var D=window.CDC_DESPERTAR;if(D&&D.simbolosLista){if(!D.simbolosLista.__cr){var l=D.simbolosLista,wl=function(){var a=l.apply(this,arguments);Object.keys(ACT).forEach(function(k){if(a.indexOf(k)<0)a.push(k);});return a;};wl.__cr=1;D.simbolosLista=wl;}
+  if(D.prioridad&&!D.prioridad.__cr){var p=D.prioridad,wp=function(x){return ACT[x]?5000+ACT[x].score:p.apply(this,arguments);};wp.__cr=1;D.prioridad=wp;}
+  if(D.aprueba&&!D.aprueba.__cr){var q=D.aprueba,wq=function(x){return !!ACT[x]||q.apply(this,arguments);};wq.__cr=1;D.aprueba=wq;}ok++;}}catch(e){}return ok>=2;}
+try{var _sm=window.seleccionarMoneda;document.addEventListener("click",function(){manualTs=Date.now();},true);}catch(e){}
+var _n=0,_iv=setInterval(function(){if(enganchar()||++_n>40)clearInterval(_iv);},1500);
+window.CDC_CRASH={version:"1",cfg:CFG,es:es,stats:stats,log:function(){return LOG.slice();},activas:function(){return Object.keys(ACT).map(function(k){return ACT[k];});},
+ armadas:function(){return Object.keys(S).filter(function(k){return S[k].est==="ARMADA";}).map(function(k){var r=S[k].cr;return{sym:k,caida:r.v,z:r.z,volX:r.vx,pico:r.peak,minimo:r.low,motivo:r.why||null};});},
+ abrir:abrir,_ingest:ingest,_tick:tick,_S:S,
+ probar:function(sym){sym=String(sym||"SOPHUSDT").toUpperCase();var c=cd(),p=c&&c[sym]?c[sym].price:1,r={symbol:sym,w:60,v:-5,z:-4.2,vx:5,ret:0.3,taker:0.58,entry:p,sl:p*0.97,tp1:p*1.03,tp2:p*1.045,riesgo:3,rr:1.5,score:80,ts:Date.now()};alarma(sym,r);}};
+setTimeout(function(){conectar();setInterval(tick,CFG.TICK_MS);},20000);
 })();
 </script>
 
