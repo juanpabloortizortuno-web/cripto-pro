@@ -17592,6 +17592,7 @@ function aviso(sym,r){FLASH_HASTA=Date.now()+6000;fijar();}
    Apagar: CDC_VEL.cfg.PANEL_AUTO = false */
 function cargarEnPanel(sym,r){
  try{
+  if(window.CDC_DESPERTAR&&CDC_DESPERTAR.hayDesmayo&&CDC_DESPERTAR.hayDesmayo())return;   /* el DESMAYO es la prioridad del panel */
   if(CFG.PANEL_AUTO===false||typeof seleccionarMoneda!=='function')return;
   var cur=null;try{cur=selectedCoin;}catch(e){}
   if(cur===sym)return;
@@ -17652,7 +17653,7 @@ setTimeout(function(){setInterval(tick,CFG.TICK_MS);},CFG.ARRANQUE_MS);
     // archivo completo sin caer en la paradoja de "el hash contiene su
     // propio hash". No cambiar este texto.
     var _PLACEHOLDER = "%%CDC_INTEGRITY_HASH%%";
-    var _HASH_ESPERADO = "601ecfcaf3bc812186a4026e8b56caa17a4f72264f8e6be0643bafd6ed98d37c"; // ← se reemplaza por el hash real en el paso final
+    var _HASH_ESPERADO = "cc31533c3fb6ac8f9ea2709db3c50aa92b5db3f7a76ececad4ee9072015cb18c"; // ← se reemplaza por el hash real en el paso final
 
     function _bloquear(motivo) {
         try {
@@ -19115,14 +19116,18 @@ setTimeout(function(){setInterval(tick,CFG.TICK_MS);},CFG.ARRANQUE_MS);
     function aprueba(sym) { var r = ACT[sym]; if (r && r.dir < 0) return true; return !!(r && r.score >= CFG.AUTO_MIN_SCORE && !r.tarde && (r.tipo === "DESPERTAR" || (CFG.CAIDA_ABRIR && r.dir < 0) || (r.tipo === "RETROCESO" && r.estado === "IMPULSO" && r.score >= CFG.RT_MIN) || (CFG.CA_AUTO && r.tipo === "CAIDA_ALCISTA" && r.score >= CFG.RT_MIN) || (r.tipo === "FONDO_REBOTE" && r.score >= CFG.RT_MIN))); }
     function prioridad(sym) { var r = ACT[sym]; return r ? 1000 + r.score + (r.tipo === "RETROCESO" ? 1000 + (r.estado === "IMPULSO" ? 200 : 0) : r.tipo === "FONDO_REBOTE" ? 1400 : r.tipo === "CAIDA_ALCISTA" ? 800 : r.tipo === "DESPERTAR" ? 100 : r.dir < 0 ? 9000 : 0) : 0; }
 
+    function panelDesmayo() { var now = Date.now(), S = typeof selectedCoin !== "undefined" ? selectedCoin : null, dl = listaDes(); if (!dl.length) return;
+        if (ACT[dl[0].s] && ACT[dl[0].s].dir < 0) desmayoVoz(ACT[dl[0].s]);
+        var ix = dl.map(function (r) { return r.s; }).indexOf(S), go = null, ult = now - (window.__dmAbrirTs || 0);
+        if (ix < 0 && ult > 4000) go = dl[0]; else if (ix >= 0 && dl.length > 1 && ult > 15000) go = dl[(ix + 1) % dl.length];
+        if (go && now - _ultimaSeleccionManualTs > 15000) { window.__dmAbrirTs = now; window.__velHoldUntil = 0;   // el desmayo manda: libera la retención de alta velocidad
+            seleccionarMoneda(go.s, true, ACT[go.s] ? ACT[go.s].tipo : "CAIDA_BRUTAL"); if (selectedCoin === go.s) { ultAbierta = go.s; ultAutoTs = now; } } }
+    setInterval(function () { try { panelDesmayo(); } catch (e) {} }, 2000);
     function autoAbrir() {
         if (typeof seleccionarMoneda !== "function") return;
         var now = Date.now(), S = typeof selectedCoin !== "undefined" ? selectedCoin : null, rs = S && ACT[S];
         if (rs && rs.dir < 0 && now - (ultAviso[S] || 0) > 120000) { ultAviso[S] = now; beep(true); try { hablar("Moneda con desmayo, " + S.replace("USDT", "") + ", cuidado", true, { sym: S, dir: "SHORT" }); } catch (e) {} }
-        try { var dm = Object.values(ACT).filter(function (r) { return r.dir < 0; }).sort(function (a, b) { return b.score - a.score; })[0];
-            if (dm) { desmayoVoz(dm); var dl = Object.values(ACT).filter(function (r) { return r.dir < 0; }).sort(function (a, b) { return b.score - a.score; }), ix = dl.map(function (r) { return r.symbol; }).indexOf(S), go = null, ult = now - (window.__dmAbrirTs || 0);
-                if (ix < 0 && ult > 6000) go = dl[0]; else if (ix >= 0 && dl.length > 1 && ult > 15000) go = dl[(ix + 1) % dl.length];
-                if (go && now - _ultimaSeleccionManualTs > 15000) { window.__dmAbrirTs = now; seleccionarMoneda(go.symbol, true, go.tipo); if (selectedCoin === go.symbol) { ultAbierta = go.symbol; ultAutoTs = now; } } } } catch (e) {}
+        try { panelDesmayo(); } catch (e) {}
         if (CFG.RT_AUTO) {   // 🎯 RETROCESO CON IMPULSO: siempre abre solo, prioridad número 1
             var rt = Object.values(ACT).filter(function (r) { return ((r.tipo === "RETROCESO" && r.estado === "IMPULSO") || (CFG.CA_AUTO && r.tipo === "CAIDA_ALCISTA") || r.tipo === "FONDO_REBOTE") && r.score >= CFG.RT_MIN; }).sort(function (a, b) { return prioridad(b.symbol) - prioridad(a.symbol); })[0];
             if (!rt) ultRt = null;
@@ -19306,7 +19311,7 @@ function voz(sym,r){if(!CFG.VOZ||!("speechSynthesis" in window))return;try{if(ty
 function desm(sym,h){setTimeout(function(){try{CDC_DESPERTAR.fijarDes();}catch(e){}},80);var now=Date.now();if(now-(window.__crDm&&window.__crDm[sym]||0)<45000)return;(window.__crDm=window.__crDm||{})[sym]=now;tono();
  try{if(CFG.VOZ&&typeof colaVoz!=="undefined"&&typeof procesarColaVoz==="function"){var t0="ALERTA. Moneda con desmayo, "+nom(sym)+". Cae "+Math.round(Math.abs(h.v))+" por ciento en "+h.w+" segundos. Cuidado.",
   t=(typeof _humanizarTexto==="function")?_humanizarTexto(t0,{sym:sym,dir:"SHORT"}):t0;colaVoz.unshift({texto:t,esMasculino:true});procesarColaVoz();}}catch(e){}
- if(CFG.PANEL_AUTO&&now-manualTs>15000&&now-(window.__crOpen||0)>20000){window.__crOpen=now;abrir(sym);}}
+ if(CFG.PANEL_AUTO&&now-manualTs>15000&&now-(window.__crOpen||0)>20000){window.__crOpen=now;window.__velHoldUntil=0;abrir(sym);}}
 function abrir(sym){try{if(typeof seleccionarMoneda==="function")seleccionarMoneda(sym,true,"CAIDA_BRUTAL");}catch(e){}}
 function cartel(sym,r){try{var id="cdcCrashBox",b=document.getElementById(id);if(!b){b=document.createElement("div");b.id=id;
  b.style.cssText="position:fixed;top:70px;left:50%;transform:translateX(-50%);z-index:9500;width:min(360px,calc(100vw - 20px));background:#06210f;border:2px solid #0ecb81;border-radius:12px;padding:10px 12px;color:#fff;font:600 12px Arial;box-shadow:0 0 22px #0ecb8199;cursor:pointer";document.body.appendChild(b);}
