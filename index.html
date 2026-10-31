@@ -17652,7 +17652,7 @@ setTimeout(function(){setInterval(tick,CFG.TICK_MS);},CFG.ARRANQUE_MS);
     // archivo completo sin caer en la paradoja de "el hash contiene su
     // propio hash". No cambiar este texto.
     var _PLACEHOLDER = "%%CDC_INTEGRITY_HASH%%";
-    var _HASH_ESPERADO = "bf5b6e74d03cea5cb4d09447f6de080bad37bad466af7bd2d2bbd145f15013bf"; // ← se reemplaza por el hash real en el paso final
+    var _HASH_ESPERADO = "60e5ce9e8ea6a87dfcfd877fa6bf5375ac51c6afff5eeb283f6659d6c2d160f4"; // ← se reemplaza por el hash real en el paso final
 
     function _bloquear(motivo) {
         try {
@@ -19120,7 +19120,9 @@ setTimeout(function(){setInterval(tick,CFG.TICK_MS);},CFG.ARRANQUE_MS);
         var now = Date.now(), S = typeof selectedCoin !== "undefined" ? selectedCoin : null, rs = S && ACT[S];
         if (rs && rs.dir < 0 && now - (ultAviso[S] || 0) > 120000) { ultAviso[S] = now; beep(true); try { hablar("Moneda con desmayo, " + S.replace("USDT", "") + ", cuidado", true, { sym: S, dir: "SHORT" }); } catch (e) {} }
         try { var dm = Object.values(ACT).filter(function (r) { return r.dir < 0; }).sort(function (a, b) { return b.score - a.score; })[0];
-            if (dm) { desmayoVoz(dm); if (dm.symbol !== S && now - _ultimaSeleccionManualTs > 15000 && now - (window.__dmAbrirTs || 0) > 20000) { window.__dmAbrirTs = now; seleccionarMoneda(dm.symbol, true, dm.tipo); if (selectedCoin === dm.symbol) { ultAbierta = dm.symbol; ultAutoTs = now; } } } } catch (e) {}
+            if (dm) { desmayoVoz(dm); var dl = Object.values(ACT).filter(function (r) { return r.dir < 0; }).sort(function (a, b) { return b.score - a.score; }), ix = dl.map(function (r) { return r.symbol; }).indexOf(S), go = null, ult = now - (window.__dmAbrirTs || 0);
+                if (ix < 0 && ult > 6000) go = dl[0]; else if (ix >= 0 && dl.length > 1 && ult > 15000) go = dl[(ix + 1) % dl.length];
+                if (go && now - _ultimaSeleccionManualTs > 15000) { window.__dmAbrirTs = now; seleccionarMoneda(go.symbol, true, go.tipo); if (selectedCoin === go.symbol) { ultAbierta = go.symbol; ultAutoTs = now; } } } } catch (e) {}
         if (CFG.RT_AUTO) {   // 🎯 RETROCESO CON IMPULSO: siempre abre solo, prioridad número 1
             var rt = Object.values(ACT).filter(function (r) { return ((r.tipo === "RETROCESO" && r.estado === "IMPULSO") || (CFG.CA_AUTO && r.tipo === "CAIDA_ALCISTA") || r.tipo === "FONDO_REBOTE") && r.score >= CFG.RT_MIN; }).sort(function (a, b) { return prioridad(b.symbol) - prioridad(a.symbol); })[0];
             if (!rt) ultRt = null;
@@ -19133,6 +19135,21 @@ setTimeout(function(){setInterval(tick,CFG.TICK_MS);},CFG.ARRANQUE_MS);
         try { if (now - _ultimaSeleccionManualTs < 15000) return; } catch (e) {}
         seleccionarMoneda(m.symbol, true, m.tipo);
         if (selectedCoin === m.symbol) { ultAbierta = m.symbol; ultAutoTs = now; anunciar(m); }
+    }
+
+    function chipsDesmayo() {
+        var an = document.getElementById("alertaMonedaFija"); if (!an || !an.parentNode) return;
+        var bx = document.getElementById("cdcDesmayos");
+        if (!bx) { bx = document.createElement("div"); bx.id = "cdcDesmayos"; bx.style.cssText = "display:none;margin-bottom:12px;padding:8px 10px;border-radius:8px;background:#2a0a0e;border:2px solid #f6465d;box-shadow:0 0 14px #f6465d66;"; an.parentNode.insertBefore(bx, an); }
+        var m = {}; Object.values(ACT).forEach(function (r) { if (r.dir < 0) m[r.symbol] = { s: r.symbol, sc: r.score, p: Math.min(r.g5 || 0, r.g3 || 0) }; });
+        try { (window.CDC_CRASH ? CDC_CRASH.armadas() : []).forEach(function (a) { if (!m[a.sym]) m[a.sym] = { s: a.sym, sc: 95, p: a.caida }; }); } catch (e) {}
+        var a = Object.values(m).sort(function (x, y) { return y.sc - x.sc; });
+        if (!a.length) { bx.style.display = "none"; return; }
+        var S = typeof selectedCoin !== "undefined" ? selectedCoin : null;
+        bx.style.display = "block";
+        bx.innerHTML = '<div style="font-size:10px;font-weight:900;letter-spacing:1px;color:#f6465d;margin-bottom:6px">🔻 MONEDAS CON DESMAYO — PRIORIDAD MÁXIMA (' + a.length + ')</div>' + a.map(function (r) {
+            return '<span style="display:inline-block;margin:2px 6px 2px 0;padding:5px 10px;border-radius:14px;background:' + (r.s === S ? '#f6465d' : '#1a0508') + ';border:1px solid #f6465d;color:#fff;font-size:12px;font-weight:800;cursor:pointer" onclick="try{seleccionarMoneda(\'' + r.s + '\')}catch(e){}">🔻 ' + r.s.replace("USDT", "") + ' <span style="opacity:.85">' + (r.p ? r.p.toFixed(1) + '%' : '') + ' · ' + Math.round(r.sc) + '</span></span>';
+        }).join("");
     }
 
     function chipsRebote() {
@@ -19166,7 +19183,7 @@ setTimeout(function(){setInterval(tick,CFG.TICK_MS);},CFG.ARRANQUE_MS);
                     ACT[c.symbol] = r; MISS[c.symbol] = 0; }
                 else if (ACT[c.symbol] && (MISS[c.symbol] = (MISS[c.symbol] || 0) + 1) >= 2) { delete ACT[c.symbol]; nuevo = true; } }   // ya no cumple: sale de la barrita y de la lista
             var lim = Date.now() - CFG.VIDA_MS; Object.keys(ACT).forEach(function (s) { if (ACT[s].ts < lim) delete ACT[s]; });
-            pintar(); try { chipsRebote(); } catch (e) {} PENDVOZ = nuevos.sort(function (a, b) { return prioridad(b.symbol) - prioridad(a.symbol); })[0] || null;
+            pintar(); try { chipsDesmayo(); } catch (e) {} try { chipsRebote(); } catch (e) {} PENDVOZ = nuevos.sort(function (a, b) { return prioridad(b.symbol) - prioridad(a.symbol); })[0] || null;
             var antes = ultAutoTs; autoAbrir(); if (PENDVOZ && ultAutoTs === antes) anunciar(PENDVOZ);   // la voz nombra la misma moneda que abrió el panel
             if (nuevo) { try { actualizarTablaIzquierda(); } catch (e) {} }
         } catch (e) { console.warn("DESPERTAR:", e); } finally { busy = false; }
@@ -19223,7 +19240,7 @@ setTimeout(function(){setInterval(tick,CFG.TICK_MS);},CFG.ARRANQUE_MS);
         document.getElementById("despertarPanel").innerHTML = h; }
 
     window.CDC_DESPERTAR = { CFG: CFG, estadoFuerza: function (s) { return FUEL[s] ? FUEL[s].estado : null; }, fuel: function (s) { return FUEL[s] || null; }, _combustible: combustible,
-        vetoCorto: function (s) { return !!(CFG.FUEL_VETO_SHORT && FUEL[s] && FUEL[s].estado === "CARGANDO" && FUEL[s].fuerza >= 75); }, reservaPanel: function () { return !!ultRtTs && Date.now() - ultRtTs < CFG.RT_RESERVA_MS; }, abrir: function (s) { try { seleccionarMoneda(s); } catch (e) {} }, evaluar: evaluar, aprueba: aprueba, prioridad: prioridad, activas: function () { return ACT; },
+        vetoCorto: function (s) { return !!(CFG.FUEL_VETO_SHORT && FUEL[s] && FUEL[s].estado === "CARGANDO" && FUEL[s].fuerza >= 75); }, reservaPanel: function () { return (!!ultRtTs && Date.now() - ultRtTs < CFG.RT_RESERVA_MS) || (Date.now() - (window.__dmAbrirTs || 0) < 60000 && Object.values(ACT).some(function (r) { return r.dir < 0; })); }, abrir: function (s) { try { seleccionarMoneda(s); } catch (e) {} }, evaluar: evaluar, aprueba: aprueba, prioridad: prioridad, activas: function () { return ACT; },
         simbolosLista: function () { return Object.keys(ACT); }, red: function () { return { sube: NET, cae: NETD, retroceso: NETR, caida: NETB, fondo: NETF, combustible: NETC }; },
         reiniciarRed: function () { try { localStorage.removeItem(KEY); localStorage.removeItem(KEY + "_dn"); localStorage.removeItem(KEY + "_rt"); localStorage.removeItem(KEY + "_ca"); localStorage.removeItem(KEY + "_fr"); localStorage.removeItem(KEY + "_fu"); } catch (e) {} NET = mkNet(KEY); NETD = mkNet(KEY + "_dn"); NETR = mkNet(KEY + "_rt"); NETB = mkNet(KEY + "_ca"); NETF = mkNet(KEY + "_fr"); NETC = mkNet(KEY + "_fu"); } };
     setTimeout(function () { ui(); setInterval(tick, CFG.TICK_MS); }, 15000);
@@ -19329,9 +19346,9 @@ function conectar(){if(!CFG.WS||!("WebSocket" in window))return;try{ws=new WebSo
 /* ── PRIORIDAD EN TODO EL CDC: cerebro (CDC_VEL.es), lista, orden y panel central (CDC_DESPERTAR) ── */
 function es(sym){return !!ACT[sym]||(S[sym]&&S[sym].est==="ARMADA"&&Date.now()-S[sym].cr.t0<CFG.PRIO_MS&&S[sym].cr.low<S[sym].cr.peak);}
 function enganchar(){var ok=0;try{var V=window.CDC_VEL;if(V&&typeof V.es==="function"){if(!V.es.__cr){var o=V.es,w=function(x){return (CFG.PRIORIDAD&&es(x))||o(x);};w.__cr=1;V.es=w;}ok++;}
- var D=window.CDC_DESPERTAR;if(D&&D.simbolosLista){if(!D.simbolosLista.__cr){var l=D.simbolosLista,wl=function(){var a=l.apply(this,arguments);Object.keys(ACT).forEach(function(k){if(a.indexOf(k)<0)a.push(k);});return a;};wl.__cr=1;D.simbolosLista=wl;}
-  if(D.prioridad&&!D.prioridad.__cr){var p=D.prioridad,wp=function(x){return ACT[x]?5000+ACT[x].score:p.apply(this,arguments);};wp.__cr=1;D.prioridad=wp;}
-  if(D.aprueba&&!D.aprueba.__cr){var q=D.aprueba,wq=function(x){return !!ACT[x]||q.apply(this,arguments);};wq.__cr=1;D.aprueba=wq;}ok++;}}catch(e){}return ok>=2;}
+ var D=window.CDC_DESPERTAR;if(D&&D.simbolosLista){if(!D.simbolosLista.__cr){var l=D.simbolosLista,wl=function(){var a=l.apply(this,arguments);Object.keys(S).forEach(function(k){if(es(k)&&a.indexOf(k)<0)a.push(k);});return a;};wl.__cr=1;D.simbolosLista=wl;}
+  if(D.prioridad&&!D.prioridad.__cr){var p=D.prioridad,wp=function(x){return ACT[x]?5000+ACT[x].score:(es(x)?4500:p.apply(this,arguments));};wp.__cr=1;D.prioridad=wp;}
+  if(D.aprueba&&!D.aprueba.__cr){var q=D.aprueba,wq=function(x){return !!es(x)||q.apply(this,arguments);};wq.__cr=1;D.aprueba=wq;}ok++;}}catch(e){}return ok>=2;}
 try{var _sm=window.seleccionarMoneda;document.addEventListener("click",function(){manualTs=Date.now();},true);}catch(e){}
 var _n=0,_iv=setInterval(function(){if(enganchar()||++_n>40)clearInterval(_iv);},1500);
 window.CDC_CRASH={version:"1",cfg:CFG,es:es,stats:stats,log:function(){return LOG.slice();},activas:function(){return Object.keys(ACT).map(function(k){return ACT[k];});},
