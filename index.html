@@ -24,7 +24,7 @@
 <html lang="es" style="--sidebar-mobile-top: 129px;"><head>
 <meta http-equiv="content-type" content="text/html; charset=UTF-8">
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
     <title>CDC FUTURO-PRO | PROYECTO TECNOMAN</title>
     <meta name="description" content="Cripto Scanner PRO: monitoreo de criptomonedas en tiempo real con alertas de máximos y mínimos. Por CDC FUTURO-PRO.">
     <meta name="theme-color" content="#f0b90b">
@@ -17653,7 +17653,7 @@ setTimeout(function(){setInterval(tick,CFG.TICK_MS);},CFG.ARRANQUE_MS);
     // archivo completo sin caer en la paradoja de "el hash contiene su
     // propio hash". No cambiar este texto.
     var _PLACEHOLDER = "%%CDC_INTEGRITY_HASH%%";
-    var _HASH_ESPERADO = "602828147687214c3ac773cbb72615862c603bfd12aab4edcdedd844a0464738"; // ← se reemplaza por el hash real en el paso final
+    var _HASH_ESPERADO = "fc944add25acd585dd8b860b7c8508808ef4bcba5265c12ac6ab0104221f95db"; // ← se reemplaza por el hash real en el paso final
 
     function _bloquear(motivo) {
         try {
@@ -18719,7 +18719,7 @@ dbOpen(function(){dbGet("ds",function(v){if(v&&v.length)DS=v.concat(DS);dbGet("p
 </script>
 <script>
 /* Caché offline/rápida: registra el service worker (sw.js debe estar junto a index.html) */
-if('serviceWorker' in navigator && (location.protocol==='https:'||location.hostname==='localhost')){window.addEventListener('load',function(){navigator.serviceWorker.register('sw.js').catch(function(){});});}
+if('serviceWorker' in navigator && (location.protocol==='https:'||location.hostname==='localhost')){window.addEventListener('load',function(){navigator.serviceWorker.register('sw.js',{updateViaCache:'none'}).then(function(r){try{r.update();}catch(e){}}).catch(function(){});});}
 </script>
 <script>
 /* Estado del panel central: explica por qué sigue en espera y permite abrir la mejor candidata a mano */
@@ -19391,12 +19391,53 @@ function enganchar(){var ok=0;try{var V=window.CDC_VEL;if(V&&typeof V.es==="func
   if(D.aprueba&&!D.aprueba.__cr){var q=D.aprueba,wq=function(x){return !!es(x)||q.apply(this,arguments);};wq.__cr=1;D.aprueba=wq;}ok++;}}catch(e){}return ok>=2;}
 try{var _sm=window.seleccionarMoneda;document.addEventListener("click",function(){manualTs=Date.now();},true);}catch(e){}
 var _n=0,_iv=setInterval(function(){if(enganchar()||++_n>40)clearInterval(_iv);},1500);
-window.CDC_BUILD="V9-DESMAYO-INMINENTE-31OCT2026";try{console.log("%c CDC BUILD "+window.CDC_BUILD,"background:#f6465d;color:#fff;font-weight:900");}catch(e){}
+window.CDC_BUILD="V10-MOVIL-ACTUALIZAR-31OCT2026";try{console.log("%c CDC BUILD "+window.CDC_BUILD,"background:#f6465d;color:#fff;font-weight:900");}catch(e){}
 window.CDC_CRASH={version:"1",cfg:CFG,es:es,stats:stats,log:function(){return LOG.slice();},activas:function(){return Object.keys(ACT).map(function(k){return ACT[k];});},
  armadas:function(){return Object.keys(S).filter(function(k){return S[k].est==="ARMADA"||(S[k].est==="INMI"&&S[k].inm);}).map(function(k){var s=S[k];if(s.est==="INMI"){var q=s.inm;return{sym:k,caida:q.d,z:q.z,volX:q.vx,pico:q.pk,minimo:null,fase:"INMINENTE"};}var r=s.cr;return{sym:k,caida:r.v,z:r.z,volX:r.vx,pico:r.peak,minimo:r.low,motivo:r.why||null,fase:"CURSO"};});},
  abrir:abrir,_ingest:ingest,_tick:tick,_S:S,
  probar:function(sym){sym=String(sym||"SOPHUSDT").toUpperCase();var c=cd(),p=c&&c[sym]?c[sym].price:1,r={symbol:sym,w:60,v:-5,z:-4.2,vx:5,ret:0.3,taker:0.58,entry:p,sl:p*0.97,tp1:p*1.03,tp2:p*1.045,riesgo:3,rr:1.5,score:80,ts:Date.now()};alarma(sym,r);}};
 setTimeout(function(){conectar();setInterval(tick,CFG.TICK_MS);},20000);
+})();
+</script>
+
+<style id="cdcMovil">
+#cdcUpdBtn{position:fixed;left:10px;bottom:calc(74px + env(safe-area-inset-bottom,0px));z-index:9400;width:40px;height:40px;border-radius:50%;border:1px solid #f3ba2f;background:rgba(11,18,32,.92);color:#f3ba2f;font:900 18px Arial;cursor:pointer;box-shadow:0 0 10px rgba(243,186,47,.35);padding:0;touch-action:manipulation}
+#cdcUpdBan{position:fixed;left:50%;transform:translateX(-50%);bottom:calc(124px + env(safe-area-inset-bottom,0px));z-index:9450;display:none;align-items:center;gap:10px;background:#06210f;border:2px solid #0ecb81;border-radius:12px;padding:8px 12px;color:#fff;font:700 12px Arial;box-shadow:0 0 18px rgba(14,203,129,.6);max-width:calc(100vw - 20px)}
+#cdcUpdBan button{background:#0ecb81;color:#04130b;border:0;border-radius:8px;padding:8px 14px;font:900 12px Arial;min-height:36px}
+@media (max-width:950px){
+ html{-webkit-text-size-adjust:100%}
+ body{padding-bottom:env(safe-area-inset-bottom,0px)}
+ input,select,textarea{font-size:16px !important}              /* evita el zoom raro y los problemas con el teclado al escribir */
+ button,.float-btn{min-height:40px}                              /* botones cómodos para el dedo */
+ .floating-buttons{bottom:calc(10px + env(safe-area-inset-bottom,0px)) !important}
+ #cdcCrashBox{top:calc(64px + env(safe-area-inset-top,0px)) !important}
+ #cdcDesSlot>div,#cdcDesSlot>div div{max-width:100%;overflow-wrap:anywhere}
+ #cdcDesSlot>div:first-child{padding:8px 10px !important}
+ #cdcDesSlot>div:first-child>div:nth-child(2){font-size:15px !important}
+ #cdcDesSlot span{padding:5px 10px !important;font-size:11px !important;min-height:28px;box-sizing:border-box}
+}
+</style>
+<button id="cdcUpdBtn" title="Actualizar a la última versión (no borra tu contraseña)" aria-label="Actualizar">🔄</button>
+<div id="cdcUpdBan"><span>🔄 Hay una versión nueva</span><button id="cdcUpdGo">Actualizar</button></div>
+<script>
+/* ═══ CDC-UPDATE · actualización sin teclado y sin borrar tu contraseña (borra solo caché y service worker, NUNCA localStorage) ═══ */
+(function(){"use strict";
+var B=window.CDC_BUILD||"",T0=Date.now(),busy=false,ETAG=null,RX=new RegExp("CDC_BUILD=\\u0022([^\\u0022]+)\\u0022");
+function $(i){return document.getElementById(i);}
+function limpiar(){var p=[];try{if(navigator.serviceWorker)p.push(navigator.serviceWorker.getRegistrations().then(function(rs){return Promise.all(rs.map(function(r){return r.unregister();}));}));}catch(e){}
+ try{if(window.caches)p.push(caches.keys().then(function(ks){return Promise.all(ks.map(function(k){return caches.delete(k);}));}));}catch(e){}
+ return Promise.all(p).catch(function(){});}
+function aplicar(){if(busy)return;busy=true;var b=$("cdcUpdBtn");if(b)b.textContent="⏳";
+ limpiar().then(function(){location.replace(location.pathname+"?v="+Date.now()+location.hash);});}
+function guardOK(){try{var n=+sessionStorage.getItem("cdc_upd_n")||0,l=+sessionStorage.getItem("cdc_upd_t")||0;if(Date.now()-l>60000)n=0;if(n>=2)return false;sessionStorage.setItem("cdc_upd_n",n+1);sessionStorage.setItem("cdc_upd_t",Date.now());}catch(e){}return true;}
+function banner(){var b=$("cdcUpdBan");if(b)b.style.display="flex";}
+function revisar(){fetch(location.pathname+"?_="+Date.now(),{cache:"no-store"}).then(function(r){ETAG=r.headers.get("etag")||r.headers.get("last-modified");return r.text();}).then(function(tx){var m=tx.match(RX);if(!m||!B)return;
+  if(m[1]!==B){if(Date.now()-T0<25000&&guardOK())aplicar();else banner();}}).catch(function(){});}
+function liviano(){if(!ETAG||busy)return;fetch(location.pathname+"?_="+Date.now(),{method:"HEAD",cache:"no-store"}).then(function(r){var e=r.headers.get("etag")||r.headers.get("last-modified");if(e&&e!==ETAG)banner();}).catch(function(){});}
+$("cdcUpdBtn").onclick=aplicar;$("cdcUpdGo").onclick=aplicar;
+setTimeout(revisar,3000);setInterval(liviano,300000);
+document.addEventListener("visibilitychange",function(){if(!document.hidden)liviano();});
+window.CDC_UPDATE={aplicar:aplicar,revisar:revisar};
 })();
 </script>
 
