@@ -9426,7 +9426,7 @@ async function obtenerDatosBinance() {
     // Si Binance ya nos limitó, no insistir: cada intento durante el bloqueo
     // solo alarga el castigo. Nos quedamos con los datos en caché hasta que
     // pase la pausa (el aviso en el ticker ya le explica al usuario por qué).
-    if (estaPausadoPorRateLimit()) return;
+    if (estaPausadoPorRateLimit() && !(window.CDC_WS24 && CDC_WS24.listo())) return;
     try {
         // ── fapi.binance.com (Futuros) es el endpoint que SÍ funciona en este hosting.
         // Se intenta primero; si falla, se cae a data-api.binance.vision y luego a api.binance.com (Spot).
@@ -9434,7 +9434,9 @@ async function obtenerDatosBinance() {
         let fuenteEsFutures = false; // true si los datos vinieron del endpoint de Futuros (ya vienen filtrados por Binance)
         let statusRateLimit = null; // guarda el status 429/418 si CUALQUIERA de los 3 endpoints lo devuelve
         try {
-            response = await fetch('https://fapi.binance.com/fapi/v1/ticker/24hr');
+            response = (window.CDC_WS24 && CDC_WS24.listo())
+                ? new Response(JSON.stringify(CDC_WS24.todos()), { status: 200, headers: { 'Content-Type': 'application/json' } })   // datos en vivo, 0 consultas REST
+                : await fetch('https://fapi.binance.com/fapi/v1/ticker/24hr');
             if (esRespuestaRateLimit(response.status)) statusRateLimit = response.status;
             if (!response.ok) throw new Error('fapi no OK: ' + response.status);
             fuenteEsFutures = true;
@@ -15706,7 +15708,9 @@ let _jefeNombresActivos = '';
 
 async function _fetchJefes() {
     try {
-        const res = await fetch('https://fapi.binance.com/fapi/v1/ticker/24hr?symbols=["BTCUSDT","ETHUSDT","BNBUSDT","SOLUSDT"]');
+        const res = (window.CDC_WS24 && CDC_WS24.listo())
+            ? new Response(JSON.stringify(CDC_WS24.pocos(["BTCUSDT","ETHUSDT","BNBUSDT","SOLUSDT"])), { status: 200 })
+            : await fetch('https://fapi.binance.com/fapi/v1/ticker/24hr?symbols=["BTCUSDT","ETHUSDT","BNBUSDT","SOLUSDT"]');
         if (!res.ok) return;
         const lista = await res.json();
         const ahora = Date.now();
@@ -17641,7 +17645,7 @@ setTimeout(function(){setInterval(tick,CFG.TICK_MS);},CFG.ARRANQUE_MS);
     // archivo completo sin caer en la paradoja de "el hash contiene su
     // propio hash". No cambiar este texto.
     var _PLACEHOLDER = "%%CDC_INTEGRITY_HASH%%";
-    var _HASH_ESPERADO = "cdffb0e7a5eb41b3f7eb687dfa163cfaca614313c1a088478f0c67c8a927d4ae"; // ← se reemplaza por el hash real en el paso final
+    var _HASH_ESPERADO = "c10b0868f2f08a1df9e57a1cb23d8195ea6d96d5509b58519f2524928f94d829"; // ← se reemplaza por el hash real en el paso final
 
     function _bloquear(motivo) {
         try {
@@ -19502,8 +19506,34 @@ setInterval(tick,700);})();
       ws.onclose=function(){tries++;setTimeout(conectar,Math.min(300000,5000*Math.pow(2,Math.min(tries,6))))};ws.onerror=function(){try{ws.close()}catch(x){}};
     }catch(e){setTimeout(conectar,8000)}
   }
-  setTimeout(conectar,9000);
+  window.__cpProc=proc;   // los datos llegan de CDC_WS24 (una sola conexión compartida)
   window.CDC_PUMP={cfg:CFG,probar:function(s){aviso(String(s||'ESPORTSUSDT').toUpperCase(),12.1,14,0.016872,true)}};
+})();
+</script>
+
+<script>
+/* 🔌 CDC_WS24 · alimenta al CDC con la conexión en vivo de Binance (sin consultas REST → sin rate limit) */
+window.CDC_WS24=(function(){
+  var C={},T={},first=0,last=0,tries=0,ws=null;
+  function map(x){return{symbol:x.s,priceChange:x.p,priceChangePercent:x.P,weightedAvgPrice:x.w,lastPrice:x.c,lastQty:x.Q,openPrice:x.o,highPrice:x.h,lowPrice:x.l,volume:x.v,quoteVolume:x.q,openTime:x.O,closeTime:x.C,firstId:x.F,lastId:x.L,count:x.n}}
+  function conectar(){
+    if(!('WebSocket' in window))return;
+    try{ws=new WebSocket('wss://fstream.binance.com/ws/!ticker@arr');
+      ws.onmessage=function(e){var a;try{a=JSON.parse(e.data)}catch(x){return}
+        if(!Array.isArray(a))return;var n=Date.now();tries=0;if(!first)first=n;last=n;
+        for(var i=0;i<a.length;i++){var s=a[i].s;if(s){C[s]=map(a[i]);T[s]=n}}
+        try{if(window.__cpProc)window.__cpProc(a)}catch(x){}};
+      ws.onclose=function(){tries++;setTimeout(conectar,Math.min(300000,3000*Math.pow(2,Math.min(tries,6))))};
+      ws.onerror=function(){try{ws.close()}catch(x){}};
+    }catch(e){setTimeout(conectar,8000)}
+  }
+  setInterval(function(){var n=Date.now();for(var s in T)if(n-T[s]>900000){delete T[s];delete C[s]}},60000);
+  conectar();
+  return{
+    listo:function(){var n=Date.now(),k=Object.keys(C).length;return n-last<8000&&k>=150&&(n-first>20000||k>=450)},
+    todos:function(){return Object.keys(C).map(function(s){return C[s]})},
+    pocos:function(l){return l.filter(function(s){return C[s]}).map(function(s){return C[s]})}
+  };
 })();
 </script>
 
