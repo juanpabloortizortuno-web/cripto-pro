@@ -8415,9 +8415,13 @@ function renderizarTickerNoticias() {
 let datosEMA = {};          // { symbol: { ema7, ema25, ema99, ema7Prev, ema25Prev, ema99Prev, minimo48h, alineadasAlcista, subidaDesdeMinimo } }
 let colaSimbolosEMA = [];   // cola de símbolos pendientes de actualizar EMA (rotamos para no saturar la API)
 let indiceEMAActual = 0;
-const EMA_LOTE_POR_CICLO = 15;      // cuántos símbolos actualizamos cada ciclo de refresco EMA (bajado de 35 a 15: 35 peticiones en paralelo cada 8s disparaba el rate limit de Binance -429/418-)
+// 🎯 SOLO monedas de 0 a 2 USDT: las de más precio no se leen ni se piden a Binance (menos peticiones).
+// BTC/ETH/BNB/SOL se mantienen únicamente como referencia de mercado (correlación).
+const PRECIO_MAX_ESCANEO_USDT = 2;
+const _SIEMPRE_ESCANEAR = ['BTCUSDT', 'ETHUSDT', 'BNBUSDT', 'SOLUSDT'];
+const EMA_LOTE_POR_CICLO = 10;      // cuántos símbolos actualizamos cada ciclo de refresco EMA (bajado de 35 a 15: 35 peticiones en paralelo cada 8s disparaba el rate limit de Binance -429/418-)
 const EMA_INTERVALO_MS = 13 * 1000; // cada 13s actualizamos un lote (antes 8s: era muy agresivo y sumado al resto de peticiones activaba el rate limit de Binance)
-const EMA_LOTE_RAFAGA_INICIAL = 20; // lote más grande SOLO en los primeros ciclos al abrir la app (bajado de 40 a 20: seguía siendo demasiadas peticiones en paralelo y activaba el rate limit de Binance)
+const EMA_LOTE_RAFAGA_INICIAL = 12; // lote más grande SOLO en los primeros ciclos al abrir la app (bajado de 40 a 20: seguía siendo demasiadas peticiones en paralelo y activaba el rate limit de Binance)
 let ciclosEMARestantesRafaga = 4;   // cuántos ciclos usan el lote grande antes de volver al tamaño normal
 
 // ── Cola de escaneo 72h (velas de 15m) para TODAS las monedas, no solo la
@@ -8427,7 +8431,7 @@ let ciclosEMARestantesRafaga = 4;   // cuántos ciclos usan el lote grande antes
 // peticiones en paralelo junto con el resto de ciclos activos y disparar el
 // rate limit de Binance (429/418).
 let colaSimbolos72h = [];
-const LOTE_72H_POR_CICLO = 6;        // monedas por ciclo (cada una = 2 peticiones a Binance)
+const LOTE_72H_POR_CICLO = 4;        // monedas por ciclo (cada una = 2 peticiones a Binance)
 const INTERVALO_72H_MS = 20 * 1000;  // cada 20s un lote nuevo
 
 function calcularEMASerie(valores, periodo) {
@@ -9468,6 +9472,8 @@ async function obtenerDatosBinance() {
         data.forEach(item => {
             const precio = parseFloat(item.lastPrice);
             if(!item.symbol.endsWith("USDT")){ return; } // solo pares USDT
+            // 🎯 rango de búsqueda: 0 < precio ≤ 2 USDT (la moneda abierta en pantalla y las de referencia se respetan)
+            if (!(precio > 0) || (precio > PRECIO_MAX_ESCANEO_USDT && !_SIEMPRE_ESCANEAR.includes(item.symbol) && item.symbol !== (typeof selectedCoin !== 'undefined' ? selectedCoin : null))) { delete cachedData[item.symbol]; return; }
             // El endpoint de Futuros (fapi) YA devuelve únicamente contratos reales
             // de Futuros USDT-M — no depende de que haya cargado exchangeInfo. El
             // filtro contra la lista real solo hace falta cuando la fuente es el
@@ -17645,7 +17651,7 @@ setTimeout(function(){setInterval(tick,CFG.TICK_MS);},CFG.ARRANQUE_MS);
     // archivo completo sin caer en la paradoja de "el hash contiene su
     // propio hash". No cambiar este texto.
     var _PLACEHOLDER = "%%CDC_INTEGRITY_HASH%%";
-    var _HASH_ESPERADO = "c10b0868f2f08a1df9e57a1cb23d8195ea6d96d5509b58519f2524928f94d829"; // ← se reemplaza por el hash real en el paso final
+    var _HASH_ESPERADO = "ef3bf372a7cd67ad7752670a54b7348d56311d0e58f42db23d29b8dcddb9dff3"; // ← se reemplaza por el hash real en el paso final
 
     function _bloquear(motivo) {
         try {
@@ -19468,7 +19474,7 @@ setInterval(tick,700);})();
 <script>
 (function(){
   "use strict";
-  var CFG={VENT:60000,SALTO:3,VOLX:5,MIN_Q:500000,CALMA_MS:480000,ENFRIA:240000,TOAST_MS:25000,ON:true};
+  var CFG={PMAX:2,VENT:60000,SALTO:3,VOLX:5,MIN_Q:500000,CALMA_MS:480000,ENFRIA:240000,TOAST_MS:25000,ON:true};
   var H={},ULT={},tries=0,box=document.getElementById('cpBox'),ws=null,t0=Date.now();
   function beep(){try{var a=new(window.AudioContext||window.webkitAudioContext)(),g=a.createGain();g.gain.value=.14;g.connect(a.destination);[660,880,1180].forEach(function(f,i){var o=a.createOscillator();o.frequency.value=f;o.connect(g);o.start(a.currentTime+i*.13);o.stop(a.currentTime+i*.13+.11)});setTimeout(function(){a.close()},700)}catch(e){}}
   function fp(n){return n>=1?n.toFixed(4):n.toPrecision(4)}
@@ -19484,7 +19490,7 @@ setInterval(tick,700);})();
     var now=Date.now();
     for(var i=0;i<m.length;i++){
       var x=m[i],s=x.s;if(!s||s.slice(-4)!=='USDT')continue;
-      var p=+x.c,q=+x.q;if(!(p>0)||q<CFG.MIN_Q)continue;
+      var p=+x.c,q=+x.q;if(!(p>0)||p>CFG.PMAX||q<CFG.MIN_Q)continue;
       var a=H[s]||(H[s]=[]),l=a[a.length-1];
       if(!l||now-l.t>=1500)a.push({t:now,p:p,q:q});
       while(a.length&&now-a[0].t>CFG.CALMA_MS+60000)a.shift();
@@ -19528,6 +19534,19 @@ window.CDC_WS24=(function(){
     }catch(e){setTimeout(conectar,8000)}
   }
   setInterval(function(){var n=Date.now();for(var s in T)if(n-T[s]>900000){delete T[s];delete C[s]}},60000);
+  /* 🛑 freno general: durante la pausa de Binance, NINGUNA parte del CDC consulta la API (cada intento alarga el castigo) */
+  var _f=window.fetch;
+  if(_f)window.fetch=function(u){try{var url=typeof u==='string'?u:(u&&u.url)||'';
+    if(/^https:\/\/(fapi|api|data-api)\.binance\.(com|vision)\//.test(url)&&typeof estaPausadoPorRateLimit==='function'&&estaPausadoPorRateLimit())
+      return Promise.resolve(new Response('{"msg":"pausa local CDC"}',{status:503}));}catch(e){}return _f.apply(this,arguments)};
+  /* 🔎 indicador de estado (abajo a la izquierda) */
+  var bd=document.createElement('div');bd.id='cdcEstado';bd.style.cssText='position:fixed;left:8px;bottom:30px;z-index:8000;font:700 10px Inter,Arial,sans-serif;padding:3px 7px;border-radius:6px;background:rgba(6,11,22,.85);pointer-events:none';
+  document.body.appendChild(bd);
+  setInterval(function(){var n=Date.now(),k=Object.keys(C).length,pz=0;
+    try{pz=Math.max(0,Math.round((bloqueadoPorRateLimitHasta-n)/1000))}catch(e){}
+    if(n-last<8000){bd.style.color='#0ecb81';bd.textContent='🔌 EN VIVO · '+k+' monedas'+(pz?' · REST en pausa '+pz+'s':'')}
+    else if(pz){bd.style.color='#ff6b6b';bd.textContent='⏸ Binance limita · reintento en '+pz+'s'}
+    else{bd.style.color='#f3ba2f';bd.textContent='🔌 Conectando con Binance…'}},1000);
   conectar();
   return{
     listo:function(){var n=Date.now(),k=Object.keys(C).length;return n-last<8000&&k>=150&&(n-first>20000||k>=450)},
