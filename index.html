@@ -1521,7 +1521,7 @@
   <button class="ci-skip" id="ciSkip" type="button">SALTAR ▶</button>
   <div class="ci-welcome">BIENVENIDO AL <span>CDC</span></div>
   <div class="ci-bar">
-    <div class="ci-msg"><span id="ciMsg">Iniciando sistema…</span><div class="ci-r"><b id="ciPct">0.0%</b><em id="ciMs">0 / 18000 MS</em></div></div>
+    <div class="ci-msg"><span id="ciMsg">Iniciando sistema…</span><div class="ci-r"><b id="ciPct">0.0%</b><em id="ciMs">0 / 13000 MS</em></div></div>
     <div class="ci-track"><div class="ci-fill" id="ciFill"></div></div>
     <div class="ci-tip">JUAN PABLO ORTIZ ORTUÑO · SANTA CRUZ DE LA SIERRA · BOLIVIA</div>
   </div>
@@ -1530,7 +1530,7 @@
 (function(){
   var el=document.getElementById('cdcIntro'); if(!el) return;
   try{var fr=document.getElementById('ciBrain'),sb=document.getElementById('ciBrainSrc');if(fr&&sb){var bin=atob(sb.textContent.replace(/\s+/g,'')),u8=new Uint8Array(bin.length);for(var q=0;q<bin.length;q++)u8[q]=bin.charCodeAt(q);fr.srcdoc=new TextDecoder('utf-8').decode(u8);}}catch(e){try{fr.style.display='none';}catch(x){}}
-  var DUR=(function(){try{var _p=+localStorage.getItem('cdc_intro_ts')||0;localStorage.setItem('cdc_intro_ts',String(Date.now()));return (Date.now()-_p<43200000)?4000:18000;}catch(e){return 18000;}})(), t0=Date.now(), fin=false, habl=false;
+  var DUR=(function(){try{var _p=+localStorage.getItem('cdc_intro_ts')||0;localStorage.setItem('cdc_intro_ts',String(Date.now()));return (Date.now()-_p<43200000)?3000:13000;}catch(e){return 13000;}})(), t0=Date.now(), fin=false, habl=false;
   var fill=document.getElementById('ciFill'), pct=document.getElementById('ciPct'), msg=document.getElementById('ciMsg'); var msEl=document.getElementById('ciMs');
   var MSGS=[[0,'Iniciando sistema…'],[12,'Despertando el cerebro neuronal…'],[28,'Conectando con Binance Futuros…'],[36,'Recibiendo datos de mercados de todo el mundo…'],[45,'Calibrando radar de techos y pisos…'],[62,'Cargando estudio de tiempo y velocidad…'],[80,'Sincronizando señales y voz…'],[93,'Sistema listo']];
   function hablar(){
@@ -1547,7 +1547,7 @@
   }
   /* 🌍 DATOS DE TODO EL MUNDO → CEREBRO (canvas): globo giratorio, paquetes que viajan desde cada mercado hasta el cerebro */
   var cv=document.getElementById('ciBolts'), cx=cv&&cv.getContext?cv.getContext('2d'):null;
-  var W=0,H=0,DPR=Math.min(2,window.devicePixelRatio||1);
+  var W=0,H=0,DPR=Math.min(1.25,window.devicePixelRatio||1);
   function rs(){ if(!cv) return; W=el.clientWidth; H=el.clientHeight; cv.width=Math.round(W*DPR); cv.height=Math.round(H*DPR); if(cx) cx.setTransform(DPR,0,0,DPR,0,0); }
   rs(); window.addEventListener('resize',rs);
   function R(a,b){ return a+Math.random()*(b-a); }
@@ -1565,7 +1565,10 @@
     var X=W/2, Y=H*.395, Rr=Math.min(W*.46,H*.33), l0=now*.007-60, i, pr, g;
     g=cx.createRadialGradient(X,Y,Rr*.55,X,Y,Rr*1.07); g.addColorStop(0,'rgba(37,99,235,0)'); g.addColorStop(.8,'rgba(56,189,248,.08)'); g.addColorStop(1,'rgba(125,211,252,.38)');
     cx.fillStyle=g; cx.beginPath(); cx.arc(X,Y,Rr*1.07,0,6.2832); cx.fill();
-    for(i=0;i<DOTS.length;i++){ pr=proy(DOTS[i][0],DOTS[i][1],l0,X,Y,Rr); if(pr[2]>0){ cx.fillStyle='rgba(125,211,252,'+(.12+.5*pr[2])+')'; cx.fillRect(pr[0]-.9,pr[1]-.9,1.8,1.8); } }
+    if(!DOTS.pre){ var pf=new Float32Array(DOTS.length*4); for(i=0;i<DOTS.length;i++){ var f0=DOTS[i][0]*D2R,o0=DOTS[i][1]*D2R; pf[i*4]=Math.sin(f0); pf[i*4+1]=Math.cos(f0); pf[i*4+2]=Math.cos(o0); pf[i*4+3]=Math.sin(o0); } DOTS.pre=pf; }
+    var pq=DOTS.pre,L0=l0*D2R,c0=Math.cos(L0),s0=Math.sin(L0),ST=Math.sin(.38),CT=Math.cos(.38),BK=[[],[],[],[]],nd=DOTS.length;
+    for(i=0;i<nd;i++){ var sf=pq[i*4],cf=pq[i*4+1],cl=pq[i*4+2],sl=pq[i*4+3],cd=cl*c0+sl*s0,sd=sl*c0-cl*s0,zz=ST*sf+CT*cf*cd; if(zz>0){ var bi=Math.min(3,(zz*4)|0); BK[bi].push(X+Rr*cf*sd,Y-Rr*(CT*sf-ST*cf*cd)); } }
+    for(i=0;i<4;i++){ var bk=BK[i]; if(!bk.length) continue; cx.fillStyle='rgba(125,211,252,'+(.12+.5*((i+.5)/4))+')'; cx.beginPath(); for(var m=0;m<bk.length;m+=2) cx.rect(bk[m]-.9,bk[m+1]-.9,1.8,1.8); cx.fill(); }
     for(i=0;i<CIU.length;i++){ pr=proy(CIU[i][1],CIU[i][2],l0,X,Y,Rr); if(pr[2]>.05){ var home=i===6; cx.fillStyle=home?'rgba(14,203,129,'+(.5+.5*pr[2])+')':'rgba(243,186,47,'+(.35+.6*pr[2])+')'; cx.beginPath(); cx.arc(pr[0],pr[1],home?3:1.8,0,6.2832); cx.fill(); } }
     if(now>=nextP){ nextP=now+R(260,520)*(1.2-p*.5);
       for(var tr=0;tr<8;tr++){ var c=(Math.random()*CIU.length)|0; pr=proy(CIU[c][1],CIU[c][2],l0,X,Y,Rr); if(pr[2]>.2){
@@ -17630,7 +17633,7 @@ setTimeout(function(){setInterval(tick,CFG.TICK_MS);},CFG.ARRANQUE_MS);
     // archivo completo sin caer en la paradoja de "el hash contiene su
     // propio hash". No cambiar este texto.
     var _PLACEHOLDER = "%%CDC_INTEGRITY_HASH%%";
-    var _HASH_ESPERADO = "9edc3f859c202c8c6a3615d0f960f68d22bb7028bb119f88b19eee46badd330b"; // ← se reemplaza por el hash real en el paso final
+    var _HASH_ESPERADO = "0a9dc70188bf19cb4f613d5b77d8953698ceaafba40b24444c3d93412ef290ff"; // ← se reemplaza por el hash real en el paso final
 
     function _bloquear(motivo) {
         try {
@@ -19454,7 +19457,7 @@ setInterval(tick,700);})();
 (function(){
   "use strict";
   var CFG={VENT:60000,SALTO:3,VOLX:5,MIN_Q:500000,CALMA_MS:480000,ENFRIA:240000,TOAST_MS:25000,ON:true};
-  var H={},ULT={},box=document.getElementById('cpBox'),ws=null,t0=Date.now();
+  var H={},ULT={},tries=0,box=document.getElementById('cpBox'),ws=null,t0=Date.now();
   function beep(){try{var a=new(window.AudioContext||window.webkitAudioContext)(),g=a.createGain();g.gain.value=.14;g.connect(a.destination);[660,880,1180].forEach(function(f,i){var o=a.createOscillator();o.frequency.value=f;o.connect(g);o.start(a.currentTime+i*.13);o.stop(a.currentTime+i*.13+.11)});setTimeout(function(){a.close()},700)}catch(e){}}
   function fp(n){return n>=1?n.toFixed(4):n.toPrecision(4)}
   function aviso(s,j,vx,p,big){
@@ -19487,11 +19490,11 @@ setInterval(tick,700);})();
   function conectar(){
     if(!CFG.ON||!('WebSocket' in window))return;
     try{ws=new WebSocket('wss://fstream.binance.com/ws/!miniTicker@arr');
-      ws.onmessage=function(e){try{proc(JSON.parse(e.data))}catch(x){}};
-      ws.onclose=function(){setTimeout(conectar,5000)};ws.onerror=function(){try{ws.close()}catch(x){}};
+      ws.onmessage=function(e){tries=0;try{proc(JSON.parse(e.data))}catch(x){}};
+      ws.onclose=function(){tries++;setTimeout(conectar,Math.min(300000,5000*Math.pow(2,Math.min(tries,6))))};ws.onerror=function(){try{ws.close()}catch(x){}};
     }catch(e){setTimeout(conectar,8000)}
   }
-  conectar();
+  setTimeout(conectar,9000);
   window.CDC_PUMP={cfg:CFG,probar:function(s){aviso(String(s||'ESPORTSUSDT').toUpperCase(),12.1,14,0.016872,true)}};
 })();
 </script>
