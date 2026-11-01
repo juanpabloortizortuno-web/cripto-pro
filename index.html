@@ -6033,7 +6033,8 @@ function abrirParEnAppBinance(par) {
     _avisoBinanceApp('📋 <b>' + pair.replace('USDT', '') + '</b> copiado · si la app abre en el inicio, pégalo en el buscador', 6000);
 
     // 1) Intento: ir al par de futuros dentro de la app
-    window.location.href = 'bnc://app.binance.com/futures/' + pair;
+    // iPhone: Binance no tiene enlace público a un par; se abre la pestaña Mercados de la app (ahí se pega el par copiado)
+    window.location.href = /iPhone|iPad|iPod/i.test(ua) ? 'bnc://app.binance.com/markets/markets' : 'bnc://app.binance.com/futures/' + pair;
 
     // 2) Si la app no tomó el control, abrir la app (inicio)
     setTimeout(function () {
@@ -6044,8 +6045,8 @@ function abrirParEnAppBinance(par) {
             limpiar();
             if (abrio || document.hidden) return;
             const ls = 'display:inline-block;margin:4px 6px 0;padding:7px 10px;border-radius:8px;font-weight:900;text-decoration:none;';
-            _avisoBinanceApp('📱 Toca para abrir <b>' + pair.replace('USDT', '') + '</b> en la app:<br>' +
-                '<a href="https://app.binance.com/es-LA/futures/' + pair + '" style="' + ls + 'background:#f3ba2f;color:#000;">📲 Abrir en la app</a>' +
+            _avisoBinanceApp('📱 <b>' + pair.replace('USDT', '') + '</b> copiado. Abre la app y pégalo en el buscador:<br>' +
+                '<a href="bnc://app.binance.com/markets/markets" style="' + ls + 'background:#f3ba2f;color:#000;">📲 Abrir la app (Mercados)</a>' +
                 '<a href="bnc://app.binance.com" style="' + ls + 'background:#1e293b;color:#f3ba2f;border:1px solid #f3ba2f;">🏠 Inicio de la app</a>' +
                 '<a href="https://www.binance.com/es-LA/futures/' + pair + '" target="_blank" rel="noopener" style="' + ls + 'color:#94a3b8;">🌐 Web</a>', 15000);
         }, 1500);
@@ -17637,7 +17638,7 @@ setTimeout(function(){setInterval(tick,CFG.TICK_MS);},CFG.ARRANQUE_MS);
     // archivo completo sin caer en la paradoja de "el hash contiene su
     // propio hash". No cambiar este texto.
     var _PLACEHOLDER = "%%CDC_INTEGRITY_HASH%%";
-    var _HASH_ESPERADO = "0823b76ec299d66ce8dc61758ca6eba8f6ccf717b9053398328671ff5ce74995"; // ← se reemplaza por el hash real en el paso final
+    var _HASH_ESPERADO = "7a48184bc70fc9c522a52cd4f49a7fd2d4fcb258601f18d87c79416633f8485e"; // ← se reemplaza por el hash real en el paso final
 
     function _bloquear(motivo) {
         try {
