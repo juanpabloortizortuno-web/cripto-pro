@@ -36,9 +36,12 @@
     <meta property="og:description" content="Cripto Scanner PRO: monitoreo de criptomonedas en tiempo real con alertas de máximos y mínimos. Por CDC FUTURO-PRO.">
     <meta property="og:url" content="https://juanpabloortizortuno-web.github.io/cripto-pro/">
     <meta property="og:image" content="https://juanpabloortizortuno-web.github.io/cripto-pro/icon-512.png">
+    <link rel="preconnect" href="https://fapi.binance.com" crossorigin>
+    <link rel="preconnect" href="https://fstream.binance.com" crossorigin>
+    <script>try{window.__ws24Early=new WebSocket('wss://fstream.binance.com/ws/!ticker@arr');}catch(e){}</script>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap" rel="stylesheet" media="print" onload="this.media='all'">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
     <style>
         :root {
@@ -8551,14 +8554,47 @@ function calcularVWAP(highs, lows, closes, volumenes, velas = 24) {
 // de la app (fapi.binance.com → data-api.binance.vision → api.binance.com), pero
 // reutilizable para cualquier intervalo/límite en vez de tenerlo repetido. Devuelve
 // el array de klines o null si los 3 endpoints fallan.
+// ══════════════════════════════════════════════════════════════════
+// ⚡ VELOCIDAD: capa de caché para velas (klines). Antes, cada módulo pedía
+// las mismas velas por su cuenta (EMA, 72h, DESMAYO...) y Binance respondía
+// 429 "Binance limita". Ahora: (1) se reutiliza lo ya descargado unos segundos,
+// (2) si dos módulos piden lo mismo a la vez se hace UNA sola petición,
+// (3) máximo 6 peticiones simultáneas, (4) timeout de 8 s por petición.
+// ══════════════════════════════════════════════════════════════════
+const _KL_TTL = { '1m': 9000, '3m': 15000, '5m': 20000, '15m': 40000, '30m': 60000, '1h': 90000 };
+const _KL_MAX_PARALELO = 6, _KL_MAX_CACHE = 800;
+const _klCache = new Map(), _klInflight = new Map(), _klCola = [];
+let _klActivos = 0;
+function _klSig() { return (window.AbortSignal && AbortSignal.timeout) ? { signal: AbortSignal.timeout(8000) } : {}; }
+function _klLiberar() { const sig = _klCola.shift(); if (sig) sig(); else _klActivos--; }
 async function obtenerKlines(symbol, interval, limit) {
+    const key = symbol + '|' + interval + '|' + limit;
+    const hit = _klCache.get(key);
+    if (hit && Date.now() - hit.t < (_KL_TTL[interval] || 30000)) return hit.k;
+    if (_klInflight.has(key)) return _klInflight.get(key);
+    const p = (async () => {
+        if (_klActivos >= _KL_MAX_PARALELO) await new Promise(r => _klCola.push(r)); else _klActivos++;
+        try {
+            const k = await _obtenerKlinesRaw(symbol, interval, limit);
+            if (k) {
+                _klCache.set(key, { t: Date.now(), k });
+                while (_klCache.size > _KL_MAX_CACHE) _klCache.delete(_klCache.keys().next().value);
+            }
+            return k;
+        } finally { _klLiberar(); }
+    })();
+    _klInflight.set(key, p);
+    try { return await p; } finally { _klInflight.delete(key); }
+}
+
+async function _obtenerKlinesRaw(symbol, interval, limit) {
     // Igual que en obtenerDatosBinance: si estamos en pausa por rate limit,
     // no sumar más peticiones al castigo — simplemente no hay velas nuevas
     // este ciclo (la app sigue mostrando las últimas que tenía en caché).
     if (estaPausadoPorRateLimit()) return null;
     let res;
     try {
-        res = await fetch(`https://fapi.binance.com/fapi/v1/klines?symbol=${symbol}&interval=${interval}&limit=${limit}`);
+        res = await fetch(`https://fapi.binance.com/fapi/v1/klines?symbol=${symbol}&interval=${interval}&limit=${limit}`, _klSig());
         if (esRespuestaRateLimit(res.status)) { activarPausaRateLimit(); return null; }
         if (!res.ok) throw new Error('fapi klines no OK: ' + res.status);
     } catch (eFapi) {
@@ -9440,7 +9476,7 @@ async function obtenerDatosBinance() {
         try {
             response = (window.CDC_WS24 && CDC_WS24.listo())
                 ? new Response(JSON.stringify(CDC_WS24.todos()), { status: 200, headers: { 'Content-Type': 'application/json' } })   // datos en vivo, 0 consultas REST
-                : await fetch('https://fapi.binance.com/fapi/v1/ticker/24hr');
+                : await fetch('https://fapi.binance.com/fapi/v1/ticker/24hr', (window.AbortSignal && AbortSignal.timeout) ? { signal: AbortSignal.timeout(7000) } : undefined);
             if (esRespuestaRateLimit(response.status)) statusRateLimit = response.status;
             if (!response.ok) throw new Error('fapi no OK: ' + response.status);
             fuenteEsFutures = true;
@@ -15398,7 +15434,7 @@ document.addEventListener("DOMContentLoaded", () => {
             splash.classList.add("splash-hide");
             setTimeout(() => splash.remove(), 800);
         }
-    }, 2200);
+    }, 900);
     const ahora = new Date();
     document.getElementById("footerTime").innerHTML = `<i class="far fa-clock"></i> Seguimiento activo desde: ${ahora.toLocaleTimeString()}`;
     const guardadas = localStorage.getItem("cdc_simulaciones");
@@ -15406,6 +15442,16 @@ document.addEventListener("DOMContentLoaded", () => {
     actualizarPaperTradingUI();
     cargarSimbolosFuturosUSDTM(); // saber qué monedas tienen contrato real en Futuros USDT-M
     obtenerDatosBinance();
+    // ⚡ ARRANQUE RÁPIDO: revisa cada 0.5 s (sin pedir nada por REST) si el WebSocket ya trae monedas y las pinta de inmediato
+    (function () {
+        var _n = 0, _ocupado = false, _iv = setInterval(function () {
+            _n++;
+            if (_n > 60 || (cachedData && Object.keys(cachedData).length > 0)) { clearInterval(_iv); return; }
+            if (_ocupado || !(window.CDC_WS24 && CDC_WS24.listo())) return;
+            _ocupado = true;
+            Promise.resolve(obtenerDatosBinance()).finally(function () { _ocupado = false; });
+        }, 500);
+    })();
     revisarAvisosOficialesBinance(); // primer intento al cargar la página
     revisarNoticiasCointelegraph(); // primer intento al cargar la página
     revisarNoticiasGenerales(true); // primer intento al cargar la página (panel de noticias generales)
@@ -15467,7 +15513,7 @@ if (!_origActualizarTablaIzq2) {
 
     // Sistema de despegue real (EMA7/25/99 + 15% desde mínimo 48h): arranca tras el primer
     // ciclo de precios (necesita cachedData lleno) y luego rota un lote de monedas cada 20s.
-    [300, 3500, 7000, 10500].forEach(ms => setTimeout(() => { cicloActualizacionEMA(); }, ms)); // ráfaga inicial rápida, las del máximo primero
+    [1500, 4500, 8000, 11500].forEach(ms => setTimeout(() => { cicloActualizacionEMA(); }, ms)); // ráfaga inicial rápida, las del máximo primero
     setInterval(() => cicloActualizacionEMA(), EMA_INTERVALO_MS);
     setInterval(() => cargarSimbolosFuturosUSDTM(), 30 * 60 * 1000); // refrescar lista de contratos cada 30 min
 
@@ -17651,7 +17697,7 @@ setTimeout(function(){setInterval(tick,CFG.TICK_MS);},CFG.ARRANQUE_MS);
     // archivo completo sin caer en la paradoja de "el hash contiene su
     // propio hash". No cambiar este texto.
     var _PLACEHOLDER = "%%CDC_INTEGRITY_HASH%%";
-    var _HASH_ESPERADO = "ef3bf372a7cd67ad7752670a54b7348d56311d0e58f42db23d29b8dcddb9dff3"; // ← se reemplaza por el hash real en el paso final
+    var _HASH_ESPERADO = "84b29c44cf836930192a4179cd860fb981b90c7d504e7ac997709bfc7409694a"; // ← se reemplaza por el hash real en el paso final
 
     function _bloquear(motivo) {
         try {
@@ -18885,7 +18931,7 @@ setTimeout(function(){setInterval(tick,CFG.TICK_MS);},CFG.ARRANQUE_MS);
 (function () {
     "use strict";
     var CFG = { TICK_MS: 6000, RT_DD_MIN: 1.5, RT_DD_MAX: 6, RT_RUN_MIN: 1.5, RT_VOL_MIN: 3, RT_RED_MIN: 1.0, RT_AUTO: true, CA_CAMBIO_MIN: 30, CA_DD_MIN: 6, CA_DD_MAX: 30, CA_VOLAT_MIN: 0.7, CA_RED_MIN: 1.5, CA_RAPIDA: 5, FR_CAMBIO_MIN: 20, FR_DD_MIN: 5, FR_DD_MAX: 30, FR_REB_MIN: 0.4, FR_REB_MAX_RET: 0.5, FR_LOW_RECIENTE: 15, RT2_CAMBIO_MIN: 3, RT2_DD_MIN: 1.2, RT2_DD_MAX: 8, RT2_LOW_RECIENTE: 12, RT2_REB_MIN: 0.2, RT2_RET_MAX: 0.6, PRECIO_BAJO: 1, SOLO_BARATAS: false, FR_VOLAT_MIN: 0.5, FR_POS_MIN: 50, FUEL_VETO_SHORT: true, CA_AUTO: true, RT_MIN: 40, RT_RESERVA_MS: 90000, VELAS: 180, EXCL: 6, BASE_RANGO_MAX: 6, VOL_RATIO_MIN: 5, GAIN3_MIN: 1.0, RAP_GAIN5_MIN: 2.5, RAP_VOL_MIN: 3,
-        DROP3: 2.0, DROP5: 3.0, DROP_VOL: 3, BRUTAL5: 5, BRUTAL_MAX30: 8, TARDE_PCT: 15, LIQ_MIN: 300000, MAX_CAND: 40, CACHE_MS: 8000,
+        DROP3: 2.0, DROP5: 3.0, DROP_VOL: 3, BRUTAL5: 5, BRUTAL_MAX30: 8, TARDE_PCT: 15, LIQ_MIN: 300000, MAX_CAND: 40, CACHE_MS: 12000,
         VIDA_MS: 10 * 60 * 1000, AUTO_MIN_SCORE: 60, AUTO_ABRIR: false, CAIDA_ABRIR: true, ESPACIO_AUTO_MS: 20000, SONIDO: true, BOTON: true, UP: 1.5, DN: 1.5, MAX_MIN: 20 };
     var ACT = {}, CK = {}, AV = {}, PEND = [], ultAbierta = null, ultAutoTs = 0, ultRt = null, ultRtTs = 0, MISS = {}, PENDVOZ = null, ultAviso = {}, abierto = false, busy = false, KEY = "cdc_despertar_net";
     var ICONO = { DESPERTAR: "🚀", RAPIDA: "⚡", DESMAYO: "🔻", CAIDA_BRUTAL: "💥", RETROCESO: "🎯", CAIDA_ALCISTA: "🌋", FONDO_REBOTE: "🟢" };
@@ -19193,13 +19239,15 @@ setTimeout(function(){setInterval(tick,CFG.TICK_MS);},CFG.ARRANQUE_MS);
         }).join("");
     }
 
+    var _primerTickDes = true;   // ⚡ el primer ciclo solo revisa las 16 más movidas para mostrar los DESMAYOS rápido
     async function tick() {
         if (busy) return; busy = true;
         try {
             if (typeof cachedData === "undefined" || typeof obtenerKlines !== "function") return;
+            if (!Object.keys(cachedData).length) return;
             resolver(); resolverFuel();
             var lista = Object.values(cachedData).filter(function (c) { return c && c.volume >= CFG.LIQ_MIN && (c.cambioReal2Min >= 0.3 || c.ciclosSubiendo >= 3 || c.cambioReal2Min <= -0.5 || c.ciclosBajando >= 3 || (c.posicionPorcentaje >= 85 && Math.abs(c.cambioReal2Min || 0) >= 0.2) || (c.change >= CFG.CA_CAMBIO_MIN && (c.cambioReal2Min || 0) <= -0.2) || (c.change >= CFG.RT2_CAMBIO_MIN)); })
-                .sort(function (a, b) { return Math.abs(b.cambioReal2Min || 0) - Math.abs(a.cambioReal2Min || 0); }).slice(0, CFG.MAX_CAND), nuevo = false, nuevos = [];
+                .sort(function (a, b) { return Math.abs(b.cambioReal2Min || 0) - Math.abs(a.cambioReal2Min || 0); }).slice(0, _primerTickDes ? 16 : CFG.MAX_CAND), nuevo = false, nuevos = [];
             Object.keys(ACT).forEach(function (s) { if (cachedData[s] && !lista.some(function (z) { return z.symbol === s; })) lista.push(cachedData[s]); });   // las alertas activas se re-evalúan siempre
             try { if (selectedCoin && cachedData[selectedCoin] && !lista.some(function (z) { return z.symbol === selectedCoin; })) lista.push(cachedData[selectedCoin]); } catch (e) {}   // y la moneda del panel central
             try { for (var q = 0; q < lista.length; q += 10) await Promise.all(lista.slice(q, q + 10).map(function (z) { return Promise.all([klines(z.symbol), klines1h(z.symbol)]); })); } catch (e) {}   // red: descarga en paralelo (10 a la vez)
@@ -19215,7 +19263,7 @@ setTimeout(function(){setInterval(tick,CFG.TICK_MS);},CFG.ARRANQUE_MS);
             pintar(); try { fijarDes(); } catch (e) {} try { chipsRebote(); } catch (e) {} PENDVOZ = nuevos.sort(function (a, b) { return prioridad(b.symbol) - prioridad(a.symbol); })[0] || null;
             var antes = ultAutoTs; autoAbrir(); if (PENDVOZ && ultAutoTs === antes) anunciar(PENDVOZ);   // la voz nombra la misma moneda que abrió el panel
             if (nuevo) { try { actualizarTablaIzquierda(); } catch (e) {} }
-        } catch (e) { console.warn("DESPERTAR:", e); } finally { busy = false; }
+        } catch (e) { console.warn("DESPERTAR:", e); } finally { busy = false; try { if (Object.keys(cachedData).length) _primerTickDes = false; } catch (e) {} }
     }
 
     /* ── Aviso por voz: "Moneda acelerada" / "Moneda con desmayo" ── */
@@ -19272,7 +19320,7 @@ setTimeout(function(){setInterval(tick,CFG.TICK_MS);},CFG.ARRANQUE_MS);
         vetoCorto: function (s) { return !!(CFG.FUEL_VETO_SHORT && FUEL[s] && FUEL[s].estado === "CARGANDO" && FUEL[s].fuerza >= 75); }, reservaPanel: function () { return (!!ultRtTs && Date.now() - ultRtTs < CFG.RT_RESERVA_MS) || (Date.now() - (window.__dmAbrirTs || 0) < 60000 && Object.values(ACT).some(function (r) { return r.dir < 0; })); }, abrir: function (s) { try { seleccionarMoneda(s); } catch (e) {} }, evaluar: evaluar, aprueba: aprueba, prioridad: prioridad, activas: function () { return ACT; },
         simbolosLista: function () { return Object.keys(ACT); }, slotDesmayo: slotDesmayo, hayDesmayo: function () { return listaDes().length > 0; }, fijarDes: fijarDes, lista: function () { return listaTodas(); }, hayAlerta: function () { return listaTodas().length > 0; }, verTodas: function () { try { document.getElementById("dspPill").onclick(); } catch (e) {} }, red: function () { return { sube: NET, cae: NETD, retroceso: NETR, caida: NETB, fondo: NETF, combustible: NETC }; },
         reiniciarRed: function () { try { localStorage.removeItem(KEY); localStorage.removeItem(KEY + "_dn"); localStorage.removeItem(KEY + "_rt"); localStorage.removeItem(KEY + "_ca"); localStorage.removeItem(KEY + "_fr"); localStorage.removeItem(KEY + "_fu"); } catch (e) {} NET = mkNet(KEY); NETD = mkNet(KEY + "_dn"); NETR = mkNet(KEY + "_rt"); NETB = mkNet(KEY + "_ca"); NETF = mkNet(KEY + "_fr"); NETC = mkNet(KEY + "_fu"); } };
-    setTimeout(function () { ui(); setInterval(tick, CFG.TICK_MS); }, 15000);
+    setTimeout(function () { ui(); tick(); setInterval(tick, CFG.TICK_MS); }, 4000);
 })();
 </script>
 
@@ -19524,7 +19572,7 @@ window.CDC_WS24=(function(){
   function map(x){return{symbol:x.s,priceChange:x.p,priceChangePercent:x.P,weightedAvgPrice:x.w,lastPrice:x.c,lastQty:x.Q,openPrice:x.o,highPrice:x.h,lowPrice:x.l,volume:x.v,quoteVolume:x.q,openTime:x.O,closeTime:x.C,firstId:x.F,lastId:x.L,count:x.n}}
   function conectar(){
     if(!('WebSocket' in window))return;
-    try{ws=new WebSocket('wss://fstream.binance.com/ws/!ticker@arr');
+    try{ws=(window.__ws24Early&&window.__ws24Early.readyState<2)?window.__ws24Early:new WebSocket('wss://fstream.binance.com/ws/!ticker@arr');window.__ws24Early=null;
       ws.onmessage=function(e){var a;try{a=JSON.parse(e.data)}catch(x){return}
         if(!Array.isArray(a))return;var n=Date.now();tries=0;if(!first)first=n;last=n;
         for(var i=0;i<a.length;i++){var s=a[i].s;if(s){C[s]=map(a[i]);T[s]=n}}
@@ -19549,7 +19597,7 @@ window.CDC_WS24=(function(){
     else{bd.style.color='#f3ba2f';bd.textContent='🔌 Conectando con Binance…'}},1000);
   conectar();
   return{
-    listo:function(){var n=Date.now(),k=Object.keys(C).length;return n-last<8000&&k>=150&&(n-first>20000||k>=450)},
+    listo:function(){var n=Date.now(),k=Object.keys(C).length;return n-last<8000&&k>=120&&(n-first>3000||k>=300)},
     todos:function(){return Object.keys(C).map(function(s){return C[s]})},
     pocos:function(l){return l.filter(function(s){return C[s]}).map(function(s){return C[s]})}
   };
