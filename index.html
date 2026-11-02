@@ -17762,7 +17762,7 @@ setTimeout(function(){setInterval(tick,CFG.TICK_MS);},CFG.ARRANQUE_MS);
     // archivo completo sin caer en la paradoja de "el hash contiene su
     // propio hash". No cambiar este texto.
     var _PLACEHOLDER = "%%CDC_INTEGRITY_HASH%%";
-    var _HASH_ESPERADO = "457a64492fd8653ec86bf0523296336d3518edac4f6c1da55cbf891df5978c37"; // ← se reemplaza por el hash real en el paso final
+    var _HASH_ESPERADO = "f9dd3d80cc7eb45f03c23deec02d7fa63014743ee3438a42701e9e9ea2e4f168"; // ← se reemplaza por el hash real en el paso final
 
     function _bloquear(motivo) {
         try {
@@ -19680,25 +19680,26 @@ window.CDC_WS24=(function(){
 window.CDC_DESPEGUE=(function(){
   "use strict";
   var CFG={ON:true,VOZ:true,SONIDO:true,TOAST:true,
-    ARRANQUE_MS:14000,TICK_MS:12000,MAX_CAND:30,
-    POS_MAX:40,          // % del rango 24h: "fondo del fondo" (0 = en el mínimo, 100 = en el máximo)
-    CAIDA_MIN:20,        // % que cayó desde su máximo 24h ...
-    CAMBIO24_MIN:-10,    // ... o cambio 24h menor a este valor
-    RANGO_MIN:12,        // % de rango 24h (volatilidad)
-    LIQ_MIN:300000,      // volumen 24h en USDT (descarta monedas sin liquidez)
+    ARRANQUE_MS:14000,TICK_MS:12000,MAX_CAND:45,
+    POS_MAX:55,          // % del rango 24h: "fondo del fondo" (0 = en el mínimo, 100 = en el máximo)
+    CAIDA_MIN:12,        // % que cayó desde su máximo 24h ...
+    CAMBIO24_MIN:-6,     // ... o cambio 24h menor a este valor
+    RANGO_MIN:8,         // % de rango 24h (volatilidad)
+    LIQ_MIN:200000,      // volumen 24h en USDT (descarta monedas sin liquidez)
     VELAS:180,           // velas de 1m que se descargan (misma petición que usa DESMAYO → se comparte la caché)
     VENT:15,             // se cuentan las velas verdes entre las últimas VENT velas
-    VERDES_MIN:7,        // mínimo de velas verdes en esa ventana (o una racha de 4 seguidas)
-    REB_MIN:0.6,REB_MAX:12, // % de rebote desde el mínimo de la última hora (más de REB_MAX = ya despegó, tarde)
-    MIN_RECIENTE:45,     // el mínimo tiene que ser de las últimas 45 velas (fondo fresco)
-    VOLX_MIN:1.3,        // volumen de los últimos 10 min vs. lo normal de la hora anterior
+    VERDES_MIN:6,        // mínimo de velas verdes en esa ventana (o una racha de 4 seguidas)
+    REB_MIN:0.6,REB_MAX:15, // % de rebote desde el mínimo de la última hora (más de REB_MAX = ya despegó, tarde)
+    MIN_RECIENTE:60,     // el mínimo tiene que ser de las últimas 45 velas (fondo fresco)
+    VOLX_MIN:1.15,        // volumen de los últimos 10 min vs. lo normal de la hora anterior
     VELA_RANGO_MIN:0.15, // % de rango promedio por vela (que se esté moviendo de verdad)
-    CAP_MIN:4,CLX_MIN:2.5,TK_VETO:0.45, /* CAP_MIN: % de caída desde el pico de ~2.5h · TK_VETO: bajo esto dominan los vendedores */
-     SCORE_MIN:60,VIDA_MS:15*60000,COOLDOWN_MS:10*60000,GLOBAL_MS:20000,
+    CAP_MIN:3,CLX_MIN:2.5,TK_VETO:0.45, /* CAP_MIN: % de caída desde el pico de ~2.5h · TK_VETO: bajo esto dominan los vendedores */
+     SCORE_MIN:50,VIDA_MS:15*60000,COOLDOWN_MS:10*60000,GLOBAL_MS:20000,
     PANEL_AUTO:true,        // abre sola en el panel central la mejor moneda ✈️ (respetando DESMAYO y demás alarmas)
     PANEL_DWELL_MS:30000,   // mínimo entre una apertura automática y otra
     AUTO_COOLDOWN_MS:600000 /* una misma moneda no se vuelve a abrir sola antes de 10 min */};
-  var ACT={},MISS={},AV={},busy=false,ultGlobal=0,box=null,ncand=0;
+  var ACT={},MISS={},AV={},busy=false,ultGlobal=0,box=null,ncand=0,FAIL={},PRE={};
+  function F(s,g){FAIL[s]=g;return null;}
 
   function avg(a,i,j){var s=0,c=0;for(var x=i;x<j;x++){s+=a[x];c++;}return c?s/c:0;}
   function med(a,i,j){var t=a.slice(i,j).sort(function(x,y){return x-y;});return t.length?t[Math.floor(t.length/2)]:0;}
@@ -19711,21 +19712,21 @@ window.CDC_DESPEGUE=(function(){
   /* v2 · DESMAYO → REVERSA: caída fuerte + pánico de volumen + fondo fresco + giro con compradores entrando */
   function evaluar(sym,k,c){
     var V=CFG.VENT;
-    if(!k||k.length<110)return null;
+    if(!k||k.length<110)return F(sym,"pocas velas");
     var n=k.length,O=[],H=[],L=[],C=[],Q=[],TB=[],i,tb,q;
     for(i=0;i<n;i++){O.push(+k[i][1]);H.push(+k[i][2]);L.push(+k[i][3]);C.push(+k[i][4]);
       q=+k[i][7]||(+k[i][5]*+k[i][4]);Q.push(q);tb=+k[i][10];TB.push(isFinite(tb)&&tb>=0?tb:-1);}
-    var P=C[n-1];if(!(P>0))return null;
+    var P=C[n-1];if(!(P>0))return F(sym,"sin precio");
     /* 1) fondo fresco (mínimo de la última hora, de las últimas MIN_RECIENTE velas) y rebote todavía temprano */
     var mn=Infinity,mi=-1;
     for(i=n-60;i<n;i++){if(L[i]<mn){mn=L[i];mi=i;}}
-    if(mi<n-CFG.MIN_RECIENTE)return null;
+    if(mi<n-CFG.MIN_RECIENTE)return F(sym,"fondo no fresco");
     var reb=(P/mn-1)*100;
-    if(!(reb>=CFG.REB_MIN&&reb<=CFG.REB_MAX))return null;
+    if(!(reb>=CFG.REB_MIN&&reb<=CFG.REB_MAX))return F(sym,reb<CFG.REB_MIN?"aún no rebota":"ya despegó (rebote alto)");
     /* 2) el desmayo: caída desde el pico de las últimas ~2.5h hasta el fondo */
     var pk=0;for(i=Math.max(0,mi-150);i<=mi;i++){if(H[i]>pk)pk=H[i];}
     var cap=(pk/mn-1)*100;
-    if(cap<CFG.CAP_MIN)return null;
+    if(cap<CFG.CAP_MIN)return F(sym,"sin caída previa");
     /* 3) clímax de pánico: vela de volumen enorme pegada al fondo (vendedores agotándose) */
     var base=med(Q,Math.max(0,n-130),n-70);if(!(base>0))base=med(Q,0,n-10);
     var clx=0;for(i=Math.max(0,mi-8);i<=Math.min(n-1,mi+8);i++){if(Q[i]>clx)clx=Q[i];}
@@ -19734,21 +19735,21 @@ window.CDC_DESPEGUE=(function(){
     var verdes=0,racha=0,rmax=0,rng=0;
     for(i=n-V;i<n;i++){if(C[i]>O[i]){verdes++;racha++;if(racha>rmax)rmax=racha;}else racha=0;rng+=(H[i]-L[i])/L[i]*100;}
     rng/=V;
-    if(rng<CFG.VELA_RANGO_MIN)return null;
-    if(verdes<CFG.VERDES_MIN&&rmax<4)return null;
+    if(rng<CFG.VELA_RANGO_MIN)return F(sym,"velas sin movimiento");
+    if(verdes<CFG.VERDES_MIN&&rmax<4)return F(sym,"pocas velas verdes");
     /* 5) volumen entrando + presión compradora real (taker buy) */
     var rec=avg(Q,n-10,n),base2=med(Q,n-70,n-10),volx=base2>0?rec/base2:0;
-    if(volx<CFG.VOLX_MIN)return null;
+    if(volx<CFG.VOLX_MIN)return F(sym,"volumen bajo");
     var tk=0,tk0=0,a1=0,b1=0,a0=0,b0=0;
     if(TB[n-1]>=0){for(i=n-8;i<n;i++){a1+=TB[i];b1+=Q[i];}for(i=n-40;i<n-8;i++){a0+=TB[i];b0+=Q[i];}
       tk=b1>0?a1/b1:0;tk0=b0>0?a0/b0:0;
-      if(tk>0&&tk<CFG.TK_VETO)return null;}   /* si dominan los vendedores, no es reversa */
+      if(tk>0&&tk<CFG.TK_VETO)return F(sym,"vendedores dominan");}   /* si dominan los vendedores, no es reversa */
     /* 6) EMAs de 1m: precio recuperó la EMA7 y la EMA7 ya sube (ya no exige que la EMA25/99 giren: llegan tarde) */
     var e7=emaS(C,7),e25=emaS(C,25),e99=emaS(C,99);
-    if(!e7||!e25||!e99||e7.length<5||e25.length<5||e99.length<5)return null;
+    if(!e7||!e25||!e99||e7.length<5||e25.length<5||e99.length<5)return F(sym,"EMAs sin datos");
     var a7=e7[e7.length-1],a25=e25[e25.length-1],a99=e99[e99.length-1];
     var s7=(a7/e7[e7.length-4]-1)*100,s25=(a25/e25[e25.length-4]-1)*100,s99=(a99/e99[e99.length-4]-1)*100;
-    if(!(s7>0&&P>a7))return null;
+    if(!(s7>0&&P>a7))return F(sym,"no recupera EMA7");
     /* 7) piso más alto (higher low) después del fondo */
     var hl=false;if(mi<=n-5){var m2=Infinity;for(i=n-5;i<n;i++){if(L[i]<m2)m2=L[i];}hl=m2>mn*1.0005;}
     /* 8) RSI saliendo de sobreventa */
@@ -19797,9 +19798,17 @@ window.CDC_DESPEGUE=(function(){
     if(busy||!CFG.ON)return;busy=true;
     try{
       if(typeof cachedData==="undefined"||typeof obtenerKlines!=="function"||!Object.keys(cachedData).length)return;
+      FAIL={};PRE={total:0,sinLiquidez:0,posAlta:0,rangoBajo:0,sinCaida24h:0,cayendoAhora:0,pasanPrefiltro:0};
+      Object.values(cachedData).forEach(function(c){if(!c)return;PRE.total++;
+        if(!(c.volume>=CFG.LIQ_MIN)){PRE.sinLiquidez++;return;}
+        if(!(c.posicionPorcentaje<=CFG.POS_MAX)){PRE.posAlta++;return;}
+        if(!(c.rangoPct24h>=CFG.RANGO_MIN)){PRE.rangoBajo++;return;}
+        if(!(c.caidaDesdeMaximo>=CFG.CAIDA_MIN||c.change<=CFG.CAMBIO24_MIN)){PRE.sinCaida24h++;return;}
+        if(!((c.cambioReal2Min||0)>-0.5)){PRE.cayendoAhora++;return;}
+        PRE.pasanPrefiltro++;});
       var lista=Object.values(cachedData).filter(function(c){
         return c&&c.volume>=CFG.LIQ_MIN&&c.posicionPorcentaje<=CFG.POS_MAX&&c.rangoPct24h>=CFG.RANGO_MIN
-          &&(c.caidaDesdeMaximo>=CFG.CAIDA_MIN||c.change<=CFG.CAMBIO24_MIN)&&(c.cambioReal2Min||0)>-0.3;})
+          &&(c.caidaDesdeMaximo>=CFG.CAIDA_MIN||c.change<=CFG.CAMBIO24_MIN)&&(c.cambioReal2Min||0)>-0.5;})
         .sort(function(a,b){return (b.cambioReal2Min||0)-(a.cambioReal2Min||0);}).slice(0,CFG.MAX_CAND);
       ncand=lista.length;
       Object.keys(ACT).forEach(function(s){if(cachedData[s]&&!lista.some(function(z){return z.symbol===s;}))lista.push(cachedData[s]);});
@@ -19885,6 +19894,8 @@ window.CDC_DESPEGUE=(function(){
     abrir:abrir,autoAbrir:autoAbrir,
     verTodas:function(){try{abrirListaDespegue();}catch(e){}},
     cfg:CFG,evaluar:evaluar,
+    diag:function(){var g={};Object.keys(FAIL).forEach(function(s){var m=FAIL[s];(g[m]=g[m]||[]).push(s.replace('USDT',''));});
+      return{activas:Object.keys(ACT).length,candidatasAnalizadas:ncand,prefiltro:PRE,descartadasPorMotivo:g};},
     es:function(s){var r=ACT[s];return !!(r&&Date.now()-r.ts<CFG.VIDA_MS);},
     datos:function(s){return ACT[s]||null;},
     lista:lista
