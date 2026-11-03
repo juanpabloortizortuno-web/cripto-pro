@@ -17762,7 +17762,7 @@ setTimeout(function(){setInterval(tick,CFG.TICK_MS);},CFG.ARRANQUE_MS);
     // archivo completo sin caer en la paradoja de "el hash contiene su
     // propio hash". No cambiar este texto.
     var _PLACEHOLDER = "%%CDC_INTEGRITY_HASH%%";
-    var _HASH_ESPERADO = "f9dd3d80cc7eb45f03c23deec02d7fa63014743ee3438a42701e9e9ea2e4f168"; // ← se reemplaza por el hash real en el paso final
+    var _HASH_ESPERADO = "7b6e3ab02c9528ba5a2d43212c58a842c3ef2dcb44ba75cfdd20514b16eceabd"; // ← se reemplaza por el hash real en el paso final
 
     function _bloquear(motivo) {
         try {
@@ -18996,7 +18996,7 @@ setTimeout(function(){setInterval(tick,CFG.TICK_MS);},CFG.ARRANQUE_MS);
 (function () {
     "use strict";
     var CFG = { TICK_MS: 6000, RT_DD_MIN: 1.5, RT_DD_MAX: 6, RT_RUN_MIN: 1.5, RT_VOL_MIN: 3, RT_RED_MIN: 1.0, RT_AUTO: true, CA_CAMBIO_MIN: 30, CA_DD_MIN: 6, CA_DD_MAX: 30, CA_VOLAT_MIN: 0.7, CA_RED_MIN: 1.5, CA_RAPIDA: 5, FR_CAMBIO_MIN: 20, FR_DD_MIN: 5, FR_DD_MAX: 30, FR_REB_MIN: 0.4, FR_REB_MAX_RET: 0.5, FR_LOW_RECIENTE: 15, RT2_CAMBIO_MIN: 3, RT2_DD_MIN: 1.2, RT2_DD_MAX: 8, RT2_LOW_RECIENTE: 12, RT2_REB_MIN: 0.2, RT2_RET_MAX: 0.6, PRECIO_BAJO: 1, SOLO_BARATAS: false, FR_VOLAT_MIN: 0.5, FR_POS_MIN: 50, FUEL_VETO_SHORT: true, CA_AUTO: true, RT_MIN: 40, RT_RESERVA_MS: 90000, VELAS: 180, EXCL: 6, BASE_RANGO_MAX: 6, VOL_RATIO_MIN: 5, GAIN3_MIN: 1.0, RAP_GAIN5_MIN: 2.5, RAP_VOL_MIN: 3,
-        DROP3: 2.0, DROP5: 3.0, DROP_VOL: 3, BRUTAL5: 5, BRUTAL_MAX30: 8, TARDE_PCT: 15, LIQ_MIN: 300000, MAX_CAND: 40, CACHE_MS: 12000,
+        DROP3: 2.0, DROP5: 3.0, DROP_VOL: 3, DM_DD_MIN: 2.0, DM_INY_MIN: 3, DM_VOLA_X: 1.5, DM_PICO_VELAS: 45, INY_CAMBIO: 10, BRUTAL5: 5, BRUTAL_MAX30: 8, TARDE_PCT: 15, LIQ_MIN: 300000, MAX_CAND: 50, CACHE_MS: 12000,
         VIDA_MS: 10 * 60 * 1000, AUTO_MIN_SCORE: 60, AUTO_ABRIR: false, CAIDA_ABRIR: true, ESPACIO_AUTO_MS: 20000, SONIDO: true, BOTON: true, UP: 1.5, DN: 1.5, MAX_MIN: 20 };
     var ACT = {}, CK = {}, AV = {}, PEND = [], ultAbierta = null, ultAutoTs = 0, ultRt = null, ultRtTs = 0, MISS = {}, PENDVOZ = null, ultAviso = {}, abierto = false, busy = false, KEY = "cdc_despertar_net";
     var ICONO = { DESPERTAR: "🚀", RAPIDA: "⚡", DESMAYO: "🔻", CAIDA_BRUTAL: "💥", RETROCESO: "🎯", CAIDA_ALCISTA: "🌋", FONDO_REBOTE: "🟢" };
@@ -19130,6 +19130,24 @@ setTimeout(function(){setInterval(tick,CFG.TICK_MS);},CFG.ARRANQUE_MS);
                  g3: (p - C[n - 4]) / C[n - 4] * 100, g5: (p - C[n - 6]) / C[n - 6] * 100, cmax: dd, sob: 0, tarde: false, sl: sl, riesgo: (p - sl) / p * 100, c24: ch, x: x, ts: Date.now() };
     }
 
+    /* 🔻 DESMAYO DESDE MÁXIMO O INYECCIÓN (prioridad máxima del CDC): la moneda venía de una subida fuerte (inyección) o tocó su máximo,
+       marcó un pico en los últimos ~45 min y AHORA cae con velocidad: bajo la EMA7, últimas velas hacia abajo y volatilidad mayor a la normal. */
+    function desdeMaximo(k, c, C, p) {
+        var n = k.length; if (n < 60) return null;
+        var H = k.map(function (x) { return +x[2]; }), L = k.map(function (x) { return +x[3]; }), i, ip = n - CFG.DM_PICO_VELAS;
+        for (i = n - CFG.DM_PICO_VELAS; i < n; i++) if (H[i] > H[ip]) ip = i;
+        if (ip >= n - 1 || ip < 10) return null;
+        var pico = H[ip], dpk = (pico - p) / pico * 100; if (dpk < CFG.DM_DD_MIN) return null;
+        var o0 = Infinity; for (i = Math.max(0, ip - 30); i <= ip; i++) if (L[i] < o0) o0 = L[i];
+        var iny = (pico - o0) / o0 * 100;
+        var enMax = c && (c.posicionPorcentaje >= 80 || (c.high && pico >= c.high * 0.995)), caliente = c && c.change >= CFG.INY_CAMBIO;
+        var origen = iny >= CFG.DM_INY_MIN ? "INYECCION" : (enMax || caliente) ? "MAXIMO" : null; if (!origen) return null;
+        var e7 = ema(C, 7)[n - 1], g3 = (p - C[n - 4]) / C[n - 4] * 100; if (!(p < e7 && g3 <= -0.3)) return null;
+        var rg = function (a, b) { var s = 0, m = 0, j; for (j = a; j < b; j++) { s += (H[j] - L[j]) / L[j] * 100; m++; } return m ? s / m : 0; };
+        var vola = rg(n - 5, n) / Math.max(rg(Math.max(0, n - 130), n - 65), 0.02); if (vola < CFG.DM_VOLA_X) return null;
+        return { origen: origen, vola: vola, dpk: dpk, iny: iny };
+    }
+
     /* ── Evaluación con velas de 1 minuto ── */
     function evaluar(sym, k, c) {
         if (!k || k.length < 60) return null;
@@ -19144,11 +19162,12 @@ setTimeout(function(){setInterval(tick,CFG.TICK_MS);},CFG.ARRANQUE_MS);
         var medias = okm && m7 > m25 && m7 > m7p, mBaj = okm && m7 < m25 && m7 < m7p;
         var mx30 = Math.max.apply(null, k.slice(-30).map(function (x) { return +x[2]; })), cmax = (mx30 - p) / mx30 * 100;
         var rt = retroceso(k, c, sym) || fondoRebote(k, c, sym) || retroTend(k, c, sym) || caidaAlcista(k, c, sym); if (rt) return rt;   // 🎯 prioridad 1
-        var tipo = null;
+        var dmx = desdeMaximo(k, c, cie, p), tipo = null;
         if (g5 <= -CFG.BRUTAL5 || (cmax >= CFG.BRUTAL_MAX30 && g3 <= -CFG.DROP3)) tipo = "CAIDA_BRUTAL";
         else if ((g3 <= -CFG.DROP3 && vr >= CFG.DROP_VOL) || (g5 <= -CFG.DROP5 && vr >= 2)) tipo = "DESMAYO";
         else if (rango <= CFG.BASE_RANGO_MAX && vr >= CFG.VOL_RATIO_MIN && p > bh && g3 >= CFG.GAIN3_MIN && medias) tipo = "DESPERTAR";
         else if (g5 >= CFG.RAP_GAIN5_MIN && vr >= CFG.RAP_VOL_MIN && medias) tipo = "RAPIDA";
+        if (!tipo && dmx) tipo = "DESMAYO";   // 🔻 desde máximo / inyección
         if (!tipo) return null;
         var baja = tipo === "DESMAYO" || tipo === "CAIDA_BRUTAL", c24 = c ? c.change : 0, c2 = c ? c.cambioReal2Min : 0, reglas, x;
         if (baja) {
@@ -19160,6 +19179,7 @@ setTimeout(function(){setInterval(tick,CFG.TICK_MS);},CFG.ARRANQUE_MS);
                 : Math.min(g5, 10) / 10 * 40 + Math.min(vr, 15) / 15 * 30 + 15 + (c24 > 0 ? 5 : 0);
             x = [Math.min(Math.log(vr), 3.5) / 3.5, Math.min(g3, 8) / 8, Math.min(rango, 10) / 10, cl(sob, 0, 20) / 20, medias ? 1 : 0, cl(c24, -30, 60) / 60, cl(c2, -3, 3) / 3, tipo === "DESPERTAR" ? 1 : 0];
         }
+        if (baja && dmx) reglas = Math.min(100, reglas + 8 + Math.min(dmx.vola, 4) / 4 * 12);   // desmayo desde máximo/inyección: sube el puntaje
         var N = baja ? NETD : NET, w = Math.min(0.6, N.n / 150), pn = fwd(x, N).p * 100, sc = reglas * (1 - w) + pn * w, cerebro = null, nn = null;
         try { nn = window.CDC_NEURO && CDC_NEURO.panel ? CDC_NEURO.panel(sym) : null; } catch (e) {}
         if (nn && nn.valida) {
@@ -19169,7 +19189,7 @@ setTimeout(function(){setInterval(tick,CFG.TICK_MS);},CFG.ARRANQUE_MS);
         sc = Math.round(cl(sc, 0, 100));
         var sl = baja ? Math.max.apply(null, k.slice(-5).map(function (x) { return +x[2]; })) * 1.003 : bh * 0.995;
         return { symbol: sym, tipo: tipo, dir: baja ? -1 : 1, price: p, score: sc, reglas: Math.round(reglas), red: Math.round(pn), cerebro: cerebro, vr: vr, g3: g3, g5: g5, cmax: cmax,
-                 sob: sob, tarde: baja ? cmax > CFG.TARDE_PCT : sob > CFG.TARDE_PCT, sl: sl, riesgo: Math.abs(sl - p) / p * 100, c24: c ? c.change : null, x: x, ts: Date.now() };
+                 sob: sob, tarde: baja ? cmax > CFG.TARDE_PCT : sob > CFG.TARDE_PCT, sl: sl, riesgo: Math.abs(sl - p) / p * 100, c24: c ? c.change : null, x: x, ts: Date.now(), origen: dmx ? dmx.origen : null, vola: dmx ? dmx.vola : 0, dpk: dmx ? dmx.dpk : 0, iny: dmx ? dmx.iny : 0 };
     }
 
     async function klines(sym) { var h = CK[sym], t = Date.now(); if (h && t - h.ts < CFG.CACHE_MS) return h.k; var k = null;
@@ -19223,12 +19243,14 @@ setTimeout(function(){setInterval(tick,CFG.TICK_MS);},CFG.ARRANQUE_MS);
         PEND = vivos; }
 
     function aprueba(sym) { var r = ACT[sym]; if (r && r.dir < 0) return true; return !!(r && r.score >= CFG.AUTO_MIN_SCORE && !r.tarde && (r.tipo === "DESPERTAR" || (CFG.CAIDA_ABRIR && r.dir < 0) || (r.tipo === "RETROCESO" && r.estado === "IMPULSO" && r.score >= CFG.RT_MIN) || (CFG.CA_AUTO && r.tipo === "CAIDA_ALCISTA" && r.score >= CFG.RT_MIN) || (r.tipo === "FONDO_REBOTE" && r.score >= CFG.RT_MIN))); }
-    function prioridad(sym) { var r = ACT[sym]; return r ? 1000 + r.score + (r.tipo === "RETROCESO" ? 1000 + (r.estado === "IMPULSO" ? 200 : 0) : r.tipo === "FONDO_REBOTE" ? 1400 : r.tipo === "CAIDA_ALCISTA" ? 800 : r.tipo === "DESPERTAR" ? 100 : r.dir < 0 ? 9000 : 0) : 0; }
+    function prioridad(sym) { var r = ACT[sym]; return r ? 1000 + r.score + (r.tipo === "RETROCESO" ? 1000 + (r.estado === "IMPULSO" ? 200 : 0) : r.tipo === "FONDO_REBOTE" ? 1400 : r.tipo === "CAIDA_ALCISTA" ? 800 : r.tipo === "DESPERTAR" ? 100 : r.dir < 0 ? 9000 + Math.min(40, Math.abs(Math.min(r.g5 || 0, r.g3 || 0)) * 4) + (r.origen ? 15 : 0) + Math.min(20, (r.vola || 0) * 3) : 0) : 0; }
 
     function panelDesmayo() { var now = Date.now(), S = typeof selectedCoin !== "undefined" ? selectedCoin : null, dl = listaDes(); if (!dl.length) return;
         if (ACT[dl[0].s] && ACT[dl[0].s].dir < 0) desmayoVoz(ACT[dl[0].s]);
         var ix = dl.map(function (r) { return r.s; }).indexOf(S), go = null, ult = now - (window.__dmAbrirTs || 0);
-        if (ix < 0 && ult > 4000) go = dl[0]; else if (ix >= 0 && dl.length > 1 && ult > 15000) go = dl[(ix + 1) % dl.length];
+        if (ix < 0 && ult > 4000) go = dl[0];
+        else if (ix > 0 && ult > 6000 && dl[0].pr - dl[ix].pr >= 15) go = dl[0];   // llegó uno peor: el más fuerte siempre arriba
+        else if (ix >= 0 && dl.length > 1 && ult > 20000) go = dl[(ix + 1) % Math.min(dl.length, 3)];   // rota solo entre los 3 peores
         if (go && now - _ultimaSeleccionManualTs > 15000) { window.__dmAbrirTs = now; window.__velHoldUntil = 0;   // el desmayo manda: libera la retención de alta velocidad
             window.__selDesmayo = true; try { seleccionarMoneda(go.s, true, ACT[go.s] ? ACT[go.s].tipo : "CAIDA_BRUTAL"); } finally { window.__selDesmayo = false; } if (selectedCoin === go.s) { ultAbierta = go.s; ultAutoTs = now; } } }
     setInterval(function () { try { panelDesmayo(); } catch (e) {} }, 2000);
@@ -19252,9 +19274,9 @@ setTimeout(function(){setInterval(tick,CFG.TICK_MS);},CFG.ARRANQUE_MS);
     }
 
     function listaDes() { var m = {};
-        Object.values(ACT).forEach(function (r) { if (r.dir < 0) m[r.symbol] = { s: r.symbol, sc: r.score, p: Math.min(r.g5 || 0, r.g3 || 0), vx: r.vr || 0 }; });
-        try { (window.CDC_CRASH ? CDC_CRASH.armadas() : []).forEach(function (a) { if (!m[a.sym]) m[a.sym] = { s: a.sym, sc: 95, p: a.caida, vx: a.volX || 0 }; }); } catch (e) {}
-        return Object.values(m).sort(function (x, y) { return y.sc - x.sc; }); }
+        Object.values(ACT).forEach(function (r) { if (r.dir < 0) m[r.symbol] = { s: r.symbol, sc: r.score, p: Math.min(r.g5 || 0, r.g3 || 0), vx: r.vr || 0, pr: prioridad(r.symbol) }; });
+        try { (window.CDC_CRASH ? CDC_CRASH.armadas() : []).forEach(function (a) { if (!m[a.sym]) m[a.sym] = { s: a.sym, sc: 95, p: a.caida, vx: a.volX || 0, pr: a.fase === "INMINENTE" ? 9400 : 9500 }; }); } catch (e) {}
+        return Object.values(m).sort(function (x, y) { return y.pr - x.pr; }); }
     function etiq(r) { return r.dir < 0 ? (r.tipo === "DESMAYO_INMINENTE" ? "⚠️ DESMAYO INMINENTE" : r.tipo === "CAIDA_BRUTAL" ? "ESTÁ OCURRIENDO UN DESMAYO" : "MONEDA CON DESMAYO") : r.tipo === "RETROCESO" ? (r.estado === "IMPULSO" ? "RETROCESO CON IMPULSO" : "EN RETROCESO") : r.tipo === "FONDO_REBOTE" ? "ENTRADA LONG · FONDO DEL DERRUMBE" : r.tipo === "CAIDA_ALCISTA" ? (r.estado === "FRENANDO" ? "CAÍDA BRUTAL EN ALCISTA · FRENANDO" : "CAÍDA BRUTAL EN ALCISTA") : r.tipo === "REBOTE_CRASH" ? "ENTRADA LONG · REBOTE DE CAÍDA BRUTAL" : "MONEDA ACELERADA"; }
     function colr(r) { return r.tipo === "DESMAYO_INMINENTE" ? ["#ff9f1a", "rgba(255,159,26,0.18)"] : r.dir < 0 ? ["#f6465d", "rgba(246,70,93,0.16)"] : r.tipo === "CAIDA_ALCISTA" ? ["#f3ba2f", "rgba(243,186,47,0.16)"] : ["#0ecb81", "rgba(14,203,129,0.16)"]; }
     function listaTodas() { var m = {};
@@ -19275,21 +19297,30 @@ setTimeout(function(){setInterval(tick,CFG.TICK_MS);},CFG.ARRANQUE_MS);
     function fijarDes() { try { var s = document.getElementById("cdcDesSlot"), b = document.getElementById("cdcBadgeTecho"), n = slotInnerDes();
         if (s && s.innerHTML !== n) s.innerHTML = n; if (s) { var tp = n ? listaTodas()[0] : null; s.className = (tp && tp.r.dir < 0) ? (tp.r.tipo === "DESMAYO_INMINENTE" ? "cdcSlotN" : "cdcSlotR") : ""; } if (b && n) b.style.display = "none";
         var hd = document.getElementById("dspHead"); if (hd) hd.style.display = "none"; } catch (e) {} }
-    setInterval(fijarDes, 1000);
+    setInterval(function () { try { fijarDes(); chipsDesmayo(); btnDes(); } catch (e) {} }, 1000);
 
     function chipsDesmayo() {
         var an = document.getElementById("alertaMonedaFija"); if (!an || !an.parentNode) return;
         var bx = document.getElementById("cdcDesmayos");
         if (!bx) { bx = document.createElement("div"); bx.id = "cdcDesmayos"; bx.style.cssText = "display:none;margin-bottom:12px;padding:8px 10px;border-radius:8px;background:#2a0a0e;border:2px solid #f6465d;box-shadow:0 0 14px #f6465d66;"; an.parentNode.insertBefore(bx, an); }
-        var m = {}; Object.values(ACT).forEach(function (r) { if (r.dir < 0) m[r.symbol] = { s: r.symbol, sc: r.score, p: Math.min(r.g5 || 0, r.g3 || 0) }; });
-        try { (window.CDC_CRASH ? CDC_CRASH.armadas() : []).forEach(function (a) { if (!m[a.sym]) m[a.sym] = { s: a.sym, sc: 95, p: a.caida }; }); } catch (e) {}
-        var a = Object.values(m).sort(function (x, y) { return y.sc - x.sc; });
-        if (!a.length) { bx.style.display = "none"; return; }
+        var a = listaDes(); if (!a.length) { bx.style.display = "none"; return; }
         var S = typeof selectedCoin !== "undefined" ? selectedCoin : null;
         bx.style.display = "block";
-        bx.innerHTML = '<div style="font-size:10px;font-weight:900;letter-spacing:1px;color:#f6465d;margin-bottom:6px">🔻 MONEDAS CON DESMAYO — PRIORIDAD MÁXIMA (' + a.length + ')</div>' + a.map(function (r) {
-            return '<span style="display:inline-block;margin:2px 6px 2px 0;padding:5px 10px;border-radius:14px;background:' + (r.s === S ? '#f6465d' : '#1a0508') + ';border:1px solid #f6465d;color:#fff;font-size:12px;font-weight:800;cursor:pointer" onclick="try{seleccionarMoneda(\'' + r.s + '\')}catch(e){}">🔻 ' + r.s.replace("USDT", "") + ' <span style="opacity:.85">' + (r.p ? r.p.toFixed(1) + '%' : '') + ' · ' + Math.round(r.sc) + '</span></span>';
+        bx.innerHTML = '<div style="font-size:10px;font-weight:900;letter-spacing:1px;color:#f6465d;margin-bottom:6px">🔻 MONEDAS CON DESMAYO — PRIORIDAD MÁXIMA (' + a.length + ') · 💉 desde inyección · ⛰️ desde máximo</div>' + a.map(function (r, j) {
+            var A = ACT[r.s], ic = A && A.origen === "INYECCION" ? "💉" : A && A.origen === "MAXIMO" ? "⛰️" : "🔻";
+            return '<span style="display:inline-block;margin:2px 6px 2px 0;padding:5px 10px;border-radius:14px;background:' + (r.s === S ? '#f6465d' : '#1a0508') + ';border:' + (j === 0 ? '2px' : '1px') + ' solid #f6465d;color:#fff;font-size:12px;font-weight:800;cursor:pointer" onclick="try{CDC_DESPERTAR.abrir(\'' + r.s + '\')}catch(e){}">' + (j === 0 ? "🔥 " : "") + ic + ' ' + r.s.replace("USDT", "") + ' <span style="opacity:.85">' + (r.p ? r.p.toFixed(1) + '%' : '') + (r.vx ? ' · Vol x' + r.vx.toFixed(1) : '') + (A && A.vola ? ' · ⚡x' + A.vola.toFixed(1) : '') + '</span></span>';
         }).join("");
+    }
+    /* 🔻 Botón de DESMAYO siempre visible arriba: rojo y parpadeando cuando hay desmayos; clic = abre en el panel central el peor */
+    function btnDes() {
+        var b = document.getElementById("cdcBtnDes");
+        if (!b) { b = document.createElement("button"); b.id = "cdcBtnDes"; b.type = "button";
+            b.style.cssText = "margin:0 8px;padding:6px 12px;border-radius:10px;border:1px solid #f6465d;background:#1a0508;color:#fff;font:800 12px Arial,sans-serif;cursor:pointer;white-space:nowrap;flex:0 0 auto;max-width:46vw;overflow:hidden;text-overflow:ellipsis";
+            b.onclick = function () { var l = listaDes(); if (!l.length) return; window.__dmAbrirTs = Date.now(); window.__velHoldUntil = 0; window.__selDesmayo = true; try { seleccionarMoneda(l[0].s, true, ACT[l[0].s] ? ACT[l[0].s].tipo : "CAIDA_BRUTAL"); } finally { window.__selDesmayo = false; } };
+            var hd = document.querySelector("header"); if (hd && hd.children.length >= 2) hd.insertBefore(b, hd.children[1]); else { b.style.cssText += ";position:fixed;top:12px;right:12px;z-index:8500"; document.body.appendChild(b); } }
+        var a = listaDes(), n = a.length;
+        b.textContent = n ? ("🔻 DESMAYO · " + a[0].s.replace("USDT", "") + " " + (a[0].p ? a[0].p.toFixed(1) + "%" : "") + (n > 1 ? " +" + (n - 1) : "")) : "🔻 DESMAYO · vigilando";
+        b.style.background = n ? "#f6465d" : "#1a0508"; b.style.boxShadow = n ? "0 0 14px #f6465d" : "none"; b.className = n ? "cdcBlink" : "";
     }
 
     function chipsRebote() {
@@ -19311,8 +19342,8 @@ setTimeout(function(){setInterval(tick,CFG.TICK_MS);},CFG.ARRANQUE_MS);
             if (typeof cachedData === "undefined" || typeof obtenerKlines !== "function") return;
             if (!Object.keys(cachedData).length) return;
             resolver(); resolverFuel();
-            var lista = Object.values(cachedData).filter(function (c) { return c && c.volume >= CFG.LIQ_MIN && (c.cambioReal2Min >= 0.3 || c.ciclosSubiendo >= 3 || c.cambioReal2Min <= -0.5 || c.ciclosBajando >= 3 || (c.posicionPorcentaje >= 85 && Math.abs(c.cambioReal2Min || 0) >= 0.2) || (c.change >= CFG.CA_CAMBIO_MIN && (c.cambioReal2Min || 0) <= -0.2) || (c.change >= CFG.RT2_CAMBIO_MIN)); })
-                .sort(function (a, b) { return Math.abs(b.cambioReal2Min || 0) - Math.abs(a.cambioReal2Min || 0); }).slice(0, _primerTickDes ? 16 : CFG.MAX_CAND), nuevo = false, nuevos = [];
+            var lista = Object.values(cachedData).filter(function (c) { return c && c.volume >= CFG.LIQ_MIN && (c.cambioReal2Min >= 0.3 || c.ciclosSubiendo >= 3 || c.cambioReal2Min <= -0.5 || c.ciclosBajando >= 3 || (c.posicionPorcentaje >= 85 && Math.abs(c.cambioReal2Min || 0) >= 0.2) || (c.change >= CFG.CA_CAMBIO_MIN && (c.cambioReal2Min || 0) <= -0.2) || (c.change >= CFG.RT2_CAMBIO_MIN) || (c.change >= CFG.INY_CAMBIO && (c.caidaDesdeMaximo || 0) >= 1.5) || (c.posicionPorcentaje >= 70 && (c.cambioReal2Min || 0) <= -0.3)); })
+                .sort(function (a, b) { var f = function (z) { var d = z.cambioReal2Min || 0; return Math.abs(d) + (d < 0 ? 1 : 0) + ((z.change >= CFG.INY_CAMBIO && (z.caidaDesdeMaximo || 0) >= 1.5) ? 5 : 0); }; return f(b) - f(a); }).slice(0, _primerTickDes ? 16 : CFG.MAX_CAND), nuevo = false, nuevos = [];
             Object.keys(ACT).forEach(function (s) { if (cachedData[s] && !lista.some(function (z) { return z.symbol === s; })) lista.push(cachedData[s]); });   // las alertas activas se re-evalúan siempre
             try { if (selectedCoin && cachedData[selectedCoin] && !lista.some(function (z) { return z.symbol === selectedCoin; })) lista.push(cachedData[selectedCoin]); } catch (e) {}   // y la moneda del panel central
             try { for (var q = 0; q < lista.length; q += 10) await Promise.all(lista.slice(q, q + 10).map(function (z) { return Promise.all([klines(z.symbol), klines1h(z.symbol)]); })); } catch (e) {}   // red: descarga en paralelo (10 a la vez)
@@ -19325,7 +19356,7 @@ setTimeout(function(){setInterval(tick,CFG.TICK_MS);},CFG.ARRANQUE_MS);
                     ACT[c.symbol] = r; MISS[c.symbol] = 0; }
                 else if (ACT[c.symbol] && (MISS[c.symbol] = (MISS[c.symbol] || 0) + 1) >= 2) { delete ACT[c.symbol]; nuevo = true; } }   // ya no cumple: sale de la barrita y de la lista
             var lim = Date.now() - CFG.VIDA_MS; Object.keys(ACT).forEach(function (s) { if (ACT[s].ts < lim) delete ACT[s]; });
-            pintar(); try { fijarDes(); } catch (e) {} try { chipsRebote(); } catch (e) {} PENDVOZ = nuevos.sort(function (a, b) { return prioridad(b.symbol) - prioridad(a.symbol); })[0] || null;
+            pintar(); try { fijarDes(); } catch (e) {} try { chipsRebote(); } catch (e) {} try { chipsDesmayo(); btnDes(); } catch (e) {} PENDVOZ = nuevos.sort(function (a, b) { return prioridad(b.symbol) - prioridad(a.symbol); })[0] || null;
             var antes = ultAutoTs; autoAbrir(); if (PENDVOZ && ultAutoTs === antes) anunciar(PENDVOZ);   // la voz nombra la misma moneda que abrió el panel
             if (nuevo) { try { actualizarTablaIzquierda(); } catch (e) {} }
         } catch (e) { console.warn("DESPERTAR:", e); } finally { busy = false; try { if (Object.keys(cachedData).length) _primerTickDes = false; } catch (e) {} }
