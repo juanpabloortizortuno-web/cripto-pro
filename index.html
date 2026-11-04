@@ -17762,7 +17762,7 @@ setTimeout(function(){setInterval(tick,CFG.TICK_MS);},CFG.ARRANQUE_MS);
     // archivo completo sin caer en la paradoja de "el hash contiene su
     // propio hash". No cambiar este texto.
     var _PLACEHOLDER = "%%CDC_INTEGRITY_HASH%%";
-    var _HASH_ESPERADO = "7b6e3ab02c9528ba5a2d43212c58a842c3ef2dcb44ba75cfdd20514b16eceabd"; // ← se reemplaza por el hash real en el paso final
+    var _HASH_ESPERADO = "b91676afaf1ef9216792ce76b3c2ddd6add26216f795e8fc6168f5eec5723f88"; // ← se reemplaza por el hash real en el paso final
 
     function _bloquear(motivo) {
         try {
@@ -19148,6 +19148,8 @@ setTimeout(function(){setInterval(tick,CFG.TICK_MS);},CFG.ARRANQUE_MS);
         return { origen: origen, vola: vola, dpk: dpk, iny: iny };
     }
 
+    function rsi14(C) { var n = C.length; if (n < 16) return null; var g = 0, l = 0, i, d; for (i = 1; i <= 14; i++) { d = C[i] - C[i - 1]; if (d > 0) g += d; else l -= d; } g /= 14; l /= 14;
+        for (i = 15; i < n; i++) { d = C[i] - C[i - 1]; g = (g * 13 + (d > 0 ? d : 0)) / 14; l = (l * 13 + (d < 0 ? -d : 0)) / 14; } return l === 0 ? 100 : 100 - 100 / (1 + g / l); }
     /* ── Evaluación con velas de 1 minuto ── */
     function evaluar(sym, k, c) {
         if (!k || k.length < 60) return null;
@@ -19180,6 +19182,15 @@ setTimeout(function(){setInterval(tick,CFG.TICK_MS);},CFG.ARRANQUE_MS);
             x = [Math.min(Math.log(vr), 3.5) / 3.5, Math.min(g3, 8) / 8, Math.min(rango, 10) / 10, cl(sob, 0, 20) / 20, medias ? 1 : 0, cl(c24, -30, 60) / 60, cl(c2, -3, 3) / 3, tipo === "DESPERTAR" ? 1 : 0];
         }
         if (baja && dmx) reglas = Math.min(100, reglas + 8 + Math.min(dmx.vola, 4) / 4 * 12);   // desmayo desde máximo/inyección: sube el puntaje
+        /* 🔻 FASE del desmayo: ACELERANDO (cae cada vez más rápido) · CAYENDO · AGOTADO (RSI muy bajo + mechas de rechazo o caída frenándose: no perseguir el SHORT, vigilar DESPEGUE) */
+        var fase = null, rs = null;
+        if (baja) {
+            rs = rsi14(cie); var lw = 0, jj, kk, rgk, v3 = g3 / 3, v5 = g5 / 5;
+            for (jj = n - 3; jj < n; jj++) { kk = k[jj]; rgk = +kk[2] - +kk[3]; if (rgk > 0 && (Math.min(+kk[1], +kk[4]) - +kk[3]) / rgk >= 0.5) lw++; }
+            if (rs !== null && rs < 22 && (lw >= 2 || Math.abs(v3) < Math.abs(v5) * 0.4)) fase = "AGOTADO";
+            else if (v3 <= v5 && vr >= 2) fase = "ACELERANDO"; else fase = "CAYENDO";
+            if (fase === "AGOTADO") reglas = Math.max(0, reglas - 12); else if (fase === "ACELERANDO") reglas = Math.min(100, reglas + 5);
+        }
         var N = baja ? NETD : NET, w = Math.min(0.6, N.n / 150), pn = fwd(x, N).p * 100, sc = reglas * (1 - w) + pn * w, cerebro = null, nn = null;
         try { nn = window.CDC_NEURO && CDC_NEURO.panel ? CDC_NEURO.panel(sym) : null; } catch (e) {}
         if (nn && nn.valida) {
@@ -19189,7 +19200,7 @@ setTimeout(function(){setInterval(tick,CFG.TICK_MS);},CFG.ARRANQUE_MS);
         sc = Math.round(cl(sc, 0, 100));
         var sl = baja ? Math.max.apply(null, k.slice(-5).map(function (x) { return +x[2]; })) * 1.003 : bh * 0.995;
         return { symbol: sym, tipo: tipo, dir: baja ? -1 : 1, price: p, score: sc, reglas: Math.round(reglas), red: Math.round(pn), cerebro: cerebro, vr: vr, g3: g3, g5: g5, cmax: cmax,
-                 sob: sob, tarde: baja ? cmax > CFG.TARDE_PCT : sob > CFG.TARDE_PCT, sl: sl, riesgo: Math.abs(sl - p) / p * 100, c24: c ? c.change : null, x: x, ts: Date.now(), origen: dmx ? dmx.origen : null, vola: dmx ? dmx.vola : 0, dpk: dmx ? dmx.dpk : 0, iny: dmx ? dmx.iny : 0 };
+                 sob: sob, tarde: baja ? cmax > CFG.TARDE_PCT : sob > CFG.TARDE_PCT, sl: sl, riesgo: Math.abs(sl - p) / p * 100, c24: c ? c.change : null, x: x, ts: Date.now(), origen: dmx ? dmx.origen : null, vola: dmx ? dmx.vola : 0, dpk: dmx ? dmx.dpk : 0, iny: dmx ? dmx.iny : 0, fase: fase, rsi: rs };
     }
 
     async function klines(sym) { var h = CK[sym], t = Date.now(); if (h && t - h.ts < CFG.CACHE_MS) return h.k; var k = null;
@@ -19243,7 +19254,7 @@ setTimeout(function(){setInterval(tick,CFG.TICK_MS);},CFG.ARRANQUE_MS);
         PEND = vivos; }
 
     function aprueba(sym) { var r = ACT[sym]; if (r && r.dir < 0) return true; return !!(r && r.score >= CFG.AUTO_MIN_SCORE && !r.tarde && (r.tipo === "DESPERTAR" || (CFG.CAIDA_ABRIR && r.dir < 0) || (r.tipo === "RETROCESO" && r.estado === "IMPULSO" && r.score >= CFG.RT_MIN) || (CFG.CA_AUTO && r.tipo === "CAIDA_ALCISTA" && r.score >= CFG.RT_MIN) || (r.tipo === "FONDO_REBOTE" && r.score >= CFG.RT_MIN))); }
-    function prioridad(sym) { var r = ACT[sym]; return r ? 1000 + r.score + (r.tipo === "RETROCESO" ? 1000 + (r.estado === "IMPULSO" ? 200 : 0) : r.tipo === "FONDO_REBOTE" ? 1400 : r.tipo === "CAIDA_ALCISTA" ? 800 : r.tipo === "DESPERTAR" ? 100 : r.dir < 0 ? 9000 + Math.min(40, Math.abs(Math.min(r.g5 || 0, r.g3 || 0)) * 4) + (r.origen ? 15 : 0) + Math.min(20, (r.vola || 0) * 3) : 0) : 0; }
+    function prioridad(sym) { var r = ACT[sym]; return r ? 1000 + r.score + (r.tipo === "RETROCESO" ? 1000 + (r.estado === "IMPULSO" ? 200 : 0) : r.tipo === "FONDO_REBOTE" ? 1400 : r.tipo === "CAIDA_ALCISTA" ? 800 : r.tipo === "DESPERTAR" ? 100 : r.dir < 0 ? 9000 + Math.min(40, Math.abs(Math.min(r.g5 || 0, r.g3 || 0)) * 4) + (r.origen ? 15 : 0) + Math.min(20, (r.vola || 0) * 3) + (r.fase === "ACELERANDO" ? 10 : r.fase === "AGOTADO" ? -25 : 0) : 0) : 0; }
 
     function panelDesmayo() { var now = Date.now(), S = typeof selectedCoin !== "undefined" ? selectedCoin : null, dl = listaDes(); if (!dl.length) return;
         if (ACT[dl[0].s] && ACT[dl[0].s].dir < 0) desmayoVoz(ACT[dl[0].s]);
@@ -19288,7 +19299,7 @@ setTimeout(function(){setInterval(tick,CFG.TICK_MS);},CFG.ARRANQUE_MS);
         h = '<div onclick="CDC_DESPERTAR.abrir(\'' + m.s + '\')" title="Clic para abrir la moneda en el panel"' + (m.r.dir < 0 ? ' class="cdcBlink"' : '') + ' style="box-sizing:border-box;width:100%;cursor:pointer;background:' + c[1] + ';border:2px solid ' + c[0] + ';border-radius:8px;padding:5px 8px;text-align:center;box-shadow:0 0 14px ' + c[0] + '88;margin-bottom:4px">' +
             '<div style="font:900 10px Arial;color:' + c[0] + ';letter-spacing:.4px">' + (m.r.dir < 0 ? "🔻 " : "🚀 ") + etiq(m.r) + (a.length > 1 ? ' · ' + a.length : '') + '</div>' +
             '<div style="font:900 13px Arial;color:#fff"><b>' + m.s.replace("USDT", "") + '</b> ' + (m.r.dir < 0 ? "▼" : "▲") + ' · puntaje ' + Math.round(m.sc) + '/100' + (m.vx ? ' · Vol x' + m.vx.toFixed(1) : '') + '</div>' +
-            (m.p ? '<div style="font:600 9.5px Arial;color:#cbd5e1">' + (m.p > 0 ? "+" : "") + m.p.toFixed(1) + '% en ' + (m.r.dir < 0 ? '5' : '3') + ' min</div>' : '') + '</div>';
+            (m.p ? '<div style="font:600 9.5px Arial;color:#cbd5e1">' + (m.p > 0 ? "+" : "") + m.p.toFixed(1) + '% en ' + (m.r.dir < 0 ? '5' : '3') + ' min</div>' : '') + (m.r.fase ? '<div style="font:800 9.5px Arial;color:' + (m.r.fase === "AGOTADO" ? '#fbbf24' : '#fca5a5') + '">' + (m.r.fase === "AGOTADO" ? '⚠️ AGOTADO: no perseguir, vigila DESPEGUE' : m.r.fase === "ACELERANDO" ? '⚡ ACELERANDO la caída' : '↘ cayendo') + '</div>' : '') + '</div>';
         h += '<div style="display:flex;gap:5px;flex-wrap:wrap;justify-content:center;margin-bottom:4px">';
         a.slice(1, 6).forEach(function (o) { var k = colr(o.r); h += '<span onclick="CDC_DESPERTAR.abrir(\'' + o.s + '\')" title="' + etiq(o.r) + '" style="cursor:pointer;background:' + (o.s === S ? k[0] : '#0b1220') + ';border:1px solid ' + k[0] + ';border-radius:7px;padding:2px 8px;font:700 10px Arial;color:#fff"><b>' + o.s.replace("USDT", "") + '</b> ' + (o.r.dir < 0 ? "▼" : "▲") + ' ' + Math.round(o.sc) + '</span>'; });
         h += '<span onclick="CDC_DESPERTAR.verTodas()" style="cursor:pointer;background:#0b1220;border:1px solid #64748b;border-radius:7px;padding:2px 8px;font:700 10px Arial;color:#cbd5e1">📋 ver todas</span></div>';
@@ -19308,7 +19319,7 @@ setTimeout(function(){setInterval(tick,CFG.TICK_MS);},CFG.ARRANQUE_MS);
         bx.style.display = "block";
         bx.innerHTML = '<div style="font-size:10px;font-weight:900;letter-spacing:1px;color:#f6465d;margin-bottom:6px">🔻 MONEDAS CON DESMAYO — PRIORIDAD MÁXIMA (' + a.length + ') · 💉 desde inyección · ⛰️ desde máximo</div>' + a.map(function (r, j) {
             var A = ACT[r.s], ic = A && A.origen === "INYECCION" ? "💉" : A && A.origen === "MAXIMO" ? "⛰️" : "🔻";
-            return '<span style="display:inline-block;margin:2px 6px 2px 0;padding:5px 10px;border-radius:14px;background:' + (r.s === S ? '#f6465d' : '#1a0508') + ';border:' + (j === 0 ? '2px' : '1px') + ' solid #f6465d;color:#fff;font-size:12px;font-weight:800;cursor:pointer" onclick="try{CDC_DESPERTAR.abrir(\'' + r.s + '\')}catch(e){}">' + (j === 0 ? "🔥 " : "") + ic + ' ' + r.s.replace("USDT", "") + ' <span style="opacity:.85">' + (r.p ? r.p.toFixed(1) + '%' : '') + (r.vx ? ' · Vol x' + r.vx.toFixed(1) : '') + (A && A.vola ? ' · ⚡x' + A.vola.toFixed(1) : '') + '</span></span>';
+            return '<span style="display:inline-block;margin:2px 6px 2px 0;padding:5px 10px;border-radius:14px;background:' + (r.s === S ? '#f6465d' : '#1a0508') + ';border:' + (j === 0 ? '2px' : '1px') + ' solid #f6465d;color:#fff;font-size:12px;font-weight:800;cursor:pointer" onclick="try{CDC_DESPERTAR.abrir(\'' + r.s + '\')}catch(e){}">' + (j === 0 ? "🔥 " : "") + ic + ' ' + r.s.replace("USDT", "") + ' <span style="opacity:.85">' + (r.p ? r.p.toFixed(1) + '%' : '') + (r.vx ? ' · Vol x' + r.vx.toFixed(1) : '') + (A && A.vola ? ' · ⚡x' + A.vola.toFixed(1) : '') + (A && A.fase ? (A.fase === "AGOTADO" ? ' · ⚠️AGOTADO' : A.fase === "ACELERANDO" ? ' · ⚡ACELERA' : '') : '') + '</span></span>';
         }).join("");
     }
     /* 🔻 Botón de DESMAYO siempre visible arriba: rojo y parpadeando cuando hay desmayos; clic = abre en el panel central el peor */
@@ -19352,7 +19363,7 @@ setTimeout(function(){setInterval(tick,CFG.TICK_MS);},CFG.ARRANQUE_MS);
                 if (r) { var prev = ACT[c.symbol];
                     if (!prev || prev.tipo !== r.tipo || prev.estado !== r.estado) { nuevo = true; PEND.push({ s: c.symbol, p0: r.price, t: Date.now(), hi: 0, lo: 0, x: r.x, d: r.dir, rt: r.tipo === "RETROCESO", ca: r.tipo === "CAIDA_ALCISTA", fr: r.tipo === "FONDO_REBOTE" });
                         var ak = c.symbol + "_" + r.tipo, anun = r.tipo !== "RETROCESO" || r.estado === "IMPULSO";
-                        if (anun && Date.now() - (AV[ak] || 0) > CFG.VIDA_MS) { AV[ak] = Date.now(); if (r.tipo !== "RAPIDA") beep(r.dir < 0); nuevos.push(r); } }
+                        if (anun && Date.now() - (AV[ak] || 0) > CFG.VIDA_MS) { AV[ak] = Date.now(); if (r.tipo !== "RAPIDA") beep(r.dir < 0); try { CDC_TRACK.reg(r.tipo, r.symbol, r.dir, r.fase || null); } catch (e) {} nuevos.push(r); } }
                     ACT[c.symbol] = r; MISS[c.symbol] = 0; }
                 else if (ACT[c.symbol] && (MISS[c.symbol] = (MISS[c.symbol] || 0) + 1) >= 2) { delete ACT[c.symbol]; nuevo = true; } }   // ya no cumple: sale de la barrita y de la lista
             var lim = Date.now() - CFG.VIDA_MS; Object.keys(ACT).forEach(function (s) { if (ACT[s].ts < lim) delete ACT[s]; });
@@ -19412,7 +19423,8 @@ setTimeout(function(){setInterval(tick,CFG.TICK_MS);},CFG.ARRANQUE_MS);
             (r.fu ? '<div class="dsp-f"><span>⛽ ' + r.fu.ico + ' ' + r.fu.estado + ' · fuerza ' + r.fu.fuerza + '</span><span>' + r.fu.pred + '</span></div><div class="dsp-f"><span>Combustible ' + r.fu.fuel.toFixed(0) + '% → ' + r.fu.f3.toFixed(0) + '% en 3 h</span><span>vida ' + vd(r.fu) + ' h · reloj ' + Math.round(r.fu.relojShare * 100) + '%</span></div>' : '') + '<div class="dsp-f"><span>SL sugerido ' + f4(r.sl) + (r.dir < 0 ? " (short)" : "") + (r.obj ? " · Obj " + f4(r.obj) : "") + '</span><span>riesgo ' + r.riesgo.toFixed(1) + '%</span></div></div>'; });
         document.getElementById("despertarPanel").innerHTML = h; }
 
-    window.CDC_DESPERTAR = { CFG: CFG, estadoFuerza: function (s) { return FUEL[s] ? FUEL[s].estado : null; }, fuel: function (s) { return FUEL[s] || null; }, _combustible: combustible,
+    window.CDC_DESPERTAR = {
+        agotados: function () { return Object.keys(ACT).filter(function (s) { return ACT[s].fase === "AGOTADO" && ACT[s].dir < 0; }); }, CFG: CFG, estadoFuerza: function (s) { return FUEL[s] ? FUEL[s].estado : null; }, fuel: function (s) { return FUEL[s] || null; }, _combustible: combustible,
         vetoCorto: function (s) { return !!(CFG.FUEL_VETO_SHORT && FUEL[s] && FUEL[s].estado === "CARGANDO" && FUEL[s].fuerza >= 75); }, reservaPanel: function () { return (!!ultRtTs && Date.now() - ultRtTs < CFG.RT_RESERVA_MS) || (Date.now() - (window.__dmAbrirTs || 0) < 60000 && Object.values(ACT).some(function (r) { return r.dir < 0; })); }, abrir: function (s) { try { seleccionarMoneda(s); } catch (e) {} }, evaluar: evaluar, aprueba: aprueba, prioridad: prioridad, activas: function () { return ACT; },
         simbolosLista: function () { return Object.keys(ACT); }, slotDesmayo: slotDesmayo, hayDesmayo: function () { return listaDes().length > 0; }, fijarDes: fijarDes, lista: function () { return listaTodas(); }, hayAlerta: function () { return listaTodas().length > 0; }, verTodas: function () { try { document.getElementById("dspPill").onclick(); } catch (e) {} }, red: function () { return { sube: NET, cae: NETD, retroceso: NETR, caida: NETB, fondo: NETF, combustible: NETC }; },
         reiniciarRed: function () { try { localStorage.removeItem(KEY); localStorage.removeItem(KEY + "_dn"); localStorage.removeItem(KEY + "_rt"); localStorage.removeItem(KEY + "_ca"); localStorage.removeItem(KEY + "_fr"); localStorage.removeItem(KEY + "_fu"); } catch (e) {} NET = mkNet(KEY); NETD = mkNet(KEY + "_dn"); NETR = mkNet(KEY + "_rt"); NETB = mkNet(KEY + "_ca"); NETF = mkNet(KEY + "_fr"); NETC = mkNet(KEY + "_fu"); } };
@@ -19800,10 +19812,20 @@ window.CDC_DESPEGUE=(function(){
     sc=Math.min(100,sc*100/105);
     return {symbol:sym,price:P,min:mn,sl:mn*0.997,riesgo:(P/(mn*0.997)-1)*100,score:Math.round(sc),verdes:verdes,vent:V,racha:rmax,reb:reb,volx:volx,
       s7:s7,s25:s25,s99:s99,cruce:a7>a25,pos:pos,caida:caida,change:c?c.change:0,
-      cap:cap,clx:clx,tk:tk,hl:hl,rsiMin:rmin,mech:mech,fase:(hl&&reb>=2)?"CONFIRMADA":"TEMPRANA",
+      cap:cap,clx:clx,tk:tk,hl:hl,rsiMin:rmin,mech:mech,pk:pk,tp1:mn+(pk-mn)*0.382,tp2:mn+(pk-mn)*0.618,rr:(mn+(pk-mn)*0.382-P)/Math.max(P-mn*0.997,1e-12),fase:(hl&&reb>=2)?"CONFIRMADA":"TEMPRANA",
       ts:Date.now(),t0:(ACT[sym]&&ACT[sym].t0)||Date.now()};
   }
 
+  /* ⏱ Confirmación en 5m (anti falso rebote): piso firme, precio sobre EMA9 y que no siga haciendo mínimos más bajos */
+  var C5={};
+  function conf5(sym){var o=C5[sym];if(o&&Date.now()-o.ts<60000)return Promise.resolve(o.v);
+    return obtenerKlines(sym,"5m",30).then(function(k){
+      if(!k||k.length<20)return null;var n=k.length-1,C=[],O=[],L=[],i;
+      for(i=0;i<k.length;i++){O.push(+k[i][1]);L.push(+k[i][3]);C.push(+k[i][4]);}
+      var e9=emaS(C,9),R=rsiS(C,14);
+      var v={verde:C[n]>O[n],piso:Math.min(L[n],L[n-1])>Math.min(L[n-2],L[n-3]),cae:(C[n]<O[n]&&C[n-1]<O[n-1]&&L[n]<L[n-1]),ema:!!(e9&&C[n]>e9[e9.length-1]),rsi:R?R[n]:null};
+      C5[sym]={ts:Date.now(),v:v};return v;});}
+  function ajuste5(r){var v=r.c5;if(!v)return;var d=(v.piso?6:0)+(v.ema?4:0)+(v.verde?3:0)-(v.cae?15:0)-(v.rsi!==null&&v.rsi>78?8:0);r.score=Math.max(0,Math.min(100,r.score+d));}
   function beep(){if(!CFG.SONIDO)return;try{var A=window.AudioContext||window.webkitAudioContext,x=new A(),o=x.createOscillator(),g=x.createGain();
     o.frequency.value=520;g.gain.value=0.07;o.connect(g);g.connect(x.destination);o.start();
     setTimeout(function(){o.frequency.value=780;},110);setTimeout(function(){o.frequency.value=1040;},220);setTimeout(function(){o.stop();x.close();},360);}catch(e){}}
@@ -19843,18 +19865,22 @@ window.CDC_DESPEGUE=(function(){
         .sort(function(a,b){return (b.cambioReal2Min||0)-(a.cambioReal2Min||0);}).slice(0,CFG.MAX_CAND);
       ncand=lista.length;
       Object.keys(ACT).forEach(function(s){if(cachedData[s]&&!lista.some(function(z){return z.symbol===s;}))lista.push(cachedData[s]);});
+      try{var ag=window.CDC_DESPERTAR&&CDC_DESPERTAR.agotados?CDC_DESPERTAR.agotados():[];ag.forEach(function(s){if(cachedData[s]&&!lista.some(function(z){return z.symbol===s;}))lista.push(cachedData[s]);});}catch(e){}   /* desmayos AGOTADOS = candidatas a despegue */
       var ks={},q;
       for(q=0;q<lista.length;q+=6){
         await Promise.all(lista.slice(q,q+6).map(function(z){return obtenerKlines(z.symbol,"1m",CFG.VELAS).then(function(k){ks[z.symbol]=k;}).catch(function(){});}));await new Promise(function(r){setTimeout(r,40);});}
       var nuevos=[],now=Date.now();
+      var res={};lista.forEach(function(c){var r=null;try{r=evaluar(c.symbol,ks[c.symbol],c);}catch(e){}res[c.symbol]=r;});
+      var pass=lista.filter(function(c){return res[c.symbol]&&res[c.symbol].score>=CFG.SCORE_MIN-10;});
+      for(q=0;q<pass.length;q+=6){await Promise.all(pass.slice(q,q+6).map(function(c){return conf5(c.symbol).then(function(v){var r=res[c.symbol];r.c5=v;ajuste5(r);}).catch(function(){});}));}
       lista.forEach(function(c){
-        var r=null;try{r=evaluar(c.symbol,ks[c.symbol],c);}catch(e){}
+        var r=res[c.symbol];
         if(r&&r.score>=CFG.SCORE_MIN){if(!ACT[c.symbol])nuevos.push(r);ACT[c.symbol]=r;MISS[c.symbol]=0;}
         else if(ACT[c.symbol]){
           if(!ks[c.symbol])return;   /* sin velas nuevas (pausa de Binance): se mantiene */
           MISS[c.symbol]=(MISS[c.symbol]||0)+1;if(MISS[c.symbol]>=2){delete ACT[c.symbol];}}});
       Object.keys(ACT).forEach(function(s){if(now-ACT[s].ts>CFG.VIDA_MS)delete ACT[s];});
-      if(nuevos.length){nuevos.sort(function(a,b){return b.score-a.score;});aviso(nuevos[0]);autoAbrir();try{if(typeof actualizarTablaIzquierda==="function")actualizarTablaIzquierda();}catch(e){}}
+      if(nuevos.length){nuevos.forEach(function(r){try{CDC_TRACK.reg("DESPEGUE",r.symbol,1,r.fase||null);}catch(e){}});nuevos.sort(function(a,b){return b.score-a.score;});aviso(nuevos[0]);autoAbrir();try{if(typeof actualizarTablaIzquierda==="function")actualizarTablaIzquierda();}catch(e){}}
       actualizarBoton();
     }catch(e){console.warn("DESPEGUE:",e);}finally{busy=false;}
   }
@@ -19869,7 +19895,7 @@ window.CDC_DESPEGUE=(function(){
       '<div style="font:900 10px Arial;color:#7dd3fc;letter-spacing:.4px">✈️ MEJOR OFERTA PARA DESPEGUE'+(a.length>1?' · '+a.length:'')+'</div>'+
       '<div style="font:900 13px Arial;color:#fff"><b>'+n+'</b> ▲ · puntaje '+m.score+'/100 · Vol x'+m.volx.toFixed(1)+'</div>'+
       '<div style="font:600 9.5px Arial;color:#cbd5e1">+'+m.reb.toFixed(1)+'% desde el fondo · '+m.verdes+'/'+m.vent+' velas verdes · cayó '+m.caida.toFixed(0)+'% desde su máximo · pánico x'+m.clx.toFixed(1)+(m.tk>0?' · compra '+Math.round(m.tk*100)+'%':'')+' · '+m.fase+'</div>'+
-      '<div style="font:600 9px Arial;color:#94a3b8;margin-top:2px">Referencia: precio $'+pf(m.price)+' · fondo $'+pf(m.min)+' · stop bajo el fondo $'+pf(m.sl)+' (−'+m.riesgo.toFixed(1)+'%)</div></div>';
+      '<div style="font:600 9px Arial;color:#94a3b8;margin-top:2px">Referencia: precio $'+pf(m.price)+' · fondo $'+pf(m.min)+' · stop bajo el fondo $'+pf(m.sl)+' (−'+m.riesgo.toFixed(1)+'%)</div>'+(m.tp1>m.price?'<div style="font:700 9.5px Arial;color:#86efac;margin-top:2px">🎯 Obj1 $'+pf(m.tp1)+' · Obj2 $'+pf(m.tp2)+' · R:R '+m.rr.toFixed(1)+(m.c5?' · 5m '+(m.c5.cae?'⚠️ aún cae':m.c5.piso?'✔ piso firme':'neutral'):'')+'</div>':'')+'</div>';
     h+='<div style="display:flex;gap:5px;flex-wrap:wrap;justify-content:center;margin-bottom:4px">';
     a.slice(1,6).forEach(function(o){h+='<span onclick="CDC_DESPEGUE.abrir(\''+o.symbol+'\')" title="✈️ A punto de despegar · +'+o.reb.toFixed(1)+'% desde el fondo" style="cursor:pointer;background:'+(o.symbol===S?'#38bdf8':'#0b1220')+';border:1px solid #38bdf8;border-radius:7px;padding:2px 8px;font:700 10px Arial;color:'+(o.symbol===S?'#00121f':'#fff')+'"><b>'+o.symbol.replace("USDT","")+'</b> ✈️ '+o.score+'</span>';});
     h+='<span onclick="CDC_DESPEGUE.verTodas()" style="cursor:pointer;background:#0b1220;border:1px solid #64748b;border-radius:7px;padding:2px 8px;font:700 10px Arial;color:#cbd5e1">📋 ver todas</span></div>';
@@ -19931,6 +19957,47 @@ window.CDC_DESPEGUE=(function(){
     datos:function(s){return ACT[s]||null;},
     lista:lista
   };
+})();
+</script>
+<script>
+/* 📊 CDC_TRACK · mide qué pasó DESPUÉS de cada alerta (DESMAYO, CAIDA_BRUTAL, DESPEGUE...) a los 5/15/30/60 min.
+   Guarda en este navegador (localStorage, máx. 400 alertas). Botón 📊 junto a DESMAYO · consola: CDC_TRACK.stats()
+   Resultado = % a favor de la dirección de la alerta (DESMAYO: ganancia si hubieras hecho SHORT; DESPEGUE: si hubieras hecho LONG). */
+window.CDC_TRACK=(function(){
+  var KEY="cdc_track_v1",MAXR=400,HZ=[5,15,30,60],R=[],last={};
+  try{R=JSON.parse(localStorage.getItem(KEY)||"[]");}catch(e){R=[];}
+  function save(){try{if(R.length>MAXR)R=R.slice(-MAXR);localStorage.setItem(KEY,JSON.stringify(R));}catch(e){}}
+  function px(s){try{var c=cachedData[s];return c&&c.price>0?+c.price:0;}catch(e){return 0;}}
+  function reg(tipo,sym,dir,fase){var p=px(sym);if(!p)return;var k=tipo+sym,now=Date.now();if(last[k]&&now-last[k]<20*60000)return;last[k]=now;
+    R.push({tipo:tipo,s:sym,d:(dir===undefined||dir>=0)?1:-1,p0:p,t0:now,pnl:{},mfe:0,mae:0,f:fase||null,done:false});save();}
+  function tick(){var now=Date.now(),ch=false;R.forEach(function(r){if(r.done)return;var p=px(r.s);if(!p)return;var m=(now-r.t0)/60000,x=r.d*(p/r.p0-1)*100;
+    if(x>r.mfe)r.mfe=x;if(x<r.mae)r.mae=x;
+    HZ.forEach(function(h){if(r.pnl[h]===undefined&&m>=h){r.pnl[h]=+x.toFixed(2);ch=true;}});
+    if(m>=HZ[HZ.length-1]+1){r.done=true;ch=true;}});if(ch)save();}
+  setInterval(tick,30000);
+  function avg(a){return a.length?a.reduce(function(s,x){return s+x;},0)/a.length:null;}
+  function stats(){var g={};R.forEach(function(r){(g[r.tipo]=g[r.tipo]||[]).push(r);});
+    return Object.keys(g).map(function(k){var a=g[k],v15=a.filter(function(r){return r.pnl[15]!==undefined;}),w=v15.filter(function(r){return r.pnl[15]>0;}).length;
+      var f=function(h){return avg(a.filter(function(r){return r.pnl[h]!==undefined;}).map(function(r){return r.pnl[h];}));};
+      return{tipo:k,alertas:a.length,medidas15m:v15.length,acierto15m:v15.length?Math.round(w/v15.length*100):null,prom5m:f(5),prom15m:f(15),prom30m:f(30),prom60m:f(60),mejorMov:avg(a.map(function(r){return r.mfe;})),peorMov:avg(a.map(function(r){return r.mae;}))};});}
+  function fx(x){return x===null||x===undefined?"–":(x>0?"+":"")+x.toFixed(2)+"%";}
+  function panel(){var o=document.getElementById("cdcTrackPanel");if(o){o.remove();return;}
+    var st=stats(),h='<div style="font:900 14px Arial;color:#fff;margin-bottom:6px">📊 ¿Qué pasó después de cada alerta?</div><div style="font:600 10.5px Arial;color:#94a3b8;margin-bottom:8px">% a favor de la dirección de la alerta (DESMAYO = ganancia si hubieras hecho SHORT · DESPEGUE = si hubieras hecho LONG). Se mide a 5, 15, 30 y 60 min.</div>';
+    if(!st.length)h+='<div style="color:#cbd5e1;font:700 12px Arial">Aún no hay alertas medidas. Deja el CDC abierto: se llena solo.</div>';
+    else{h+='<table style="width:100%;border-collapse:collapse;font:700 11px Arial;color:#e2e8f0"><tr style="color:#94a3b8"><td>Tipo</td><td>N</td><td>Acierto 15m</td><td>5m</td><td>15m</td><td>30m</td><td>60m</td><td>Mejor</td><td>Peor</td></tr>';
+      st.forEach(function(s){h+='<tr style="border-top:1px solid #334155"><td><b>'+s.tipo+'</b></td><td>'+s.alertas+'</td><td>'+(s.acierto15m===null?"–":s.acierto15m+"%")+'</td><td>'+fx(s.prom5m)+'</td><td>'+fx(s.prom15m)+'</td><td>'+fx(s.prom30m)+'</td><td>'+fx(s.prom60m)+'</td><td style="color:#86efac">'+fx(s.mejorMov)+'</td><td style="color:#fca5a5">'+fx(s.peorMov)+'</td></tr>';});h+='</table>';
+      h+='<div style="font:900 11px Arial;color:#fff;margin:10px 0 4px">Últimas alertas</div>';
+      R.slice(-12).reverse().forEach(function(r){h+='<div style="font:600 10.5px Arial;color:#cbd5e1">'+new Date(r.t0).toLocaleTimeString()+' · <b>'+r.s.replace("USDT","")+'</b> '+r.tipo+(r.f?' ('+r.f+')':'')+' · 15m '+fx(r.pnl[15])+' · 60m '+fx(r.pnl[60])+'</div>';});}
+    h+='<div style="margin-top:10px;display:flex;gap:8px"><button id="cdcTrackX" style="padding:6px 14px;border-radius:8px;border:0;background:#f6465d;color:#fff;font:800 12px Arial;cursor:pointer">Cerrar</button><button id="cdcTrackR" style="padding:6px 14px;border-radius:8px;border:1px solid #64748b;background:#0b1220;color:#cbd5e1;font:700 12px Arial;cursor:pointer">Borrar historial</button></div>';
+    o=document.createElement("div");o.id="cdcTrackPanel";o.style.cssText="position:fixed;top:60px;left:50%;transform:translateX(-50%);width:min(680px,94vw);max-height:80vh;overflow:auto;z-index:99999;background:#0b1220;border:2px solid #38bdf8;border-radius:12px;padding:14px;box-shadow:0 0 30px #000";
+    o.innerHTML=h;document.body.appendChild(o);
+    document.getElementById("cdcTrackX").onclick=function(){o.remove();};
+    document.getElementById("cdcTrackR").onclick=function(){if(confirm("¿Borrar todo el historial de alertas medidas?")){R=[];last={};save();o.remove();}};}
+  setInterval(function(){if(document.getElementById("cdcBtnStats"))return;var b=document.getElementById("cdcBtnDes");if(!b||!b.parentNode)return;
+    var s=document.createElement("button");s.id="cdcBtnStats";s.type="button";s.textContent="📊";s.title="Resultados de las alertas (qué pasó después)";
+    s.style.cssText="margin:0 6px 0 0;padding:6px 10px;border-radius:10px;border:1px solid #38bdf8;background:#0b1220;color:#fff;font:800 12px Arial,sans-serif;cursor:pointer;flex:0 0 auto";
+    s.onclick=panel;b.parentNode.insertBefore(s,b.nextSibling);},2000);
+  return{reg:reg,stats:function(){var s=stats();try{console.table(s);}catch(e){}return s;},panel:panel,datos:function(){return R;}};
 })();
 </script>
 
