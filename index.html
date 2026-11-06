@@ -13426,6 +13426,69 @@ function _toggleMotorLongShort() {
     if (typeof actualizarPanelCentral === 'function') actualizarPanelCentral();
 }
 
+/* 🧠 Núcleo neuronal animado del PANEL CENTRAL (fondo del bloque principal). Un solo bucle rAF; se detiene solo si el canvas no existe. */
+(function(){
+    var N = 44, nodes = null, pulses = [], raf = 0;
+    function init(){
+        nodes = [];
+        for (var i = 0; i < N; i++) nodes.push({x: Math.random(), y: Math.random(), vx: (Math.random() - .5) * .00035, vy: (Math.random() - .5) * .00035, p: Math.random() * 6.28, r: 1.2 + Math.random() * 1.9});
+    }
+    function frame(ts){
+        var cv = document.getElementById('cdcNeuroHero');
+        if (!cv) { raf = 0; return; }
+        raf = requestAnimationFrame(frame);
+        if (document.hidden) return;
+        var w = cv.clientWidth, h = cv.clientHeight;
+        if (!w || !h) return;
+        var dpr = Math.min(2, window.devicePixelRatio || 1);
+        if (cv.width !== Math.round(w * dpr) || cv.height !== Math.round(h * dpr)) { cv.width = Math.round(w * dpr); cv.height = Math.round(h * dpr); }
+        var g = cv.getContext('2d');
+        g.setTransform(dpr, 0, 0, dpr, 0, 0);
+        g.clearRect(0, 0, w, h);
+        var rgb = cv.getAttribute('data-rgb') || '95,200,232';
+        var sp = parseFloat(cv.getAttribute('data-speed')) || 1;
+        var i, j, a, b, d, L = Math.min(w, h) * 0.34, links = [];
+        for (i = 0; i < N; i++) {
+            a = nodes[i];
+            a.x += a.vx * sp * 16; a.y += a.vy * sp * 16;
+            if (a.x < 0 || a.x > 1) a.vx *= -1;
+            if (a.y < 0 || a.y > 1) a.vy *= -1;
+        }
+        g.lineWidth = 1;
+        for (i = 0; i < N; i++) for (j = i + 1; j < N; j++) {
+            a = nodes[i]; b = nodes[j];
+            d = Math.hypot((a.x - b.x) * w, (a.y - b.y) * h);
+            if (d < L) {
+                g.strokeStyle = 'rgba(' + rgb + ',' + (0.30 * (1 - d / L)).toFixed(3) + ')';
+                g.beginPath(); g.moveTo(a.x * w, a.y * h); g.lineTo(b.x * w, b.y * h); g.stroke();
+                links.push([i, j]);
+            }
+        }
+        if (links.length && pulses.length < 16 && Math.random() < 0.18 * sp) {
+            var lk = links[(Math.random() * links.length) | 0];
+            pulses.push({i: lk[0], j: lk[1], t: 0, v: 0.012 + Math.random() * 0.016});
+        }
+        for (i = pulses.length - 1; i >= 0; i--) {
+            var p = pulses[i]; p.t += p.v * sp;
+            if (p.t >= 1) { pulses.splice(i, 1); continue; }
+            a = nodes[p.i]; b = nodes[p.j];
+            var px = (a.x + (b.x - a.x) * p.t) * w, py = (a.y + (b.y - a.y) * p.t) * h;
+            g.fillStyle = 'rgba(255,255,255,0.95)'; g.shadowColor = 'rgba(' + rgb + ',1)'; g.shadowBlur = 10;
+            g.beginPath(); g.arc(px, py, 2, 0, 6.283); g.fill(); g.shadowBlur = 0;
+        }
+        var tt = ts / 1000;
+        for (i = 0; i < N; i++) {
+            a = nodes[i];
+            var glow = 0.55 + 0.45 * Math.sin(tt * 2 * sp + a.p);
+            g.fillStyle = 'rgba(' + rgb + ',' + (0.35 + 0.5 * glow).toFixed(3) + ')';
+            g.shadowColor = 'rgba(' + rgb + ',0.9)'; g.shadowBlur = 8 * glow;
+            g.beginPath(); g.arc(a.x * w, a.y * h, a.r * (0.8 + 0.5 * glow), 0, 6.283); g.fill();
+        }
+        g.shadowBlur = 0;
+    }
+    window._cdcNeuroHero = function(){ if (!nodes) init(); if (!raf) raf = requestAnimationFrame(frame); };
+})();
+
 function actualizarPanelCentral() {
     const c = cachedData[selectedCoin];
     if (!c) return;
@@ -13540,112 +13603,126 @@ function actualizarPanelCentral() {
         
         ${btnMotorAlcistaHTML}
 
-        <!-- CABECERA: NOMBRE + PRECIO + CAMBIO -->
-        <div style="text-align:center; padding-bottom:14px; border-bottom:1px solid rgba(255,255,255,0.05); margin-bottom:14px;">
-        <div style="display:flex; align-items:flex-start; justify-content:center; gap:16px; flex-wrap:wrap;">
-            <div style="flex:1; min-width:180px; text-align:center;">
-                <div style="font-size:13px; font-weight:700; color:#64748b; letter-spacing:2px; text-transform:uppercase; margin-bottom:4px;">
-                    ⚡ MONITOREO EN TIEMPO REAL
+        <!-- ═══ PANEL CENTRAL · DISEÑO IA: núcleo neuronal + métricas grandes + señales + gráfico ═══ -->
+        ${(() => {
+            const fp = (v) => {
+                if (typeof v !== 'number' || !isFinite(v)) return '…';
+                const a = Math.abs(v);
+                const mn = a >= 1 ? 2 : a >= 0.01 ? 4 : 6, mx = a >= 1 ? 4 : a >= 0.01 ? 6 : 8;
+                return v.toLocaleString(undefined, {minimumFractionDigits: mn, maximumFractionDigits: mx});
+            };
+            const _pe = (c.posicionExtendida !== undefined && c.posicionExtendida !== null) ? c.posicionExtendida : (c.posicionPorcentaje || 0);
+            const pct = Math.max(0, _pe);
+            const pctBar = Math.min(100, Math.max(0, c.posicionPorcentaje || 0));
+            const hi = c.high, lo = c.low;
+            const distPct = (typeof c.caidaDesdeMaximo === 'number') ? Math.max(0, c.caidaDesdeMaximo) : (hi > 0 ? Math.max(0, ((hi - c.price) / hi) * 100) : 0);
+            const distUsd = (typeof hi === 'number') ? Math.max(0, hi - c.price) : 0;
+            const enTechoAhora = distPct <= 0.3;
+            const zona = pct >= 90 ? {c:'#ff2a3b', rgb:'255,42,59', t:'🔴 ZONA DE TECHO'} : pct >= 70 ? {c:'#f3ba2f', rgb:'243,186,47', t:'🟠 ZONA ALTA'} : (c.posicionPorcentaje || 0) <= 15 ? {c:'#0ecb81', rgb:'14,203,129', t:'🟢 ZONA DE SUELO'} : {c:'#5fc8e8', rgb:'95,200,232', t:'🔵 ZONA MEDIA'};
+            const colCambio = c.change < 0 ? '#ff2a3b' : '#0ecb81';
+            const vel = Math.min(3, 0.8 + Math.abs(c.cambioReal2Min || 0) * 0.6);
+            const _t72 = obtenerToques72h(selectedCoin);
+            const _err72 = hayErrorEscaneo72h(selectedCoin);
+            const _tEf = _t72 !== null ? _t72 : (c.vecesEnTechoActual || 0);
+            const _colT = _err72 ? '#ff2a3b' : _tEf >= 3 ? '#ff2a3b' : _tEf >= 2 ? '#ff6b00' : _tEf === 1 ? '#f3ba2f' : '#64748b';
+            const M = (ico, tit, val, col, expl, grande) => `<div style="flex:1 1 ${grande ? 150 : 110}px; min-width:0; background:rgba(4,9,20,0.72); border:1px solid ${col}44; border-radius:14px; padding:10px 8px; text-align:center; backdrop-filter:blur(3px); box-shadow:0 0 18px ${col}14 inset;">
+                    <div style="font-size:9px; font-weight:800; letter-spacing:1px; color:#94a3b8;">${ico} ${tit}</div>
+                    <div style="font-size:${grande ? 30 : 20}px; font-weight:900; color:${col}; line-height:1.15; margin:3px 0; text-shadow:0 0 14px ${col}55; word-break:break-all;">${val}</div>
+                    <div style="font-size:8.5px; color:#64748b; line-height:1.3;">${expl}</div>
+                </div>`;
+            return `<div style="position:relative; overflow:hidden; border-radius:18px; margin-bottom:12px; background:radial-gradient(ellipse at 50% 0%, #0b1730 0%, #050914 70%); border:1px solid ${zona.c}55; box-shadow:0 10px 34px rgba(0,0,0,0.45), 0 0 26px ${zona.c}1f;">
+                <canvas id="cdcNeuroHero" data-rgb="${zona.rgb}" data-speed="${vel.toFixed(2)}" style="position:absolute; inset:0; width:100%; height:100%; display:block; pointer-events:none;"></canvas>
+                <div style="position:relative; z-index:1; padding:14px 14px 13px;">
+                    <div style="display:flex; align-items:center; justify-content:space-between; gap:8px; flex-wrap:wrap;">
+                        <div style="display:inline-flex; align-items:center; gap:7px; font-size:10px; font-weight:800; color:#7fe9ff; letter-spacing:2px;">
+                            <span style="width:8px;height:8px;border-radius:50%;background:#0ecb81;box-shadow:0 0 9px #0ecb81;display:inline-block;animation:blinker-glow 1.4s linear infinite;"></span>
+                            🧠 CEREBRO IA · ANÁLISIS EN VIVO
+                        </div>
+                        <span style="font-size:10px; font-weight:900; color:${zona.c}; background:${zona.c}1f; border:1px solid ${zona.c}66; padding:3px 10px; border-radius:20px;">${zona.t}</span>
+                    </div>
+                    <div style="margin:8px 0 10px; display:flex; align-items:center; justify-content:center; gap:8px; flex-wrap:wrap;">
+                        <span class="cdc-click-moneda" data-sym="${simbolo}" title="Click: estudiar esta moneda en el Cerebro Neuronal" style="font-size:32px; font-weight:900; color:#fff; letter-spacing:1px; cursor:pointer; border-bottom:1px dashed rgba(255,255,255,0.35); text-shadow:0 0 16px rgba(127,233,255,0.35);">${simbolo}</span>
+                        <span style="font-size:11px; color:#94a3b8; font-weight:800; background:rgba(255,255,255,0.07); border:1px solid rgba(255,255,255,0.1); padding:2px 8px; border-radius:20px;">USDT</span>${badgeAlarma}
+                    </div>
+
+                    <!-- 3 MÉTRICAS PRINCIPALES: valor · % de techo · distancia al techo -->
+                    <div style="display:flex; gap:8px; flex-wrap:wrap;">
+                        ${M('💲','VALOR MONEDA', '$' + fp(c.price), '#0ecb81', 'precio actual (USDT)', true)}
+                        ${M('📍','% DE TECHO', pct.toFixed(0) + '%', zona.c, '0% = suelo · 100% = techo 24 h', true)}
+                        ${M('📏','DISTANCIA AL TECHO', enTechoAhora ? '¡EN EL TECHO!' : distPct.toFixed(2) + '%', enTechoAhora ? '#ff2a3b' : distPct <= 2 ? '#f3ba2f' : '#5fc8e8', enTechoAhora ? 'tocando su máximo de 24 h' : 'le falta $' + fp(distUsd) + ' para su máx.', true)}
+                    </div>
+                    <div style="display:flex; gap:8px; flex-wrap:wrap; margin-top:8px;">
+                        ${M('📉','CAMBIO 24H', (c.change >= 0 ? '+' : '') + c.change.toFixed(2) + '%', colCambio, 'subió o bajó en 24 h', false)}
+                        ${M('⬆️','MÁXIMO 24H', '$' + fp(hi), '#ff6b6b', 'el techo del día', false)}
+                        ${M('⬇️','MÍNIMO 24H', '$' + fp(lo), '#6ee7b7', 'el suelo del día', false)}
+                    </div>
+
+                    <!-- BARRA DE RANGO -->
+                    <div style="margin-top:10px; background:rgba(4,9,20,0.72); border:1px solid rgba(255,255,255,0.08); border-radius:12px; padding:9px 12px 12px;">
+                        <div style="display:flex; justify-content:space-between; align-items:center; font-size:9px; color:#94a3b8; margin-bottom:7px;">
+                            <span>SUELO 0%</span><span style="font-size:10px; font-weight:900; color:${zona.c};">Rango: ${pctBar.toFixed(1)}%</span><span>TECHO 100%</span>
+                        </div>
+                        <div style="height:7px; background:linear-gradient(to right,#0ecb81,#f3ba2f,#ff2a3b); border-radius:4px; position:relative; overflow:visible;">
+                            <div style="position:absolute; top:-3px; left:calc(${pctBar}% - 6px); width:13px; height:13px; background:#fff; border:2.5px solid ${zona.c}; border-radius:50%; box-shadow:0 0 8px ${zona.c}; transition:left 0.5s;"></div>
+                        </div>
+                        <div style="font-size:8.5px; color:#64748b; margin-top:7px; text-align:center;">posición del precio dentro del rango mínimo–máximo de 24 h</div>
+                    </div>
+
+                    <!-- VELAS 72H: veces que tocó su máximo -->
+                    <div style="margin-top:8px; display:flex; align-items:center; justify-content:center; flex-wrap:wrap; gap:10px; background:rgba(255,60,0,0.09); border:1px solid rgba(255,60,0,0.35); border-radius:12px; padding:8px 12px;">
+                        <div style="font-size:${_err72 ? 22 : 30}px; font-weight:900; line-height:1; color:${_colT}; text-shadow:0 0 10px rgba(255,60,0,0.4);">${_err72 ? '⚠️' : (_t72 !== null ? _tEf : '…')}</div>
+                        <div style="font-size:10px; color:#cbd5e1; text-align:left; line-height:1.3; text-transform:uppercase; letter-spacing:0.5px;">
+                            ${_err72 ? 'no se pudo conectar<br>con Binance · reintentar →' : (_t72 !== null ? '🕯️ veces tocó su máximo<br>escaneo real 72 h (IA) ✅' : 'calculando escaneo<br>real de 72 h…')}
+                        </div>
+                        <button onclick="event.stopPropagation(); actualizarEscaneo72h('${selectedCoin}').then(()=>{ if(selectedCoin==='${selectedCoin}') actualizarPanelCentral(); });"
+                            style="background:rgba(255,255,255,0.06); border:1px solid rgba(255,255,255,0.15); color:#cbd5e1; font-size:9px; font-weight:700; border-radius:8px; padding:5px 8px; cursor:pointer; white-space:nowrap;">
+                            🔍 Re-escanear
+                        </button>
+                    </div>
                 </div>
-                <div style="font-size:26px; font-weight:900; color:#fff; letter-spacing:1px; display:flex; align-items:center; justify-content:center; gap:8px; flex-wrap:wrap;">
-                    <span class="cdc-click-moneda" data-sym="${simbolo}" title="Click: estudiar esta moneda en el Cerebro Neuronal" style="cursor:pointer;border-bottom:1px dashed rgba(255,255,255,0.35);">${simbolo}</span> <span style="font-size:14px; color:#64748b; font-weight:600;">USDT</span>${badgeAlarma}
-                </div>
-                <!-- 🔴 % de techo · 🟡 cambio 24h · 🟢 valor de la moneda — orden BANDERA BOLIVIANA (rojo, amarillo, verde), los 3 juntos, mismo tamaño, sin repetir en ningún otro lado del panel -->
-                ${(() => {
-                    // 📈 % EXTENDIDO (sin tope): si la moneda ya tocó el 100% de su rango 24h
-                    // y sigue subiendo, este número sigue creciendo con ella (101%, 105%,
-                    // 110%, 120%...) en vez de quedarse pegado en 100% para siempre.
-                    const _posExtHeader = (c.posicionExtendida !== undefined && c.posicionExtendida !== null) ? c.posicionExtendida : (c.posicionPorcentaje || 0);
-                    const pctHeader = Math.max(0, _posExtHeader);
-                    const colorTecho = pctHeader >= 90 ? '#ff2a3b' : '#f3ba2f';
-                    return `<div style="display:flex; align-items:baseline; justify-content:center; gap:18px; flex-wrap:wrap; margin:10px 0 4px;">
-                        <div style="text-align:center;">
-                            <div style="font-size:34px; font-weight:900; color:${colorTecho}; line-height:1.1;">${pctHeader.toFixed(0)}%</div>
-                            <div style="font-size:10px; color:#64748b; font-weight:700; letter-spacing:0.5px;">% DE TECHO</div>
-                        </div>
-                        <div style="text-align:center;">
-                            <div style="font-size:34px; font-weight:900; color:${c.change < 0 ? '#ff2a3b' : '#0ecb81'}; line-height:1.1;">${c.change >= 0 ? '+' : ''}${c.change.toFixed(2)}%</div>
-                            <div style="font-size:10px; color:#64748b; font-weight:700; letter-spacing:0.5px;">CAMBIO 24H</div>
-                        </div>
-                        <div style="text-align:center;">
-                            <div style="font-size:34px; font-weight:900; color:#0ecb81; line-height:1.1;">${c.price.toLocaleString(undefined,{minimumFractionDigits:2,maximumFractionDigits:4})} <span style="font-size:14px; font-weight:700; color:#0ecb81;">USDT</span></div>
-                            <div style="font-size:10px; color:#64748b; font-weight:700; letter-spacing:0.5px;">VALOR MONEDA</div>
-                        </div>
-                    </div>`;
-                })()}
-            </div>
-            <!-- 🎯 COLUMNA DERECHA: badge Techo 4-EMA + mini gráfico en tiempo real -->
-            ${(() => {
-                const eBadge = datosEMA[selectedCoin];
-                let bgB, colorB, txtB, spreadTxt;
-                if (!eBadge) {
-                    bgB = 'rgba(255,255,255,0.04)'; colorB = '#475569'; txtB = 'Techo 4-EMA: cargando…'; spreadTxt = '…';
+            </div>`;
+        })()}
+
+        <!-- ═══ SEÑALES EN VIVO + GRÁFICO PRECIO/EMAs ═══ -->
+        <div style="display:flex; gap:12px; flex-wrap:wrap; align-items:stretch; margin-bottom:14px;">
+        ${(() => {
+            const eBadge = datosEMA[selectedCoin];
+            let bgB, colorB, txtB, spreadTxt;
+            if (!eBadge) {
+                bgB = 'rgba(255,255,255,0.04)'; colorB = '#475569'; txtB = 'Techo 4-EMA: cargando…'; spreadTxt = '…';
+            } else {
+                const distMaxBadge = Math.min(c.caidaDesdeMaximo ?? 999, c.caidaDesdeMaximo48h !== undefined ? c.caidaDesdeMaximo48h : 999);
+                const tocandoMaxBadge = distMaxBadge <= 0.3;
+                const emasJuntasBadge = !!eBadge.emasJuntasTecho;
+                if (tocandoMaxBadge && emasJuntasBadge) {
+                    bgB = 'rgba(255,42,59,0.18)'; colorB = '#ff2a3b'; txtB = '🚨 TECHO CONFIRMADO';
+                } else if (tocandoMaxBadge || emasJuntasBadge) {
+                    bgB = 'rgba(243,186,47,0.15)'; colorB = '#f3ba2f'; txtB = `⚠️ ${tocandoMaxBadge ? 'En máx 24h' : 'EMAs juntas'}`;
                 } else {
-                    const distMaxBadge = Math.min(c.caidaDesdeMaximo ?? 999, c.caidaDesdeMaximo48h !== undefined ? c.caidaDesdeMaximo48h : 999);
-                    const tocandoMaxBadge = distMaxBadge <= 0.3;
-                    const emasJuntasBadge = !!eBadge.emasJuntasTecho;
-                    if (tocandoMaxBadge && emasJuntasBadge) {
-                        bgB = 'rgba(255,42,59,0.18)'; colorB = '#ff2a3b'; txtB = '🚨 TECHO CONFIRMADO';
-                    } else if (tocandoMaxBadge || emasJuntasBadge) {
-                        bgB = 'rgba(243,186,47,0.15)'; colorB = '#f3ba2f'; txtB = `⚠️ ${tocandoMaxBadge ? 'En máx 24h' : 'EMAs juntas'}`;
-                    } else {
-                        bgB = 'rgba(14,203,129,0.12)'; colorB = '#0ecb81'; txtB = '✅ Fuera de techo';
-                    }
-                    spreadTxt = eBadge.emaSpreadPct !== null && eBadge.emaSpreadPct !== undefined ? `${eBadge.emaSpreadPct.toFixed(2)}%` : '…';
+                    bgB = 'rgba(14,203,129,0.12)'; colorB = '#0ecb81'; txtB = '✅ Fuera de techo';
                 }
-                return `<div style="flex:0 0 auto; display:flex; flex-direction:column; align-items:center; gap:6px; width:300px;">
+                spreadTxt = eBadge.emaSpreadPct !== null && eBadge.emaSpreadPct !== undefined ? `${eBadge.emaSpreadPct.toFixed(2)}%` : '…';
+            }
+            return `<div style="flex:1 1 260px; min-width:240px; box-sizing:border-box; display:flex; flex-direction:column; gap:8px; background:linear-gradient(180deg,rgba(127,233,255,0.06),rgba(255,255,255,0.01)); border:1px solid rgba(127,233,255,0.2); border-radius:16px; padding:12px;">
+                    <div style="text-align:left;">
+                        <div style="font-size:11px; font-weight:900; color:#7fe9ff; letter-spacing:1.5px;">🎯 SEÑALES EN VIVO</div>
+                        <div style="font-size:9px; color:#64748b; line-height:1.3;">alertas automáticas de esta moneda: desmayo, flash, despegue…</div>
+                    </div>
                     <div id="cdcDesBtnHost" style="width:100%;display:flex;justify-content:center"></div>
                     ${(window.CDC_FLASH&&CDC_FLASH.slotHTML)?CDC_FLASH.slotHTML():''}${(window.CDC_DESPERTAR&&CDC_DESPERTAR.slotDesmayo)?CDC_DESPERTAR.slotDesmayo():''}${(window.CDC_DESPEGUE&&CDC_DESPEGUE.slotHTML)?CDC_DESPEGUE.slotHTML():''}${(window.CDC_VEL&&CDC_VEL.slotHTML)?CDC_VEL.slotHTML():''}
-                    <div id="cdcBadgeTecho" style="display:${(window.CDC_FLASH&&CDC_FLASH.hay&&CDC_FLASH.hay())?'none':'flex'}; flex-direction:column; align-items:center; gap:1px; background:${bgB}; border:1px solid ${colorB}55; border-radius:8px; padding:5px 9px; width:100%;">
-                        <span style="font-size:10px; font-weight:900; color:${colorB}; text-align:center; line-height:1.3;">${txtB}</span>
-                        <span style="font-size:8.5px; color:#94a3b8;">EMAs: ${spreadTxt}</span>
+                    <div id="cdcBadgeTecho" style="display:${(window.CDC_FLASH&&CDC_FLASH.hay&&CDC_FLASH.hay())?'none':'flex'}; flex-direction:column; align-items:center; gap:1px; background:${bgB}; border:1px solid ${colorB}55; border-radius:10px; padding:7px 10px; width:100%; box-sizing:border-box;">
+                        <span style="font-size:11px; font-weight:900; color:${colorB}; text-align:center; line-height:1.3;">${txtB}</span>
+                        <span style="font-size:9px; color:#94a3b8;">EMAs: ${spreadTxt}</span>
                     </div>
-                    <canvas id="miniChartTecho" width="300" height="190" style="background:radial-gradient(ellipse at 50% 30%, #0a1220 0%, #050914 75%); border:1px solid rgba(255,255,255,0.08); border-radius:10px; box-shadow:0 0 18px rgba(0,0,0,0.35) inset;"></canvas>
+                </div>
+                <div style="flex:1 1 330px; min-width:240px; box-sizing:border-box; background:linear-gradient(180deg,rgba(127,233,255,0.06),rgba(255,255,255,0.01)); border:1px solid rgba(127,233,255,0.2); border-radius:16px; padding:12px; text-align:center;">
+                    <div style="text-align:left;">
+                        <div style="font-size:11px; font-weight:900; color:#7fe9ff; letter-spacing:1.5px;">📈 GRÁFICO · PRECIO + EMAs</div>
+                        <div style="font-size:9px; color:#64748b; line-height:1.3; padding-bottom:8px;">EMA7, 25, 99 y 200 son promedios que marcan la tendencia; si se juntan arriba, puede haber techo</div>
+                    </div>
+                    <canvas id="miniChartTecho" width="300" height="190" style="display:block; margin:0 auto; max-width:100%; background:radial-gradient(ellipse at 50% 30%, #0a1220 0%, #050914 75%); border:1px solid rgba(255,255,255,0.08); border-radius:10px; box-shadow:0 0 18px rgba(0,0,0,0.35) inset;"></canvas>
                 </div>`;
-            })()}
-        </div>
-            <!-- NÚMERO GRANDE: veces que tocó su máximo — ESCANEO REAL DE 72H (velas
-                 históricas reales de Binance, con certeza; no depende de si la app
-                 estuvo abierta todo ese tiempo ni de si ahora mismo está en el máximo) -->
-            ${(() => {
-                const _t72 = obtenerToques72h(selectedCoin);
-                const _errorT72 = hayErrorEscaneo72h(selectedCoin);
-                const _tEfectivo = _t72 !== null ? _t72 : (c.vecesEnTechoActual || 0);
-                const _color = _errorT72 ? '#ff2a3b' : _tEfectivo >= 3 ? '#ff2a3b' : _tEfectivo >= 2 ? '#ff6b00' : _tEfectivo === 1 ? '#f3ba2f' : '#475569';
-                return `<div style="display:inline-flex; align-items:center; gap:10px; background:rgba(255,60,0,0.08); border:1px solid rgba(255,60,0,0.35); border-radius:12px; padding:8px 16px; margin-top:10px;">
-                    <div style="font-size:${_errorT72 ? 22 : 34}px; font-weight:900; line-height:1; color:${_color}; text-shadow:0 0 10px rgba(255,60,0,0.4);">
-                        ${_errorT72 ? '⚠️' : (_t72 !== null ? _tEfectivo : '…')}
-                    </div>
-                    <div style="font-size:10px; color:#94a3b8; text-align:left; line-height:1.3; text-transform:uppercase; letter-spacing:0.5px;">
-                        ${_errorT72
-                            ? 'no se pudo conectar<br>con Binance · reintentar →'
-                            : (_t72 !== null
-                                ? 'veces tocó su máximo<br>escaneo real 72h (IA) ✅'
-                                : 'calculando escaneo<br>real de 72h…')}
-                    </div>
-                    <button onclick="event.stopPropagation(); actualizarEscaneo72h('${selectedCoin}').then(()=>{ if(selectedCoin==='${selectedCoin}') actualizarPanelCentral(); });"
-                        style="background:rgba(255,255,255,0.06); border:1px solid rgba(255,255,255,0.15); color:#cbd5e1; font-size:9px; font-weight:700; border-radius:8px; padding:5px 8px; cursor:pointer; white-space:nowrap;">
-                        🔍 Re-escanear
-                    </button>
-                </div>`;
-            })()}
-            ${(() => {
-                const pos = c.posicionPorcentaje || 0;
-                const pct = Math.min(100, Math.max(0, pos));
-                const barColor = pct >= 95 ? '#ff2a3b' : pct >= 85 ? '#f97316' : pct >= 70 ? '#f3ba2f' : pct <= 15 ? '#0ecb81' : '#64748b';
-                const alerta   = pct >= 95 ? '🔴 TECHO' : pct >= 85 ? '🟠 Zona alta' : pct <= 15 ? '🟢 SUELO' : '';
-                const alertaTxt = alerta ? `<span style="color:${barColor};font-weight:900;">${alerta} · </span>` : '';
-                return `<div style="margin-top:8px;padding:0 8px;">
-                    <div style="display:flex;justify-content:space-between;align-items:center;font-size:9px;color:#64748b;margin-bottom:3px;">
-                        <span>SUELO 0%</span>
-                        <span style="font-size:10px;">${alertaTxt}<span style="color:${barColor};font-weight:900;">Rango: ${pct.toFixed(1)}%</span></span>
-                        <span>TECHO 100%</span>
-                    </div>
-                    <div style="height:7px;background:linear-gradient(to right,#0ecb81,#f3ba2f,#ff2a3b);border-radius:4px;position:relative;overflow:visible;">
-                        <div style="position:absolute;top:-3px;left:calc(${pct}% - 6px);width:13px;height:13px;background:#fff;border:2.5px solid ${barColor};border-radius:50%;box-shadow:0 0 6px ${barColor};transition:left 0.5s;"></div>
-                    </div>
-                </div>`;
-            })()}
+        })()}
         </div>
 
         <div id="cdcCerebroEnPanel" data-sym="${selectedCoin}">${(window.CDC_CEREBRO_HTML ? window.CDC_CEREBRO_HTML(selectedCoin) : '')}</div>
@@ -14165,6 +14242,7 @@ function actualizarPanelCentral() {
     // 📈 Mini gráfico en tiempo real (junto al badge de techo, arriba a la derecha)
     _registrarPrecioMiniChart(selectedCoin, c.price, datosEMA[selectedCoin], c.high);
     _dibujarMiniChart('miniChartTecho', selectedCoin);
+    try { _cdcNeuroHero(); } catch (e) {}
 }
 
 
@@ -17992,7 +18070,7 @@ window.CDC_FLASH=(function(){
     // archivo completo sin caer en la paradoja de "el hash contiene su
     // propio hash". No cambiar este texto.
     var _PLACEHOLDER = "%%CDC_INTEGRITY_HASH%%";
-    var _HASH_ESPERADO = "90d7eb6513c4fb8b635a5ff3d5167726fe34e3f7e1a8248da806c1d2c65dcd91"; // ← se reemplaza por el hash real en el paso final
+    var _HASH_ESPERADO = "77fca591afe645903592caa9580274fba82763c94807d3127b412b0c101a2c37"; // ← se reemplaza por el hash real en el paso final
 
     function _bloquear(motivo) {
         try {
