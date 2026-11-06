@@ -1543,6 +1543,183 @@ try{new PerformanceObserver(function(l){l.getEntries().forEach(function(e){var L
 #cdcIntro .ci-fill::after{content:"";position:absolute;right:-7px;top:50%;width:14px;height:14px;margin-top:-7px;border-radius:50%;background:radial-gradient(circle,#fff 0%,#bfe3ff 35%,rgba(96,165,250,.0) 72%);box-shadow:0 0 14px 5px rgba(125,211,252,.9),0 0 30px 10px rgba(37,99,235,.55);animation:ciHead .12s linear infinite alternate;}
 @keyframes ciHead{from{transform:scale(.8);opacity:.85}to{transform:scale(1.35);opacity:1}}
 </style>
+<link rel="preconnect" href="https://fonts.googleapis.com"><link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600&display=swap" rel="stylesheet">
+<style id="cdcbn-css">
+/* CDC FUTURO-PRO · PANEL CENTRAL estilo Binance (Juan Pablo Ortiz Ortuno) */
+#detailView{container-type:inline-size;container-name:cdcbn;font-family:'IBM Plex Sans',Inter,system-ui,-apple-system,'Segoe UI',Arial,sans-serif;}
+.cdcbn-top{display:grid;grid-template-columns:minmax(0,1fr);gap:10px;margin-bottom:12px;}
+@container cdcbn (min-width:760px){.cdcbn-top{grid-template-columns:minmax(0,1fr) 290px;}.cdcbn-chart{grid-column:1 / -1;}}
+.cdcbn-hero{position:relative;overflow:hidden;background:#0B0E11;border:1px solid #2B3139;border-radius:8px;color:#EAECEF;min-width:0;box-shadow:0 0 0 1px color-mix(in srgb,var(--z) 18%,transparent);}
+.cdcbn-in{position:relative;z-index:1;padding:14px;}
+.cdcbn-tabs{display:flex;justify-content:space-between;align-items:flex-start;gap:8px;flex-wrap:wrap;border-bottom:1px solid #2B3139;margin-bottom:12px;}
+.cdcbn-tabs-l{display:flex;gap:18px;flex-wrap:wrap;}
+.cdcbn-tab{font-size:14px;font-weight:500;color:#848E9C;padding:0 0 10px;}
+.cdcbn-tab.on{color:#EAECEF;border-bottom:2px solid #FCD535;margin-bottom:-1px;}
+.cdcbn-zone{font-size:12px;font-weight:600;padding:4px 10px;border-radius:4px;margin-bottom:10px;white-space:nowrap;}
+.cdcbn-main{display:grid;grid-template-columns:minmax(0,1fr) 78px;gap:10px;align-items:stretch;}
+.cdcbn-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px;align-content:start;}.cdcbn-gap{min-height:10px;}.cdcbn-chartrow{display:flex;gap:10px;flex-wrap:wrap;align-items:stretch;margin-top:8px;}.cdcbn-chartcv{flex:1 1 300px;min-width:0;display:flex;align-items:center;justify-content:center;}.cdcbn-strip{flex:1 1 190px;min-width:0;display:grid;grid-template-columns:minmax(0,1fr);gap:8px;align-content:start;text-align:left;}
+.cdcbn-c{background:rgba(24,26,32,.93);border:1px solid #2B3139;border-radius:6px;padding:12px 10px;display:flex;flex-direction:column;justify-content:center;gap:3px;min-width:0;}
+.cdcbn-c.hot{border-color:rgba(246,70,93,.45);background:rgba(246,70,93,.09);}
+.cdcbn-c.ok{border-color:rgba(14,203,129,.5);background:rgba(14,203,129,.08);}
+.cdcbn-l{font-size:12px;color:#848E9C;}
+.cdcbn-v{font-size:20px;font-weight:600;line-height:1.2;font-variant-numeric:tabular-nums;overflow-wrap:anywhere;}
+.cdcbn-c.hot .cdcbn-v{font-size:26px;}
+.cdcbn-c.ok .cdcbn-v{font-size:22px;}
+.cdcbn-u{font-size:13px;font-weight:400;color:#848E9C;}
+.cdcbn-s{font-size:11px;color:#5E6673;line-height:1.35;}
+.cdcbn-btn{align-self:flex-start;margin-top:4px;background:#2B3139;border:0;color:#EAECEF;font:500 11px 'IBM Plex Sans',Arial,sans-serif;padding:4px 9px;border-radius:4px;cursor:pointer;}
+.cdcbn-btn:hover{background:#363C45;}
+.cdcbn-coin{grid-column:1 / -1;display:flex;align-items:center;justify-content:center;gap:10px;flex-wrap:wrap;padding:6px 0;}
+.cdcbn-ico{width:32px;height:32px;border-radius:50%;background:#FCD535;color:#0B0E11;display:flex;align-items:center;justify-content:center;font-size:14px;font-weight:600;flex:0 0 auto;}
+.cdcbn-coin .cdc-click-moneda{font-size:32px !important;font-weight:600 !important;line-height:1;color:#EAECEF !important;text-shadow:none !important;letter-spacing:0 !important;border-bottom:1px dashed #5E6673 !important;}
+.cdcbn-usdt{font-size:12px;padding:2px 10px;border-radius:4px;background:#2B3139;color:#848E9C;}
+.cdcbn-bar{background:rgba(24,26,32,.93);border:1px solid #2B3139;border-radius:6px;padding:12px 6px;display:flex;flex-direction:column;align-items:center;gap:8px;min-height:250px;}
+.cdcbn-bt{font-size:12px;font-weight:500;color:#F6465D;text-align:center;line-height:1.3;}
+.cdcbn-bs{font-size:12px;font-weight:500;color:#0ECB81;text-align:center;line-height:1.3;}
+.cdcbn-bm{flex:1;display:flex;gap:6px;justify-content:center;width:100%;min-height:120px;}
+.cdcbn-sc{display:flex;flex-direction:column;justify-content:space-between;align-items:flex-end;font-size:11px;color:#5E6673;}
+.cdcbn-track{position:relative;width:12px;background:#2B3139;border-radius:3px;}
+.cdcbn-fill{position:absolute;left:0;right:0;bottom:0;border-radius:3px;overflow:hidden;max-height:100%;}
+.cdcbn-fill::after{content:"";position:absolute;inset:0;background:linear-gradient(180deg,transparent,rgba(255,255,255,.5),transparent);animation:cdcbnSweep 1.8s linear infinite;}
+.cdcbn-mk{position:absolute;left:50%;width:18px;height:18px;border-radius:50%;background:#FCD535;border:3px solid #0B0E11;transform:translate(-50%,50%);animation:cdcbnPulse 1.6s ease-in-out infinite;}
+.cdcbn-pct{font-size:18px;font-weight:600;font-variant-numeric:tabular-nums;}
+.cdcbn-card{background:#181A20;border:1px solid #2B3139;border-radius:6px;padding:12px;box-sizing:border-box;min-width:0;color:#EAECEF;}
+.cdcbn-h{display:flex;align-items:center;justify-content:space-between;font-size:14px;font-weight:600;color:#EAECEF;text-align:left;margin-bottom:2px;}
+.cdcbn-dot{width:7px;height:7px;border-radius:50%;background:#FCD535;display:inline-block;animation:cdcbnPulse 1.6s ease-in-out infinite;}
+.cdcbn-main{display:grid;grid-template-columns:78px minmax(0,1fr) minmax(130px,175px);gap:16px;align-items:start;}
+.cdcbn-bar{background:none;border:0;padding:0;}
+.cdcbn-mid{display:flex;flex-direction:column;gap:18px;min-width:0;}
+.cdcbn-coin{justify-content:flex-start;padding:0;}
+.cdcbn-right{display:flex;flex-direction:column;gap:18px;min-width:0;border-left:1px solid #2B3139;padding-left:16px;}
+.cdcbn-c.plain{background:none;border:0;padding:0;border-radius:0;}
+.cdcbn-foot{margin-top:12px;}
+.cdcbn-foot .cdcbn-zone{display:inline-block;margin:0;}
+.cdcbn-slot{flex:1 1 230px;min-width:0;display:flex;justify-content:flex-end;align-items:flex-start;padding-bottom:6px;}
+.cdcbn-dock{display:flex;align-items:flex-start;gap:8px;min-width:0;max-width:100%;}
+.cdcbn-dock.float{position:fixed;top:8px;left:50%;transform:translateX(-50%);z-index:9997;max-width:94vw;}
+.cdcbn-tbox{display:flex;flex-direction:column;gap:4px;min-width:0;flex:1 1 auto;}
+.cdcbn-tbox>div{max-width:100% !important;font-size:11px !important;margin-bottom:0 !important;padding:6px 10px !important;line-height:1.35 !important;}
+#cdcBtnStats{margin:0 !important;flex:0 0 auto;}
+@keyframes cdcbnSweep{0%{transform:translateY(100%)}100%{transform:translateY(-100%)}}
+@keyframes cdcbnPulse{0%,100%{box-shadow:0 0 0 0 rgba(252,213,53,.55)}50%{box-shadow:0 0 0 6px rgba(252,213,53,0)}}
+@container cdcbn (max-width:520px){.cdcbn-main{grid-template-columns:minmax(0,1fr);}.cdcbn-mid{order:1;}.cdcbn-right{order:2;border-left:0;padding-left:0;display:grid;grid-template-columns:repeat(2,minmax(0,1fr));}.cdcbn-bar{order:3;min-height:210px;}.cdcbn-coin .cdc-click-moneda{font-size:26px !important;}}
+@media (prefers-reduced-motion:reduce){.cdcbn-fill::after,.cdcbn-mk,.cdcbn-dot{animation:none;}}
+</style>
+<style id="cdc-fit-pantalla">
+/* ═══════════════════════════════════════════════════════════════════
+   CDC FUTURO-PRO · AJUSTE AUTOMÁTICO A LA PANTALLA + PANEL CENTRAL v2
+   (Juan Pablo Ortiz Ortuño)
+   · Las columnas laterales ya no son fijas: se encogen en laptops de 14"
+     y se estiran en 15.6" / monitores grandes, sin tocar el código.
+   · El panel central usa "container queries": se reacomoda según el
+     ANCHO REAL que tiene, no según el tamaño de la ventana.
+   ═══════════════════════════════════════════════════════════════════ */
+@media (min-width:951px){
+  html body .sidebar{width:clamp(240px,17vw,300px)!important;min-width:clamp(240px,17vw,300px)!important;max-width:clamp(240px,17vw,300px)!important;}
+  html body .column-right{width:clamp(300px,24vw,420px)!important;min-width:clamp(300px,24vw,420px)!important;max-width:clamp(300px,24vw,420px)!important;padding:clamp(10px,1.1vw,20px)!important;}
+  html body .column-center{padding:clamp(10px,1.1vw,20px)!important;gap:clamp(10px,1.1vw,20px)!important;min-width:0!important;}
+  html body #detailView.card{padding:clamp(10px,1.1vw,22px);}
+}
+
+/* ── Rejilla del panel: 1 columna si es angosto · 2 columnas si hay espacio ── */
+#detailView .cdcbn-top{display:grid;grid-template-columns:minmax(0,1fr);gap:12px;}
+#detailView .cdcbn-top>.cdcbn-hero{order:1;}
+#detailView .cdcbn-top .cdcbn-chart{order:2;grid-column:auto;}
+#detailView .cdcbn-top .cdcbn-signals{order:3;min-width:0;overflow-wrap:break-word;}
+@container cdcbn (min-width:820px){
+  #detailView .cdcbn-top{grid-template-columns:minmax(0,1fr) clamp(280px,34cqw,360px);align-items:start;}
+  #detailView .cdcbn-top>.cdcbn-hero{grid-column:1;grid-row:1;}
+  #detailView .cdcbn-top .cdcbn-chart{grid-column:1;grid-row:2;}
+  #detailView .cdcbn-top .cdcbn-signals{grid-column:2;grid-row:1 / span 2;}
+}
+
+/* ── Tarjeta principal (hero) ── */
+#detailView .cdcbn-hero{min-height:150px;border-radius:12px;background:linear-gradient(160deg,#10151c 0%,#0B0E11 62%);}
+#detailView .cdcbn-hero::before{content:"";position:absolute;left:0;right:0;top:0;height:2px;z-index:2;background:linear-gradient(90deg,transparent,var(--z),transparent);opacity:.85;}
+#detailView .cdcbn-hero .cdcbn-in{padding:clamp(12px,3.2cqw,20px);}
+#detailView .cdcbn-hero .cdcbn-main{grid-template-columns:clamp(58px,10cqw,78px) minmax(0,1fr) minmax(120px,22cqw);gap:clamp(10px,3cqw,20px);}
+#detailView .cdcbn-hero .cdcbn-bar,#detailView .cdcbn-hero .cdcbn-mid,#detailView .cdcbn-hero .cdcbn-right{order:0;min-height:0;}
+#detailView .cdcbn-hero .cdcbn-bm{min-height:clamp(96px,18vh,150px);}
+#detailView .cdcbn-hero .cdcbn-sc{font-size:10px;}
+#detailView .cdcbn-hero .cdcbn-mid{gap:clamp(8px,2cqw,18px);}
+#detailView .cdcbn-hero .cdcbn-coin .cdc-click-moneda{font-size:clamp(22px,4.4cqw,32px)!important;line-height:1.1!important;overflow-wrap:anywhere;word-break:break-word;}
+#detailView .cdcbn-hero .cdcbn-mid .cdcbn-c.plain .cdcbn-v{font-size:clamp(20px,4.4cqw,32px);font-weight:700;white-space:nowrap;overflow-wrap:normal;}
+#detailView .cdcbn-hero .cdcbn-right{gap:clamp(8px,2cqw,14px);padding-left:clamp(10px,3cqw,18px);}
+#detailView .cdcbn-hero .cdcbn-right .cdcbn-c.plain{padding:0 0 clamp(6px,1.4cqw,10px);border-bottom:1px solid #1E2329;}
+#detailView .cdcbn-hero .cdcbn-right .cdcbn-c.plain:last-child{border-bottom:0;padding-bottom:0;}
+#detailView .cdcbn-hero .cdcbn-right .cdcbn-v{font-size:clamp(16px,4.2cqw,21px);}
+@container cdcbn (max-width:600px){
+  #detailView .cdcbn-hero .cdcbn-main{grid-template-columns:56px minmax(0,1fr);}
+  #detailView .cdcbn-hero .cdcbn-bar{grid-row:1 / span 2;}
+  #detailView .cdcbn-hero .cdcbn-right{grid-column:2;border-left:0;padding-left:0;border-top:1px solid #1E2329;padding-top:10px;display:grid;grid-template-columns:repeat(auto-fit,minmax(96px,1fr));gap:8px;}
+  #detailView .cdcbn-hero .cdcbn-right .cdcbn-c.plain{border-bottom:0;padding:0;}
+}
+
+/* ── Gráfico + tarjetas "Tocó su máximo / Distancia al techo": ya no se montan encima ── */
+#detailView .cdcbn-chart{overflow:hidden;}
+#detailView .cdcbn-chartrow{flex-direction:column;flex-wrap:nowrap;gap:10px;}
+#detailView .cdcbn-chartcv{flex:none;width:100%;}
+#detailView .cdcbn-chartcv #miniChartTecho{max-width:100%;}
+#detailView .cdcbn-strip{flex:none;width:100%;grid-template-columns:repeat(2,minmax(0,1fr));align-items:stretch;}
+#detailView .cdcbn-strip .cdcbn-c.hot .cdcbn-v{font-size:clamp(20px,4.6cqw,28px);}
+@container cdcbn (max-width:440px){ #detailView .cdcbn-strip{grid-template-columns:minmax(0,1fr);} }
+
+/* ── Tarjetas y textos de apoyo más legibles ── */
+#detailView .cdcbn-card{border-radius:12px;padding:clamp(10px,1.6cqw,16px);}
+#detailView .cdcbn-card>div:first-child>div[style*="font-size:9px"]{font-size:10.5px!important;}
+
+/* ── Pantallas bajitas (laptop 14" · ventana de ~650 px de alto): menos aire vertical ── */
+@media (min-width:951px) and (max-height:800px){
+  #detailView .cdcbn-top{gap:8px;margin-bottom:8px;}
+  #detailView .cdcbn-hero .cdcbn-in{padding:10px 12px;}
+  #detailView .cdcbn-hero .cdcbn-bm{min-height:70px;}
+  #detailView .cdcbn-hero .cdcbn-mid{gap:8px;}
+  #detailView .cdcbn-hero .cdcbn-tabs{margin-bottom:8px;}
+  #detailView .cdcbn-card{padding:10px;}
+}
+
+/* ── Laptop 14" / 15.6" con poca altura útil: encabezado, correlación, ticker y pie más delgados ── */
+@media (min-width:951px) and (max-height:800px){
+  html body>header{height:46px!important;}
+  html body #btcEthBar{padding:2px 16px!important;}
+  html body #newsTickerBar{height:28px!important;}
+  html body>footer{flex-direction:row!important;flex-wrap:wrap;align-items:center;justify-content:space-between;}
+  html body>footer .footer-top,html body>footer .footer-bottom{padding:3px 14px!important;margin:0!important;border:0!important;}
+  html body>footer .footer-location{display:none!important;}
+}
+
+/* ═══ UNA SOLA PIEZA: resumen + gráfico + señales dentro del mismo marco con fondo neuronal ═══ */
+#detailView .cdcbn-top{position:relative;overflow:hidden;isolation:isolate;background:#0B0E11;border:1px solid #2B3139;border-radius:12px;padding:clamp(12px,2cqw,20px);}
+#detailView .cdcbn-top>.cdcbn-hero{position:static;overflow:visible;background:none;border:0;box-shadow:none;border-radius:0;min-height:0;}
+#detailView .cdcbn-top>.cdcbn-hero .cdcbn-in{padding:0;}
+#detailView .cdcbn-top .cdcbn-card{position:relative;z-index:1;background:none;border:0;border-radius:0;box-shadow:none;padding:0;}
+#detailView .cdcbn-top .cdcbn-chart{border-top:1px solid #232A33;padding-top:clamp(10px,1.6cqw,16px);}
+#detailView .cdcbn-top .cdcbn-signals{border-top:1px solid #232A33;padding-top:clamp(10px,1.6cqw,16px);}
+#detailView .cdcbn-strip .cdcbn-c{background:rgba(24,26,32,.55);}
+@container cdcbn (min-width:820px){
+  #detailView .cdcbn-top{column-gap:clamp(14px,2.4cqw,24px);}
+  #detailView .cdcbn-top .cdcbn-signals{border-top:0;padding-top:0;border-left:1px solid #232A33;padding-left:clamp(14px,2.4cqw,24px);}
+}
+@media (min-width:951px) and (max-height:800px){
+  #detailView .cdcbn-top{padding:10px 12px;}
+  #detailView .cdcbn-top .cdcbn-card{padding:0;}
+  #detailView .cdcbn-top .cdcbn-chart{padding-top:8px;}
+}
+
+/* ═══ Gráfico completo a la vista: tarjetas "Tocó su máximo / Distancia al techo" al lado, no debajo ═══ */
+@container cdcbn (min-width:820px){
+  #detailView .cdcbn-chartrow{flex-direction:row;align-items:stretch;}
+  #detailView .cdcbn-chartcv{flex:1 1 0;width:auto;min-width:0;}
+  #detailView .cdcbn-strip{flex:0 0 clamp(150px,20cqw,190px);width:auto;grid-template-columns:minmax(0,1fr);}
+  #detailView .cdcbn-strip .cdcbn-c.hot .cdcbn-v{font-size:clamp(18px,2.6cqw,24px);}
+}
+@media (min-width:951px) and (max-height:800px){
+  #detailView .cdcbn-top .cdcbn-chart>div:first-child>div[style*="font-size:9px"]{display:none;}
+  #detailView .cdcbn-hero .cdcbn-main .cdcbn-s{display:none;}
+  #detailView .cdcbn-hero .cdcbn-foot{margin-top:6px;}
+  #detailView .cdcbn-strip .cdcbn-s{display:none;}
+}
+</style>
 </head>
 <body>
 <style id="cdcIntroPro">
@@ -13604,6 +13781,7 @@ function actualizarPanelCentral() {
         ${btnMotorAlcistaHTML}
 
         <!-- ═══ PANEL CENTRAL · DISEÑO IA: núcleo neuronal + métricas grandes + señales + gráfico ═══ -->
+        <div class="cdcbn-top">
         ${(() => {
             const fp = (v) => {
                 if (typeof v !== 'number' || !isFinite(v)) return '…';
@@ -13630,61 +13808,52 @@ function actualizarPanelCentral() {
                     <div style="font-size:${grande ? 30 : 20}px; font-weight:900; color:${col}; line-height:1.15; margin:3px 0; text-shadow:0 0 14px ${col}55; word-break:break-all;">${val}</div>
                     <div style="font-size:8.5px; color:#64748b; line-height:1.3;">${expl}</div>
                 </div>`;
-            return `<div style="position:relative; overflow:hidden; border-radius:18px; margin-bottom:12px; background:radial-gradient(ellipse at 50% 0%, #0b1730 0%, #050914 70%); border:1px solid ${zona.c}55; box-shadow:0 10px 34px rgba(0,0,0,0.45), 0 0 26px ${zona.c}1f;">
-                <canvas id="cdcNeuroHero" data-rgb="${zona.rgb}" data-speed="${vel.toFixed(2)}" style="position:absolute; inset:0; width:100%; height:100%; display:block; pointer-events:none;"></canvas>
-                <div style="position:relative; z-index:1; padding:14px 14px 13px;">
-                    <div style="display:flex; align-items:center; justify-content:space-between; gap:8px; flex-wrap:wrap;">
-                        <div style="display:inline-flex; align-items:center; gap:7px; font-size:10px; font-weight:800; color:#7fe9ff; letter-spacing:2px;">
-                            <span style="width:8px;height:8px;border-radius:50%;background:#0ecb81;box-shadow:0 0 9px #0ecb81;display:inline-block;animation:blinker-glow 1.4s linear infinite;"></span>
-                            🧠 CEREBRO IA · ANÁLISIS EN VIVO
+            const BN = (lab, val, col, sub, cls, extra) => `<div class="cdcbn-c ${cls||''}"><div class="cdcbn-l">${lab}</div><div class="cdcbn-v" style="color:${col};">${val}</div><div class="cdcbn-s">${sub}</div>${extra||''}</div>`;
+            const bnUp = '#0ECB81', bnDn = '#F6465D', bnGold = '#FCD535', bnTxt = '#EAECEF';
+            const bnCambio = c.change < 0 ? bnDn : bnUp;
+            const bnDist = enTechoAhora ? bnDn : distPct <= 2 ? bnGold : bnTxt;
+            const bnToques = _err72 ? '\u26A0' : (_t72 !== null ? _tEf : '\u2026');
+            const bnToquesSub = _err72 ? 'Sin conexi\u00F3n con Binance \u00B7 reintentar' : (_t72 !== null ? 'Escaneo real 72 h (IA)' : 'Calculando escaneo de 72 h\u2026');
+            const bnBtn = `<button class="cdcbn-btn" onclick="event.stopPropagation(); actualizarEscaneo72h('${selectedCoin}').then(()=>{ if(selectedCoin==='${selectedCoin}') actualizarPanelCentral(); });">\u21BB Re-escanear</button>`;
+            window.__cdcbnStrip = `<div class="cdcbn-strip">${BN('Toc\u00F3 su m\u00E1ximo', `${bnToques} <span class="cdcbn-u">veces</span>`, _colT === '#64748b' ? bnTxt : _colT, bnToquesSub, 'hot', bnBtn)}${BN('Distancia al techo', enTechoAhora ? '\u00A1En el techo!' : distPct.toFixed(2) + '%', bnDist, enTechoAhora ? 'Tocando su m\u00E1ximo de 24 h' : 'Le falta $' + fp(distUsd) + ' para su m\u00E1x.')}</div>`;
+            return `<div class="cdcbn-hero" style="--z:${zona.c};">
+                <canvas id="cdcNeuroHero" data-rgb="${zona.rgb}" data-speed="${vel.toFixed(2)}" style="position:absolute; inset:0; width:100%; height:100%; display:block; pointer-events:none; opacity:0.42;"></canvas>
+                <div class="cdcbn-in">
+                    <div class="cdcbn-tabs">
+                        <div class="cdcbn-tabs-l"><span class="cdcbn-tab on">\uD83E\uDDE0 Cerebro IA</span><span class="cdcbn-tab">An\u00E1lisis en vivo</span></div>
+                        <div id="cdcAlertSlot" class="cdcbn-slot"></div>
+                    </div>
+                    <div class="cdcbn-main">
+                        <div class="cdcbn-bar" title="0% = suelo \u00B7 100% = techo de 24 h">
+                            <div class="cdcbn-bt">Techo<br>100%</div>
+                            <div class="cdcbn-bm">
+                                <div class="cdcbn-sc"><span>100</span><span>75</span><span>50</span><span>25</span><span>0</span></div>
+                                <div class="cdcbn-track"><div class="cdcbn-fill" style="height:${pctBar}%; background:${zona.c};"></div><div class="cdcbn-mk" style="bottom:${pctBar}%; --z:${zona.c};"></div></div>
+                            </div>
+                            <div class="cdcbn-pct" style="color:${zona.c};">${pct.toFixed(1)}%</div>
+                            <div class="cdcbn-bs">Suelo<br>0%</div>
                         </div>
-                        <span style="font-size:10px; font-weight:900; color:${zona.c}; background:${zona.c}1f; border:1px solid ${zona.c}66; padding:3px 10px; border-radius:20px;">${zona.t}</span>
-                    </div>
-                    <div style="margin:8px 0 10px; display:flex; align-items:center; justify-content:center; gap:8px; flex-wrap:wrap;">
-                        <span class="cdc-click-moneda" data-sym="${simbolo}" title="Click: estudiar esta moneda en el Cerebro Neuronal" style="font-size:32px; font-weight:900; color:#fff; letter-spacing:1px; cursor:pointer; border-bottom:1px dashed rgba(255,255,255,0.35); text-shadow:0 0 16px rgba(127,233,255,0.35);">${simbolo}</span>
-                        <span style="font-size:11px; color:#94a3b8; font-weight:800; background:rgba(255,255,255,0.07); border:1px solid rgba(255,255,255,0.1); padding:2px 8px; border-radius:20px;">USDT</span>${badgeAlarma}
-                    </div>
-
-                    <!-- 3 MÉTRICAS PRINCIPALES: valor · % de techo · distancia al techo -->
-                    <div style="display:flex; gap:8px; flex-wrap:wrap;">
-                        ${M('💲','VALOR MONEDA', '$' + fp(c.price), '#0ecb81', 'precio actual (USDT)', true)}
-                        ${M('📍','% DE TECHO', pct.toFixed(0) + '%', zona.c, '0% = suelo · 100% = techo 24 h', true)}
-                        ${M('📏','DISTANCIA AL TECHO', enTechoAhora ? '¡EN EL TECHO!' : distPct.toFixed(2) + '%', enTechoAhora ? '#ff2a3b' : distPct <= 2 ? '#f3ba2f' : '#5fc8e8', enTechoAhora ? 'tocando su máximo de 24 h' : 'le falta $' + fp(distUsd) + ' para su máx.', true)}
-                    </div>
-                    <div style="display:flex; gap:8px; flex-wrap:wrap; margin-top:8px;">
-                        ${M('📉','CAMBIO 24H', (c.change >= 0 ? '+' : '') + c.change.toFixed(2) + '%', colCambio, 'subió o bajó en 24 h', false)}
-                        ${M('⬆️','MÁXIMO 24H', '$' + fp(hi), '#ff6b6b', 'el techo del día', false)}
-                        ${M('⬇️','MÍNIMO 24H', '$' + fp(lo), '#6ee7b7', 'el suelo del día', false)}
-                    </div>
-
-                    <!-- BARRA DE RANGO -->
-                    <div style="margin-top:10px; background:rgba(4,9,20,0.72); border:1px solid rgba(255,255,255,0.08); border-radius:12px; padding:9px 12px 12px;">
-                        <div style="display:flex; justify-content:space-between; align-items:center; font-size:9px; color:#94a3b8; margin-bottom:7px;">
-                            <span>SUELO 0%</span><span style="font-size:10px; font-weight:900; color:${zona.c};">Rango: ${pctBar.toFixed(1)}%</span><span>TECHO 100%</span>
+                        <div class="cdcbn-mid">
+                            <div class="cdcbn-coin">
+                                <span class="cdcbn-ico">${String(simbolo).charAt(0)}</span>
+                                <span class="cdc-click-moneda" data-sym="${simbolo}" title="Click: estudiar esta moneda en el Cerebro Neuronal">${simbolo}</span>
+                                <span class="cdcbn-usdt">USDT</span>${badgeAlarma}
+                            </div>
+                            ${BN('Cambio 24h', (c.change >= 0 ? '+' : '') + c.change.toFixed(2) + '%', bnCambio, 'Subi\u00F3 o baj\u00F3 en 24 h', 'plain')}
                         </div>
-                        <div style="height:7px; background:linear-gradient(to right,#0ecb81,#f3ba2f,#ff2a3b); border-radius:4px; position:relative; overflow:visible;">
-                            <div style="position:absolute; top:-3px; left:calc(${pctBar}% - 6px); width:13px; height:13px; background:#fff; border:2.5px solid ${zona.c}; border-radius:50%; box-shadow:0 0 8px ${zona.c}; transition:left 0.5s;"></div>
+                        <div class="cdcbn-right">
+                            ${BN('M\u00E1ximo 24h', '$' + fp(hi), bnDn, 'El techo del d\u00EDa', 'plain')}
+                            ${BN('Valor moneda', '$' + fp(c.price), bnUp, 'Precio actual (USDT)', 'plain')}
+                            ${BN('M\u00EDnimo 24h', '$' + fp(lo), bnUp, 'El suelo del d\u00EDa', 'plain')}
                         </div>
-                        <div style="font-size:8.5px; color:#64748b; margin-top:7px; text-align:center;">posición del precio dentro del rango mínimo–máximo de 24 h</div>
                     </div>
-
-                    <!-- VELAS 72H: veces que tocó su máximo -->
-                    <div style="margin-top:8px; display:flex; align-items:center; justify-content:center; flex-wrap:wrap; gap:10px; background:rgba(255,60,0,0.09); border:1px solid rgba(255,60,0,0.35); border-radius:12px; padding:8px 12px;">
-                        <div style="font-size:${_err72 ? 22 : 30}px; font-weight:900; line-height:1; color:${_colT}; text-shadow:0 0 10px rgba(255,60,0,0.4);">${_err72 ? '⚠️' : (_t72 !== null ? _tEf : '…')}</div>
-                        <div style="font-size:10px; color:#cbd5e1; text-align:left; line-height:1.3; text-transform:uppercase; letter-spacing:0.5px;">
-                            ${_err72 ? 'no se pudo conectar<br>con Binance · reintentar →' : (_t72 !== null ? '🕯️ veces tocó su máximo<br>escaneo real 72 h (IA) ✅' : 'calculando escaneo<br>real de 72 h…')}
-                        </div>
-                        <button onclick="event.stopPropagation(); actualizarEscaneo72h('${selectedCoin}').then(()=>{ if(selectedCoin==='${selectedCoin}') actualizarPanelCentral(); });"
-                            style="background:rgba(255,255,255,0.06); border:1px solid rgba(255,255,255,0.15); color:#cbd5e1; font-size:9px; font-weight:700; border-radius:8px; padding:5px 8px; cursor:pointer; white-space:nowrap;">
-                            🔍 Re-escanear
-                        </button>
-                    </div>
+                    <div class="cdcbn-foot"><span class="cdcbn-zone" style="color:${zona.c}; background:${zona.c}1f;">${zona.t}</span></div>
                 </div>
             </div>`;
         })()}
 
         <!-- ═══ SEÑALES EN VIVO + GRÁFICO PRECIO/EMAs ═══ -->
-        <div style="display:flex; gap:12px; flex-wrap:wrap; align-items:stretch; margin-bottom:14px;">
+        <div class="cdcbn-sigwrap" style="display:contents;">
         ${(() => {
             const eBadge = datosEMA[selectedCoin];
             let bgB, colorB, txtB, spreadTxt;
@@ -13703,9 +13872,9 @@ function actualizarPanelCentral() {
                 }
                 spreadTxt = eBadge.emaSpreadPct !== null && eBadge.emaSpreadPct !== undefined ? `${eBadge.emaSpreadPct.toFixed(2)}%` : '…';
             }
-            return `<div style="flex:1 1 260px; min-width:240px; box-sizing:border-box; display:flex; flex-direction:column; gap:8px; background:linear-gradient(180deg,rgba(127,233,255,0.06),rgba(255,255,255,0.01)); border:1px solid rgba(127,233,255,0.2); border-radius:16px; padding:12px;">
+            return `<div class="cdcbn-card cdcbn-signals" style="display:flex; flex-direction:column; gap:8px;">
                     <div style="text-align:left;">
-                        <div style="font-size:11px; font-weight:900; color:#7fe9ff; letter-spacing:1.5px;">🎯 SEÑALES EN VIVO</div>
+                        <div class="cdcbn-h">Señales en vivo <span class="cdcbn-dot"></span></div>
                         <div style="font-size:9px; color:#64748b; line-height:1.3;">alertas automáticas de esta moneda: desmayo, flash, despegue…</div>
                     </div>
                     <div id="cdcDesBtnHost" style="width:100%;display:flex;justify-content:center"></div>
@@ -13715,15 +13884,16 @@ function actualizarPanelCentral() {
                         <span style="font-size:9px; color:#94a3b8;">EMAs: ${spreadTxt}</span>
                     </div>
                 </div>
-                <div style="flex:1 1 330px; min-width:240px; box-sizing:border-box; background:linear-gradient(180deg,rgba(127,233,255,0.06),rgba(255,255,255,0.01)); border:1px solid rgba(127,233,255,0.2); border-radius:16px; padding:12px; text-align:center;">
+                <div class="cdcbn-card cdcbn-chart" style="text-align:center;">
                     <div style="text-align:left;">
-                        <div style="font-size:11px; font-weight:900; color:#7fe9ff; letter-spacing:1.5px;">📈 GRÁFICO · PRECIO + EMAs</div>
+                        <div class="cdcbn-h">Gráfico · Precio + EMAs</div>
                         <div style="font-size:9px; color:#64748b; line-height:1.3; padding-bottom:8px;">EMA7, 25, 99 y 200 son promedios que marcan la tendencia; si se juntan arriba, puede haber techo</div>
                     </div>
-                    <canvas id="miniChartTecho" width="300" height="190" style="display:block; margin:0 auto; max-width:100%; background:radial-gradient(ellipse at 50% 30%, #0a1220 0%, #050914 75%); border:1px solid rgba(255,255,255,0.08); border-radius:10px; box-shadow:0 0 18px rgba(0,0,0,0.35) inset;"></canvas>
+                    <div class="cdcbn-chartrow"><div class="cdcbn-chartcv"><canvas id="miniChartTecho" width="300" height="190" style="display:block; margin:0 auto; max-width:100%; background:#0B0E11; border:1px solid #2B3139; border-radius:6px;"></canvas></div>${window.__cdcbnStrip||''}</div>
                 </div>`;
         })()}
         </div>
+        </div><!-- /cdcbn-top -->
 
         <div id="cdcCerebroEnPanel" data-sym="${selectedCoin}">${(window.CDC_CEREBRO_HTML ? window.CDC_CEREBRO_HTML(selectedCoin) : '')}</div>
         <!-- BLOQUE MEMORIA IA AVANZADA (colapsable) -->
@@ -14242,7 +14412,7 @@ function actualizarPanelCentral() {
     // 📈 Mini gráfico en tiempo real (junto al badge de techo, arriba a la derecha)
     _registrarPrecioMiniChart(selectedCoin, c.price, datosEMA[selectedCoin], c.high);
     _dibujarMiniChart('miniChartTecho', selectedCoin);
-    try { _cdcNeuroHero(); } catch (e) {}
+    try { _cdcNeuroHero(); } catch (e) {} try { if (window.cdcbnPlaceDock) window.cdcbnPlaceDock(); } catch (e) {}
 }
 
 
@@ -17320,7 +17490,12 @@ function _miniPill(ctx, txt, x, y, color, bg, alineacion) {
 function _dibujarMiniChart(canvasId, symbol) {
     const canvas = document.getElementById(canvasId);
     if (!canvas || !canvas.getContext) return;
-    const w = MINI_CHART_W, h = MINI_CHART_H;
+    let w = MINI_CHART_W, h = MINI_CHART_H;
+    /* 📐 Ajuste automático: el gráfico toma el ancho real de su tarjeta (antes era fijo 300×190) */
+    try {
+        const _bw = canvas.parentElement ? Math.floor(canvas.parentElement.clientWidth) : 0;
+        if (_bw >= 200) { w = Math.max(280, Math.min(620, _bw)); h = Math.round(Math.max(190, Math.min(230, w * 0.5))); }
+    } catch (e) {}
     const dpr = Math.min(window.devicePixelRatio || 1, 3);
     if (canvas.width !== Math.round(w * dpr) || canvas.height !== Math.round(h * dpr)) {
         canvas.width = Math.round(w * dpr); canvas.height = Math.round(h * dpr);
@@ -18070,7 +18245,7 @@ window.CDC_FLASH=(function(){
     // archivo completo sin caer en la paradoja de "el hash contiene su
     // propio hash". No cambiar este texto.
     var _PLACEHOLDER = "%%CDC_INTEGRITY_HASH%%";
-    var _HASH_ESPERADO = "77fca591afe645903592caa9580274fba82763c94807d3127b412b0c101a2c37"; // ← se reemplaza por el hash real en el paso final
+    var _HASH_ESPERADO = "c05918edf13c60aaa92dfbbebd1fe5a0967e68eb5f0eb81b07f9cf98a33d55a6"; // ← se reemplaza por el hash real en el paso final
 
     function _bloquear(motivo) {
         try {
@@ -18154,7 +18329,7 @@ function toast(s,g){var k=s+g.q.tipo;if(CD[k]&&Date.now()-CD[k]<600000)return;CD
  var d=document.createElement("div"),col=g.q.tipo==="short"?"#ff2a3b":g.q.tipo==="long"?"#0ecb81":"#f3ba2f";
  d.style.cssText="background:#060b16;color:#fff;border:2px solid "+col+";border-radius:10px;padding:8px 12px;margin-bottom:6px;font:700 12px Arial;box-shadow:0 0 16px "+col+"66;max-width:420px";
  d.innerHTML="<b style='color:"+col+"'>"+s.replace("USDT","")+"</b> "+g.q.txt;var w=document.getElementById("cdcFutToast");
- if(!w){w=document.createElement("div");w.id="cdcFutToast";w.style.cssText="position:fixed;top:8px;left:50%;transform:translateX(-50%);z-index:9996;pointer-events:none";document.body.appendChild(w);}
+ if(!w){w=document.createElement("div");w.id="cdcFutToast";w.className="cdcbn-tbox";w.style.cssText="pointer-events:none";(window.__cdcbnDock||document.body).appendChild(w);}
  w.appendChild(d);setTimeout(function(){d.remove();},15000);}
 function scan(){var S=ev("selectedCoin");for(var k in OI){var g=get(k);if(g&&g.q.tipo&&(g.q.nivel>=.7||(k===S&&g.q.nivel>=.5))&&TOAST_ON)toast(k,g);}}
 function start(){loadFR();setInterval(loadFR,60000);setInterval(function(){pri().forEach(loadOI);scan();},8000);}
@@ -20159,7 +20334,7 @@ window.CDC_DESPEGUE=(function(){
     AV[r.symbol]=now;ultGlobal=now;
     var n=r.symbol.replace("USDT","");
     if(CFG.TOAST){try{
-      if(!box){box=document.createElement("div");box.style.cssText="position:fixed;top:72px;left:50%;transform:translateX(-50%);z-index:9997;pointer-events:none";document.body.appendChild(box);}
+      if(!box){box=document.createElement("div");box.className="cdcbn-tbox";box.style.cssText="pointer-events:none";(window.__cdcbnDock||document.body).appendChild(box);}
       var d=document.createElement("div");
       d.style.cssText="pointer-events:auto;cursor:pointer;background:#04121f;color:#fff;border:2px solid #38bdf8;border-radius:12px;padding:9px 14px;margin-bottom:6px;font:700 12px Inter,Arial,sans-serif;box-shadow:0 0 18px rgba(56,189,248,.6);max-width:430px";
       d.innerHTML="✈️ <b style='color:#7dd3fc'>"+n+"</b> A PUNTO DE DESPEGAR · "+r.verdes+"/"+r.vent+" velas verdes · +"+r.reb.toFixed(1)+"% desde el fondo<br><small style='font-weight:600;color:#94a3b8'>cayó "+r.caida.toFixed(0)+"% desde su máximo · volumen x"+r.volx.toFixed(1)+" · EMAs girando hacia arriba</small>";
@@ -20325,4 +20500,51 @@ window.CDC_TRACK=(function(){
 })();
 </script>
 
+<script>
+/* CDC FUTURO-PRO: dock de alertas del panel central (alarma + icono de resultados) */
+(function(){
+ var dock=document.createElement('div');dock.id='cdcAlertDock';dock.className='cdcbn-dock float';
+ window.__cdcbnDock=dock;
+ function place(){
+  try{
+   var slot=document.getElementById('cdcAlertSlot');
+   if(slot){ if(dock.parentNode!==slot) slot.appendChild(dock); dock.classList.remove('float'); }
+   else { if(document.body && dock.parentNode!==document.body) document.body.appendChild(dock); dock.classList.add('float'); }
+   var bs=document.querySelectorAll('#cdcBtnStats');
+   if(bs.length){
+    var b=bs[0],i;
+    for(i=0;i<bs.length;i++){ if(bs[i].parentNode===dock){ b=bs[i]; break; } }
+    for(i=0;i<bs.length;i++){ if(bs[i]!==b) bs[i].remove(); }
+    if(b.parentNode!==dock) dock.insertBefore(b,dock.firstChild);
+   }
+  }catch(e){}
+ }
+ window.cdcbnPlaceDock=place;
+ setInterval(place,1000);
+ if(document.readyState==='loading') document.addEventListener('DOMContentLoaded',place); else place();
+})();
+</script>
+
+<script id="cdc-seguir-alarma">
+/* CDC FUTURO-PRO · el panel central SIGUE a la moneda de la alarma FLASH (Juan Pablo Ortiz Ortuño)
+   Antes, después de cualquier clic tuyo el panel se quedaba fijo 2 minutos y no cambiaba a la moneda de la alarma.
+   Ahora respeta tu clic solo 20 segundos; después vuelve a seguir la alarma automáticamente. */
+(function(){
+  var PAUSA=20000, ultClick=0;
+  function ajustar(){ try{ if(window.CDC_FLASH && CDC_FLASH.cfg){ CDC_FLASH.cfg.MANUAL_PAUSA_MS=PAUSA; return true; } }catch(e){} return false; }
+  var t0=setInterval(function(){ if(ajustar()) clearInterval(t0); },500);
+  document.addEventListener('pointerdown',function(e){
+    try{ if(e.target && e.target.closest && e.target.closest('tr[data-symbol], .cdc-click-moneda, [onclick*="seleccionarMoneda"], [onclick*="CDC_FLASH.ver"]')) ultClick=Date.now(); }catch(x){}
+  },true);
+  setInterval(function(){
+    try{
+      if(!window.CDC_FLASH || !CDC_FLASH.actual) return;
+      var a=CDC_FLASH.actual(); if(!a || !a.sym) return;
+      if(typeof selectedCoin==='undefined' || selectedCoin===a.sym) return;
+      if(Date.now()-ultClick<PAUSA) return;
+      CDC_FLASH.ver(a.sym);
+    }catch(e){}
+  },2000);
+})();
+</script>
 </body></html>
