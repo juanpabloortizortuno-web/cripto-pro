@@ -13568,7 +13568,7 @@ function actualizarPanelCentral() {
                             <div style="font-size:10px; color:#64748b; font-weight:700; letter-spacing:0.5px;">CAMBIO 24H</div>
                         </div>
                         <div style="text-align:center;">
-                            <div style="font-size:34px; font-weight:900; color:${c.change < 0 ? '#ff2a3b' : '#0ecb81'}; line-height:1.1;">$${c.price.toLocaleString(undefined,{minimumFractionDigits:2,maximumFractionDigits:4})}</div>
+                            <div style="font-size:34px; font-weight:900; color:#0ecb81; line-height:1.1;">${c.price.toLocaleString(undefined,{minimumFractionDigits:2,maximumFractionDigits:4})} <span style="font-size:14px; font-weight:700; color:#0ecb81;">USDT</span></div>
                             <div style="font-size:10px; color:#64748b; font-weight:700; letter-spacing:0.5px;">VALOR MONEDA</div>
                         </div>
                     </div>`;
@@ -13594,6 +13594,7 @@ function actualizarPanelCentral() {
                     spreadTxt = eBadge.emaSpreadPct !== null && eBadge.emaSpreadPct !== undefined ? `${eBadge.emaSpreadPct.toFixed(2)}%` : '…';
                 }
                 return `<div style="flex:0 0 auto; display:flex; flex-direction:column; align-items:center; gap:6px; width:300px;">
+                    <div id="cdcDesBtnHost" style="width:100%;display:flex;justify-content:center"></div>
                     ${(window.CDC_FLASH&&CDC_FLASH.slotHTML)?CDC_FLASH.slotHTML():''}${(window.CDC_DESPERTAR&&CDC_DESPERTAR.slotDesmayo)?CDC_DESPERTAR.slotDesmayo():''}${(window.CDC_DESPEGUE&&CDC_DESPEGUE.slotHTML)?CDC_DESPEGUE.slotHTML():''}${(window.CDC_VEL&&CDC_VEL.slotHTML)?CDC_VEL.slotHTML():''}
                     <div id="cdcBadgeTecho" style="display:${(window.CDC_FLASH&&CDC_FLASH.hay&&CDC_FLASH.hay())?'none':'flex'}; flex-direction:column; align-items:center; gap:1px; background:${bgB}; border:1px solid ${colorB}55; border-radius:8px; padding:5px 9px; width:100%;">
                         <span style="font-size:10px; font-weight:900; color:${colorB}; text-align:center; line-height:1.3;">${txtB}</span>
@@ -17775,8 +17776,8 @@ setTimeout(function(){setInterval(tick,CFG.TICK_MS);},CFG.ARRANQUE_MS);
 window.CDC_FLASH=(function(){
   "use strict";
   var CFG={ON:true,SOLO_FLASH:true,PRECIO_MAX:1,POS_MAX:45,RANGO_MIN:10,LIQ_MIN:150000,SCORE_MIN:45,SCORE_VOZ:55,MAX_CAND:20,TICK_MS:15000,KL_TTL:90000,
-    DWELL_MS:30000,CAMBIO_MARGEN:5,TP:2,SL:3,SOMBRA_MS:300000,SEG_MAX_MS:2700000,MANUAL_PAUSA_MS:120000,ROT_MS:20000,SCORE_OBS:30,HOLD_MAX_MS:180000,DESCANSO_MS:480000,DESC_TP_MS:1200000,VOZ:true,SONIDO:true,VOZ_CD_MS:600000,ARRANQUE_MS:12000};
-  var ACT=null,OTROS=[],descanso={},uTs=0,lastForce=0,M={},manualTs=0,flashPass=false,busy=false,ultCambio=0,vozTs={},AC=null,orig=null,aviso=null;
+    DWELL_MS:15000,CAMBIO_MARGEN:5,TP:2,SL:3,SOMBRA_MS:300000,SEG_MAX_MS:2700000,MANUAL_PAUSA_MS:120000,ROT_MS:10000,SCORE_OBS:30,HOLD_MAX_MS:40000,DESCANSO_MS:150000,DESC_TP_MS:1200000,VOZ:true,SONIDO:true,VOZ_CD_MS:600000,ARRANQUE_MS:12000};
+  var ACT=null,OTROS=[],vistoTs={},descanso={},uTs=0,lastForce=0,M={},manualTs=0,flashPass=false,busy=false,ultCambio=0,vozTs={},AC=null,orig=null,aviso=null;
   function cd(){try{return cachedData;}catch(e){return null;}}
   /* 🧠 CEREBRO FLASH: red 8-6-1 que aprende de cada rebote. Se guardan "operaciones sombra" de las mejores monedas y a los 45 min (o al llegar a +TP% / -SL%) se entrena. */
   var NI=8,NH=6,KN="cdc_flash_net",KP="cdc_flash_pend",NET=null,PEND=[],sombraTs={};
@@ -17906,14 +17907,16 @@ window.CDC_FLASH=(function(){
       if(s2){var held=now-ultCambio,subio=s2.price>=ACT.entry*(1+CFG.TP/100);
         if(subio||held>=CFG.HOLD_MAX_MS){            /* ya subió o lleva mucho sin moverse: rota a la siguiente */
           descanso[ACT.sym]=now+(subio?CFG.DESC_TP_MS:CFG.DESCANSO_MS);
-          ok=ok.filter(function(x){return x.sym!==ACT.sym;});best=ok.filter(function(x){return x.score>=CFG.SCORE_OBS;})[0]||null;s2=null;}
+          ok=ok.filter(function(x){return x.sym!==ACT.sym;});
+          /* 🔄 rotación justa: pasa a la candidata que lleva MÁS tiempo sin mostrarse (no siempre la de mayor puntaje) */
+          best=ok.filter(function(x){return x.score>=CFG.SCORE_OBS;}).sort(function(a,b){return (vistoTs[a.sym]||0)-(vistoTs[b.sym]||0)||b.score-a.score;})[0]||null;s2=null;}
         else if(!(best&&best.sym!==ACT.sym&&held>=CFG.DWELL_MS&&best.score>=s2.score+CFG.CAMBIO_MARGEN))el=s2;}}
     if(!el)el=best;
     if(el)el.entry=(ACT&&ACT.sym===el.sym&&ACT.entry)?ACT.entry:el.price;
     OTROS=ok.filter(function(x){return el&&x.sym!==el.sym&&x.score>=CFG.SCORE_OBS;}).slice(0,12);
     var cambio=el&&(!ACT||ACT.sym!==el.sym);
     ACT=el||null;
-    if(cambio){ultCambio=now;nuevo(el);}else fijar();
+    if(cambio){ultCambio=now;vistoTs[el.sym]=now;nuevo(el);}else fijar();
   }
   function tick(){
     if(!CFG.ON||busy)return;var C=cd();if(!C||typeof obtenerKlines!=="function")return;
@@ -17938,11 +17941,11 @@ window.CDC_FLASH=(function(){
       ch+='</div>';}
     return '<div onclick="CDC_FLASH.ir()" title="Clic para abrir la moneda en el panel" style="box-sizing:border-box;width:100%;cursor:pointer;background:rgba(255,42,59,.14);border:2px solid #ff2a3b;border-radius:8px;padding:6px 8px;text-align:center;margin-bottom:4px;animation:cdcFlashBox .9s ease-in-out infinite alternate">'+
       '<div style="font:900 11px Arial;letter-spacing:.6px;color:#ff6b78">'+RAYO+(r.score>=CFG.SCORE_VOZ?' FLASH · REBOTE · LONG ':' FLASH · EN OBSERVACIÓN ')+RAYO+'</div>'+
-      '<div style="font:900 15px Arial;color:#fff"><b>'+nom(r.sym)+'</b> ▼ · $'+pf(r.price)+' · puntaje '+r.score+'/100</div>'+
+      '<div style="font:900 15px Arial;color:#fff"><b>'+nom(r.sym)+'</b> ▼ · <span style=\"color:#0ecb81\">'+pf(r.price)+' USDT</span> · puntaje '+r.score+'/100</div>'+
       '<div style="font:600 9.5px Arial;color:#cbd5e1;line-height:1.35">'+rz.join(' · ')+'</div>'+
       '<div style="font:700 9.5px Arial;color:#c4b5fd;margin-top:2px">🧠 cerebro FLASH: '+Math.round(r.pnet*100)+'% de rebote · '+r.nn+(r.nn===1?' muestra':' muestras')+(NET.n>5?' · aciertos '+Math.round(NET.ok/NET.n*100)+'%':' · aprendiendo')+'</div>'+
-      '<div style="font:600 9px Arial;color:#94a3b8;margin-top:2px">Referencia: mínimo 24h $'+pf(r.min)+' · stop $'+pf(r.sl)+' (−'+r.riesgo.toFixed(1)+'%)</div>'+
-      '<div style="font:700 9.5px Arial;color:#86efac;margin-top:2px">🎯 Obj1 $'+pf(r.tp1)+' · Obj2 $'+pf(r.tp2)+'</div>'+
+      '<div style="font:600 9px Arial;color:#94a3b8;margin-top:2px">Referencia: mínimo 24h <span style=\"color:#0ecb81\">'+pf(r.min)+'</span> · stop <span style=\"color:#0ecb81\">'+pf(r.sl)+'</span> USDT (−'+r.riesgo.toFixed(1)+'%)</div>'+
+      '<div style="font:700 9.5px Arial;color:#86efac;margin-top:2px">🎯 Obj1 '+pf(r.tp1)+' · Obj2 '+pf(r.tp2)+' USDT</div>'+
       '<div style="font:700 9px Arial;color:#94a3b8;margin-top:2px">⏱ rota a la siguiente en '+Math.floor(seg/60)+':'+('0'+seg%60).slice(-2)+' · o antes si otra la supera</div>'+
       '<div style="font:900 9.5px Arial;color:#ffd0d4;margin-top:3px">ENTRA RÁPIDO EN LONG · AISLADO (NO CRUZADO)</div></div>'+ch;
   }
@@ -19565,9 +19568,13 @@ setTimeout(function(){setInterval(tick,CFG.TICK_MS);},CFG.ARRANQUE_MS);
     function btnDes() {
         var b = document.getElementById("cdcBtnDes");
         if (!b) { b = document.createElement("button"); b.id = "cdcBtnDes"; b.type = "button";
-            b.style.cssText = "margin:0 8px;padding:6px 12px;border-radius:10px;border:1px solid #f6465d;background:#1a0508;color:#fff;font:800 12px Arial,sans-serif;cursor:pointer;white-space:nowrap;flex:0 0 auto;max-width:46vw;overflow:hidden;text-overflow:ellipsis";
+            b.style.cssText = "margin:0;padding:6px 12px;border-radius:10px;border:1px solid #f6465d;background:#1a0508;color:#fff;font:800 12px Arial,sans-serif;cursor:pointer;white-space:nowrap;flex:0 0 auto;width:100%;max-width:100%;overflow:hidden;text-overflow:ellipsis";
             b.onclick = function () { var l = listaDes(); if (!l.length) return; window.__dmAbrirTs = Date.now(); window.__velHoldUntil = 0; window.__selDesmayo = true; try { seleccionarMoneda(l[0].s, true, ACT[l[0].s] ? ACT[l[0].s].tipo : "CAIDA_BRUTAL"); } finally { window.__selDesmayo = false; } };
-            var hd = document.querySelector("header"); if (hd && hd.children.length >= 2) hd.insertBefore(b, hd.children[1]); else { b.style.cssText += ";position:fixed;top:12px;right:12px;z-index:8500"; document.body.appendChild(b); } }
+        }
+        /* 📍 el botón DESMAYO vive en el panel central: se vuelve a colocar cada segundo porque el panel se redibuja */
+        var host = document.getElementById("cdcDesBtnHost");
+        if (host) { if (b.parentNode !== host) host.appendChild(b); b.style.display = ""; }
+        else if (b.parentNode) { b.style.display = "none"; }
         var a = listaDes(), n = a.length;
         b.textContent = n ? ("🔻 DESMAYO · " + a[0].s.replace("USDT", "") + " " + (a[0].p ? a[0].p.toFixed(1) + "%" : "") + (n > 1 ? " +" + (n - 1) : "")) : "🔻 DESMAYO · vigilando";
         b.style.background = n ? "#f6465d" : "#1a0508"; b.style.boxShadow = n ? "0 0 14px #f6465d" : "none"; b.className = n ? "cdcBlink" : "";
@@ -20232,10 +20239,10 @@ window.CDC_TRACK=(function(){
     o.innerHTML=h;document.body.appendChild(o);
     document.getElementById("cdcTrackX").onclick=function(){o.remove();};
     document.getElementById("cdcTrackR").onclick=function(){if(confirm("¿Borrar todo el historial de alertas medidas?")){R=[];last={};save();o.remove();}};}
-  setInterval(function(){if(document.getElementById("cdcBtnStats"))return;var b=document.getElementById("cdcBtnDes");if(!b||!b.parentNode)return;
+  setInterval(function(){if(document.getElementById("cdcBtnStats"))return;var hd0=document.querySelector("header");if(!hd0)return;
     var s=document.createElement("button");s.id="cdcBtnStats";s.type="button";s.textContent="📊";s.title="Resultados de las alertas (qué pasó después)";
     s.style.cssText="margin:0 6px 0 0;padding:6px 10px;border-radius:10px;border:1px solid #38bdf8;background:#0b1220;color:#fff;font:800 12px Arial,sans-serif;cursor:pointer;flex:0 0 auto";
-    s.onclick=panel;b.parentNode.insertBefore(s,b.nextSibling);},2000);
+    s.onclick=panel;hd0.insertBefore(s,hd0.children[1]||null);},2000);
   return{reg:reg,stats:function(){var s=stats();try{console.table(s);}catch(e){}return s;},panel:panel,datos:function(){return R;}};
 })();
 </script>
