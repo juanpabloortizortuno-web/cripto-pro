@@ -2177,7 +2177,7 @@ la computadora.</p>
                     <button id="btnTecho4EmaSide" onclick="abrirListaDorado()" title="BOTÓN DORADO: solo las monedas de MOMENTUM ALTO (cerca del 100% del rango 24h y subiendo con fuerza), las mismas que salen en el radar. La mejor se abre en el panel central." style="flex:1 1 calc(50% - 6px);padding:10px 6px;border-radius:10px;border:none;cursor:pointer;font-size:12px;font-weight:900;transition:all 0.25s;letter-spacing:0.3px;background:rgba(243,186,47,0.22);color:#f3ba2f;box-shadow:inset 0 0 0 1px rgba(243,186,47,0.55);">
                         🟡 BOTÓN DORADO<br><span style="font-size:9px;font-weight:700;opacity:0.85;">MOMENTUM ALTO</span>
                     </button>
-                    <button id="btnReventonSide" onclick="CDC_FLASH.ir()" title="FLASH: la ÚNICA alarma del panel central. Moneda menor a 1 USDT, en rojo, en el fondo de su rango 24h, muy volátil y con rebotes hoy. Clic para abrirla y entrar en LONG (aislado)." style="flex:1 1 calc(50% - 6px);padding:10px 6px;border-radius:10px;border:none;cursor:pointer;font-size:12px;font-weight:900;transition:all 0.25s;letter-spacing:0.3px;background:rgba(255,42,59,0.20);color:#ff6b78;box-shadow:inset 0 0 0 1px rgba(255,42,59,0.6);">
+                    <button id="btnReventonSide" onclick="CDC_FLASH.ir()" title="FLASH: la ÚNICA alarma del panel central. Moneda menor a 0.50 USDT, en rojo, en el fondo de su rango 24h, muy volátil y con rebotes hoy. Clic para abrirla y entrar en LONG (aislado)." style="flex:1 1 calc(50% - 6px);padding:10px 6px;border-radius:10px;border:none;cursor:pointer;font-size:12px;font-weight:900;transition:all 0.25s;letter-spacing:0.3px;background:rgba(255,42,59,0.20);color:#ff6b78;box-shadow:inset 0 0 0 1px rgba(255,42,59,0.6);">
                         <svg class="cdcFlashRay" viewBox="0 0 24 24" width="15" height="15" style="vertical-align:-2px"><path d="M13 1 3 14h7l-1 9 11-14h-7z" fill="#ff2a3b" stroke="#fff" stroke-width=".8"/></svg> FLASH<br><span style="font-size:9px;font-weight:700;opacity:0.85;">REBOTE · LONG</span>
                     </button>
                     <button id="btnGiroTempranoSide" onclick="abrirListaBombaMaxima()" title="Monedas que subieron 100%+ desde su mínimo real de 48h Y ya están cayendo al menos 3% desde su pico (patrón APRUSDT) — solo entran las que de verdad llegaron a un máximo así de grande, no cualquier caída." style="flex:1 1 calc(50% - 6px);padding:10px 6px;border-radius:10px;border:none;cursor:pointer;font-size:12px;font-weight:900;transition:all 0.25s;letter-spacing:0.3px;background:rgba(255,140,26,0.22);color:#ff8c1a;box-shadow:inset 0 0 0 1px rgba(255,140,26,0.55);">
@@ -8710,7 +8710,7 @@ let colaSimbolosEMA = [];   // cola de símbolos pendientes de actualizar EMA (r
 let indiceEMAActual = 0;
 // 🎯 SOLO monedas de 0 a 2 USDT: las de más precio no se leen ni se piden a Binance (menos peticiones).
 // BTC/ETH/BNB/SOL se mantienen únicamente como referencia de mercado (correlación).
-const PRECIO_MAX_ESCANEO_USDT = 2;
+let PRECIO_MAX_ESCANEO_USDT = (function(){ try{ var v=parseFloat(localStorage.getItem('cdc_precio_max')); return v>0?v:0.5; }catch(e){ return 0.5; } })(); /* 🎯 solo monedas ≤ 0.50 USDT: menos peticiones a Binance (no se cuelga la red ni salta el límite). Para cambiarlo: localStorage.setItem('cdc_precio_max','1') y recargar */
 const _SIEMPRE_ESCANEAR = ['BTCUSDT', 'ETHUSDT', 'BNBUSDT', 'SOLUSDT'];
 const EMA_LOTE_POR_CICLO = 10;      // cuántos símbolos actualizamos cada ciclo de refresco EMA (bajado de 35 a 15: 35 peticiones en paralelo cada 8s disparaba el rate limit de Binance -429/418-)
 const EMA_INTERVALO_MS = 13 * 1000; // cada 13s actualizamos un lote (antes 8s: era muy agresivo y sumado al resto de peticiones activaba el rate limit de Binance)
@@ -9798,7 +9798,7 @@ async function obtenerDatosBinance() {
         data.forEach(item => {
             const precio = parseFloat(item.lastPrice);
             if(!item.symbol.endsWith("USDT")){ return; } // solo pares USDT
-            // 🎯 rango de búsqueda: 0 < precio ≤ 2 USDT (la moneda abierta en pantalla y las de referencia se respetan)
+            // 🎯 rango de búsqueda: 0 < precio ≤ 0.50 USDT (la moneda abierta en pantalla y las de referencia se respetan)
             if (!(precio > 0) || (precio > PRECIO_MAX_ESCANEO_USDT && !_SIEMPRE_ESCANEAR.includes(item.symbol) && item.symbol !== (typeof selectedCoin !== 'undefined' ? selectedCoin : null))) { delete cachedData[item.symbol]; return; }
             // El endpoint de Futuros (fapi) YA devuelve únicamente contratos reales
             // de Futuros USDT-M — no depende de que haya cargado exchangeInfo. El
@@ -18058,7 +18058,7 @@ setTimeout(function(){setInterval(tick,CFG.TICK_MS);},CFG.ARRANQUE_MS);
 <script>
 /* ⚡ CDC_FLASH · UNA SOLA ALARMA EN EL PANEL CENTRAL (rebote en LONG)
    Elige UNA moneda que cumpla TODO esto:
-     1) valor menor a 1 USDT · 2) en ROJO (cambio 24h negativo) · 3) en el FONDO de su rango 24h (cerca de su mínimo)
+     1) valor menor a 0.50 USDT · 2) en ROJO (cambio 24h negativo) · 3) en el FONDO de su rango 24h (cerca de su mínimo)
      4) muy VOLÁTIL (rango 24h grande) · 5) puntaje extra si está "peleada": ya hizo 1, 2 o más rebotes del mínimo al máximo hoy
      y si se mueve rápido (velocidad de volatilidad). Gana la más cercana a su mínimo.
    v2: usa también las monedas de DESMAYO, tiene su propio CEREBRO NEURONAL que aprende de cada rebote (gana o pierde), sale desde 45 puntos
@@ -18067,7 +18067,7 @@ setTimeout(function(){setInterval(tick,CFG.TICK_MS);},CFG.ARRANQUE_MS);
    Ajustes en vivo: CDC_FLASH.cfg.POS_MAX = 25 · Volver a mostrar las otras tarjetas: CDC_FLASH.solo(false) · Apagar: CDC_FLASH.cfg.ON = false */
 window.CDC_FLASH=(function(){
   "use strict";
-  var CFG={ON:true,SOLO_FLASH:true,PRECIO_MAX:1,POS_MAX:45,RANGO_MIN:10,LIQ_MIN:150000,SCORE_MIN:45,SCORE_VOZ:55,MAX_CAND:20,TICK_MS:15000,KL_TTL:90000,
+  var CFG={ON:true,SOLO_FLASH:true,PRECIO_MAX:0.5,POS_MAX:45,RANGO_MIN:10,LIQ_MIN:150000,SCORE_MIN:45,SCORE_VOZ:55,MAX_CAND:20,TICK_MS:15000,KL_TTL:90000,
     DWELL_MS:15000,CAMBIO_MARGEN:5,TP:2,SL:3,SOMBRA_MS:300000,SEG_MAX_MS:2700000,MANUAL_PAUSA_MS:120000,ROT_MS:10000,SCORE_OBS:30,HOLD_MAX_MS:40000,DESCANSO_MS:150000,DESC_TP_MS:1200000,VOZ:true,SONIDO:true,VOZ_CD_MS:600000,ARRANQUE_MS:12000};
   var ACT=null,OTROS=[],vistoTs={},descanso={},uTs=0,lastForce=0,M={},manualTs=0,flashPass=false,busy=false,ultCambio=0,vozTs={},AC=null,orig=null,aviso=null;
   function cd(){try{return cachedData;}catch(e){return null;}}
@@ -18222,7 +18222,7 @@ window.CDC_FLASH=(function(){
   }
   function slotInner(){
     css();var r=ACT;
-    if(!r)return '<div style="box-sizing:border-box;width:100%;text-align:center;margin-bottom:4px;padding:3px 8px;border:1px dashed rgba(255,42,59,.4);border-radius:8px;font:700 9.5px Arial;color:#94a3b8">'+RAYO+' FLASH · buscando moneda &lt; 1 USDT en el fondo…</div>';
+    if(!r)return '<div style="box-sizing:border-box;width:100%;text-align:center;margin-bottom:4px;padding:3px 8px;border:1px dashed rgba(255,42,59,.4);border-radius:8px;font:700 9.5px Arial;color:#94a3b8">'+RAYO+' FLASH · buscando moneda &lt; 0.50 USDT en el fondo…</div>';
     var rz=['bajó '+r.ch.toFixed(1)+'% hoy','al '+r.pos.toFixed(0)+'% sobre su mínimo 24h','rango 24h '+r.rg.toFixed(0)+'%',
       r.dg?'✈️ DESPEGUE confirmado':'',r.dm?'en lista DESMAYO'+(r.agot?' (agotado)':''):'',r.vueltas>0?'peleada: '+r.vueltas+' rebote'+(r.vueltas>1?'s':'')+' hoy':'sin rebotes aún hoy','velocidad '+r.v15.toFixed(1)+'% por vela']; rz=rz.filter(Boolean);if(r.cae)rz.push('⚠️ aún cayendo');
     var seg=Math.max(0,Math.round((CFG.HOLD_MAX_MS-(Date.now()-ultCambio))/1000)),ch='';
@@ -18252,7 +18252,7 @@ window.CDC_FLASH=(function(){
   function ir(){
     if(ACT){manualTs=Date.now();abrir(ACT.sym);return;}
     try{if(!aviso){aviso=document.createElement("div");aviso.style.cssText="position:fixed;top:70px;left:50%;transform:translateX(-50%);z-index:9500;max-width:min(340px,calc(100vw - 20px));background:#1a0b0e;border:2px solid #ff2a3b;border-radius:12px;padding:10px 14px;color:#fff;font:700 12px Arial;text-align:center";document.body.appendChild(aviso);}
-      aviso.innerHTML=RAYO+' FLASH: ahora no hay ninguna moneda que cumpla (menor a 1 USDT, en rojo, en el fondo y volátil). Sigo buscando.';aviso.style.display="block";clearTimeout(aviso._h);aviso._h=setTimeout(function(){aviso.style.display="none";},5000);}catch(e){}
+      aviso.innerHTML=RAYO+' FLASH: ahora no hay ninguna moneda que cumpla (menor a 0.50 USDT, en rojo, en el fondo y volátil). Sigo buscando.';aviso.style.display="block";clearTimeout(aviso._h);aviso._h=setTimeout(function(){aviso.style.display="none";},5000);}catch(e){}
   }
   ["pointerdown","keydown","touchstart"].forEach(function(ev){try{document.addEventListener(ev,function(){uTs=Date.now();},true);}catch(e){}});
   /* Solo esta alarma puede mover el panel central: las demás selecciones AUTOMÁTICAS se ignoran (tus clics siempre mandan) */
@@ -18284,7 +18284,7 @@ window.CDC_FLASH=(function(){
     // archivo completo sin caer en la paradoja de "el hash contiene su
     // propio hash". No cambiar este texto.
     var _PLACEHOLDER = "%%CDC_INTEGRITY_HASH%%";
-    var _HASH_ESPERADO = "4e9dd106ab9dceb505a4042d30304f9eb1f8c515a28fb3c9252f74f251b653e4"; // ← se reemplaza por el hash real en el paso final
+    var _HASH_ESPERADO = "8dc9ddc9f1c3702540ecf4f5ffcc9efdf91a417e3ecd21181ffd99a642a53966"; // ← se reemplaza por el hash real en el paso final
 
     function _bloquear(motivo) {
         try {
@@ -19404,7 +19404,7 @@ if('serviceWorker' in navigator && (location.protocol==='https:'||location.hostn
    Probar: CDC_BAJO1.probar('DOSUSDT') en la consola.
    ═══════════════════════════════════════════════════════════════════ */
 (function(){"use strict";
-var CFG={ON:true,PRECIO_MAX:1,VOL_MIN:1000000,RANGO_MIN:8,SCORE_MIN:45,POS_MIN:70,
+var CFG={ON:true,PRECIO_MAX:0.5,VOL_MIN:1000000,RANGO_MIN:8,SCORE_MIN:45,POS_MIN:70,
  TICK_MS:5000,ARRANQUE_MS:20000,TOP:5,GRACIA_MS:30000,
  PANEL_AUTO:true,PANEL_DWELL_MS:60000,COOLDOWN_MS:180000,SONIDO:true};
 var CACHE={},ACTIVAS={},ALERTADAS={},AC=null,LASTLOAD=0,LASTSYM=null,FLASH=0;
