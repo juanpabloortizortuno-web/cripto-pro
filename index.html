@@ -11335,9 +11335,12 @@ function autoAbrirMejorCandidataFuerte() {
     if (selectedCoin !== mejor.symbol) { _ultimoAutoPanelSymbol = null; return; } _ultimoAutoPanelSymbol = mejor.symbol;
 }
 
+window.__cdcSelBase = seleccionarMoneda; // 🔻 copia de la función original (respaldo del DESMAYO)
 let _ultimaSeleccionManualTs = 0; // se actualiza SOLO con clicks reales del usuario, no con el auto-cambio por techo
 
 function seleccionarMoneda(symbol, _esAutoTecho, _origen) {
+    // 🔒 RETENCIÓN 15 s: mientras una moneda está fija, ningún cambio AUTOMÁTICO la saca (aunque llegue por una vía que no pasa por los envoltorios). Un clic/tecla tuyo sí manda y libera la retención.
+    try { var _hu = window.__cdcHoldUntil || 0; if (_hu && Date.now() < _hu && symbol !== window.__cdcHoldSym) { if (window.__cdcClickNow === true) window.__cdcHoldUntil = 0; else return; } } catch (_e) {}
     // 🧠 EL CEREBRO MANDA: ninguna selección AUTOMÁTICA (listas, botones, alarmas) entra al panel central si el cerebro no la aprueba. El click manual del usuario sí pasa.
     if ((_esAutoTecho === true || _origen) && !_cerebroAprueba(symbol)) return;
     initAudio(); 
@@ -13916,12 +13919,13 @@ function actualizarPanelCentral() {
                         <div class="cdcbn-h">Señales en vivo <span class="cdcbn-dot"></span></div>
                         <div style="font-size:9px; color:#64748b; line-height:1.3;">alertas automáticas de esta moneda: desmayo, flash, despegue…</div>
                     </div>
-                    <div id="cdcDesBtnHost" style="width:100%;display:flex;justify-content:center"></div>
                     ${(window.CDC_FLASH&&CDC_FLASH.slotHTML)?CDC_FLASH.slotHTML():''}${(window.CDC_DESPERTAR&&CDC_DESPERTAR.slotDesmayo)?CDC_DESPERTAR.slotDesmayo():''}${(window.CDC_DESPEGUE&&CDC_DESPEGUE.slotHTML)?CDC_DESPEGUE.slotHTML():''}${(window.CDC_VEL&&CDC_VEL.slotHTML)?CDC_VEL.slotHTML():''}
-                    <div id="cdcBadgeTecho" style="display:${(window.CDC_FLASH&&CDC_FLASH.hay&&CDC_FLASH.hay())?'none':'flex'}; flex-direction:column; align-items:center; gap:1px; background:${bgB}; border:1px solid ${colorB}55; border-radius:10px; padding:7px 10px; width:100%; box-sizing:border-box;">
+                    <div id="cdcBadgeTecho" style="display:flex; flex-direction:column; align-items:center; gap:1px; background:${bgB}; border:1px solid ${colorB}55; border-radius:10px; padding:7px 10px; width:100%; box-sizing:border-box;">
                         <span style="font-size:11px; font-weight:900; color:${colorB}; text-align:center; line-height:1.3;">${txtB}</span>
                         <span style="font-size:9px; color:#94a3b8;">EMAs: ${spreadTxt}</span>
                     </div>
+                    <div id="cdcDesBtnHost" style="width:100%;display:flex;justify-content:center"></div>
+                    <div id="cdcDesCuadroHost" style="width:100%"></div>
                 </div>
                 <div class="cdcbn-card cdcbn-chart" style="text-align:center;">
                     <div style="text-align:left;">
@@ -17998,7 +18002,7 @@ function fijar(){
  try{
   var s=document.getElementById('cdcVelSlot'),b=document.getElementById('cdcBadgeTecho');
   if(s)s.innerHTML=slotInner();
-  if(b)b.style.display=hay()?'none':'flex';
+  if(b)b.style.display='flex';
  }catch(e){}
 }
 function aviso(sym,r){FLASH_HASTA=Date.now()+6000;fijar();}
@@ -18178,13 +18182,15 @@ window.CDC_FLASH=(function(){
           t=(typeof _humanizarTexto==="function")?_humanizarTexto(t0,{sym:r.sym,dir:"LONG"}):t0;
       colaVoz.unshift({texto:t,esMasculino:true});var m=(typeof MAX_COLA_VOZ==="number")?MAX_COLA_VOZ:20;while(colaVoz.length>m)colaVoz.pop();procesarColaVoz();}}catch(e){}
   }
+  /* 🔻 el DESMAYO es la prioridad del panel: mientras haya monedas en esa lista, FLASH no se lo quita */
+  function _hayDesCDC(){try{return !!(window.CDC_DESPERTAR&&CDC_DESPERTAR.hayDesmayo&&CDC_DESPERTAR.hayDesmayo());}catch(e){return false;}}
   /* Abre la moneda en el panel central (salta el filtro del cerebro: esta es la alarma principal) */
   function abrir(sym){
     try{if(typeof seleccionarMoneda!=="function")return;flashPass=true;try{seleccionarMoneda(sym,false);}finally{flashPass=false;}}catch(e){}
   }
   function nuevo(r){
     fijar();
-    if(Date.now()-manualTs>CFG.MANUAL_PAUSA_MS)abrir(r.sym);
+    if(Date.now()-manualTs>CFG.MANUAL_PAUSA_MS&&!_hayDesCDC())abrir(r.sym);
     var n=Date.now();if(r.score>=CFG.SCORE_VOZ&&n-(vozTs[r.sym]||0)>=CFG.VOZ_CD_MS){vozTs[r.sym]=n;tono();voz(r);}
   }
   function calc(lst){
@@ -18220,16 +18226,24 @@ window.CDC_FLASH=(function(){
       return obtenerKlines(p.sym,"15m",96).then(function(k){M[p.sym]={t:Date.now(),r:metricas(k)};}).catch(function(){M[p.sym]={t:Date.now(),r:null};});}))
     .then(function(){calc(lst);}).catch(function(){}).then(function(){busy=false;});
   }
+  var CH={};   /* memoria de fichas LONG (15 s) */
   function slotInner(){
     css();var r=ACT;
     if(!r)return '<div style="box-sizing:border-box;width:100%;text-align:center;margin-bottom:4px;padding:3px 8px;border:1px dashed rgba(255,42,59,.4);border-radius:8px;font:700 9.5px Arial;color:#94a3b8">'+RAYO+' FLASH · buscando moneda &lt; 0.50 USDT en el fondo…</div>';
     var rz=['bajó '+r.ch.toFixed(1)+'% hoy','al '+r.pos.toFixed(0)+'% sobre su mínimo 24h','rango 24h '+r.rg.toFixed(0)+'%',
       r.dg?'✈️ DESPEGUE confirmado':'',r.dm?'en lista DESMAYO'+(r.agot?' (agotado)':''):'',r.vueltas>0?'peleada: '+r.vueltas+' rebote'+(r.vueltas>1?'s':'')+' hoy':'sin rebotes aún hoy','velocidad '+r.v15.toFixed(1)+'% por vela']; rz=rz.filter(Boolean);if(r.cae)rz.push('⚠️ aún cayendo');
     var seg=Math.max(0,Math.round((CFG.HOLD_MAX_MS-(Date.now()-ultCambio))/1000)),ch='';
-    if(OTROS.length){var show=OTROS,K=4;   /* grupo que ROTA cada ROT_MS: incluye las monedas de DESMAYO */
-      if(OTROS.length>K){var pg=Math.ceil(OTROS.length/K),i0=(Math.floor(Date.now()/CFG.ROT_MS)%pg)*K;show=OTROS.slice(i0,i0+K);}
+    var nP=Date.now(),kP=window.CDC_DES_PERSISTE_MS||15000,hS=(nP<(window.__cdcHoldUntil||0))?window.__cdcHoldSym:null,selSym=null,arrC;
+    try{selSym=selectedCoin;}catch(e){}
+    OTROS.forEach(function(o){var c=CH[o.sym];if(c){c.o=o;c.last=nP;}else CH[o.sym]={o:o,first:nP,last:nP};});
+    Object.keys(CH).forEach(function(k){if(nP-CH[k].last>kP&&k!==hS)delete CH[k];});
+    arrC=Object.keys(CH).map(function(k){return CH[k];}).filter(function(c){return !ACT||c.o.sym!==ACT.sym;});
+    if(arrC.length>8){arrC.sort(function(a,b){return b.o.score-a.o.score;});arrC=arrC.slice(0,8);}
+    arrC.sort(function(a,b){return a.first-b.first;});
+    var show=arrC.map(function(c){return c.o;});
+    if(show.length){
       ch='<div style="display:flex;gap:5px;flex-wrap:wrap;justify-content:center;margin-bottom:4px">';
-      show.forEach(function(o){ch+='<span onclick="CDC_FLASH.ver(\''+o.sym+'\')" title="Otra candidata FLASH · puntaje '+o.score+(o.dm?' · en lista DESMAYO':'')+'" style="cursor:pointer;background:#0b1220;border:1px solid #ff2a3b99;border-radius:7px;padding:2px 8px;font:700 10px Arial;color:'+(o.ch<0?'#ff6b78':'#0ecb81')+'">'+(o.dm?'💥 ':'')+nom(o.sym)+' '+(o.ch>0?'+':'')+o.ch.toFixed(0)+'% · '+o.score+'</span>';});
+      show.forEach(function(o){ch+='<span onclick="CDC_FLASH.ver(\''+o.sym+'\')" title="Otra candidata FLASH · puntaje '+o.score+(o.dm?' · en lista DESMAYO':'')+'" style="cursor:pointer;background:'+(o.sym===selSym?'rgba(255,42,59,.5)':'#0b1220')+';border:1px solid #ff2a3b99;border-radius:7px;padding:2px 8px;font:700 10px Arial;color:'+(o.ch<0?'#ff6b78':'#0ecb81')+'">'+(o.sym===hS?'🔒 ':'')+(o.dm?'💥 ':'')+nom(o.sym)+' '+(o.ch>0?'+':'')+o.ch.toFixed(0)+'% · '+o.score+'</span>';});
       ch+='</div>';}
     return '<div onclick="CDC_FLASH.ir()" title="Clic para abrir la moneda en el panel" style="box-sizing:border-box;width:100%;cursor:pointer;background:rgba(255,42,59,.14);border:2px solid #ff2a3b;border-radius:8px;padding:6px 8px;text-align:center;margin-bottom:4px;animation:cdcFlashBox .9s ease-in-out infinite alternate">'+
       '<div style="font:900 11px Arial;letter-spacing:.6px;color:#ff6b78">'+RAYO+(r.score>=CFG.SCORE_VOZ?' FLASH · REBOTE · LONG ':' FLASH · EN OBSERVACIÓN ')+RAYO+'</div>'+
@@ -18238,19 +18252,23 @@ window.CDC_FLASH=(function(){
       '<div style="font:700 9.5px Arial;color:#c4b5fd;margin-top:2px">🧠 cerebro FLASH: '+Math.round(r.pnet*100)+'% de rebote · '+r.nn+(r.nn===1?' muestra':' muestras')+(NET.n>5?' · aciertos '+Math.round(NET.ok/NET.n*100)+'%':' · aprendiendo')+'</div>'+
       '<div style="font:600 9px Arial;color:#94a3b8;margin-top:2px">Referencia: mínimo 24h <span style=\"color:#0ecb81\">'+pf(r.min)+'</span> · stop <span style=\"color:#0ecb81\">'+pf(r.sl)+'</span> USDT (−'+r.riesgo.toFixed(1)+'%)</div>'+
       '<div style="font:700 9.5px Arial;color:#86efac;margin-top:2px">🎯 Obj1 '+pf(r.tp1)+' · Obj2 '+pf(r.tp2)+' USDT</div>'+
-      '<div style="font:700 9px Arial;color:#94a3b8;margin-top:2px">⏱ rota a la siguiente en '+Math.floor(seg/60)+':'+('0'+seg%60).slice(-2)+' · o antes si otra la supera</div>'+
+      '<div style="font:700 9px Arial;color:#94a3b8;margin-top:2px">⏱ rota a la siguiente en <span data-fseg="1">'+Math.floor(seg/60)+':'+('0'+seg%60).slice(-2)+'</span> · o antes si otra la supera</div>'+
       '<div style="font:900 9.5px Arial;color:#ffd0d4;margin-top:3px">ENTRA RÁPIDO EN LONG · AISLADO (NO CRUZADO)</div></div>'+ch;
   }
   function slotHTML(){return '<div id="cdcFlashSlot" style="width:100%">'+slotInner()+'</div>';}
   function fijar(){
+    try{var hu=window.__cdcHoldUntil||0,hs=window.__cdcHoldSym;   /* vigilante: si algo automático saca la moneda fija antes de tiempo, se devuelve */
+      if(hs&&Date.now()<hu&&typeof selectedCoin!=="undefined"&&selectedCoin!==hs&&Date.now()-(window.__cdcUserTs||0)>1500&&typeof window.__cdcSelBase==="function"){window.__cdcSelBase(hs);setTimeout(function(){try{if(typeof _iaActivarParaMoneda==="function")_iaActivarParaMoneda(hs);}catch(e){}},600);}}catch(e){}
     try{if(ACT&&CFG.ON&&CFG.SOLO_FLASH){var cu=null,nw=Date.now();try{cu=selectedCoin;}catch(e){}
-        if(cu!==ACT.sym&&nw-manualTs>CFG.MANUAL_PAUSA_MS&&nw-lastForce>5000){lastForce=nw;abrir(ACT.sym);}}}catch(e){}
-    try{var el=document.getElementById("cdcFlashSlot"),x=slotInner();if(el&&el.innerHTML!==x)el.innerHTML=x;
-      var b=document.getElementById("cdcBadgeTecho");if(b)b.style.display=ACT?"none":"flex";}catch(e){}
+        if(cu!==ACT.sym&&nw-manualTs>CFG.MANUAL_PAUSA_MS&&nw-lastForce>5000&&!_hayDesCDC()){lastForce=nw;abrir(ACT.sym);}}}catch(e){}
+    try{var el=document.getElementById("cdcFlashSlot"),x=slotInner();if(el){var sg=x.replace(/<span data-fseg="1">[^<]*<\/span>/,"");if(el.__sig!==sg||!el.firstChild){el.__sig=sg;el.innerHTML=x;}else{var sp=el.querySelector("[data-fseg]"),mt=x.match(/<span data-fseg="1">([^<]*)<\/span>/);if(sp&&mt&&sp.textContent!==mt[1])sp.textContent=mt[1];}}
+      var b=document.getElementById("cdcBadgeTecho");if(b)b.style.display="flex";}catch(e){}
   }
-  function ver(sym){manualTs=Date.now();abrir(sym);}
+  function sostener(sym){try{var nw=Date.now();window.__cdcHoldSym=sym;window.__cdcHoldUntil=nw+(window.CDC_DES_HOLD_MS||15000);window.__velHoldUntil=0;window.__dmAbrirTs=nw;}catch(e){}}
+  function ver(sym){manualTs=Date.now();sostener(sym);abrir(sym);
+    try{if(typeof selectedCoin!=="undefined"&&selectedCoin!==sym&&window.CDC_DESPERTAR&&CDC_DESPERTAR.fijar7)CDC_DESPERTAR.fijar7(sym);}catch(e){}}
   function ir(){
-    if(ACT){manualTs=Date.now();abrir(ACT.sym);return;}
+    if(ACT){manualTs=Date.now();sostener(ACT.sym);abrir(ACT.sym);return;}
     try{if(!aviso){aviso=document.createElement("div");aviso.style.cssText="position:fixed;top:70px;left:50%;transform:translateX(-50%);z-index:9500;max-width:min(340px,calc(100vw - 20px));background:#1a0b0e;border:2px solid #ff2a3b;border-radius:12px;padding:10px 14px;color:#fff;font:700 12px Arial;text-align:center";document.body.appendChild(aviso);}
       aviso.innerHTML=RAYO+' FLASH: ahora no hay ninguna moneda que cumpla (menor a 0.50 USDT, en rojo, en el fondo y volátil). Sigo buscando.';aviso.style.display="block";clearTimeout(aviso._h);aviso._h=setTimeout(function(){aviso.style.display="none";},5000);}catch(e){}
   }
@@ -18260,12 +18278,12 @@ window.CDC_FLASH=(function(){
   if(orig){window.seleccionarMoneda=function(sym,auto,origen){
     if(!flashPass){
       if(Date.now()-uTs<1500)manualTs=Date.now();                 /* clic real tuyo: siempre pasa */
-      else if(CFG.ON&&CFG.SOLO_FLASH&&ACT){var cur=null;try{cur=selectedCoin;}catch(e){}if(cur)return;}   /* llamada interna del CDC: se ignora mientras hay FLASH */
+      else if(CFG.ON&&CFG.SOLO_FLASH&&ACT&&window.__selDesmayo!==true){var cur=null;try{cur=selectedCoin;}catch(e){}if(cur)return;}   /* llamada interna del CDC: se ignora mientras hay FLASH */
     }
     return orig.apply(this,arguments);};}
   css();
   setTimeout(tick,CFG.ARRANQUE_MS);setInterval(tick,CFG.TICK_MS);setInterval(fijar,1000);
-  return{version:"5",cfg:CFG,slotHTML:slotHTML,hay:function(){return !!ACT;},ir:ir,ver:ver,solo:solo,actual:function(){return ACT;},rayo:RAYO,
+  return{version:"5",cfg:CFG,slotHTML:slotHTML,hay:function(){return !!ACT;},ir:ir,ver:ver,seguir:abrir,solo:solo,actual:function(){return ACT;},rayo:RAYO,
     cerebro:function(){return{muestras:NET.n,aciertos:NET.ok,pendientes:PEND.length};},_t:{pre:pre,metricas:metricas,puntuar:puntuar,aprender:aprender,fwd:fwd}};
 })();
 </script>
@@ -18284,7 +18302,7 @@ window.CDC_FLASH=(function(){
     // archivo completo sin caer en la paradoja de "el hash contiene su
     // propio hash". No cambiar este texto.
     var _PLACEHOLDER = "%%CDC_INTEGRITY_HASH%%";
-    var _HASH_ESPERADO = "8dc9ddc9f1c3702540ecf4f5ffcc9efdf91a417e3ecd21181ffd99a642a53966"; // ← se reemplaza por el hash real en el paso final
+    var _HASH_ESPERADO = "3a033661dd7c6c5a110df234b2d1caa72810c0ba7e5cb163dc533e7458fb74bc"; // ← se reemplaza por el hash real en el paso final
 
     function _bloquear(motivo) {
         try {
@@ -18292,15 +18310,15 @@ window.CDC_FLASH=(function(){
         } catch (e) {}
         try {
             document.documentElement.innerHTML =
+                '<style>@keyframes _cdcParpadeo{0%,100%{opacity:1}50%{opacity:.25}}</style>' +
                 '<div style="position:fixed;inset:0;background:#030712;color:#ff2a3b;' +
                 'display:flex;align-items:center;justify-content:center;flex-direction:column;' +
                 'font-family:Arial,sans-serif;text-align:center;padding:24px;z-index:999999;">' +
-                '<div style="font-size:44px;margin-bottom:14px;">🔒</div>' +
-                '<div style="font-size:18px;font-weight:900;letter-spacing:0.5px;">' +
-                'Este código fue modificado y ha sido bloqueado.</div>' +
-                '<div style="font-size:12px;color:#94a3b8;margin-top:10px;max-width:420px;">' +
-                'CDC FUTURO-PRO detectó un cambio en su estructura original y detuvo su ' +
-                'ejecución para proteger la integridad del proyecto.</div></div>';
+                '<div style="font-size:44px;margin-bottom:14px;animation:_cdcParpadeo 1s infinite;">⚠️</div>' +
+                '<div style="font-size:26px;font-weight:900;letter-spacing:1px;color:#ff2a3b;' +
+                'animation:_cdcParpadeo 1s infinite;">WARNING</div>' +
+                '<div style="font-size:18px;font-weight:900;letter-spacing:0.5px;margin-top:6px;' +
+                'animation:_cdcParpadeo 1s infinite;">MODIFICACIÓN BLOQUEADA</div></div>';
         } catch (e) {}
     }
 
@@ -19787,17 +19805,133 @@ setTimeout(function(){setInterval(tick,CFG.TICK_MS);},CFG.ARRANQUE_MS);
             if (fin === null) vivos.push(q); else aprender(q.x, fin, q.d < 0 ? NETD : (q.fr ? NETF : q.ca ? NETB : q.rt ? NETR : NET)); });
         PEND = vivos; }
 
-    function aprueba(sym) { var r = ACT[sym]; if (r && r.dir < 0) return true; return !!(r && r.score >= CFG.AUTO_MIN_SCORE && !r.tarde && (r.tipo === "DESPERTAR" || (CFG.CAIDA_ABRIR && r.dir < 0) || (r.tipo === "RETROCESO" && r.estado === "IMPULSO" && r.score >= CFG.RT_MIN) || (CFG.CA_AUTO && r.tipo === "CAIDA_ALCISTA" && r.score >= CFG.RT_MIN) || (r.tipo === "FONDO_REBOTE" && r.score >= CFG.RT_MIN))); }
+    function aprueba(sym) { var r = ACT[sym]; if (r && r.dir < 0) return true;
+        try { if (listaDes().some(function (x) { return x.s === sym; })) return true; } catch (e) {}   /* 🔻 cualquier moneda del detector de DESMAYO entra al panel */
+        return !!(r && r.score >= CFG.AUTO_MIN_SCORE && !r.tarde && (r.tipo === "DESPERTAR" || (CFG.CAIDA_ABRIR && r.dir < 0) || (r.tipo === "RETROCESO" && r.estado === "IMPULSO" && r.score >= CFG.RT_MIN) || (CFG.CA_AUTO && r.tipo === "CAIDA_ALCISTA" && r.score >= CFG.RT_MIN) || (r.tipo === "FONDO_REBOTE" && r.score >= CFG.RT_MIN))); }
     function prioridad(sym) { var r = ACT[sym]; return r ? 1000 + r.score + (r.tipo === "RETROCESO" ? 1000 + (r.estado === "IMPULSO" ? 200 : 0) : r.tipo === "FONDO_REBOTE" ? 1400 : r.tipo === "CAIDA_ALCISTA" ? 800 : r.tipo === "DESPERTAR" ? 100 : r.dir < 0 ? 9000 + Math.min(40, Math.abs(Math.min(r.g5 || 0, r.g3 || 0)) * 4) + (r.origen ? 15 : 0) + Math.min(20, (r.vola || 0) * 3) + (r.fase === "ACELERANDO" ? 10 : r.fase === "AGOTADO" ? -25 : 0) : 0) : 0; }
 
     function panelDesmayo() { var now = Date.now(), S = typeof selectedCoin !== "undefined" ? selectedCoin : null, dl = listaDes(); if (!dl.length) return;
         if (ACT[dl[0].s] && ACT[dl[0].s].dir < 0) desmayoVoz(ACT[dl[0].s]);
+        if (window.__cdcDesAuto !== true) return;   // 🔒 el desmayo ya no mueve el panel solo: usa el CUADRO "MONEDAS CON DESMAYO" (toca la moneda)
         var ix = dl.map(function (r) { return r.s; }).indexOf(S), go = null, ult = now - (window.__dmAbrirTs || 0);
         if (ix < 0 && ult > 4000) go = dl[0];
         else if (ix > 0 && ult > 6000 && dl[0].pr - dl[ix].pr >= 15) go = dl[0];   // llegó uno peor: el más fuerte siempre arriba
-        else if (ix >= 0 && dl.length > 1 && ult > 20000) go = dl[(ix + 1) % Math.min(dl.length, 3)];   // rota solo entre los 3 peores
-        if (go && now - _ultimaSeleccionManualTs > 15000) { window.__dmAbrirTs = now; window.__velHoldUntil = 0;   // el desmayo manda: libera la retención de alta velocidad
-            window.__selDesmayo = true; try { seleccionarMoneda(go.s, true, ACT[go.s] ? ACT[go.s].tipo : "CAIDA_BRUTAL"); } finally { window.__selDesmayo = false; } if (selectedCoin === go.s) { ultAbierta = go.s; ultAutoTs = now; } } }
+        else if (ix >= 0 && dl.length > 1 && ult > 20000) go = dl[(ix + 1) % dl.length];   // rota entre TODAS las monedas del detector de desmayo
+        window.__dmDiag = { hora: new Date().toLocaleTimeString(), enPanel: S, detector: dl.map(function (r) { return r.s; }), objetivo: go ? go.s : null, segDesdeTuUltimoClic: Math.round((now - (window.__cdcUserTs || 0)) / 1000), abrio: false, respaldo: false };
+        if (go && now - (window.__cdcUserTs || 0) > 15000) { window.__dmAbrirTs = now; window.__velHoldUntil = 0;   // el desmayo manda: libera la retención de alta velocidad
+            window.__dmDiag.abrio = true; forzarPanelDesmayo(go.s, ACT[go.s] ? ACT[go.s].tipo : "CAIDA_BRUTAL"); if (selectedCoin === go.s) { ultAbierta = go.s; ultAutoTs = now; } } }
+    /* 🔻 Abre una moneda del detector de desmayo en el panel central. Si algún filtro la bloquea, entra por la función original. */
+    /* 🖱️ __cdcClickNow = true SOLO mientras se ejecuta un evento real tuyo (clic, tecla, toque). Los temporizadores y cambios automáticos NUNCA lo tienen en true. */
+    window.__cdcClickNow = false;
+    ["pointerup", "mouseup", "click", "keydown", "keyup", "change", "touchend"].forEach(function (ev) { try { document.addEventListener(ev, function () { window.__cdcClickNow = true; setTimeout(function () { window.__cdcClickNow = false; }, 0); }, true); } catch (e) {} });
+    window.__cdcUserTs = window.__cdcUserTs || 0;   // último clic / tecla / toque REAL tuyo (las aperturas automáticas de otros módulos NO cuentan como clic)
+    ["pointerdown", "mousedown", "click", "keydown", "touchstart"].forEach(function (ev) { try { document.addEventListener(ev, function () { window.__cdcUserTs = Date.now(); }, true); } catch (e) {} });
+    window.__cdcFixDesmayo = "v2";
+    function forzarPanelDesmayo(sym, tipo) {
+        window.__selDesmayo = true; try { seleccionarMoneda(sym, true, tipo); } finally { window.__selDesmayo = false; }
+        setTimeout(function () { try {
+            if (typeof selectedCoin !== "undefined" && selectedCoin !== sym && typeof window.__cdcSelBase === "function" && Date.now() - (window.__cdcUserTs || 0) > 1000) {
+                window.__selDesmayo = true; try { window.__cdcSelBase(sym, true, tipo); } finally { window.__selDesmayo = false; }
+                if (window.__dmDiag) window.__dmDiag.respaldo = true;
+                try { if (typeof _iaActivarParaMoneda === "function") setTimeout(function () { _iaActivarParaMoneda(sym); }, 600); } catch (e2) {}
+            } } catch (e) {} }, 500); }
+
+    /* ═══ 🔻 CUADRO "MONEDAS CON DESMAYO" (debajo de Señales en vivo) — INICIO ═══
+       • Cada moneda con desmayo que aparece en el detector se QUEDA en el cuadro 15 s aunque el detector la suelte (CDC_DES_PERSISTE_MS).
+       • 🔵 AZUL = desmayo normal · 🟢 VERDE = desmayo BRUTAL (caída brutal / caída brutal + rebote).
+       • Toca una moneda: se abre en el panel central y se QUEDA FIJA 15 s (CDC_DES_HOLD_MS). Mientras está fija, ningún cambio AUTOMÁTICO la saca (tus clics sí).
+       • El cuadro es un elemento permanente: cuando el panel se redibuja se vuelve a colocar al instante (no desaparece). */
+    window.CDC_DES_HOLD_MS = window.CDC_DES_HOLD_MS || 15000;
+    window.CDC_DES_PERSISTE_MS = window.CDC_DES_PERSISTE_MS || 15000;
+    try { window.__cdcDesAuto = localStorage.getItem("cdc_des_auto") === "1"; } catch (e) { window.__cdcDesAuto = false; }   // apertura automática del desmayo: APAGADA por defecto
+    function fijar7(sym) {
+        var now = Date.now();
+        window.__cdcHoldSym = sym; window.__cdcHoldUntil = now + (window.CDC_DES_HOLD_MS || 15000);
+        window.__velHoldUntil = 0; window.__dmAbrirTs = now;
+        window.__selDesmayo = true; try { seleccionarMoneda(sym); } finally { window.__selDesmayo = false; }
+        if (typeof selectedCoin !== "undefined" && selectedCoin !== sym && typeof window.__cdcSelBase === "function") {   // respaldo si algún filtro lo frenó
+            try { window.__cdcSelBase(sym); } catch (e) {}
+            try { if (typeof _iaActivarParaMoneda === "function") setTimeout(function () { _iaActivarParaMoneda(sym); }, 600); } catch (e) {}
+        }
+        try { cuadroDes(); } catch (e) {}
+    }
+    function autoDes() { window.__cdcDesAuto = window.__cdcDesAuto !== true; try { localStorage.setItem("cdc_des_auto", window.__cdcDesAuto ? "1" : "0"); } catch (e) {} try { cuadroDes(); } catch (e) {} }
+    function instalarHold() {
+        try {
+            var o = window.seleccionarMoneda; if (typeof o !== "function" || o.__cdcHoldW) return;
+            var w = function (symbol, _a, _o) {
+                try {
+                    var now = Date.now();
+                    if (now < (window.__cdcHoldUntil || 0) && symbol !== window.__cdcHoldSym) {
+                        if (window.__cdcClickNow !== true) return;   // cambio AUTOMÁTICO: se ignora mientras la moneda está fija
+                        window.__cdcHoldUntil = 0;                             // elegiste otra moneda tú mismo: se libera
+                    }
+                } catch (e) {}
+                return o.apply(this, arguments);
+            };
+            w.__cdcHoldW = 1; w.__velW = o.__velW; w.__despW = o.__despW;
+            window.seleccionarMoneda = w;
+        } catch (e) {}
+    }
+    setTimeout(function () { instalarHold(); setInterval(instalarHold, 3000); }, 9000);
+
+    /* ── memoria de monedas con desmayo (15 s) ── */
+    var DESHIST = {}, cuadroEl = null;
+    function fuentesDes() {   // todo lo que el detector muestra ahora: normales (azul) y brutales (verde)
+        var m = {};
+        try { Object.values(ACT).forEach(function (r) { if (r.dir < 0) m[r.symbol] = { s: r.symbol, p: Math.min(r.g5 || 0, r.g3 || 0), brutal: r.tipo === "CAIDA_BRUTAL", pr: prioridad(r.symbol), info: (r.tipo === "CAIDA_BRUTAL" ? "Desmayo BRUTAL" : "Desmayo") + " · puntaje " + Math.round(r.score || 0) }; }); } catch (e) {}
+        try { (window.CDC_CRASH ? CDC_CRASH.armadas() : []).forEach(function (q) { var br = q.fase !== "INMINENTE", c = m[q.sym];
+            if (c) { if (br) c.brutal = true; } else m[q.sym] = { s: q.sym, p: q.caida || 0, brutal: br, pr: br ? 9500 : 9400, info: br ? "Caída brutal en curso" : "Desmayo inminente" }; }); } catch (e) {}
+        try { (window.CDC_CRASH ? CDC_CRASH.activas() : []).forEach(function (g) { var sy = g.symbol || g.sym; if (!sy) return;
+            var inf = "Caída brutal + REBOTE · entrada LONG · puntaje " + Math.round(g.score || 0);
+            if (m[sy]) { m[sy].brutal = true; m[sy].info = inf; } else m[sy] = { s: sy, p: typeof g.v === "number" ? g.v : 0, brutal: true, pr: 5000 + (g.score || 0), info: inf }; }); } catch (e) {}
+        return m;
+    }
+    function muestrearDes() {
+        var now = Date.now(), keep = window.CDC_DES_PERSISTE_MS || 15000, m = fuentesDes(),
+            hold = now < (window.__cdcHoldUntil || 0) ? window.__cdcHoldSym : null;
+        Object.keys(m).forEach(function (s) { var x = m[s], h = DESHIST[s] || (DESHIST[s] = { first: now, brutal: false });
+            h.last = now; h.p = x.p; h.pr = x.pr; h.info = x.info; if (x.brutal) h.brutal = true; });
+        Object.keys(DESHIST).forEach(function (s) { if (now - DESHIST[s].last > keep && s !== hold) delete DESHIST[s]; });
+    }
+    function cuadroDes() {
+        if (!cuadroEl) { cuadroEl = document.createElement("div"); cuadroEl.id = "cdcDesCuadro"; cuadroEl.style.cssText = "width:100%"; }
+        var host = document.getElementById("cdcDesCuadroHost");
+        if (host && cuadroEl.parentNode !== host) host.appendChild(cuadroEl);   // el panel se redibujó: el cuadro vuelve a su sitio al instante
+        var now = Date.now(), S = typeof selectedCoin !== "undefined" ? selectedCoin : null,
+            hold = now < (window.__cdcHoldUntil || 0) ? window.__cdcHoldSym : null, auto = window.__cdcDesAuto === true,
+            a = Object.keys(DESHIST).map(function (s) { var h = DESHIST[s]; return { s: s, h: h, vivo: now - h.last < 1500 }; })
+                .sort(function (x, y) { return ((y.h.brutal ? 1 : 0) - (x.h.brutal ? 1 : 0)) || ((y.h.pr || 0) - (x.h.pr || 0)) || (y.h.last - x.h.last); }),
+            hayBr = a.some(function (x) { return x.h.brutal; }),
+            sig = a.map(function (x) { return x.s + (x.h.brutal ? "B" : "N") + (x.vivo ? "v" : "o"); }).join(",") + "|" + S + "|" + hold + "|" + auto;
+        if (cuadroEl.getAttribute("data-sig") !== sig) {
+            cuadroEl.setAttribute("data-sig", sig);
+            var col = hayBr ? "#0ecb81" : "#38bdf8", seg = Math.round((window.CDC_DES_HOLD_MS || 15000) / 1000), keep = Math.round((window.CDC_DES_PERSISTE_MS || 15000) / 1000);
+            cuadroEl.innerHTML = '<div style="box-sizing:border-box;width:100%;border:2px solid ' + col + ';border-radius:10px;background:' + (hayBr ? 'rgba(14,203,129,.08)' : 'rgba(56,189,248,.08)') + ';padding:6px 7px;box-shadow:0 0 12px ' + col + '55">' +
+                '<div style="display:flex;justify-content:space-between;align-items:center;gap:6px;margin-bottom:4px"><div style="font:900 10px Arial;color:' + col + ';letter-spacing:.4px">🔻 MONEDAS CON DESMAYO · ' + a.length + '</div>' +
+                '<span onclick="CDC_DESPERTAR.autoDes()" title="SÍ = el desmayo cambia el panel solo · NO = solo cuando tú tocas una moneda" style="cursor:pointer;font:800 9px Arial;padding:1px 6px;border-radius:6px;border:1px solid ' + (auto ? '#0ecb81' : '#64748b') + ';color:' + (auto ? '#0ecb81' : '#94a3b8') + '">AUTO: ' + (auto ? 'SÍ' : 'NO') + '</span></div>' +
+                '<div style="font:600 9px Arial;color:#94a3b8;margin-bottom:5px;line-height:1.35"><span style="color:#38bdf8;font-weight:800">● normal</span> · <span style="color:#0ecb81;font-weight:800">● brutal</span> · cada moneda queda ' + keep + ' s · toca una: se fija ' + seg + ' s en el panel central</div>' +
+                (a.length ? '<div style="display:flex;flex-wrap:wrap;gap:5px;max-height:150px;overflow-y:auto">' + a.map(function (x) {
+                    var br = x.h.brutal, sel = x.s === S, bd = br ? "#0ecb81" : "#38bdf8", bg = sel ? (br ? "#0ecb81" : "#0ea5e9") : (br ? "#06210f" : "#0b1f33"), nm = x.s.replace("USDT", "");
+                    return '<span onclick="CDC_DESPERTAR.fijar7(\'' + x.s + '\')" title="' + (br ? "BRUTAL · " : "") + String(x.h.info || "").replace(/"/g, "'") + ' · toca para abrir ' + nm + '" style="cursor:pointer;opacity:' + (x.vivo ? 1 : 0.72) + ';background:' + bg + ';border:1px solid ' + bd + ';border-radius:8px;padding:4px 8px;font:800 11px Arial;color:#fff;white-space:nowrap">' +
+                        (br ? "💥" : "🔻") + ' <b>' + nm + '</b> <span data-dmp="' + x.s + '" style="font-weight:700;color:' + (br ? "#bbf7d0" : "#bae6fd") + '"></span> <span data-dmk="' + x.s + '" style="color:#fde68a"></span></span>';
+                }).join("") + '</div>' : '<div style="font:700 10px Arial;color:#94a3b8;text-align:center;padding:6px 0">Esperando monedas con desmayo…</div>') + '</div>';
+        }
+        a.forEach(function (x) { try {
+            var p = cuadroEl.querySelector('[data-dmp="' + x.s + '"]'), k = cuadroEl.querySelector('[data-dmk="' + x.s + '"]');
+            if (p) p.textContent = x.h.p ? (x.h.p > 0 ? "+" : "") + x.h.p.toFixed(1) + "%" : "";
+            if (k) k.textContent = (hold === x.s) ? "🔒 " + Math.max(0, Math.ceil(((window.__cdcHoldUntil || 0) - now) / 1000)) + "s" : "";
+        } catch (e) {} });
+    }
+    /* cada vez que el panel central se redibuja, el cuadro vuelve a su lugar en el mismo instante (sin parpadeo) */
+    function envolverPanel() {
+        try { var o = window.actualizarPanelCentral; if (typeof o !== "function" || o.__cdcCW) return;
+            var w = function () { var r = o.apply(this, arguments); try { cuadroDes(); } catch (e) {} return r; };
+            w.__cdcCW = 1; window.actualizarPanelCentral = w; } catch (e) {}
+    }
+    setTimeout(function () { envolverPanel(); setInterval(envolverPanel, 3000); }, 3000);
+    setInterval(function () { try { muestrearDes(); cuadroDes(); } catch (e) {} }, 300);
+    /* ═══ CUADRO "MONEDAS CON DESMAYO" — FIN ═══ */
     setInterval(function () { try { panelDesmayo(); } catch (e) {} }, 2000);
     function autoAbrir() {
         if (typeof seleccionarMoneda !== "function") return;
@@ -19840,9 +19974,32 @@ setTimeout(function(){setInterval(tick,CFG.TICK_MS);},CFG.ARRANQUE_MS);
         return h; }
     function slotDesmayo() { return '<div id="cdcDesSlot" style="width:100%">' + slotInnerDes() + '</div>'; }
     function fijarDes() { try { var s = document.getElementById("cdcDesSlot"), b = document.getElementById("cdcBadgeTecho"), n = slotInnerDes();
-        if (s && s.innerHTML !== n) s.innerHTML = n; if (s) { var tp = n ? listaTodas()[0] : null; s.className = (tp && tp.r.dir < 0) ? (tp.r.tipo === "DESMAYO_INMINENTE" ? "cdcSlotN" : "cdcSlotR") : ""; } if (b && n) b.style.display = "none";
+        if (s && s.innerHTML !== n) s.innerHTML = n; if (s) { var tp = n ? listaTodas()[0] : null; s.className = (tp && tp.r.dir < 0) ? (tp.r.tipo === "DESMAYO_INMINENTE" ? "cdcSlotN" : "cdcSlotR") : ""; } if (b) b.style.display = "flex";
         var hd = document.getElementById("dspHead"); if (hd) hd.style.display = "none"; } catch (e) {} }
-    setInterval(function () { try { fijarDes(); chipsDesmayo(); btnDes(); } catch (e) {} }, 1000);
+    /* 🟢 Barra "Fuera de techo / En máx 24h / EMAs juntas": SIEMPRE visible y se actualiza cada segundo con los datos en vivo */
+    function badgeTecho() {
+        var b = document.getElementById("cdcBadgeTecho"); if (!b) return;
+        b.style.display = "flex";
+        var S = typeof selectedCoin !== "undefined" ? selectedCoin : null,
+            c = S && typeof cachedData !== "undefined" ? cachedData[S] : null,
+            e = S && typeof datosEMA !== "undefined" ? datosEMA[S] : null;
+        if (!c || !e) return;
+        var d1 = c.caidaDesdeMaximo != null ? c.caidaDesdeMaximo : 999, d2 = c.caidaDesdeMaximo48h !== undefined ? c.caidaDesdeMaximo48h : 999,
+            toc = Math.min(d1, d2) <= 0.3, jun = !!e.emasJuntasTecho, bg, col, tx;
+        if (toc && jun) { bg = "rgba(255,42,59,0.18)"; col = "#ff2a3b"; tx = "🚨 TECHO CONFIRMADO"; }
+        else if (toc || jun) { bg = "rgba(243,186,47,0.15)"; col = "#f3ba2f"; tx = "⚠️ " + (toc ? "En máx 24h" : "EMAs juntas"); }
+        else { bg = "rgba(14,203,129,0.12)"; col = "#0ecb81"; tx = "✅ Fuera de techo"; }
+        var t2 = "EMAs: " + (e.emaSpreadPct !== null && e.emaSpreadPct !== undefined ? e.emaSpreadPct.toFixed(2) + "%" : "…"),
+            s1 = b.children[0], s2 = b.children[1];
+        if (s1) { if (s1.textContent !== tx) s1.textContent = tx; s1.style.color = col; }
+        if (s2 && s2.textContent !== t2) s2.textContent = t2;
+        b.style.background = bg; b.style.border = "1px solid " + col + "55";
+    }
+    setInterval(function () { try { fijarDes(); chipsDesmayo(); btnDes(); cuadroDes(); badgeTecho(); } catch (e) {} }, 1000);
+    try { var _moDes = false; new MutationObserver(function () { if (_moDes) return; _moDes = true; Promise.resolve().then(function () { _moDes = false; try {
+        var h = document.getElementById("cdcDesBtnHost"), bb = document.getElementById("cdcBtnDes"), h2 = document.getElementById("cdcDesCuadroHost");
+        if (h && (!bb || bb.parentNode !== h)) btnDes();
+        if (h2 && !h2.firstChild) cuadroDes(); } catch (e) {} }); }).observe(document.body, { childList: true, subtree: true }); } catch (e) {}
 
     function chipsDesmayo() {
         var an = document.getElementById("alertaMonedaFija"); if (!an || !an.parentNode) return;
@@ -19856,20 +20013,21 @@ setTimeout(function(){setInterval(tick,CFG.TICK_MS);},CFG.ARRANQUE_MS);
             return '<span style="display:inline-block;margin:2px 6px 2px 0;padding:5px 10px;border-radius:14px;background:' + (r.s === S ? '#f6465d' : '#1a0508') + ';border:' + (j === 0 ? '2px' : '1px') + ' solid #f6465d;color:#fff;font-size:12px;font-weight:800;cursor:pointer" onclick="try{CDC_DESPERTAR.abrir(\'' + r.s + '\')}catch(e){}">' + (j === 0 ? "🔥 " : "") + ic + ' ' + r.s.replace("USDT", "") + ' <span style="opacity:.85">' + (r.p ? r.p.toFixed(1) + '%' : '') + (r.vx ? ' · Vol x' + r.vx.toFixed(1) : '') + (A && A.vola ? ' · ⚡x' + A.vola.toFixed(1) : '') + (A && A.fase ? (A.fase === "AGOTADO" ? ' · ⚠️AGOTADO' : A.fase === "ACELERANDO" ? ' · ⚡ACELERA' : '') : '') + '</span></span>';
         }).join("");
     }
+    function ultDesBtn() { var best = null; try { Object.keys(DESHIST).forEach(function (s) { var h = DESHIST[s], g = DESHIST[best]; if (!best || (h.brutal ? 1 : 0) > (g.brutal ? 1 : 0) || ((h.brutal ? 1 : 0) === (g.brutal ? 1 : 0) && (h.pr || 0) > (g.pr || 0))) best = s; }); } catch (e) {} return best; }
     /* 🔻 Botón de DESMAYO siempre visible arriba: rojo y parpadeando cuando hay desmayos; clic = abre en el panel central el peor */
     function btnDes() {
         var b = document.getElementById("cdcBtnDes");
         if (!b) { b = document.createElement("button"); b.id = "cdcBtnDes"; b.type = "button";
             b.style.cssText = "margin:0;padding:6px 12px;border-radius:10px;border:1px solid #f6465d;background:#1a0508;color:#fff;font:800 12px Arial,sans-serif;cursor:pointer;white-space:nowrap;flex:0 0 auto;width:100%;max-width:100%;overflow:hidden;text-overflow:ellipsis";
-            b.onclick = function () { var l = listaDes(); if (!l.length) return; window.__dmAbrirTs = Date.now(); window.__velHoldUntil = 0; window.__selDesmayo = true; try { seleccionarMoneda(l[0].s, true, ACT[l[0].s] ? ACT[l[0].s].tipo : "CAIDA_BRUTAL"); } finally { window.__selDesmayo = false; } };
+            b.onclick = function () { var l = listaDes(), s = l.length ? l[0].s : ultDesBtn(); if (!s) return; fijar7(s); };
         }
         /* 📍 el botón DESMAYO vive en el panel central: se vuelve a colocar cada segundo porque el panel se redibuja */
         var host = document.getElementById("cdcDesBtnHost");
         if (host) { if (b.parentNode !== host) host.appendChild(b); b.style.display = ""; }
         else if (b.parentNode) { b.style.display = "none"; }
-        var a = listaDes(), n = a.length;
-        b.textContent = n ? ("🔻 DESMAYO · " + a[0].s.replace("USDT", "") + " " + (a[0].p ? a[0].p.toFixed(1) + "%" : "") + (n > 1 ? " +" + (n - 1) : "")) : "🔻 DESMAYO · vigilando";
-        b.style.background = n ? "#f6465d" : "#1a0508"; b.style.boxShadow = n ? "0 0 14px #f6465d" : "none"; b.className = n ? "cdcBlink" : "";
+        var a = listaDes(), n = a.length, rec = n ? null : ultDesBtn();
+        b.textContent = n ? ("🔻 DESMAYO · " + a[0].s.replace("USDT", "") + " " + (a[0].p ? a[0].p.toFixed(1) + "%" : "") + (n > 1 ? " +" + (n - 1) : "")) : rec ? ("🔻 DESMAYO · " + rec.replace("USDT", "") + " " + (DESHIST[rec].p ? DESHIST[rec].p.toFixed(1) + "%" : "") + " (reciente)") : "🔻 DESMAYO · vigilando";
+        b.style.background = n ? "#f6465d" : rec ? "#7f1d2b" : "#1a0508"; b.style.boxShadow = n ? "0 0 14px #f6465d" : "none"; b.className = n ? "cdcBlink" : "";
     }
 
     function chipsRebote() {
@@ -19963,8 +20121,8 @@ setTimeout(function(){setInterval(tick,CFG.TICK_MS);},CFG.ARRANQUE_MS);
 
     window.CDC_DESPERTAR = {
         agotados: function () { return Object.keys(ACT).filter(function (s) { return ACT[s].fase === "AGOTADO" && ACT[s].dir < 0; }); }, CFG: CFG, estadoFuerza: function (s) { return FUEL[s] ? FUEL[s].estado : null; }, fuel: function (s) { return FUEL[s] || null; }, _combustible: combustible,
-        vetoCorto: function (s) { return !!(CFG.FUEL_VETO_SHORT && FUEL[s] && FUEL[s].estado === "CARGANDO" && FUEL[s].fuerza >= 75); }, reservaPanel: function () { return (!!ultRtTs && Date.now() - ultRtTs < CFG.RT_RESERVA_MS) || (Date.now() - (window.__dmAbrirTs || 0) < 60000 && Object.values(ACT).some(function (r) { return r.dir < 0; })); }, abrir: function (s) { try { seleccionarMoneda(s); } catch (e) {} }, evaluar: evaluar, aprueba: aprueba, prioridad: prioridad, activas: function () { return ACT; },
-        simbolosLista: function () { return Object.keys(ACT); }, slotDesmayo: slotDesmayo, hayDesmayo: function () { return listaDes().length > 0; }, fijarDes: fijarDes, lista: function () { return listaTodas(); }, hayAlerta: function () { return listaTodas().length > 0; }, verTodas: function () { try { document.getElementById("dspPill").onclick(); } catch (e) {} }, red: function () { return { sube: NET, cae: NETD, retroceso: NETR, caida: NETB, fondo: NETF, combustible: NETC }; },
+        vetoCorto: function (s) { return !!(CFG.FUEL_VETO_SHORT && FUEL[s] && FUEL[s].estado === "CARGANDO" && FUEL[s].fuerza >= 75); }, reservaPanel: function () { return (!!ultRtTs && Date.now() - ultRtTs < CFG.RT_RESERVA_MS) || (Date.now() - (window.__dmAbrirTs || 0) < 60000 && Object.values(ACT).some(function (r) { return r.dir < 0; })); }, abrir: function (s) { try { fijar7(s); } catch (e) { try { seleccionarMoneda(s); } catch (e2) {} } }, fijar7: fijar7, autoDes: autoDes, evaluar: evaluar, aprueba: aprueba, prioridad: prioridad, activas: function () { return ACT; },
+        simbolosLista: function () { return Object.keys(ACT); }, forzar: forzarPanelDesmayo, slotDesmayo: slotDesmayo, hayDesmayo: function () { return listaDes().length > 0; }, fijarDes: fijarDes, lista: function () { return listaTodas(); }, hayAlerta: function () { return listaTodas().length > 0; }, verTodas: function () { try { document.getElementById("dspPill").onclick(); } catch (e) {} }, red: function () { return { sube: NET, cae: NETD, retroceso: NETR, caida: NETB, fondo: NETF, combustible: NETC }; },
         reiniciarRed: function () { try { localStorage.removeItem(KEY); localStorage.removeItem(KEY + "_dn"); localStorage.removeItem(KEY + "_rt"); localStorage.removeItem(KEY + "_ca"); localStorage.removeItem(KEY + "_fr"); localStorage.removeItem(KEY + "_fu"); } catch (e) {} NET = mkNet(KEY); NETD = mkNet(KEY + "_dn"); NETR = mkNet(KEY + "_rt"); NETB = mkNet(KEY + "_ca"); NETF = mkNet(KEY + "_fr"); NETC = mkNet(KEY + "_fu"); } };
     setTimeout(function () { ui(); tick(); setInterval(tick, CFG.TICK_MS); }, 4000);
 })();
@@ -20020,8 +20178,8 @@ function voz(sym,r){if(!CFG.VOZ||!("speechSynthesis" in window))return;try{if(ty
 function desm(sym,h,k){setTimeout(function(){try{CDC_DESPERTAR.fijarDes();}catch(e){}},80);var now=Date.now(),key=sym+k;if(now-(window.__crDm&&window.__crDm[key]||0)<45000)return;(window.__crDm=window.__crDm||{})[key]=now;tono();
  try{if(CFG.VOZ&&typeof colaVoz!=="undefined"&&typeof procesarColaVoz==="function"){var t0=k==="inminente"?"ALERTA. Desmayo inminente, "+nom(sym)+". Posible caída fuerte. Atención.":"ALERTA. Está ocurriendo un desmayo, "+nom(sym)+". Cae "+Math.round(Math.abs(h.v))+" por ciento en "+h.w+" segundos.",
   tx=(typeof _humanizarTexto==="function")?_humanizarTexto(t0,{sym:sym,dir:"SHORT"}):t0;colaVoz.unshift({texto:tx,esMasculino:true});procesarColaVoz();}}catch(e){}
- if(CFG.PANEL_AUTO&&now-manualTs>15000&&now-(window.__crOpen||0)>6000){window.__crOpen=now;window.__velHoldUntil=0;abrir(sym);}}
-function abrir(sym){try{if(typeof seleccionarMoneda==="function"){window.__selDesmayo=true;try{seleccionarMoneda(sym,true,"CAIDA_BRUTAL");}finally{window.__selDesmayo=false;}}}catch(e){}}
+ if(CFG.PANEL_AUTO&&window.__cdcDesAuto===true&&now-manualTs>15000&&now-(window.__crOpen||0)>6000){window.__crOpen=now;window.__velHoldUntil=0;abrir(sym);}}
+function abrir(sym){try{if(window.CDC_DESPERTAR&&CDC_DESPERTAR.forzar){CDC_DESPERTAR.forzar(sym,"CAIDA_BRUTAL");return;}if(typeof seleccionarMoneda==="function"){window.__selDesmayo=true;try{seleccionarMoneda(sym,true,"CAIDA_BRUTAL");}finally{window.__selDesmayo=false;}}}catch(e){}}
 function cartel(sym,r){try{var id="cdcCrashBox",b=document.getElementById(id);if(!b){b=document.createElement("div");b.id=id;
  b.style.cssText="position:fixed;top:70px;left:50%;transform:translateX(-50%);z-index:9500;width:min(360px,calc(100vw - 20px));background:#06210f;border:2px solid #0ecb81;border-radius:12px;padding:10px 12px;color:#fff;font:600 12px Arial;box-shadow:0 0 22px #0ecb8199;cursor:pointer";document.body.appendChild(b);}
  b.onclick=function(){abrir(sym);b.style.display="none";};
@@ -20573,7 +20731,7 @@ window.CDC_TRACK=(function(){
   function ajustar(){ try{ if(window.CDC_FLASH && CDC_FLASH.cfg){ CDC_FLASH.cfg.MANUAL_PAUSA_MS=PAUSA; return true; } }catch(e){} return false; }
   var t0=setInterval(function(){ if(ajustar()) clearInterval(t0); },500);
   document.addEventListener('pointerdown',function(e){
-    try{ if(e.target && e.target.closest && e.target.closest('tr[data-symbol], .cdc-click-moneda, [onclick*="seleccionarMoneda"], [onclick*="CDC_FLASH.ver"]')) ultClick=Date.now(); }catch(x){}
+    try{ if(e.target && e.target.closest && e.target.closest('tr[data-symbol], .cdc-click-moneda, #cdcBtnDes, [onclick*="seleccionarMoneda"], [onclick*="CDC_FLASH"], [onclick*="CDC_DESPERTAR"], [onclick*="CDC_DESPEGUE"], [onclick*="CDC_VEL"]')) ultClick=Date.now(); }catch(x){}
   },true);
   setInterval(function(){
     try{
@@ -20581,7 +20739,8 @@ window.CDC_TRACK=(function(){
       var a=CDC_FLASH.actual(); if(!a || !a.sym) return;
       if(typeof selectedCoin==='undefined' || selectedCoin===a.sym) return;
       if(Date.now()-ultClick<PAUSA) return;
-      CDC_FLASH.ver(a.sym);
+      if(Date.now()<(window.__cdcHoldUntil||0)) return;   /* hay una moneda fija: no la saques */
+      if(CDC_FLASH.seguir) CDC_FLASH.seguir(a.sym); else CDC_FLASH.ver(a.sym);
     }catch(e){}
   },2000);
 })();
