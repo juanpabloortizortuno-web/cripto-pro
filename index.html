@@ -18302,7 +18302,7 @@ window.CDC_FLASH=(function(){
     // archivo completo sin caer en la paradoja de "el hash contiene su
     // propio hash". No cambiar este texto.
     var _PLACEHOLDER = "%%CDC_INTEGRITY_HASH%%";
-    var _HASH_ESPERADO = "3a033661dd7c6c5a110df234b2d1caa72810c0ba7e5cb163dc533e7458fb74bc"; // ← se reemplaza por el hash real en el paso final
+    var _HASH_ESPERADO = "3a14ddab629eeb8cd4e8efe600715728f233374b36d96b3aafbf9188640f5e14"; // ← se reemplaza por el hash real en el paso final
 
     function _bloquear(motivo) {
         try {
@@ -20436,7 +20436,14 @@ window.CDC_DESPEGUE=(function(){
      SCORE_MIN:50,VIDA_MS:15*60000,COOLDOWN_MS:10*60000,GLOBAL_MS:20000,
     PANEL_AUTO:true,        // abre sola en el panel central la mejor moneda ✈️ (respetando DESMAYO y demás alarmas)
     PANEL_DWELL_MS:30000,   // mínimo entre una apertura automática y otra
-    AUTO_COOLDOWN_MS:600000 /* una misma moneda no se vuelve a abrir sola antes de 10 min */};
+    AUTO_COOLDOWN_MS:600000, /* una misma moneda no se vuelve a abrir sola antes de 10 min */
+    /* 🔥 VÍA VOLUMEN BILLONARIO: monedas con una vela de 1m de 1B+ UNIDADES (escala 1B/2B del gráfico) y precio girando al alza */
+    VOLU_ON:true,
+    VOLU_MIN:1e9,        // unidades de la moneda en UNA vela de 1m (1e9 = 1B · 2e9 = 2B)
+    VOLU_VENT:30,        // se busca esa vela entre las últimas VOLU_VENT velas de 1m
+    VOLU_MAX_CAND:20,    // máximo de monedas extra que se descargan por ciclo por esta vía
+    VOLU_REB_MAX:40      // % máx. de rebote desde el mínimo de 1h (más permisivo que REB_MAX)
+  };
   var ACT={},MISS={},AV={},busy=false,ultGlobal=0,box=null,ncand=0,FAIL={},PRE={};
   function F(s,g){FAIL[s]=g;return null;}
 
@@ -20512,6 +20519,45 @@ window.CDC_DESPEGUE=(function(){
       ts:Date.now(),t0:(ACT[sym]&&ACT[sym].t0)||Date.now()};
   }
 
+  function fmtU(x){return x>=1e9?(x/1e9).toFixed(2)+"B":x>=1e6?(x/1e6).toFixed(0)+"M":x>=1e3?(x/1e3).toFixed(0)+"K":String(Math.round(x));}
+  /* 🔥 VÍA VOLUMEN BILLONARIO · una vela de 1m con >= VOLU_MIN unidades (1B/2B) + precio recuperando la EMA7 con compradores.
+     Solo se usa si la evaluación normal (evaluar) no aprobó la moneda. Si no hay vela de 1B+, devuelve null sin tocar FAIL. */
+  function evaluarBillon(sym,k,c){
+    if(!CFG.VOLU_ON||!k||k.length<110)return null;
+    var n=k.length,V=CFG.VOLU_VENT,i,maxU=0,mU=-1;
+    for(i=Math.max(0,n-V);i<n;i++){var u=+k[i][5];if(u>maxU){maxU=u;mU=i;}}
+    if(!(maxU>=CFG.VOLU_MIN))return null;
+    var O=[],H=[],L=[],C=[],Q=[],TB=[],tb,q;
+    for(i=0;i<n;i++){O.push(+k[i][1]);H.push(+k[i][2]);L.push(+k[i][3]);C.push(+k[i][4]);
+      q=+k[i][7]||(+k[i][5]*+k[i][4]);Q.push(q);tb=+k[i][10];TB.push(isFinite(tb)&&tb>=0?tb:-1);}
+    var P=C[n-1];if(!(P>0))return F(sym,"1B: sin precio");
+    var mn=Infinity,mi=-1;for(i=n-60;i<n;i++){if(L[i]<mn){mn=L[i];mi=i;}}
+    var reb=(P/mn-1)*100;
+    if(!(reb>=CFG.REB_MIN&&reb<=CFG.VOLU_REB_MAX))return F(sym,reb<CFG.REB_MIN?"1B: aún no rebota":"1B: ya despegó (rebote muy alto)");
+    var pk=0;for(i=Math.max(0,mi-150);i<=mi;i++){if(H[i]>pk)pk=H[i];}
+    var cap=(pk/mn-1)*100;
+    var tk=0,tk0=0,a1=0,b1=0,a0=0,b0=0;
+    if(TB[n-1]>=0){for(i=n-8;i<n;i++){a1+=TB[i];b1+=Q[i];}for(i=n-40;i<n-8;i++){a0+=TB[i];b0+=Q[i];}
+      tk=b1>0?a1/b1:0;tk0=b0>0?a0/b0:0;
+      if(tk>0&&tk<CFG.TK_VETO)return F(sym,"1B: vendedores dominan");}
+    var e7=emaS(C,7),e25=emaS(C,25),e99=emaS(C,99);
+    if(!e7||!e25||!e99||e7.length<5||e25.length<5||e99.length<5)return F(sym,"1B: EMAs sin datos");
+    var a7=e7[e7.length-1],a25=e25[e25.length-1],a99=e99[e99.length-1];
+    var s7=(a7/e7[e7.length-4]-1)*100,s25=(a25/e25[e25.length-4]-1)*100,s99=(a99/e99[e99.length-4]-1)*100;
+    if(!(s7>0&&P>a7))return F(sym,"1B: no recupera EMA7");
+    var V2=CFG.VENT,verdes=0,racha=0,rmax=0;
+    for(i=n-V2;i<n;i++){if(C[i]>O[i]){verdes++;racha++;if(racha>rmax)rmax=racha;}else racha=0;}
+    var rec=avg(Q,n-10,n),base2=med(Q,n-70,n-10),volx=base2>0?rec/base2:0;
+    var hl=false;if(mi<=n-5){var m2=Infinity;for(i=n-5;i<n;i++){if(L[i]<m2)m2=L[i];}hl=m2>mn*1.0005;}
+    var sc=55+Math.min(20,(maxU/CFG.VOLU_MIN-1)*10)+Math.min(10,Math.max(0,volx-1)*5)+(tk>=0.5?5:0)+(a7>a25?5:0)+(hl?5:0);
+    sc=Math.min(100,sc);
+    var pos=c?c.posicionPorcentaje:0,caida=c?c.caidaDesdeMaximo:0;
+    return {symbol:sym,price:P,min:mn,sl:mn*0.997,riesgo:(P/(mn*0.997)-1)*100,score:Math.round(sc),verdes:verdes,vent:V2,racha:rmax,reb:reb,volx:volx,
+      s7:s7,s25:s25,s99:s99,cruce:a7>a25,pos:pos,caida:caida,change:c?c.change:0,
+      cap:cap,clx:0,tk:tk,hl:hl,rsiMin:50,mech:0,pk:pk,tp1:mn+(pk-mn)*0.382,tp2:mn+(pk-mn)*0.618,rr:(mn+(pk-mn)*0.382-P)/Math.max(P-mn*0.997,1e-12),fase:"VOL "+fmtU(maxU),
+      volU:maxU,bil:true,ts:Date.now(),t0:(ACT[sym]&&ACT[sym].t0)||Date.now()};
+  }
+
   /* ⏱ Confirmación en 5m (anti falso rebote): piso firme, precio sobre EMA9 y que no siga haciendo mínimos más bajos */
   var C5={};
   function conf5(sym){var o=C5[sym];if(o&&Date.now()-o.ts<60000)return Promise.resolve(o.v);
@@ -20534,7 +20580,7 @@ window.CDC_DESPEGUE=(function(){
       if(!box){box=document.createElement("div");box.className="cdcbn-tbox";box.style.cssText="pointer-events:none";(window.__cdcbnDock||document.body).appendChild(box);}
       var d=document.createElement("div");
       d.style.cssText="pointer-events:auto;cursor:pointer;background:#04121f;color:#fff;border:2px solid #38bdf8;border-radius:12px;padding:9px 14px;margin-bottom:6px;font:700 12px Inter,Arial,sans-serif;box-shadow:0 0 18px rgba(56,189,248,.6);max-width:430px";
-      d.innerHTML="✈️ <b style='color:#7dd3fc'>"+n+"</b> A PUNTO DE DESPEGAR · "+r.verdes+"/"+r.vent+" velas verdes · +"+r.reb.toFixed(1)+"% desde el fondo<br><small style='font-weight:600;color:#94a3b8'>cayó "+r.caida.toFixed(0)+"% desde su máximo · volumen x"+r.volx.toFixed(1)+" · EMAs girando hacia arriba</small>";
+      d.innerHTML="✈️ <b style='color:#7dd3fc'>"+n+"</b> A PUNTO DE DESPEGAR · "+r.verdes+"/"+r.vent+" velas verdes · +"+r.reb.toFixed(1)+"% desde el fondo<br><small style='font-weight:600;color:#94a3b8'>cayó "+r.caida.toFixed(0)+"% desde su máximo · volumen x"+r.volx.toFixed(1)+(r.volU?" · 🔥 vela de "+fmtU(r.volU)+" unidades":"")+" · EMAs girando hacia arriba</small>";
       d.onclick=function(){try{if(typeof seleccionarMoneda==="function")seleccionarMoneda(r.symbol,false,"DESPEGUE");}catch(e){}d.remove();};
       box.appendChild(d);while(box.children.length>3)box.firstChild.remove();
       setTimeout(function(){try{d.remove();}catch(e){}},20000);}catch(e){}}
@@ -20562,11 +20608,20 @@ window.CDC_DESPEGUE=(function(){
       ncand=lista.length;
       Object.keys(ACT).forEach(function(s){if(cachedData[s]&&!lista.some(function(z){return z.symbol===s;}))lista.push(cachedData[s]);});
       try{var ag=window.CDC_DESPERTAR&&CDC_DESPERTAR.agotados?CDC_DESPERTAR.agotados():[];ag.forEach(function(s){if(cachedData[s]&&!lista.some(function(z){return z.symbol===s;}))lista.push(cachedData[s]);});}catch(e){}   /* desmayos AGOTADOS = candidatas a despegue */
+      try{if(CFG.VOLU_ON){var yaL={};lista.forEach(function(z){yaL[z.symbol]=1;});var nb=0;
+        Object.values(cachedData).filter(function(c){
+          if(!c||yaL[c.symbol]||!(c.volume>=CFG.LIQ_MIN)||!((c.cambioReal2Min||0)>-0.5))return false;
+          var ub=c.volumeBase>0?c.volumeBase:(c.price>0?c.volume/c.price:0);   /* unidades movidas en 24h (condición necesaria para una vela de 1B+) */
+          return ub>=CFG.VOLU_MIN;})
+        .sort(function(a,b){return (b.cambioReal2Min||0)-(a.cambioReal2Min||0);}).slice(0,CFG.VOLU_MAX_CAND)
+        .forEach(function(c){lista.push(c);nb++;});PRE.billonarias=nb;}}catch(e){}
       var ks={},q;
       for(q=0;q<lista.length;q+=6){
         await Promise.all(lista.slice(q,q+6).map(function(z){return obtenerKlines(z.symbol,"1m",CFG.VELAS).then(function(k){ks[z.symbol]=k;}).catch(function(){});}));await new Promise(function(r){setTimeout(r,40);});}
       var nuevos=[],now=Date.now();
-      var res={};lista.forEach(function(c){var r=null;try{r=evaluar(c.symbol,ks[c.symbol],c);}catch(e){}res[c.symbol]=r;});
+      var res={};lista.forEach(function(c){var r=null;try{r=evaluar(c.symbol,ks[c.symbol],c);}catch(e){}
+        if(!r||r.score<CFG.SCORE_MIN){try{var rb=evaluarBillon(c.symbol,ks[c.symbol],c);if(rb)r=rb;}catch(e){}}
+        res[c.symbol]=r;});
       var pass=lista.filter(function(c){return res[c.symbol]&&res[c.symbol].score>=CFG.SCORE_MIN-10;});
       for(q=0;q<pass.length;q+=6){await Promise.all(pass.slice(q,q+6).map(function(c){return conf5(c.symbol).then(function(v){var r=res[c.symbol];r.c5=v;ajuste5(r);}).catch(function(){});}));}
       lista.forEach(function(c){
@@ -20590,7 +20645,7 @@ window.CDC_DESPEGUE=(function(){
     h='<div onclick="CDC_DESPEGUE.abrir(\''+m.symbol+'\',false)" title="Clic para abrir la moneda en el panel" style="box-sizing:border-box;width:100%;cursor:pointer;background:rgba(56,189,248,0.16);border:2px solid #38bdf8;border-radius:8px;padding:5px 8px;text-align:center;margin-bottom:4px;animation:cdcDespCard 1s infinite">'+
       '<div style="font:900 10px Arial;color:#7dd3fc;letter-spacing:.4px">✈️ MEJOR OFERTA PARA DESPEGUE'+(a.length>1?' · '+a.length:'')+'</div>'+
       '<div style="font:900 13px Arial;color:#fff"><b>'+n+'</b> ▲ · puntaje '+m.score+'/100 · Vol x'+m.volx.toFixed(1)+'</div>'+
-      '<div style="font:600 9.5px Arial;color:#cbd5e1">+'+m.reb.toFixed(1)+'% desde el fondo · '+m.verdes+'/'+m.vent+' velas verdes · cayó '+m.caida.toFixed(0)+'% desde su máximo · pánico x'+m.clx.toFixed(1)+(m.tk>0?' · compra '+Math.round(m.tk*100)+'%':'')+' · '+m.fase+'</div>'+
+      '<div style="font:600 9.5px Arial;color:#cbd5e1">+'+m.reb.toFixed(1)+'% desde el fondo · '+m.verdes+'/'+m.vent+' velas verdes · cayó '+m.caida.toFixed(0)+'% desde su máximo · pánico x'+m.clx.toFixed(1)+(m.tk>0?' · compra '+Math.round(m.tk*100)+'%':'')+(m.volU?' · 🔥 vela de '+fmtU(m.volU)+' unid.':'')+' · '+m.fase+'</div>'+
       '<div style="font:600 9px Arial;color:#94a3b8;margin-top:2px">Referencia: precio $'+pf(m.price)+' · fondo $'+pf(m.min)+' · stop bajo el fondo $'+pf(m.sl)+' (−'+m.riesgo.toFixed(1)+'%)</div>'+(m.tp1>m.price?'<div style="font:700 9.5px Arial;color:#86efac;margin-top:2px">🎯 Obj1 $'+pf(m.tp1)+' · Obj2 $'+pf(m.tp2)+' · R:R '+m.rr.toFixed(1)+(m.c5?' · 5m '+(m.c5.cae?'⚠️ aún cae':m.c5.piso?'✔ piso firme':'neutral'):'')+'</div>':'')+'</div>';
     h+='<div style="display:flex;gap:5px;flex-wrap:wrap;justify-content:center;margin-bottom:4px">';
     a.slice(1,6).forEach(function(o){h+='<span onclick="CDC_DESPEGUE.abrir(\''+o.symbol+'\')" title="✈️ A punto de despegar · +'+o.reb.toFixed(1)+'% desde el fondo" style="cursor:pointer;background:'+(o.symbol===S?'#38bdf8':'#0b1220')+';border:1px solid #38bdf8;border-radius:7px;padding:2px 8px;font:700 10px Arial;color:'+(o.symbol===S?'#00121f':'#fff')+'"><b>'+o.symbol.replace("USDT","")+'</b> ✈️ '+o.score+'</span>';});
@@ -20646,7 +20701,7 @@ window.CDC_DESPEGUE=(function(){
     slotHTML:slotHTML,
     abrir:abrir,autoAbrir:autoAbrir,
     verTodas:function(){try{abrirListaDespegue();}catch(e){}},
-    cfg:CFG,evaluar:evaluar,
+    cfg:CFG,evaluar:evaluar,evaluarBil:evaluarBillon,
     diag:function(){var g={};Object.keys(FAIL).forEach(function(s){var m=FAIL[s];(g[m]=g[m]||[]).push(s.replace('USDT',''));});
       return{activas:Object.keys(ACT).length,candidatasAnalizadas:ncand,prefiltro:PRE,descartadasPorMotivo:g};},
     es:function(s){var r=ACT[s];return !!(r&&Date.now()-r.ts<CFG.VIDA_MS);},
