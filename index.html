@@ -18302,7 +18302,7 @@ window.CDC_FLASH=(function(){
     // archivo completo sin caer en la paradoja de "el hash contiene su
     // propio hash". No cambiar este texto.
     var _PLACEHOLDER = "%%CDC_INTEGRITY_HASH%%";
-    var _HASH_ESPERADO = "3a14ddab629eeb8cd4e8efe600715728f233374b36d96b3aafbf9188640f5e14"; // ← se reemplaza por el hash real en el paso final
+    var _HASH_ESPERADO = "6f7fb3ae1c378e61b9fa8bf161855a464dd2af1715ae17721041a062e9c56c78"; // ← se reemplaza por el hash real en el paso final
 
     function _bloquear(motivo) {
         try {
@@ -19536,7 +19536,7 @@ setTimeout(function(){setInterval(tick,CFG.TICK_MS);},CFG.ARRANQUE_MS);
 (function () {
     "use strict";
     var CFG = { TICK_MS: 6000, RT_DD_MIN: 1.5, RT_DD_MAX: 6, RT_RUN_MIN: 1.5, RT_VOL_MIN: 3, RT_RED_MIN: 1.0, RT_AUTO: true, CA_CAMBIO_MIN: 30, CA_DD_MIN: 6, CA_DD_MAX: 30, CA_VOLAT_MIN: 0.7, CA_RED_MIN: 1.5, CA_RAPIDA: 5, FR_CAMBIO_MIN: 20, FR_DD_MIN: 5, FR_DD_MAX: 30, FR_REB_MIN: 0.4, FR_REB_MAX_RET: 0.5, FR_LOW_RECIENTE: 15, RT2_CAMBIO_MIN: 3, RT2_DD_MIN: 1.2, RT2_DD_MAX: 8, RT2_LOW_RECIENTE: 12, RT2_REB_MIN: 0.2, RT2_RET_MAX: 0.6, PRECIO_BAJO: 1, SOLO_BARATAS: false, FR_VOLAT_MIN: 0.5, FR_POS_MIN: 50, FUEL_VETO_SHORT: true, CA_AUTO: true, RT_MIN: 40, RT_RESERVA_MS: 90000, VELAS: 180, EXCL: 6, BASE_RANGO_MAX: 6, VOL_RATIO_MIN: 5, GAIN3_MIN: 1.0, RAP_GAIN5_MIN: 2.5, RAP_VOL_MIN: 3,
-        DROP3: 2.0, DROP5: 3.0, DROP_VOL: 3, DM_DD_MIN: 2.0, DM_INY_MIN: 3, DM_VOLA_X: 1.5, DM_PICO_VELAS: 45, INY_CAMBIO: 10, BRUTAL5: 5, BRUTAL_MAX30: 8, TARDE_PCT: 15, LIQ_MIN: 300000, MAX_CAND: 50, CACHE_MS: 12000,
+        DROP3: 3.0, DROP5: 3.0, DROP_VOL: 3, DM_DD_MIN: 3.0, DM_INY_MIN: 3, DM_VOLA_X: 2.5, DES_VOLA_X: 2.5, DES_RANGO_MIN: 0.7, DM_PICO_VELAS: 45, INY_CAMBIO: 10, BRUTAL5: 5, BRUTAL_MAX30: 8, TARDE_PCT: 15, LIQ_MIN: 300000, MAX_CAND: 50, CACHE_MS: 12000,
         VIDA_MS: 10 * 60 * 1000, AUTO_MIN_SCORE: 60, AUTO_ABRIR: false, CAIDA_ABRIR: true, ESPACIO_AUTO_MS: 20000, SONIDO: true, BOTON: true, UP: 1.5, DN: 1.5, MAX_MIN: 20 };
     var ACT = {}, CK = {}, AV = {}, PEND = [], ultAbierta = null, ultAutoTs = 0, ultRt = null, ultRtTs = 0, MISS = {}, PENDVOZ = null, ultAviso = {}, abierto = false, busy = false, KEY = "cdc_despertar_net";
     var ICONO = { DESPERTAR: "🚀", RAPIDA: "⚡", DESMAYO: "🔻", CAIDA_BRUTAL: "💥", RETROCESO: "🎯", CAIDA_ALCISTA: "🌋", FONDO_REBOTE: "🟢" };
@@ -19695,6 +19695,14 @@ setTimeout(function(){setInterval(tick,CFG.TICK_MS);},CFG.ARRANQUE_MS);
         return { origen: origen, vola: vola, dpk: dpk, iny: iny };
     }
 
+    /* 🌪️ SUPER VOLATIL (Juan Pablo Ortiz Ortuño): un desmayo solo cuenta si la moneda esta MUY volatil ahora:
+       rango medio de las ultimas 5 velas de 1m >= DES_RANGO_MIN % y al menos DES_VOLA_X veces su rango normal (velas n-130..n-65). */
+    function superVolatil(k) {
+        var n = k.length; if (n < 60) return false;
+        var rg = function (a, b) { var s = 0, m = 0, j, h, l; for (j = a; j < b; j++) { h = +k[j][2]; l = +k[j][3]; if (l > 0) { s += (h - l) / l * 100; m++; } } return m ? s / m : 0; };
+        var ahora = rg(n - 5, n), normal = Math.max(rg(Math.max(0, n - 130), n - 65), 0.02);
+        return ahora >= CFG.DES_RANGO_MIN && ahora / normal >= CFG.DES_VOLA_X;
+    }
     function rsi14(C) { var n = C.length; if (n < 16) return null; var g = 0, l = 0, i, d; for (i = 1; i <= 14; i++) { d = C[i] - C[i - 1]; if (d > 0) g += d; else l -= d; } g /= 14; l /= 14;
         for (i = 15; i < n; i++) { d = C[i] - C[i - 1]; g = (g * 13 + (d > 0 ? d : 0)) / 14; l = (l * 13 + (d < 0 ? -d : 0)) / 14; } return l === 0 ? 100 : 100 - 100 / (1 + g / l); }
     /* ── Evaluación con velas de 1 minuto ── */
@@ -19717,6 +19725,7 @@ setTimeout(function(){setInterval(tick,CFG.TICK_MS);},CFG.ARRANQUE_MS);
         else if (rango <= CFG.BASE_RANGO_MAX && vr >= CFG.VOL_RATIO_MIN && p > bh && g3 >= CFG.GAIN3_MIN && medias) tipo = "DESPERTAR";
         else if (g5 >= CFG.RAP_GAIN5_MIN && vr >= CFG.RAP_VOL_MIN && medias) tipo = "RAPIDA";
         if (!tipo && dmx) tipo = "DESMAYO";   // 🔻 desde máximo / inyección
+        if (tipo === "DESMAYO" && !superVolatil(k)) tipo = null;   // 🌪️ solo desmayos de monedas SUPER VOLATILES (caída de 3% a 5%)
         if (!tipo) return null;
         var baja = tipo === "DESMAYO" || tipo === "CAIDA_BRUTAL", c24 = c ? c.change : 0, c2 = c ? c.cambioReal2Min : 0, reglas, x;
         if (baja) {
@@ -20138,7 +20147,7 @@ setTimeout(function(){setInterval(tick,CFG.TICK_MS);},CFG.ARRANQUE_MS);
    PRIORIDAD TOTAL: cerebro neuronal (CDC_VEL.es), lista y panel central (CDC_DESPERTAR), voz, alarma y cartel.
    Ajustes: CDC_CRASH.cfg.X=valor · Apagar: cfg.ON=false · Probar: CDC_CRASH.probar('SOPHUSDT'). No es asesoría financiera. */
 (function(){"use strict";
-var CFG={ON:true,WS:true,BUF_S:180,WARM_S:90,V30:2,V60:2.5,V120:3.5,Z_MIN:-3,VOL_X:2,INM_MIN:0.8,INM_MAX:2.5,INM_UP:1.5,INM_Z:-2,INM_VOL:1.5,INM_TTL:90000,INM_CD:300000,INM_TOP:60,LIQ_MIN:1000000,REB_MIN:0.236,REB_MAX:0.35,HL_S:6,
+var CFG={ON:true,WS:true,BUF_S:180,WARM_S:90,V30:3,V60:3,V120:3.5,Z_MIN:-3,VOL_X:2,INM_MIN:3,INM_MAX:5,INM_UP:1.5,INM_Z:-2,INM_VOL:1.5,INM_TTL:90000,INM_CD:300000,INM_TOP:60,LIQ_MIN:1000000,REB_MIN:0.236,REB_MAX:0.35,HL_S:6,
  ARM_MS:600000,COOLDOWN_MS:900000,MAX_ACT:3,SL_BUF:0.0015,TP1:0.382,TP2:0.5,RIESGO_MAX:6,RR_MIN:0.7,SPREAD_MAX:0.3,TAKER_MIN:0.5,
  TREND_SLOPE:0.6,SIM_MS:1800000,TICK_MS:1000,VOZ:true,PANEL_AUTO:true,PRIORIDAD:true,TOAST_MS:25000,PRIO_MS:1800000};
 var S={},ACT={},LOG=[],K="cdc_crash_log",AC=null,wsOk=0,ws=null,wsTry=0,manualTs=0;
