@@ -2268,6 +2268,76 @@ return {setCoins:setCoins,fire:fireByName,setMode:function(m){if(MODES[m]&&m!==l
   #detailView .cdcbn-strip .cdcbn-s{display:none;}
 }
 </style>
+<style id="cdc-ui-upgrade-v8">
+/* ════════════════════════════════════════════════════════════════════
+   CDC FUTURO-PRO · UI/UX v8 (PC y CELULAR)  ·  Autor: Juan Pablo Ortiz Ortuño
+   Adaptado a los selectores REALES del v7 (respeta el carril de los botones
+   flotantes y el menú lateral móvil existente).
+   ════════════════════════════════════════════════════════════════════ */
+:root{--cdc8-gold:#f3ba2f;--cdc8-green:#0ecb81;--cdc8-red:#f6465d;--cdc8-blue:#38bdf8;
+      --cdc8-line:rgba(255,255,255,.08);--cdc8-gline:rgba(243,186,47,.35);--cdc8-nav-h:58px}
+
+/* 1) Texto nítido y números que no "saltan" cuando entran datos de Binance */
+body{-webkit-font-smoothing:antialiased;text-rendering:optimizeLegibility}
+td,.cdcbn-v,.cdcbn-pct,.gauge-display-val,#cryptoList span,.mx-kpi b,.mx-g b,.bc-hero,.qb-big{font-variant-numeric:tabular-nums}
+
+/* 2) Botones del sidebar con acabado limpio */
+.sidebar-header button{border-radius:10px;letter-spacing:.4px;transition:transform .15s ease,box-shadow .2s ease,filter .2s ease}
+.sidebar-header button:active{transform:scale(.97) !important}
+#btnAlarmaUnificado{border-radius:12px;box-shadow:0 6px 20px rgba(0,0,0,.45)}
+#cryptoList td{vertical-align:middle}
+.short-confirmado-card{border-radius:8px}
+
+/* 3) PANEL DE ARRANQUE RÁPIDO (pantalla principal, columna del monitor) */
+#cdcQuickBootBox{display:grid;grid-template-columns:1.05fr 1.35fr .75fr 1.15fr;gap:12px;align-items:stretch;
+  background:linear-gradient(145deg,#0b1324,#070c18);border:1px solid var(--cdc8-gline);border-radius:12px;
+  padding:12px 14px;margin-bottom:12px;box-shadow:0 8px 25px rgba(0,0,0,.35);scroll-margin-top:70px;
+  box-sizing:border-box;width:100%;font-family:Inter,-apple-system,Arial,sans-serif}
+#cdcQuickBootBox *{box-sizing:border-box}
+.qb-cell{display:flex;flex-direction:column;gap:4px;min-width:0}
+.qb-cell>label{font-size:10px;font-weight:800;color:#94a3b8;letter-spacing:.6px}
+.qb-big{font-size:15px;font-weight:900;color:#fff;line-height:1.2;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.qb-big.on{color:#ff6b7a}.qb-big.off{color:#94a3b8}
+.qb-cell small{font-size:10.5px;color:#94a3b8;line-height:1.35;overflow:hidden;text-overflow:ellipsis;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical}
+.qb-pill{display:inline-block;padding:2px 9px;border-radius:10px;font-size:10px;font-weight:900;letter-spacing:.4px}
+.qb-pill.t{background:rgba(243,186,47,.15);color:var(--cdc8-gold);border:1px solid var(--cdc8-gold)}
+.qb-pill.r{background:rgba(246,70,93,.15);color:#ff6b7a;border:1px solid #ff6b7a}
+#qbMax{background:#040812;border:1px solid rgba(255,255,255,.14);color:var(--cdc8-gold);border-radius:8px;padding:8px 10px;
+  font-size:15px;font-weight:900;width:100%;text-align:center;font-family:inherit}
+.qb-row{display:flex;gap:6px}
+#qbRun{flex:1;display:flex;align-items:center;justify-content:center;gap:6px;border:none;border-radius:8px;padding:9px 10px;
+  font-size:12.5px;font-weight:900;cursor:pointer;background:linear-gradient(135deg,#0ecb81,#059669);color:#001a0d;
+  box-shadow:0 0 15px rgba(14,203,129,.4);font-family:inherit;white-space:nowrap}
+#qbRun.on{background:linear-gradient(135deg,#f6465d,#b91c1c);color:#fff;box-shadow:0 0 18px rgba(246,70,93,.55)}
+#qbPanel{flex:none;width:40px;display:flex;align-items:center;justify-content:center;border-radius:8px;cursor:pointer;
+  background:#0f172a;border:1px solid var(--cdc8-gline);color:var(--cdc8-gold)}
+.qb-mon{font-size:10.5px;font-weight:700;color:#94a3b8;display:flex;align-items:center;gap:6px}
+.qb-mon i{width:8px;height:8px;border-radius:50%;background:#64748b;display:inline-block}
+.qb-mon.ok i{background:var(--cdc8-green);box-shadow:0 0 8px var(--cdc8-green)}
+.qb-mon.warn i{background:var(--cdc8-gold);box-shadow:0 0 8px var(--cdc8-gold)}
+.qb-mon.ok{color:#7ee2b8}.qb-mon.warn{color:#ffd978}
+
+/* 4) BARRA INFERIOR TIPO APP (solo celular) */
+#cdcMobileNav{display:none}
+@media (max-width:950px){
+  #cdcQuickBootBox{grid-template-columns:1fr 1fr;gap:10px;padding:10px}
+  body{padding-bottom:calc(var(--cdc8-nav-h) + env(safe-area-inset-bottom,0px))}
+  #cdcMobileNav{display:flex;position:fixed;left:0;right:0;bottom:0;z-index:9500;justify-content:space-around;align-items:center;
+    height:calc(var(--cdc8-nav-h) + env(safe-area-inset-bottom,0px));padding-bottom:env(safe-area-inset-bottom,0px);
+    background:rgba(6,11,22,.96);-webkit-backdrop-filter:blur(12px);backdrop-filter:blur(12px);border-top:1px solid var(--cdc8-gline)}
+  .cdc-mnav-btn{background:none;border:none;color:#94a3b8;display:flex;flex-direction:column;align-items:center;gap:3px;
+    font-size:10px;font-weight:800;letter-spacing:.3px;cursor:pointer;padding:6px 12px;font-family:Inter,Arial,sans-serif;
+    -webkit-tap-highlight-color:transparent}
+  .cdc-mnav-btn.active{color:var(--cdc8-gold)}
+  /* el menú lateral móvil termina justo encima de la barra, sin quedar tapado */
+  .sidebar.sidebar-mobile-open{height:calc(100vh - var(--sidebar-mobile-top,135px) - var(--cdc8-nav-h)) !important;
+    height:calc(100dvh - var(--sidebar-mobile-top,135px) - var(--cdc8-nav-h)) !important}
+  /* botones flotantes por encima de la barra (se mantiene el carril derecho del v7) */
+  .floating-buttons{bottom:calc(var(--cdc8-nav-h) + 10px + env(safe-area-inset-bottom,0px)) !important}
+  .column-center,.column-right{scroll-margin-top:70px}
+}
+</style>
+
 </head>
 <body>
 <style id="cdcIntroPro">
@@ -4103,6 +4173,75 @@ la computadora.</p>
     <div class="main-workspace" id="mainWorkspace">
         
         <div class="column-center" id="columnCenter">
+<!-- v8 · PANEL DE ARRANQUE RÁPIDO (conectado al bot REAL: usa su mismo botón RUN y su mismo "Máx. posiciones") -->
+<div id="cdcQuickBootBox" aria-label="Arranque rápido del bot">
+  <div class="qb-cell">
+    <label>BOT CDC</label>
+    <div class="qb-big off" id="qbEstado">○ APAGADO</div>
+    <div id="qbModo"></div>
+  </div>
+  <div class="qb-cell">
+    <label>MI CUENTA</label>
+    <div class="qb-big" id="qbSaldo">—</div>
+    <small id="qbPerfil">Cargando…</small>
+  </div>
+  <div class="qb-cell">
+    <label>MÁX. POSICIONES</label>
+    <input id="qbMax" type="number" min="1" max="50" step="1" inputmode="numeric" title="Monedas abiertas a la vez (tope)">
+    <small>monedas a la vez</small>
+  </div>
+  <div class="qb-cell">
+    <label style="color:#f3ba2f">CONTROL DE ARRANQUE</label>
+    <div class="qb-row">
+      <button id="qbRun" type="button"></button>
+      <button id="qbPanel" type="button" title="Abrir panel completo del bot (API, perfiles, monitor)" aria-label="Abrir panel completo del bot">
+        <svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.5 1.7 1.7 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.5-1.1 1.7 1.7 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.8.3H9a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.8V9a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1z"/></svg>
+      </button>
+    </div>
+    <div class="qb-mon" id="qbMon"><i></i><span>Monitoreo…</span></div>
+  </div>
+</div>
+<script>
+(function () {
+  "use strict";
+  var $ = function (i) { return document.getElementById(i); };
+  var PLAY = '<svg viewBox="0 0 24 24" width="15" height="15" fill="currentColor"><polygon points="5,3 19,12 5,21"/></svg>';
+  var STOP = '<svg viewBox="0 0 24 24" width="15" height="15" fill="currentColor"><rect x="6" y="6" width="12" height="12" rx="1"/></svg>';
+  function fmt(x, d) { return isFinite(x) ? Number(x).toFixed(d == null ? 2 : d) : "—"; }
+  function view() { try { return window.__cdcBotView ? window.__cdcBotView() : null; } catch (e) { return null; } }
+  function abrirPanel() { var b = $("bdFabBtn"); if (b) b.click(); }
+
+  function pintar() {
+    var est = $("qbEstado"); if (!est) return;
+    var v = view(), mon = $("qbMon"), run = $("qbRun");
+    if (!v) { run.innerHTML = PLAY + " RUN · ARRANCAR"; return; }
+    est.textContent = v.activo ? "● ACTIVO" : "○ APAGADO"; est.className = "qb-big " + (v.activo ? "on" : "off");
+    $("qbModo").innerHTML = '<span class="qb-pill ' + (v.testnet ? "t" : "r") + '">' + (v.testnet ? "TESTNET" : "CUENTA REAL") + "</span>";
+    if (v.ok) { $("qbSaldo").textContent = fmt(v.wallet) + " USDT"; $("qbPerfil").textContent = "Disp. " + fmt(v.disp) + " · " + v.npos + " posición(es) · " + (v.modo || ""); }
+    else if (!v.claves) { $("qbSaldo").textContent = "Sin conectar"; $("qbPerfil").textContent = "Guarda tu API Key y Secret en el panel del bot (⚙)."; }
+    else if (v.err) { $("qbSaldo").textContent = "Sin datos"; $("qbPerfil").textContent = v.err.slice(0, 110); }
+    else { $("qbSaldo").textContent = "Conectando…"; $("qbPerfil").textContent = ""; }
+    run.innerHTML = v.activo ? STOP + " PARAR BOT" : PLAY + " RUN · ARRANCAR"; run.className = v.activo ? "on" : "";
+    var mx = $("qbMax"); if (document.activeElement !== mx && v.maxPos != null) mx.value = v.maxPos;
+    var sp = mon.querySelector("span");
+    if (v.ok) { var seg = Math.max(0, Math.round((Date.now() - v.t) / 1000)); mon.className = "qb-mon " + (v.stale ? "warn" : "ok");
+        sp.textContent = (v.stale ? "Reintentando · últimos datos hace " : "Monitoreo OK · hace ") + seg + " s" + (v.ip ? " · IP " + v.ip : ""); }
+    else { mon.className = "qb-mon"; sp.textContent = v.claves ? "Monitoreo: esperando datos…" : "Monitoreo: sin conectar"; }
+  }
+
+  $("qbRun").onclick = function () {
+    var v = view(); if (!v) return;
+    var on = $("bdOn"); if (!v.claves || !on) { abrirPanel(); return; }
+    var tn = $("bdTest"); if (tn) tn.checked = v.testnet;   /* igual que el RUN del panel: evita cambiar de modo sin querer */
+    on.click();                                             /* mismo botón real: incluye la confirmación de DINERO REAL */
+    setTimeout(pintar, 400);
+  };
+  $("qbPanel").onclick = abrirPanel;
+  $("qbMax").onchange = function () { if (window.__cdcBotSet) window.__cdcBotSet({ maxPos: this.value }); pintar(); };
+  pintar(); setInterval(pintar, 1500);
+})();
+</script>
+
             <div class="card" id="detailView" style="width:100%;">
         <!-- 🏷️ JEFE DE LISTA: de cuál botón/lista vino esta moneda -->
         
@@ -18811,7 +18950,7 @@ window.CDC_FLASH=(function(){
     // archivo completo sin caer en la paradoja de "el hash contiene su
     // propio hash". No cambiar este texto.
     var _PLACEHOLDER = "%%CDC_INTEGRITY_HASH%%";
-    var _HASH_ESPERADO = "ec1320bf42b9338d86624641c957de2367eb78f62967c3dc21946bca49a78225"; // ← se reemplaza por el hash real en el paso final
+    var _HASH_ESPERADO = "1be9470a1fa3dd01b1937f8625bba3bb3626bbbd35bc43a6c46498903a87b930"; // ← se reemplaza por el hash real en el paso final
 
     function _bloquear(motivo) {
         try {
@@ -21735,7 +21874,7 @@ window.CDC_TRACK=(function(){
        ══════════════════════════════════════════════════════════════════ */
     var OPLS = "cdcBotOps_v1", CHL = "cdcBotChk_v1", ops = (function () { var a = leerLS(OPLS); return Array.isArray(a) ? a : []; })(), chk = leerLS(CHL);
     var fabOpen = false, fabTab = "mon", fabSel = null, fabBusy = false, fabFrameSym = null, fabData = null, fabN = 0, fabIni = false, avT = 0;
-    var fabIP = "", ipBusy = false;
+    var fabIP = "", ipBusy = false, fabFallos = 0;
     var URLS = { api: "https://www.binance.com/es-LA/my/settings/api-management", kyc: "https://www.binance.com/es-LA/my/settings/kyc",
         fut: "https://www.binance.com/es-LA/futures/BTCUSDT", test: "https://testnet.binancefuture.com", panel: "https://www.binance.com/es-LA/my/dashboard" };
     var TABS = [["mon", "📊 Monitor"], ["ops", "📒 Operaciones"], ["log", "🧾 Registro"], ["gui", "🔑 Guía API"], ["chk", "✅ Antes de operar"], ["bot", "❓ Botones"]];
@@ -21779,13 +21918,20 @@ window.CDC_TRACK=(function(){
                 if (!hist.length || Date.now() - hist[hist.length - 1][0] > 5000) { hist.push([Date.now(), wallet + unr]); if (hist.length > 400) hist = hist.slice(-400); escLS(EQLS, hist); }
                 var al = [];
                 try { CDC_DESPERTAR.lista().forEach(function (it) { if (it.r && it.r.dir < 0) al.push({ s: it.s, t: it.r.tipo === "DESMAYO_INMINENTE" ? "inminente" : it.r.tipo === "CAIDA_BRUTAL" ? "caída brutal" : "desmayo" }); }); } catch (e) {}
-                fabData = { wallet: wallet, disp: disp, unr: unr, pos: pos, ords: r[2], al: al, t: Date.now() };
+                fabData = { wallet: wallet, disp: disp, unr: unr, pos: pos, ords: r[2], al: al, t: Date.now() }; fabFallos = 0;
                 fabN = pos.length; pintarBadge();
                 if (!fabSel || (!pos.some(function (x) { return x.symbol === fabSel; }) && !al.some(function (x) { return x.s === fabSel; }))) fabSel = pos.length ? pos[0].symbol : (al[0] ? al[0].s : null);
             }
         } catch (e) {
+            /* v8 · ARREGLO DEL CORTE DE MONITOREO: antes, cualquier error pasajero (red inestable, -2015 por cambio
+               de IP, -1021, 5xx) BORRABA los datos buenos y el panel mostraba error por unos segundos.
+               Ahora se conservan los últimos datos y se reintenta solo; el error duro solo sale si no hay
+               datos buenos o si falla 4 veces seguidas (~30 s). */
+            fabFallos++;
             var limit = /pausa local|HTTP 429|HTTP 418|Too many|too many|banned|HTTP 503|No se pudo conectar/.test(e.message || "");
-            if (limit && fabData && !fabData.err && fabData.wallet != null) { var LL = window.__cdcApiLim || {}; fabData.stale = { until: LL.until || (Date.now() + 15000), s: LL.s || 0 }; }
+            var buenos = !!(fabData && !fabData.err && fabData.wallet != null), LL = window.__cdcApiLim || {};
+            if (e && e.code === -1021) { try { api("GET", "/fapi/v1/time", {}, false).then(function (tm) { offset = tm.serverTime - Date.now(); }, function () {}); } catch (x) {} }
+            if (buenos && (limit || fabFallos < 4)) { fabData.stale = { until: LL.until || (Date.now() + (limit ? 15000 : 10000)), s: limit ? (LL.s || 0) : 0, motivo: limit ? "" : ((e && e.code) ? "código " + e.code : "sin respuesta") }; }
             else if (limit) fabData = { err: "⏸ Binance está limitando las peticiones por un momento. Es normal si el CDC escanea muchas monedas: tus claves y tu IP están bien. Se reintenta solo cada pocos segundos." };
             else { fabData = { err: e.message + (e.code === -2015 ? " · Revisa tu IP: la actual es " + (fabIP && fabIP !== "?" ? fabIP : "(míra la pestaña «🔑 Guía API»)") + " y debe estar en las IPs de confianza de tu API en Binance." : "") }; if (e.code === -2015 && !fabIP) ipDetectar(); } }
         fabBusy = false; pintarFab();
@@ -22098,7 +22244,7 @@ window.CDC_TRACK=(function(){
     }
     async function conIPDetect() {
         if (conIPBusy) return; conIPBusy = true; conIPPaint();
-        var fu = ["https://api.ipify.org?format=json", "https://checkip.amazonaws.com", "https://api64.ipify.org?format=json"], ip = "";
+        var fu = ["https://api.ipify.org?format=json", "https://checkip.amazonaws.com", "https://api64.ipify.org?format=json", "https://icanhazip.com"], ip = "";
         for (var i = 0; i < fu.length && !ip; i++) {
             try {
                 var ctl = new AbortController(), to = setTimeout(function () { ctl.abort(); }, 6000);
@@ -22107,7 +22253,7 @@ window.CDC_TRACK=(function(){
                 if (/^[0-9a-fA-F:.]{7,45}$/.test(v)) ip = v;
             } catch (e) {}
         }
-        conIPBusy = false; conIP = ip || "?";
+        conIPBusy = false; conIP = ip || (conIP && conIP !== "?" ? conIP : "?");
         if (ip) { fabIP = ip; if (conIPInfo.ult !== ip) { conIPInfo.ult = ip; conIPInfo.cuando = Date.now(); escLS(IPLS, conIPInfo); } }
         conIPPaint();
     }
@@ -22161,6 +22307,24 @@ window.CDC_TRACK=(function(){
         persistir();
         conIPPaint(); await fabRefrescar(); if (fabData && !fabData.err) conEdit = false; conPintar();
     }
+    /* v8 · Ventana segura hacia el bot para el panel de ARRANQUE RÁPIDO (pantalla principal).
+       No expone claves: solo estado, saldo y perfil. El botón RUN usa el MISMO botón real (#bdOn). */
+    window.__cdcBotView = function () {
+        var d = fabData, v = { activo: !!cfg.activo, testnet: !!cfg.testnet, maxPos: cfg.maxPos, claves: !!(cfg.key && cfg.secret),
+            ok: !!(d && !d.err && d.wallet != null), err: (d && d.err) ? String(d.err) : "", stale: !!(d && d.stale), t: (d && d.t) || 0, ip: (conIP && conIP !== "?") ? conIP : (fabIP && fabIP !== "?" ? fabIP : "") };
+        if (v.ok) {
+            v.wallet = d.wallet; v.disp = d.disp; v.unr = d.unr; v.npos = d.pos.length;
+            try { var mm = modoMulti(d.wallet);
+                if (mm) v.modo = "MULTI-MONEDA · hasta " + mm.n + " monedas · ≈ " + nf(mm.presup, 2) + " USDT c/u";
+                else { var pr = elegirPerfil(d.disp); v.modo = pr ? "Perfil " + (cfg.perfiles.indexOf(pr) + 1) + " · entra " + pr.ent + "% · sale +" + pr.tp + " USDT" : "Ningún perfil aplica al saldo"; }
+            } catch (e) {}
+        }
+        return v;
+    };
+    window.__cdcBotSet = function (o) {
+        if (o && o.maxPos != null) { var m = parseInt(o.maxPos, 10);
+            if (!isNaN(m)) { cfg.maxPos = Math.max(1, Math.min(50, m)); guardar(); var i = $("bdMax"); if (i) i.value = cfg.maxPos; } }
+    };
     function persistir() { try { if (navigator.storage && navigator.storage.persist) navigator.storage.persist(); } catch (e) {} }
     function ipAviso() {
         var ok = conIP && conIP !== "?";
@@ -22200,7 +22364,7 @@ window.CDC_TRACK=(function(){
         var d = fabData, tot = d.wallet + d.unr, hoy = monIncome.v, top = av || "";
         if (d.stale) {
             var seg = Math.max(0, Math.round((Date.now() - (d.t || Date.now())) / 1000)), esp = Math.max(0, Math.round((d.stale.until - Date.now()) / 1000));
-            top += '<div class="bdf-av" style="background:rgba(243,186,47,.1);border:1px solid #f3ba2f;color:#ffd978">⏸ Binance está limitando las peticiones. Te muestro los últimos datos <span id="mxStaleT" data-t="' + (d.t || Date.now()) + '" data-u="' + d.stale.until + '">(hace ' + seg + ' s' + (esp ? ' · reintento en ' + esp + ' s' : ' · reintentando…') + ')</span>. Tu conexión y tus claves están bien.</div>';
+            top += '<div class="bdf-av" style="background:rgba(243,186,47,.1);border:1px solid #f3ba2f;color:#ffd978">' + (d.stale.motivo ? '⏸ Conexión inestable por un momento (' + d.stale.motivo + '). Te muestro' : '⏸ Binance está limitando las peticiones. Te muestro') + ' los últimos datos <span id="mxStaleT" data-t="' + (d.t || Date.now()) + '" data-u="' + d.stale.until + '">(hace ' + seg + ' s' + (esp ? ' · reintento en ' + esp + ' s' : ' · reintentando…') + ')</span>. ' + (d.stale.motivo ? 'Se reintenta solo.' : 'Tu conexión y tus claves están bien.') + '</div>';
         }
         var hero = '<div class="bc-hero"><div style="font-size:11px;color:#94a3b8;letter-spacing:.5px">CUENTA TOTAL · ' + (cfg.testnet ? "TESTNET" : "CUENTA REAL") + '</div>' +
             '<div style="font-size:34px;font-weight:900;color:#fff;line-height:1.15">' + nf(tot, 2) + ' <span style="font-size:14px;color:#94a3b8;font-weight:700">USDT</span></div>' +
@@ -22756,6 +22920,55 @@ window.CDC_TRACK=(function(){
 
     if (document.readyState === "loading") document.addEventListener("DOMContentLoaded", montar); else montar();
     setInterval(tick, 4000);
+})();
+</script>
+
+<!-- v8 · BARRA INFERIOR TIPO APP (solo celular ≤950px). Usa el menú lateral y los paneles que ya existen. -->
+<nav id="cdcMobileNav" aria-label="Navegación principal">
+  <button class="cdc-mnav-btn" id="cdcNavLista" type="button" onclick="cdcNavMovil('lista')">
+    <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><line x1="8" y1="6" x2="21" y2="6"/><line x1="8" y1="12" x2="21" y2="12"/><line x1="8" y1="18" x2="21" y2="18"/><circle cx="3.5" cy="6" r="1"/><circle cx="3.5" cy="12" r="1"/><circle cx="3.5" cy="18" r="1"/></svg>
+    MERCADO
+  </button>
+  <button class="cdc-mnav-btn active" id="cdcNavMonitor" type="button" onclick="cdcNavMovil('monitor')">
+    <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="3" width="20" height="14" rx="2"/><line x1="8" y1="21" x2="16" y2="21"/><line x1="12" y1="17" x2="12" y2="21"/></svg>
+    MONITOR &amp; BOT
+  </button>
+  <button class="cdc-mnav-btn" id="cdcNavCerebro" type="button" onclick="cdcNavMovil('cerebro')">
+    <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 3"/></svg>
+    IA / RADAR
+  </button>
+</nav>
+<script>
+(function () {
+  "use strict";
+  var MQ = window.matchMedia("(max-width:950px)");
+  function sbAbierto() { var s = document.getElementById("sidebar"); return !!(s && s.classList.contains("sidebar-mobile-open")); }
+  function activo(k) {
+    [["lista", "cdcNavLista"], ["monitor", "cdcNavMonitor"], ["cerebro", "cdcNavCerebro"]].forEach(function (x) {
+      var b = document.getElementById(x[1]); if (b) b.classList.toggle("active", x[0] === k);
+    });
+  }
+  function auto() {
+    if (!MQ.matches) return;
+    if (sbAbierto()) { activo("lista"); return; }
+    var r = document.getElementById("columnRight");
+    activo(r && r.getBoundingClientRect().top < window.innerHeight * 0.45 ? "cerebro" : "monitor");
+  }
+  window.cdcNavMovil = function (k) {
+    if (!MQ.matches) return;
+    if (k === "lista") {
+      if (sbAbierto()) { if (typeof cerrarSidebarMobile === "function") cerrarSidebarMobile(); }
+      else if (typeof abrirSidebarMobile === "function") abrirSidebarMobile();
+      setTimeout(auto, 50); return;
+    }
+    if (sbAbierto() && typeof cerrarSidebarMobile === "function") cerrarSidebarMobile();
+    var t = document.getElementById(k === "monitor" ? "cdcQuickBootBox" : "columnRight");
+    if (t && t.scrollIntoView) t.scrollIntoView({ behavior: "smooth", block: "start" });
+    activo(k);
+  };
+  var tick = false;
+  window.addEventListener("scroll", function () { if (tick) return; tick = true; requestAnimationFrame(function () { tick = false; auto(); }); }, { passive: true });
+  document.addEventListener("click", function () { setTimeout(auto, 120); });
 })();
 </script>
 
