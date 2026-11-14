@@ -18302,7 +18302,7 @@ window.CDC_FLASH=(function(){
     // archivo completo sin caer en la paradoja de "el hash contiene su
     // propio hash". No cambiar este texto.
     var _PLACEHOLDER = "%%CDC_INTEGRITY_HASH%%";
-    var _HASH_ESPERADO = "05c475941775660ec724ec622c380e621afd512cb8e4f43d56de75fc7f912904"; // ← se reemplaza por el hash real en el paso final
+    var _HASH_ESPERADO = "40fd6fb116fa0988986f7c9fb5b1e4434495c93699052d984671b87ec5f6a0d3"; // ← se reemplaza por el hash real en el paso final
 
     function _bloquear(motivo) {
         try {
@@ -20286,8 +20286,14 @@ function $(i){return document.getElementById(i);}
 function limpiar(){var p=[];try{if(navigator.serviceWorker)p.push(navigator.serviceWorker.getRegistrations().then(function(rs){return Promise.all(rs.map(function(r){return r.unregister();}));}));}catch(e){}
  try{if(window.caches)p.push(caches.keys().then(function(ks){return Promise.all(ks.map(function(k){return caches.delete(k);}));}));}catch(e){}
  return Promise.all(p).catch(function(){});}
-function aplicar(){if(busy)return;busy=true;var b=$("cdcUpdBtn");if(b)b.textContent="⏳";
- limpiar().then(function(){location.replace(location.pathname+"?v="+Date.now()+location.hash);});}
+function aplicar(){if(busy)return;
+ if(window.cdcBotActivo&&window.cdcBotActivo()&&!confirm("El bot está ENCENDIDO. Al actualizar se apagará (tus salidas puestas en Binance siguen ahí). ¿Actualizar ahora?"))return;
+ busy=true;var b=$("cdcUpdBtn");if(b)b.textContent="⏳";
+ var url=location.pathname+"?v="+Date.now()+location.hash;
+ fetch(url,{cache:"no-store"}).then(function(r){if(!r.ok)throw new Error("http "+r.status);return r.text();})
+ .then(function(tx){if(tx.length<100000||tx.indexOf("CDC FUTURO-PRO")<0)throw new Error("la página nueva llegó vacía");return limpiar();})
+ .then(function(){window.__cdcSalir=true;location.replace(url);})
+ .catch(function(e){busy=false;if(b)b.textContent="🔄";alert("No se pudo actualizar ahora ("+((e&&e.message)||"sin conexión")+"). Tus claves siguen guardadas. Intenta de nuevo en unos segundos.");});}
 function guardOK(){try{var n=+sessionStorage.getItem("cdc_upd_n")||0,l=+sessionStorage.getItem("cdc_upd_t")||0;if(Date.now()-l>60000)n=0;if(n>=2)return false;sessionStorage.setItem("cdc_upd_n",n+1);sessionStorage.setItem("cdc_upd_t",Date.now());}catch(e){}return true;}
 function banner(){var b=$("cdcUpdBan");if(b)b.style.display="flex";}
 function revisar(){fetch(location.pathname+"?_="+Date.now(),{cache:"no-store"}).then(function(r){ETAG=r.headers.get("etag")||r.headers.get("last-modified");return r.text();}).then(function(tx){var m=tx.match(RX);if(!m||!B)return;
@@ -21474,7 +21480,7 @@ window.CDC_TRACK=(function(){
        Todo corre en el dispositivo del usuario: las claves se guardan solo en su navegador (localStorage)
        y se envían directo a Binance. La página alojada en GitHub es estática y NO recibe ninguna clave.
        ══════════════════════════════════════════════════════════════════ */
-    var IPLS = "cdcBotIp_v1", TUT_PDF = "Guia_CDC_Bot_Binance.pdf";
+    var IPLS = "cdcBotIp_v1", TUT_URL = "https://juanpabloortizortuno-web.github.io/TUTORIAL-CDC/";
     var conOpen = false, conTab = "con", conIP = "", conIPBusy = false, conIPTimer = 0, conIPInfo = leerLS(IPLS), conFrameSym = null, avCon = 0;
     function esMovil() { try { return window.matchMedia("(max-width:820px)").matches || /Android|iPhone|iPad|iPod/i.test(navigator.userAgent); } catch (e) { return false; } }
     function tipoRed() {
@@ -21599,15 +21605,12 @@ window.CDC_TRACK=(function(){
         var ok = function () { if (!el) return; var o = el.textContent; el.textContent = "✅ Copiado"; setTimeout(function () { el.textContent = o; }, 1500); };
         try { navigator.clipboard.writeText(txt).then(ok, function () { prompt("Copia el texto:", txt); }); } catch (x) { prompt("Copia el texto:", txt); }
     }
-    /* ── TUTORIAL: PDF + resumen en pantalla ── */
-    function tutHtml() {
-        var pdf = TUT_PDF;
-        var h = '<div class="bdf-row"><a class="bdf-btn bdf-green" href="' + pdf + '" download="' + pdf + '" style="flex:1">⬇ Descargar PDF</a><a class="bdf-btn bdf-blue" href="' + pdf + '" target="_blank" rel="noopener" style="flex:1">↗ Abrir en otra pestaña</a></div>' +
-            '<div class="bdf-row"><button class="bdf-btn bdf-gold" data-ta="ver" style="flex:1">👁 Ver el PDF aquí</button><button class="bdf-btn bdf-gold" data-ta="guia" style="flex:1">🔑 Guía interactiva</button></div>' +
-            '<div id="bdTutSt" style="margin:8px 0;font-size:11px;color:#94a3b8">Comprobando el PDF…</div>' +
-            '<div id="bdTutFrameBox" style="display:none"><iframe id="bdTutFrame" style="width:100%;height:68vh;border:1px solid rgba(255,255,255,.12);border-radius:8px;background:#fff"></iframe>' +
-            '<div style="font-size:11px;color:#94a3b8;margin-top:4px">Si en tu celular solo se ve la primera página, usa «Abrir en otra pestaña» o «Descargar PDF».</div></div>';
-        h += card("📋 Resumen rápido (todo el detalle está en el PDF)",
+    /* ── TUTORIAL v2: se abre DENTRO de la app, como una capa encima del CDC.
+       Ya no usa window.open ni location.href: la página principal no se toca y el bot sigue trabajando. ── */
+    var tutVista = "guia", tutListo = {}, tutTimer = 0;
+    function tutResumen() {
+        var h = '<div class="bdf-av ok" style="margin-bottom:8px">✅ Este tutorial se abre dentro de la app: no sales del CDC y el bot sigue trabajando.</div>';
+        h += card("📋 Resumen rápido (el detalle completo está en la Guía completa)",
             paso(1, "Crea la API en Binance", 'Panel de usuario → Cuenta → Gestión de API → ' + K("Crear API") + ' → ' + K("Generada por el sistema") + ' (HMAC). Requiere KYC.') +
             paso(2, "Copia Key y Secret", 'El <b>Secret se muestra una sola vez</b>. No lo compartas ni lo muestres en capturas.') +
             paso(3, "Restringe la IP primero", 'Editar restricciones → ' + K("Restringir acceso solo a IPs de confianza") + ' → pega la IP que escanea la pantalla 🔌.') +
@@ -21620,15 +21623,32 @@ window.CDC_TRACK=(function(){
             '<div>• WiFi y datos móviles tienen <b>IP pública distinta</b>. Si cambias de red, agrega la IP nueva en Binance (la pantalla 🔌 te avisa).<br>• Las IP de datos móviles suelen cambiar seguido: puede dar −2015 de vez en cuando.<br>• El bot corre dentro de la página: <b>mantén la pestaña abierta y la pantalla encendida</b>. Si el celular bloquea o suspende el navegador, el bot se detiene (las órdenes de salida ya puestas en Binance siguen ahí).<br>• Recuerda: el bot no usa stop loss. Usa solo dinero que puedas perder.</div>');
         return h;
     }
-    async function tutChequear() {
-        var st = $("bdTutSt"); if (!st) return;
-        try { var r = await fetch(TUT_PDF, { method: "HEAD", cache: "no-store" }); if (!r.ok) throw 0; st.innerHTML = '<span style="color:#0ecb81">✅ PDF disponible: ' + TUT_PDF + '</span>'; }
-        catch (e) { st.innerHTML = '<span style="color:#ff9aa5">⚠️ No encuentro «' + TUT_PDF + '» junto a esta página. Súbelo al mismo repositorio de GitHub con ese nombre exacto (si abres el HTML desde un archivo local, ponlos en la misma carpeta y ábrelos desde un servidor).</span>'; }
+    function tutPintarEstado() { var p = $("bdTutBot"); if (p) p.style.display = cfg.activo ? "inline-block" : "none"; }
+    function tutVer(v) {
+        tutVista = v;
+        ["guia", "res"].forEach(function (k) {
+            var p = $("ttP-" + k), b = document.querySelector('#bdTut [data-ta="v-' + k + '"]');
+            if (p) p.style.display = k === v ? "block" : "none";
+            if (b) { b.classList.toggle("on", k === v); b.setAttribute("aria-selected", k === v ? "true" : "false"); }
+        });
+        if (v === "guia") tutCargarGuia();
+        else if (!tutListo.res) { $("ttP-res").innerHTML = '<div class="bc-in" style="padding-top:10px">' + tutResumen() + '</div>'; tutListo.res = 1; }
+    }
+    function tutCargarGuia() {
+        if (tutListo.guia) return;
+        var f = $("ttFrame"), ld = $("ttLoad");
+        if (navigator.onLine === false) { ld.style.display = "flex"; ld.innerHTML = '<div style="font-size:30px">📡</div><b style="color:#f3ba2f">Sin conexión</b><div>La guía completa necesita internet. El resumen sí funciona sin conexión.</div><button class="bdf-btn bdf-gold" data-ta="v-res">⚡ Ver el resumen</button>'; return; }
+        tutListo.guia = 1; ld.style.display = "flex";
+        f.onload = function () { clearTimeout(tutTimer); ld.style.display = "none"; };
+        f.src = TUT_URL + "?app=1";
+        tutTimer = setTimeout(function () { if (ld.style.display !== "none") ld.innerHTML = '<div style="font-size:30px">⏳</div><b style="color:#f3ba2f">Tarda más de lo normal…</b><div>Revisa tu conexión. Mientras tanto puedes ver el resumen.</div><div style="display:flex;gap:8px;flex-wrap:wrap;justify-content:center"><button class="bdf-btn bdf-gold" data-ta="v-res">⚡ Ver el resumen</button></div>'; }, 12000);
     }
     function abrirTut(v) {
-        $("bdTut").style.display = v ? "block" : "none";
-        if (v) { $("bdTutBody").innerHTML = tutHtml(); tutChequear(); }
+        var T = $("bdTut"); if (!T) return;
+        T.style.display = v ? "flex" : "none";
+        if (v) { tutPintarEstado(); tutVer(tutVista); }
     }
+    function irTutorial() { abrirTut(true); }
     function montarCon() {
         if ($("bdCon")) return;
         var css = document.createElement("style");
@@ -21643,8 +21663,18 @@ window.CDC_TRACK=(function(){
             ".bc-big{width:100%;padding:14px;font-size:15px}.bc-hero{background:linear-gradient(135deg,#0b1630,#0b1220);border:1px solid rgba(37,99,235,.5);border-radius:14px;padding:12px 14px;margin:8px 0;text-align:center}" +
             "#bdCon .bdf-btn,#bdTut .bdf-btn{padding:10px 12px;font-size:13px;min-height:42px}#bdCon .bdf-tabs{grid-template-columns:repeat(2,1fr)}#bdCon .bdf-tabs button{padding:9px 3px;font-size:12px}";
         document.head.appendChild(css);
+        css.textContent += "#bdTut{flex-direction:column;overflow:hidden}#bdTut .bc-h{flex:none}" +
+            ".tt-tabs{display:flex;gap:6px;padding:8px 12px;background:#0b1220;border-bottom:1px solid rgba(255,255,255,.08);overflow-x:auto;flex:none}" +
+            ".tt-tabs button{flex:1 0 auto;min-height:42px;padding:8px 12px;border-radius:10px;border:1px solid rgba(255,255,255,.14);background:#0d1526;color:#cbd5e1;font:700 12.5px Inter,Arial,sans-serif;cursor:pointer;white-space:nowrap}" +
+            ".tt-tabs button.on{border-color:#f3ba2f;background:rgba(243,186,47,.14);color:#f3ba2f}.tt-tabs button.ac{border-style:dashed;border-color:rgba(14,203,129,.6);color:#0ecb81}" +
+            ".tt-tabs button:focus-visible,#bdTut .x:focus-visible{outline:2px solid #8fc3ff;outline-offset:2px}" +
+            ".tt-pill{display:none;margin-left:8px;padding:2px 8px;border-radius:99px;border:1px solid #0ecb81;color:#0ecb81;font:700 10.5px Arial,sans-serif;vertical-align:middle}" +
+            "#bdTutBody{flex:1;min-height:0;position:relative}#bdTutBody>div{position:absolute;top:0;left:0;right:0;bottom:0}#ttP-res{overflow:auto;-webkit-overflow-scrolling:touch}" +
+            "#ttFrame{position:absolute;top:0;left:0;width:100%;height:100%;border:0;background:#050914}" +
+            "#ttLoad{position:absolute;top:0;left:0;right:0;bottom:0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:10px;padding:24px;text-align:center;color:#94a3b8;background:#050914}" +
+            "";
         var C = document.createElement("div"); C.id = "bdCon";
-        C.innerHTML = '<div class="bc-h"><b style="color:#f3ba2f;font-size:14px">🔌 CONEXIÓN BINANCE<span id="bcModo" class="bdf-pill t"></span></b><span style="white-space:nowrap"><button class="x" data-ca="tut" title="Tutorial en PDF">📄</button> <button class="x" data-ca="x">✕</button></span></div>' +
+        C.innerHTML = '<div class="bc-h"><b style="color:#f3ba2f;font-size:14px">🔌 CONEXIÓN BINANCE<span id="bcModo" class="bdf-pill t"></span></b><span style="white-space:nowrap"><button class="x" data-ca="tut" title="Tutorial">📄</button> <button class="x" data-ca="upd" title="Actualizar a la última versión (no borra tus claves)">🔄</button> <button class="x" data-ca="x">✕</button></span></div>' +
             '<div class="bc-in"><div class="bdf-tabs"><button id="bcTcon" data-ca="tab-con">🔌 Conectar</button><button id="bcTopc" data-ca="tab-opc">🤖 Bot Desmayo</button><button id="bcTmon" data-ca="tab-mon">📊 Monitor</button><button data-ca="panel">📒 Operaciones / Registro</button></div><div id="bcAv"></div>' +
             '<div id="bcVcon"><div class="bdf-card"><h4>📲 Instalar como aplicación</h4><div id="bcInst"></div></div>' +
               '<div class="bdf-card"><h4>🌐 1 · IP para pegar en Binance (se escribe sola)</h4><input id="bcIP" class="bc-ip" readonly value="Escaneando…" onfocus="this.select()" aria-label="IP pública"><div id="bcIPnet" style="text-align:center;color:#94a3b8;font-size:11px"></div><div id="bcIPwarn"></div>' +
@@ -21677,21 +21707,26 @@ window.CDC_TRACK=(function(){
             if (pills) pills.style.display = "none";
         } catch (e) {}
         var T = document.createElement("div"); T.id = "bdTut";
-        T.innerHTML = '<div class="bc-h"><b style="color:#f3ba2f;font-size:14px">📄 TUTORIAL · Bot Desmayo</b><button class="x" data-ta="x">✕</button></div><div class="bc-in"><div id="bdTutBody"></div></div>';
+        T.innerHTML = '<div class="bc-h"><b style="color:#f3ba2f;font-size:14px">📄 TUTORIAL · CDC y Bot<span id="bdTutBot" class="tt-pill">🤖 Bot activo · sigue trabajando</span></b><span style="white-space:nowrap"><button class="x" data-ta="x" aria-label="Cerrar tutorial">✕</button></span></div>' +
+            '<div class="tt-tabs" role="tablist" aria-label="Vistas del tutorial"><button role="tab" data-ta="v-guia">📖 Guía completa</button><button role="tab" data-ta="v-res">⚡ Resumen</button><button class="ac" data-ta="guia" title="Abre la Guía API del panel: detecta tu IP y explica la API paso a paso">🔑 Guía API</button></div>' +
+            '<div id="bdTutBody"><div id="ttP-guia"><iframe id="ttFrame" title="Guía completa del CDC y el Bot" referrerpolicy="no-referrer"></iframe><div id="ttLoad"><div style="font-size:30px">⏳</div><b style="color:#f3ba2f">Cargando la guía…</b></div></div>' +
+            '<div id="ttP-res" style="display:none"></div>' +
+            '</div>';
         document.body.appendChild(T);
         /* botón flotante del tutorial (columna de botones flotantes) */
-        var tb = document.createElement("button"); tb.id = "bdTutBtn"; tb.type = "button"; tb.title = "Tutorial en PDF"; tb.setAttribute("aria-label", "Tutorial en PDF"); tb.textContent = "📄";
+        var tb = document.createElement("button"); tb.id = "bdTutBtn"; tb.type = "button"; tb.title = "Tutorial (CDC y Bot)"; tb.setAttribute("aria-label", "Tutorial"); tb.textContent = "📄";
         tb.style.cssText = "position:relative;width:48px;height:48px;border-radius:50%;border:2px solid #f3ba2f;background:rgba(11,18,32,.92);color:#fff;font:900 20px Arial;cursor:pointer;box-shadow:0 0 10px rgba(243,186,47,.45);padding:0;flex:none;touch-action:manipulation";
         var fb = document.querySelector(".floating-buttons"), ref = $("bdFabBtn");
         if (fb) fb.insertBefore(tb, ref && ref.parentNode === fb ? ref : fb.firstChild);
         else { tb.style.position = "fixed"; tb.style.right = "10px"; tb.style.bottom = "calc(345px + env(safe-area-inset-bottom,0px))"; tb.style.zIndex = "9400"; document.body.appendChild(tb); }
-        tb.onclick = function () { abrirTut(true); };
+        tb.onclick = irTutorial;
         C.addEventListener("click", function (e) {
             var el = e.target.closest ? e.target.closest("[data-ca],[data-sym]") : null; if (!el) return;
             var a = el.getAttribute("data-ca"), sy = el.getAttribute("data-sym");
             if (sy) { fabSel = sy; conPintar(); return; }
             if (a === "x") abrirCon(false);
-            else if (a === "tut") abrirTut(true);
+            else if (a === "tut") irTutorial();
+            else if (a === "upd") { if (window.CDC_UPDATE) window.CDC_UPDATE.aplicar(); }
             else if (a === "edit") { conEdit = true; conPintar(); }
             else if (a === "tab-con") { conTab = "con"; conPintar(); }
             else if (a === "tab-opc") { conTab = "opc"; conPintar(); autoConectar(true); }
@@ -21711,15 +21746,17 @@ window.CDC_TRACK=(function(){
             var el = e.target.closest ? e.target.closest("[data-ta]") : null; if (!el) return;
             var a = el.getAttribute("data-ta");
             if (a === "x") abrirTut(false);
-            else if (a === "ver") { var b = $("bdTutFrameBox"), f = $("bdTutFrame"); if (b.style.display === "none") { if (!f.getAttribute("src")) f.src = TUT_PDF + "#view=FitH"; b.style.display = "block"; el.textContent = "🙈 Ocultar PDF"; } else { b.style.display = "none"; el.textContent = "👁 Ver el PDF aquí"; } }
+            else if (a.indexOf("v-") === 0) tutVer(a.slice(2));
             else if (a === "guia") { abrirTut(false); if (conOpen) abrirCon(false); fabTab = "gui"; fabIni = true; abrirFab(true); }
         });
+        document.addEventListener("keydown", function (e) { if (e.key === "Escape" && T.style.display === "flex") abrirTut(false); });
         $("bcWake").onchange = function () { wakePref = this.checked; escLS(WLS, { on: wakePref }); wakeTick(); };
         window.addEventListener("online", function () { if (conOpen) setTimeout(function () { conIP = ""; conIPDetect(); }, 800); });
         try { var nc = navigator.connection; if (nc && nc.addEventListener) nc.addEventListener("change", function () { if (conOpen) { conIP = ""; conIPDetect(); } }); } catch (e) {}
     }
 
     /* ── 📲 INSTALAR COMO APP · 🔆 PANTALLA ENCENDIDA · ♻ AVISO DE REANUDACIÓN ── */
+    window.cdcBotActivo = function () { return !!cfg.activo; };
     var conEdit = false, WLS = "cdcBotWake_v1", ONLS = "cdcBotOn_v1", wakePref = leerLS(WLS).on !== false, wl = null, instEv = null, habiaOn = leerLS(ONLS), prevAct = false;
     function enApp() { try { return window.matchMedia("(display-mode: standalone)").matches || window.navigator.standalone === true; } catch (e) { return false; } }
     window.addEventListener("beforeinstallprompt", function (e) { e.preventDefault(); instEv = e; instPintar(); });
@@ -21752,7 +21789,7 @@ window.CDC_TRACK=(function(){
         wakePaint();
     }
     setInterval(wakeTick, 3000); document.addEventListener("visibilitychange", wakeTick);
-    window.addEventListener("beforeunload", function (e) { if (cfg.activo) { e.preventDefault(); e.returnValue = ""; return ""; } });
+    window.addEventListener("beforeunload", function (e) { if (cfg.activo && !window.__cdcSalir) { e.preventDefault(); e.returnValue = ""; return ""; } });
 
     /* ── PANEL ── */
     var CAMPOS = ["d", "e", "t", "c1", "p1", "t1", "c2", "p2", "t2"];
