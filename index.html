@@ -35,7 +35,31 @@ return _si.apply(window,arguments);};
 try{new PerformanceObserver(function(l){l.getEntries().forEach(function(e){var L=window.__cdcLong=window.__cdcLong||[];L.push([Math.round(e.startTime/1000),Math.round(e.duration)]);if(L.length>60)L.shift();});}).observe({entryTypes:["longtask"]});}catch(e){}
 })();
 </script>
-    <script id="cdc-net-guard">
+    <style id="cdc-mx-v4">
+/* 📐 Monitor v4: 3 columnas ≥1100px · 2 columnas 720–1099px · 1 columna en celular */
+#bdCon.mx-wide .mx-sec{border-top:2px solid rgba(243,186,47,.55);box-shadow:0 6px 22px rgba(0,0,0,.35);transition:border-color .2s,box-shadow .2s}
+#bdCon.mx-wide .mx-sec:hover{border-top-color:#f3ba2f;box-shadow:0 8px 26px rgba(243,186,47,.12)}
+.mx-kpis{display:grid;grid-template-columns:repeat(3,1fr);gap:8px}
+.mx-kpi{background:#080e1c;border:1px solid rgba(255,255,255,.08);border-left:3px solid var(--k,#475569);border-radius:10px;padding:8px 10px;min-width:0}
+.mx-kpi small{display:block;color:#7f95b3;font-size:10px;letter-spacing:.3px}
+.mx-kpi b{display:block;font-size:14px;color:#fff;margin-top:1px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.mx-kpi em{display:block;font-style:normal;font-size:10px;color:#64748b;margin-top:1px}
+.mx-meter{height:7px;background:#1a2438;border-radius:5px;margin:8px 0 2px;overflow:hidden}
+.mx-meter i{display:block;height:100%;border-radius:5px}
+@media (min-width:720px) and (max-width:1099px){
+ #bdCon.mx-wide .bc-in{max-width:1040px;padding:0 14px 30px}
+ #bcVmon{display:grid;grid-template-columns:1fr 1fr;gap:12px;align-items:start}
+ #bcMon,.mx-grid{display:contents}
+ .mx-top{grid-column:1/-1;order:-1}
+ .mx-c1{grid-column:1}.mx-c2{grid-column:2}.mx-c3{grid-column:1/-1}
+ #bcChart{grid-column:1/-1;order:3;margin:0}
+ .mx-h{cursor:default;pointer-events:none}.mx-x i{display:none}
+ .mx-sec.closed .mx-b{display:block !important}
+ .mx-g{grid-template-columns:repeat(2,1fr)}
+}
+@media (min-width:1100px){.mx-c1,.mx-c2,.mx-c3{min-width:0}}
+</style>
+<script id="cdc-net-guard">
     /* 🛡️ CDC NET-GUARD: evita llamadas repetidas a Binance (dedupe + caché corto + freno ante 429/418).
        Solo toca peticiones GET públicas sin firma; las firmadas/privadas pasan intactas. */
     (function(){var of=window.fetch;if(!of)return;var C={},P={},ban=0,TTL=2500;
@@ -1973,7 +1997,7 @@ function frame(now){
     ctx.globalAlpha=a;
     ctx.fillStyle='rgba('+col.join()+',0.95)';ctx.beginPath();ctx.arc(nd.X,nd.Y,rr,0,6.2832);ctx.fill();
     ctx.strokeStyle='rgba('+col.join()+',0.55)';ctx.lineWidth=1;
-    ctx.beginPath();ctx.arc(nd.X,nd.Y,rr+3.5*kS+(cn.hot&&!REDUCED?2*Math.sin(now/260):0),0,6.2832);ctx.stroke();
+    ctx.beginPath();ctx.arc(nd.X,nd.Y,Math.max(0.5,rr+3.5*kS+(cn.hot&&!REDUCED?2*Math.sin(now/260):0)),0,6.2832);ctx.stroke();
     if(cn.p!=null){                                                    // arco = probabilidad de caída (si hay datos)
       ctx.strokeStyle=cn.p>=0.6?'rgba(235,100,110,.95)':cn.p>=0.4?'rgba(235,185,100,.95)':'rgba(90,205,150,.95)';
       ctx.lineWidth=2;ctx.beginPath();
@@ -18736,7 +18760,7 @@ window.CDC_FLASH=(function(){
     // archivo completo sin caer en la paradoja de "el hash contiene su
     // propio hash". No cambiar este texto.
     var _PLACEHOLDER = "%%CDC_INTEGRITY_HASH%%";
-    var _HASH_ESPERADO = "a972140324e86d71614feb69837bdb6bd8e758be1c355144ce3c8a1fbad9c2d0"; // ← se reemplaza por el hash real en el paso final
+    var _HASH_ESPERADO = "7c17a74483d42e4bb6071382e21e0b852b9bf0cb2e88cda10c0c205bbb22f186"; // ← se reemplaza por el hash real en el paso final
 
     function _bloquear(motivo) {
         try {
@@ -19070,6 +19094,56 @@ function head(st){if(!BR.hd&&!BR.hd2)return;var F=window.CDC_FUT&&st.sym?CDC_FUT
  if(F)h+=" · Funding <b style='color:"+(F.fr<0?"#ff4d6d":"#0ecb81")+"'>"+F.fr.toFixed(3)+"%</b> · OI 15m <b>"+(F.c15>=0?"+":"")+F.c15.toFixed(1)+"%</b>";
  h+=clsHtml();var lg=st.E&&st.E.log&&st.E.log.length?"<div style='margin-top:3px;color:#b58cff'>🧬 "+st.E.log[st.E.log.length-1]+"</div>":"";
  var out=h+lg+(F&&F.q.tipo?"<div style='margin-top:3px;color:#f3ba2f'>"+F.q.txt+"</div>":"");if(BR.hd)BR.hd.innerHTML=out;if(BR.hd2)BR.hd2.innerHTML=out;}
+var MAPB64="AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAOAfAP8HAAAAAAAAAAAAAAAAAAAAAADo//z//wcAAAAAAAACAAAAAAAAAAAAhvvw//8PAPABAAAAwAMAAAAAAAAAwADkw////wEABAAAAABgAAAAAAAAAADAUT8A/v8PAAAAAAwA/j8AuAEAAAAAcBHtDcD/fwAAAAAwAPz/fwMAABCAAQD5w/wD8P8FAAAcAIL7//9//xOAAP/ff0668QD/HwAA+A8At///////v3/w/////x8++B8AAOD/1//7////////jP////+/+AE/gAcAn9f//////////w/w/////wEs4AEAAHz+////////////gL////8HeAAcAADg5///////////9ADgAf7/f4AnAAAAAH78////////H0QAAAiA//8f8AcAAIBB4////////38ADwAQAOD//5//AQAAHAT/////////A3AAAAAA/v//+T8AAGDz//////////8DAQAAAMD/////AwAAsP//////////LwAAAAAA6P///2IAAAD+//////////8CAAAAAAD///8/CAAA4P//////////JwAAAAAA8P///wYAAAD+/unz/////z8AAAAAAAD///8HAAAA/pgPPP//////MQAAAAAA8P//PwAAAMBD9v7n/////wcBAAAAAAD///8AAAAAPkD7f/7///8hEAAAAAAA4P//DwAAAIDhAv/n////f8YAAAAAAAD8//8AAAAA+AdE//////8jDwAAAAAAgP//AwAAAMD/APD/////PxgAAAAAAADw/x8AAAAA/n/v//////8HAAAAAAAAAPwDAgAAAOD////7////fwAAAAAAAACgHyAAAACA//9/f/7///8DAAAAAAAAAPQBAAAAAPj//+cv+P//PwAAAAAAAAAAHjAAAADA/////g/+//8EAAAAAAAAAOBhCAAAAP7//99/4D//AAAAAAAAAAAAPAMEAADA////+Qf84BcAAAAAAAAAAAA/AAAAAPz//58fgAf+QAAAAAAAAAAAAA8AAADg////ewA4gA8EAAAAAAAAAADAAAAAAPz//38BgAP4QQAAAAAAAAAAAAgPAADA////zwAwgAwQAAAAAAAAAAAA9Q8AAPj///8HAAVIAAAAAAAAAAAAAID/AQAA////fwBAAAAQAAAAAAAAAAAA+P8AAGDh//8DAAA0GAAAAAAAAAAAAID/HwAAAPj/HwAAgMIBAAAAAAAAAAAA/P8BAACA//8AAAAYXgAAAAAAAAAAAMD/fwAAAPz/BwAAAOOBAQAAAAAAAAAA/P8/AACA/z8AAABgbtQBAAAAAAAAAOD//w8AAPD/AwAAAAQIeAAAAAAAAAAA/P//AQAA/z8AAACAA4APAQAAAAAAAID//w8AAPD/AwAAAAARsEAAAAAAAAAA+P9/AAAA/j8AAAAAAAAAAAAAAAAAAAD//wcAAPD/QwAAAACAIwAAAAAAAAAA8P9/AAAA/z8EAAAAAD8GIAAAAAAAAAD8/wMAAPD/cQAAAAD4ZwAAAAAAAAAAgP8/AAAA/w8HAAAAgP8HAAAAAAAAAAD4/wMAAOD/MAAAAAD//wEBAAAAAAAAgP8PAAAA/g8DAAAA+P8fAAAAAAAAAAD4PwAAAOB/EAAAAID//wMAAAAAAAAAgP8DAAAA/AMAAAAA+P9/AAAAAAAAAAD8HwAAAMA/AAAAAID//wcAAAAAAAAAwP8BAAAA+AEAAAAA8P9/AAAAAAAAAAD8DwAAAIAPAAAAAAAP/gMAAAAAAAAAwB8AAAAAAAAAAAAAEIAfAAEAAAAAAAD+AwAAAAAAAAAAAAAA8AEgAAAAAAAA4AcAAAAAAAAAAAAAAAAAAAYAAAAAAABeAAAAAAAAAAAAAAAAwAAwAAAAAAAAwAMAAAAAAAAAAAAAAAAIgAEAAAAAAAAeAAAAAAAAAAAAAAAAAAAMAAAAAAAA4AEAAAAAAAAAAAAAAAAAAAAAAAAAAAAPAAAAAAAAAAABAAAAAAAAAAAAAAAAcAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAOAAAAAAAAAAAAAAAAAAAAAAAAAAAAwAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAABAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAMAAAAAAAB4AEDwn/8HAAAAAAAAAAAwAAAAAACA/P/h/////w8AAAAAAAAAwAcAAAD4////z///////PwAAAAAAHALwAACA//////////////8HAADw/y///wMAAP7/////////////HwAA+P///38AAID///////////////8AAPL/////BwAO////////////////DwAA8P////8HEPD//////////////z8AAOD/////////////////////////H/AfwP//////////////////////////////////////////////////////////////////////////////////////",MLAND=null;
+function mapInit(ov,cvF,hF,lg){
+ var cvM=document.createElement("canvas");cvM.style.cssText="flex:1;width:100%;min-height:0;display:none;touch-action:none";ov.insertBefore(cvM,cvF.nextSibling);
+ var cx=cvM.getContext("2d"),W=800,H=500,dp=Math.min(2,window.devicePixelRatio||1),on=false,run=false,FL=[],RP=[],nextT=0,geo=null,geoK="";
+ var HUBS=[["Nueva York",40.7,-74,"A"],["Chicago",41.9,-87.6,"A"],["São Paulo",-23.5,-46.6,"A"],["Santa Cruz",-17.8,-63.2,"H"],["Londres",51.5,-0.1,"E"],["Zúrich",47.4,8.5,"E"],["Frankfurt",50.1,8.7,"E"],["Dubái",25.2,55.3,"M"],["Mumbai",19.1,72.9,"S"],["Singapur",1.35,103.8,"S"],["Hong Kong",22.3,114.2,"S"],["Seúl",37.6,127,"S"],["Tokio",35.7,139.7,"S"],["Sídney",-33.9,151.2,"S"]];
+ var REG={A:["América",13,22,"#7fe9ff"],E:["Europa",7,16,"#b58cff"],M:["Medio Oriente",5,14,"#ffd21f"],S:["Asia-Pacífico",0,9,"#ff9a3c"]};
+ function opened(r,h){if(r==="H")return true;var q=REG[r];if(r==="S")return h<9||h>=22;return h>=q[1]&&h<q[2];}
+ if(!MLAND){MLAND=[];try{var b=atob(MAPB64);for(var r=0;r<90;r++)for(var c=0;c<180;c++){var i=r*180+c;if(b.charCodeAt(i>>3)>>(i&7)&1)MLAND.push([89-2*r,-179+2*c]);}}catch(e){}}
+ function size(){var r=cvM.getBoundingClientRect();W=Math.max(300,r.width);H=Math.max(260,r.height);cvM.width=Math.round(W*dp);cvM.height=Math.round(H*dp);cx.setTransform(dp,0,0,dp,0,0);geo=null;}
+ if(window.ResizeObserver)new ResizeObserver(function(){if(on)size();}).observe(cvM);
+ function G(){var k=W+"x"+H;if(geo&&geoK===k)return geo;geoK=k;var top=100,bot=96,mh=H-top-bot,mw=Math.min(W-24,mh*360/138);mh=mw*138/360;var x0=(W-mw)/2,y0=top+(H-top-bot-mh)/2;geo={x0:x0,y0:y0,mw:mw,mh:mh};
+  var p=[];MLAND.forEach(function(d){if(d[0]>80||d[0]<-58)return;p.push(x0+(d[1]+180)/360*mw,y0+(80-d[0])/138*mh);});geo.land=p;return geo;}
+ function P(la,lo){var g=geo;return [g.x0+(lo+180)/360*g.mw,g.y0+(80-la)/138*g.mh];}
+ function coins(){var C=[],o={};try{o=(0,eval)("typeof cachedData!=='undefined'?cachedData:{}");}catch(e){}
+  Object.keys(CN).forEach(function(q){var n=CN[q];C.push({s:q.replace("USDT",""),k:n.desp?"d":n.pow?"p":"n",p:typeof n.p==="number"?n.p:null});});return C;}
+ function col(k){return k==="d"?"255,77,109":k==="p"?"255,210,31":"95,200,232";}
+ function spawn(now,h,C){if(!C.length||FL.length>=16)return;var op=HUBS.filter(function(x){return opened(x[3],h);});if(!op.length)op=HUBS;
+  var a=op[(Math.random()*op.length)|0],bb;do{bb=HUBS[(Math.random()*HUBS.length)|0];}while(bb===a);if(Math.random()<.3)bb=HUBS[3];if(bb===a)return;
+  var c=C[(Math.random()*C.length)|0];FL.push({a:a,b:bb,t:now,d:2600+Math.random()*1800,c:c});}
+ function arc(A,B,u){var dx=B[0]-A[0],dy=B[1]-A[1],L=Math.hypot(dx,dy),cx2=(A[0]+B[0])/2,cy2=(A[1]+B[1])/2-L*.28,a=1-u;return [a*a*A[0]+2*a*u*cx2+u*u*B[0],a*a*A[1]+2*a*u*cy2+u*u*B[1]];}
+ function draw(now){var d=new Date(),h=d.getUTCHours()+d.getUTCMinutes()/60,g=G(),i,C=coins();
+  cx.clearRect(0,0,W,H);var bg=cx.createRadialGradient(W/2,H/2,20,W/2,H/2,W*.65);bg.addColorStop(0,"#0a1222");bg.addColorStop(1,"#020611");cx.fillStyle=bg;cx.fillRect(0,0,W,H);
+  cx.fillStyle="rgba(125,211,252,.30)";cx.beginPath();for(i=0;i<g.land.length;i+=2)cx.rect(g.land[i]-1,g.land[i+1]-1,2,2);cx.fill();
+  if(now>=nextT){nextT=now+520;spawn(now,h,C);}
+  cx.lineCap="round";cx.font="700 10px Inter,Arial";
+  for(i=FL.length-1;i>=0;i--){var f=FL[i],u=(now-f.t)/f.d;if(u>=1){RP.push({t:now,p:P(f.b[1],f.b[2]),c:col(f.c.k)});FL.splice(i,1);continue;}
+   var A=P(f.a[1],f.a[2]),Bp=P(f.b[1],f.b[2]),c=col(f.c.k),u0=Math.max(0,u-.26),pl=arc(A,Bp,u0),q;
+   cx.strokeStyle="rgba("+c+",.10)";cx.lineWidth=1;cx.beginPath();cx.moveTo(A[0],A[1]);for(var s2=1;s2<=20;s2++){q=arc(A,Bp,s2/20);cx.lineTo(q[0],q[1]);}cx.stroke();
+   for(var s=1;s<=8;s++){q=arc(A,Bp,u0+.26*(u-u0)/.26*s/8);cx.strokeStyle="rgba("+c+","+(.8*s/8)+")";cx.lineWidth=.6+1.8*s/8;cx.beginPath();cx.moveTo(pl[0],pl[1]);cx.lineTo(q[0],q[1]);cx.stroke();pl=q;}
+   cx.fillStyle="#fff";cx.beginPath();cx.arc(pl[0],pl[1],2.2,0,6.2832);cx.fill();cx.fillStyle="rgba("+c+",.9)";cx.fillText(f.c.s+(f.c.p!=null?" "+Math.round(f.c.p*100)+"%":""),pl[0]+6,pl[1]-6);}
+  for(i=RP.length-1;i>=0;i--){var r=RP[i],ra=now-r.t;if(ra>900){RP.splice(i,1);continue;}cx.strokeStyle="rgba("+r.c+","+(.7*(1-ra/900))+")";cx.lineWidth=1.4;cx.beginPath();cx.arc(r.p[0],r.p[1],3+ra*.03,0,6.2832);cx.stroke();}
+  cx.textAlign="left";cx.font="600 10px Inter,Arial";
+  HUBS.forEach(function(x){var p=P(x[1],x[2]),op=opened(x[3],h),home=x[3]==="H",cc=home?"14,203,129":op?"243,186,47":"100,116,139";
+   if(op){cx.fillStyle="rgba("+cc+",.22)";cx.beginPath();cx.arc(p[0],p[1],7+2*Math.sin(now/500+x[1]),0,6.2832);cx.fill();}
+   cx.fillStyle="rgb("+cc+")";cx.beginPath();cx.arc(p[0],p[1],home?4:2.6,0,6.2832);cx.fill();cx.fillStyle=op?"rgba(226,240,255,.9)":"rgba(140,155,175,.65)";cx.fillText(x[0],p[0]+7,p[1]+3);});
+  /* panel de información */
+  var nd=C.filter(function(x){return x.k==="d";}).length,np=C.filter(function(x){return x.k==="p";}).length,top=C.filter(function(x){return x.p!=null;}).sort(function(a,b){return b.p-a.p;}).slice(0,5);
+  cx.font="900 12px Inter,Arial";cx.fillStyle="#f3ba2f";cx.fillText("🌍 MAPA MUNDI · circulación de monedas",14,52);
+  cx.font="11px Inter,Arial";cx.fillStyle="#7f95b3";cx.fillText("Hora UTC "+("0"+d.getUTCHours()).slice(-2)+":"+("0"+d.getUTCMinutes()).slice(-2)+" · monedas en estudio "+C.length+" · cayendo "+nd+" · despegando "+np,14,70);
+  var xx=14;Object.keys(REG).forEach(function(k){var o=opened(k,h);cx.fillStyle=o?REG[k][3]:"#475569";cx.fillText((o?"● ":"○ ")+REG[k][0]+(o?" abierto":" cerrado"),xx,88);xx+=cx.measureText("● "+REG[k][0]+" abierto").width+16;});
+  cx.fillStyle="#cbd5e1";cx.font="11px Inter,Arial";cx.fillText(top.length?"Más probables de caer: "+top.map(function(x){return x.s+" "+Math.round(x.p*100)+"%";}).join(" · "):(C.length?"Calculando probabilidades…":"Esperando monedas del CDC…"),14,H-62);
+  var lx=14;[["255,77,109","cae"],["255,210,31","despegando / poderosa"],["95,200,232","normal"],["14,203,129","tu zona (Santa Cruz)"],["243,186,47","mercado abierto"]].forEach(function(z){cx.fillStyle="rgb("+z[0]+")";cx.beginPath();cx.arc(lx+4,H-48,4,0,6.2832);cx.fill();cx.fillStyle="#9fb2cc";cx.fillText(z[1],lx+13,H-44);lx+=cx.measureText(z[1]).width+34;});
+  cx.fillStyle="#52647d";cx.font="10px Inter,Arial";cx.fillText("Ilustrativo: las rutas son simuladas con las monedas reales del CDC y las sesiones de mercado por hora UTC; no son flujos geográficos reales.",14,H-26);}
+ function loop(){if(run)return;run=true;var last=0;(function f(now){if(!on||ov.style.display!=="flex"||document.hidden){run=false;return;}if(now-last>=33){last=now;draw(now);}requestAnimationFrame(f);})(performance.now());}
+ window.__cdcMapLoop=function(){if(on)loop();};
+ var bar=document.createElement("div");bar.style.cssText="position:absolute;left:50%;top:58px;transform:translateX(-50%);z-index:4;display:flex;gap:6px";
+ function mk(t,m){var b=document.createElement("button");b.textContent=t;b.style.cssText="background:#0b1426;color:#e2e8f0;border:1px solid rgba(243,186,47,.5);border-radius:9px;padding:6px 12px;font:700 12px Inter,Arial;cursor:pointer;min-height:34px";b.onclick=function(){set(m);};return b;}
+ var b1=mk("🧠 Cerebro",false),b2=mk("🌍 Mapa mundi",true);bar.appendChild(b1);bar.appendChild(b2);ov.appendChild(bar);
+ function set(m){on=m;cvF.style.display=m?"none":"block";cvM.style.display=m?"block":"none";hF.style.display=m?"none":"block";lg.style.display=m?"none":"block";b1.style.background=m?"#0b1426":"#112043";b2.style.background=m?"#112043":"#0b1426";if(m){size();loop();}}
+ set(false);}
 var ov,fullView;
 function buildFull(){ov=document.createElement("div");ov.style.cssText="display:none;position:fixed;inset:0;z-index:9997;background:#020611;flex-direction:column";
  var hdE=document.createElement("div");hdE.style.cssText="position:relative;z-index:2;padding:10px 14px;background:rgba(6,11,22,.92);border-bottom:1px solid #f3ba2f;color:#e2e8f0;font:12px Arial;display:flex;justify-content:space-between;gap:10px";
@@ -19079,10 +19153,10 @@ function buildFull(){ov=document.createElement("div");ov.style.cssText="display:
  var lg=document.createElement("div");lg.style.cssText="position:absolute;left:12px;bottom:46px;z-index:2;color:#cbd5e1;font:11px Arial;background:rgba(6,11,22,.8);padding:6px 10px;border-radius:8px;max-width:520px";
  lg.innerHTML="Cerebro 3D · arrastra para girar · pellizca o Ctrl+rueda para zoom · toca una moneda para encenderla · <span style='color:#ff9a3c'>●</span> alta velocidad · el arco = probabilidad de caída · Borde: 30 datos · anillo interior: <span style='color:#b58cff'>células</span> · anillo exterior: monedas en estudio (<span style='color:#ff4d6d'>●</span> cayó · <span style='color:#0ecb81'>●</span> no cayó) · puentes <span style='color:#ff4d6d'>●</span> empujan a caída, <span style='color:#0ecb81'>●</span> la frenan · monedas: <span style='color:#ffd21f'>●</span> más poderosas · <span style='color:#ff2a3b'>●</span> ▲ despegando";
  ov.appendChild(hdE);ov.appendChild(cvF);ov.appendChild(lg);document.body.appendChild(ov);
- fullView={cv:cvF,ctx:cvF.getContext("2d"),active:false};var hF=document.createElement("div");hF.style.cssText="position:absolute;left:14px;top:62px;z-index:2;font:12px/1.6 Inter,Arial,sans-serif;color:#7f95b3;pointer-events:none";var tF=document.createElement("div");tF.style.cssText="position:absolute;z-index:3;pointer-events:none;font:12px Inter,Arial;padding:5px 9px;border-radius:8px;background:rgba(5,9,20,.92);border:1px solid rgba(120,165,215,.3);color:#dbe6f5;transform:translate(-50%,-130%);white-space:nowrap;display:none";ov.appendChild(hF);ov.appendChild(tF);if(window.CDC_N3D)fullView.n3=CDC_N3D.attach(cvF,hF,tF,ov,{FRAME_MS:16});}
+ fullView={cv:cvF,ctx:cvF.getContext("2d"),active:false};var hF=document.createElement("div");hF.style.cssText="position:absolute;left:14px;top:62px;z-index:2;font:12px/1.6 Inter,Arial,sans-serif;color:#7f95b3;pointer-events:none";var tF=document.createElement("div");tF.style.cssText="position:absolute;z-index:3;pointer-events:none;font:12px Inter,Arial;padding:5px 9px;border-radius:8px;background:rgba(5,9,20,.92);border:1px solid rgba(120,165,215,.3);color:#dbe6f5;transform:translate(-50%,-130%);white-space:nowrap;display:none";ov.appendChild(hF);ov.appendChild(tF);if(window.CDC_N3D)fullView.n3=CDC_N3D.attach(cvF,hF,tF,ov,{FRAME_MS:16});mapInit(ov,cvF,hF,lg);}
 function toggle(p){if(!ov)buildFull();var o=ov.style.display!=="flex";ov.style.display=o?"flex":"none";fullView.active=o;
  if(p){if(o){ov.appendChild(p);p.style.position="absolute";p.style.left="auto";p.style.right="10px";p.style.top="64px";p.style.bottom="auto";p.style.maxHeight="calc(100% - 130px)";p.style.zIndex=3;p.style.display="block";}else p.style.display="none";}
- if(o&&!fullView.n3)sizeView(fullView);return o;}
+ if(o&&!fullView.n3)sizeView(fullView);if(o&&window.__cdcMapLoop)window.__cdcMapLoop();return o;}
 BR.toggle=toggle;window.CDC_BRAIN=BR;
 function mountEmbedded(){var host=document.getElementById("thermometerView");
  if(!host||!host.parentNode||document.getElementById("cdcBrainEmbed")){if(!host)setTimeout(mountEmbedded,400);return;}
@@ -22087,7 +22161,22 @@ window.CDC_TRACK=(function(){
         var mm = modoMulti(d.wallet), modo;
         if (mm) modo = 'Modo <b style="color:#f3ba2f">MULTI-MONEDA</b>: hasta <b>' + mm.n + '</b> monedas · parte ≈ <b>' + nf(mm.presup, 2) + ' USDT</b> cada una · abiertas <b>' + d.pos.length + '/' + mm.n + '</b>';
         else { var pr = elegirPerfil(d.disp), ix = pr ? cfg.perfiles.indexOf(pr) + 1 : 0; modo = pr ? 'Perfil <b style="color:#f3ba2f">' + ix + '</b> según tu saldo disponible · 1 moneda a la vez · abiertas <b>' + d.pos.length + '/1</b>' : "Ningún perfil aplica a tu saldo disponible"; }
-        var c1 = mxSec("cta", "💼 Cuenta", "", hero + runb + cards) + mxSec("bot", "🤖 Estado del bot", cfg.activo ? "● activo" : "○ apagado", '<div style="font-size:11.5px;color:#cbd5e1">' + modo + '</div>' + esperaBanner(d, mm));
+        var _mu=d.wallet-d.disp,_ex=0,_nl=null,_bs=null,_ws=null;
+        d.pos.forEach(function (x) { var q=Math.abs(parseFloat(x.positionAmt)),mk=parseFloat(x.markPrice),lq=parseFloat(x.liquidationPrice)||0,p=parseFloat(x.unRealizedProfit)||0; _ex+=q*mk; if(lq>0&&mk){var dl=Math.abs(mk-lq)/mk*100; if(!_nl||dl<_nl.d)_nl={s:x.symbol,d:dl};} if(!_bs||p>_bs.p)_bs={s:x.symbol,p:p}; if(!_ws||p<_ws.p)_ws={s:x.symbol,p:p}; });
+        var _pm=d.wallet>0?Math.min(100,Math.max(0,_mu/d.wallet*100)):0, _lx=d.wallet>0?_ex/d.wallet:0;
+        function kp(t,v,c,sub){return '<div class="mx-kpi" style="--k:'+(c||'#475569')+'"><small>'+t+'</small><b'+(c?' style="color:'+c+'"':'')+'>'+v+'</b>'+(sub?'<em>'+sub+'</em>':'')+'</div>';}
+        function nm(z){return z?esc(z.s.replace("USDT","")):"—";}
+        var _lqc=!_nl?"#64748b":_nl.d<10?"#ff4d6d":_nl.d<25?"#ff9f1a":"#0ecb81";
+        var riesgo='<div class="mx-kpis">'+kp("Margen en uso",nf(_mu,2)+" USDT",_pm>80?"#ff4d6d":_pm>50?"#ff9f1a":"#0ecb81",nf(_pm,0)+" % de la cuenta")+kp("Exposición total",nf(_ex,2)+" USDT","#7fe9ff",nf(_lx,1)+"x tu capital")+kp("Liquidación más cercana",_nl?nf(_nl.d,1)+" %":"—",_lqc,_nl?nm(_nl):"sin posiciones")+kp("PnL sobre capital",d.wallet>0?(d.unr>=0?"+":"")+nf(d.unr/d.wallet*100,2)+" %":"—",col(d.unr),"posiciones abiertas")+kp("Mejor posición",_bs?(_bs.p>=0?"+":"")+nf(_bs.p,3):"—",_bs?col(_bs.p):"",nm(_bs))+kp("Peor posición",_ws?(_ws.p>=0?"+":"")+nf(_ws.p,3):"—",_ws?col(_ws.p):"",nm(_ws))+'</div><div class="mx-meter"><i style="width:'+_pm.toFixed(0)+'%;background:'+(_pm>80?"#ff4d6d":_pm>50?"#ff9f1a":"#0ecb81")+'"></i></div><div style="font-size:10px;color:#64748b">Barra: margen usado de tu billetera</div>';
+        var _mi2=cfg.testnet?"t":"r",_d0=new Date();_d0.setHours(0,0,0,0);
+        var _L=(typeof ops!=="undefined"?ops:[]).filter(function(o){return o.m===_mi2&&o.t>=_d0.getTime();}),
+            _cl=_L.filter(function(o){return o.tipo!=="COMPRA"&&o.tipo!=="RECOMPRA"&&o.tipo!=="SALIDA"&&o.neto!=null;}),
+            _gn=_cl.filter(function(o){return o.neto>=0;}).length,_nt=_cl.reduce(function(a,o){return a+o.neto;},0),
+            _bc=_cl.reduce(function(a,o){return a==null||o.neto>a?o.neto:a;},null),_wc=_cl.reduce(function(a,o){return a==null||o.neto<a?o.neto:a;},null),
+            _co=_L.filter(function(o){return o.tipo==="COMPRA";}).length,_rc=_L.filter(function(o){return o.tipo==="RECOMPRA";}).length,
+            _wr=_cl.length?_gn/_cl.length*100:null;
+        var stats='<div class="mx-kpis">'+kp("Cierres hoy",_cl.length+"","#f3ba2f",_co+" compras · "+_rc+" recompras")+kp("Ganadas / perdidas",_gn+" / "+(_cl.length-_gn),"#7fe9ff","operaciones cerradas")+kp("Acierto",_wr==null?"—":nf(_wr,0)+" %",_wr==null?"":_wr>=50?"#0ecb81":"#ff9f1a","win rate de hoy")+kp("Neto de cierres",_cl.length?(_nt>=0?"+":"")+nf(_nt,3):"—",_cl.length?col(_nt):"","USDT")+kp("Mejor cierre",_bc==null?"—":(_bc>=0?"+":"")+nf(_bc,3),_bc==null?"":col(_bc),"USDT")+kp("Peor cierre",_wc==null?"—":(_wc>=0?"+":"")+nf(_wc,3),_wc==null?"":col(_wc),"USDT")+'</div>';
+        var c1 = mxSec("cta", "💼 Cuenta", "", hero + runb + cards) + mxSec("rsk", "🛡️ Riesgo y exposición", nf(_pm,0)+" % margen", riesgo) + mxSec("sts", "📊 Estadísticas de hoy", _cl.length+" cierres", stats) + mxSec("bot", "🤖 Estado del bot", cfg.activo ? "● activo" : "○ apagado", '<div style="font-size:11.5px;color:#cbd5e1">' + modo + '</div>' + esperaBanner(d, mm));
         var pos = d.pos.length ? d.pos.map(function (x) {
             var sym = x.symbol, amt = parseFloat(x.positionAmt), qty = Math.abs(amt), ent = parseFloat(x.entryPrice), mk = parseFloat(x.markPrice), pnl = parseFloat(x.unRealizedProfit) || 0, lq = parseFloat(x.liquidationPrice) || 0, lev = x.leverage;
             var tpO = d.ords.filter(function (o) { return o.symbol === sym && o.side === "SELL" && o.type === "LIMIT"; })[0], tpPx = tpO ? parseFloat(tpO.price) : null;
