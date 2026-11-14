@@ -99,6 +99,16 @@ try{new PerformanceObserver(function(l){l.getEntries().forEach(function(e){var L
  #bdCon.mx-wide .mx-cenB{grid-column:2;grid-row:4}
  #bdCon.mx-wide .mx-der{grid-column:3;grid-row:2/span 3}
 }
+
+.mx-ov{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:12px}
+.mx-ovc{background:#0b1220;border:1px solid rgba(255,255,255,.08);border-radius:14px;padding:12px;min-width:0}
+.mx-ovc.big{border-color:rgba(14,203,129,.45);background:linear-gradient(145deg,#0b1f1a,#0b1220);box-shadow:0 0 26px rgba(14,203,129,.10)}
+.mx-ovc.big .bc-hero{border:0 !important;background:none !important;box-shadow:none !important;padding:0 !important}
+.mx-ovt{font-size:10.5px;font-weight:900;color:#f3ba2f;letter-spacing:.4px;margin-bottom:8px}
+.mx-bars{display:flex;align-items:flex-end;gap:6px;height:96px;border-bottom:1px solid rgba(255,255,255,.08)}
+.mx-bars i{flex:1;border-radius:5px 5px 0 0;min-height:5px}
+.mx-cap{font-size:10px;color:#64748b;margin-top:5px}
+@media (min-width:1100px){.mx-ov{grid-template-columns:1.5fr 1fr 1fr}}
 </style>
 <script id="cdc-net-guard">
     /* 🛡️ CDC NET-GUARD: evita llamadas repetidas a Binance (dedupe + caché corto + freno ante 429/418).
@@ -18801,7 +18811,7 @@ window.CDC_FLASH=(function(){
     // archivo completo sin caer en la paradoja de "el hash contiene su
     // propio hash". No cambiar este texto.
     var _PLACEHOLDER = "%%CDC_INTEGRITY_HASH%%";
-    var _HASH_ESPERADO = "9af9a4bbbf6a23a3763429dd19f01846a37f2aee36a97f36480efd4ec11591a7"; // ← se reemplaza por el hash real en el paso final
+    var _HASH_ESPERADO = "ec1320bf42b9338d86624641c957de2367eb78f62967c3dc21946bca49a78225"; // ← se reemplaza por el hash real en el paso final
 
     function _bloquear(motivo) {
         try {
@@ -22157,7 +22167,7 @@ window.CDC_TRACK=(function(){
         if (!(ok && conIPInfo.okIp && conIPInfo.okIp !== conIP)) return "";
         return '<div class="bdf-av bad">⚠️ Tu IP cambió (WiFi ↔ datos). Agrega <b>' + esc(conIP) + '</b> en las IPs de confianza de tu API en Binance.<div class="bdf-row"><button class="bdf-btn bdf-blue" data-ca="copyip" style="flex:1">📋 Copiar IP</button><button class="bdf-btn bdf-gold" data-ca="tab-con" style="flex:1">🔌 Ver detalle</button></div></div>';
     }
-    document.addEventListener("click", function (e) { var b = e.target && e.target.closest ? e.target.closest(".mx-nav-i") : null; if (!b) return; var k = b.getAttribute("data-go"), t = k === "chart" ? $("bcChart") : document.querySelector('.mx-sec[data-k="' + k + '"]'); if (t && t.scrollIntoView) t.scrollIntoView({ behavior: "smooth", block: "start" }); });
+    document.addEventListener("click", function (e) { var b = e.target && e.target.closest ? e.target.closest(".mx-nav-i") : null; if (!b) return; var k = b.getAttribute("data-go"), t = k === "chart" ? $("bcChart") : document.querySelector('[data-k="' + k + '"]'); if (t && t.scrollIntoView) t.scrollIntoView({ behavior: "smooth", block: "start" }); });
     function conMonHtml() {
         var d = fabData, av = ipAviso();
         if (!(cfg.key && cfg.secret)) return av + '<div class="bdf-av bad">Primero guarda tu API Key y tu Secret en la pestaña 🔌 Conectar.</div>';
@@ -22221,7 +22231,7 @@ window.CDC_TRACK=(function(){
         var _PAL=["#f3ba2f","#0ecb81","#7fe9ff","#b58cff","#ff4d6d","#ff9f1a"],_ps=d.pos.map(function(x){return {s:x.symbol.replace("USDT",""),v:Math.abs(parseFloat(x.positionAmt))*parseFloat(x.markPrice)||0};}).sort(function(a,b){return b.v-a.v;}),_tv=_ps.reduce(function(a,x){return a+x.v;},0),_ac=0,_cg=[];
         _ps.forEach(function(x,i){var p=_tv?x.v/_tv*100:0,c=_PAL[Math.min(i,5)];_cg.push(c+" "+_ac.toFixed(2)+"% "+(_ac+p).toFixed(2)+"%");_ac+=p;x.p=p;x.c=c;});
         var donut=_ps.length?'<div class="mx-donut"><div class="mx-ring" style="background:conic-gradient('+_cg.join(",")+')"><span>'+_ps.length+'<small>posición(es)</small></span></div><div class="mx-leg">'+_ps.slice(0,6).map(function(x){return '<div><i style="background:'+x.c+'"></i>'+esc(x.s)+' <b>'+nf(x.p,0)+' %</b> <em>'+nf(x.v,2)+' USDT</em></div>';}).join("")+'</div></div>':'<div style="color:#64748b">Sin posiciones abiertas.</div>';
-        var c1 = mxSec("cta", "💼 Cuenta", "", hero + runb + cards) + mxSec("rsk", "🛡️ Riesgo y exposición", nf(_pm,0)+" % margen", riesgo) + mxSec("dis", "🍩 Distribución de posiciones", "", donut) + mxSec("sts", "📊 Estadísticas de hoy", _cl.length+" cierres", stats) + mxSec("bot", "🤖 Estado del bot", cfg.activo ? "● activo" : "○ apagado", '<div style="font-size:11.5px;color:#cbd5e1">' + modo + '</div>' + esperaBanner(d, mm));
+        var c1 = mxSec("cta", "💼 Mi billetera", "", runb + cards) + mxSec("rsk", "🛡️ Riesgo y exposición", nf(_pm,0)+" % margen", riesgo) + mxSec("sts", "📊 Estadísticas de hoy", _cl.length+" cierres", stats) + mxSec("bot", "🤖 Estado del bot", cfg.activo ? "● activo" : "○ apagado", '<div style="font-size:11.5px;color:#cbd5e1">' + modo + '</div>' + esperaBanner(d, mm));
         var pos = d.pos.length ? d.pos.map(function (x) {
             var sym = x.symbol, amt = parseFloat(x.positionAmt), qty = Math.abs(amt), ent = parseFloat(x.entryPrice), mk = parseFloat(x.markPrice), pnl = parseFloat(x.unRealizedProfit) || 0, lq = parseFloat(x.liquidationPrice) || 0, lev = x.leverage;
             var tpO = d.ords.filter(function (o) { return o.symbol === sym && o.side === "SELL" && o.type === "LIMIT"; })[0], tpPx = tpO ? parseFloat(tpO.price) : null;
@@ -22239,12 +22249,16 @@ window.CDC_TRACK=(function(){
         var c2 = mxSec("pos", "📌 Posiciones abiertas", d.pos.length + " abierta(s)", '<div style="color:#94a3b8;font-size:10.5px;margin-bottom:6px">Toca una para ver su gráfico</div>' + pos) + mxSec("alr", "🔔 Monedas en alerta en el CDC", d.al.length + "", chips);
         var mi = cfg.testnet ? "t" : "r", L = (typeof ops !== "undefined" ? ops : []).filter(function (o) { return o.m === mi; });
         var c3 = mxSec("evo", "📈 Evolución de tu cuenta", "capital + PnL", spark()) + mxSec("ops", "🧾 Últimas operaciones", L.length + "", L.length ? L.slice(0, 10).map(mxOp).join("") : '<div style="color:#64748b">Todavía no hay operaciones. Aquí aparecerá cada compra, recompra, salida y cierre.</div>');
-        var _p2 = c2.split("<section ").filter(Boolean).map(function (x) { return "<section " + x; });
+        function sp(x) { return x.split("<section ").filter(Boolean).map(function (y) { return "<section " + y; }); }
+        var _p2 = sp(c2), _p1 = sp(c1), _p3 = sp(c3);
+        var _cn = L.filter(function (o) { return o.tipo !== "COMPRA" && o.tipo !== "RECOMPRA" && o.tipo !== "SALIDA" && o.neto != null; }).slice(0, 8).reverse(), _mxn = _cn.reduce(function (a, o) { return Math.max(a, Math.abs(o.neto)); }, 0) || 1;
+        var perf = _cn.length ? '<div class="mx-bars">' + _cn.map(function (o) { return '<i title="' + nf(o.neto, 3) + ' USDT" style="height:' + Math.max(6, Math.abs(o.neto) / _mxn * 100).toFixed(0) + '%;background:' + (o.neto >= 0 ? "#0ecb81" : "#ff4d6d") + '"></i>'; }).join("") + '</div><div class="mx-cap">Últimos ' + _cn.length + ' cierres (neto USDT)</div>' : '<div style="color:#64748b;font-size:11.5px">Sin cierres todavía.</div>';
+        var ov = '<div class="mx-ov" data-k="dis"><div class="mx-ovc big"><div class="mx-ovt">💰 BALANCE TOTAL</div>' + hero + spark() + '</div><div class="mx-ovc"><div class="mx-ovt">🍩 DISTRIBUCIÓN</div>' + donut + '</div><div class="mx-ovc"><div class="mx-ovt">📊 RENDIMIENTO</div>' + perf + '</div></div>';
         function ni(k, t, n) { return '<button type="button" class="mx-nav-i" data-go="' + k + '"><span>' + t + '</span>' + (n !== "" && n != null ? '<b>' + n + '</b>' : '') + '</button>'; }
         var on = !!cfg.activo, pill = '<span class="mx-pill ' + (on ? "on" : "off") + '">' + (on ? "ACTIVO" : "APAGADO") + '</span>';
         var nav = '<div class="mx-navbox"><div class="mx-navt">🤖 PANEL BOT CDC ' + pill + '</div>' + ni("pos", "⚡ Operación en vivo", d.pos.length) + ni("chart", "📈 Gráfico en vivo", "") + ni("ops", "🧾 Operaciones", L.length) + ni("evo", "📉 Evolución de cuenta", "") + ni("rsk", "🛡️ Riesgo", nf(_pm, 0) + "%") + ni("dis", "🍩 Distribución", "") + ni("sts", "📊 Estadísticas", _cl.length) + ni("alr", "🔔 Alertas CDC", d.al.length) + '<div class="mx-rules"><div class="mx-rt">MODO DE OPERACIÓN</div>' + modo + '</div></div>';
         var feedh = '<div class="mx-feedh"><div><b>CENTRO DE COMANDO DEL BOT</b><small>Ejecución conectada al radar CDC · ' + (cfg.testnet ? "TESTNET" : "CUENTA REAL") + '</small></div>' + pill + '</div>';
-        return '<div class="mx-grid"><div class="mx-top">' + top + '</div><div class="mx-c mx-nav">' + nav + '</div><div class="mx-c mx-der">' + c1 + (_p2[1] || "") + '</div><div class="mx-c mx-cenA">' + feedh + (_p2[0] || "") + '</div><div class="mx-c mx-cenB">' + c3 + '</div></div>';
+        return '<div class="mx-grid"><div class="mx-top">' + top + '</div><div class="mx-c mx-nav">' + nav + '</div><div class="mx-c mx-der">' + (_p1[0] || "") + (_p3[1] || "") + (_p1[1] || "") + (_p1[2] || "") + (_p1[3] || "") + (_p2[1] || "") + '</div><div class="mx-c mx-cenA">' + feedh + ov + (_p2[0] || "") + '</div><div class="mx-c mx-cenB">' + (_p3[0] || "") + '</div></div>';
     }
     setInterval(function () {
         var e = $("mxStaleT"); if (!e) return;
@@ -22264,7 +22278,7 @@ window.CDC_TRACK=(function(){
             : guardadas && d && d.err ? '<div style="color:#ffc27a;font-size:11.5px;margin-bottom:4px">Hay un error de conexión: revisa la IP (arriba) o corrige las claves. Tus claves siguen guardadas; si dejas el Secret vacío se conserva el actual.</div>' : "";
         $("bcEstado").innerHTML = 'Estado: <b class="' + (kk ? "bdf-okc" : "bdf-badc") + '">' + (kk ? "✔ Key guardada" : "✖ falta Key") + '</b> · <b class="' + (ss ? "bdf-okc" : "bdf-badc") + '">' + (ss ? "✔ Secret guardado" : "✖ falta Secret") + '</b>' +
             (conectado ? '<div class="bdf-row"><button class="bdf-btn bdf-blue" data-ca="tab-mon" style="flex:1">✅ Conectado · ' + nf(d.wallet, 2) + ' USDT · ver mi monitor →</button></div>' : "");
-        ["con", "opc", "mon"].forEach(function (t) { $("bcV" + t).style.display = conTab === t ? "block" : "none"; $("bcT" + t).className = conTab === t ? "on" : ""; });
+        ["con", "opc", "mon"].forEach(function (t) { $("bcV" + t).style.display = conTab === t ? (t === "mon" ? "" : "block") : "none"; $("bcT" + t).className = conTab === t ? "on" : ""; });
         if (conTab === "mon") $("bcMon").innerHTML = conMonHtml();
         var wrap = $("bcChart"), f = $("bcFrame"), showF = conTab === "mon" && fabSel && d && !d.err;
         wrap.style.display = showF ? "block" : "none"; wrap.classList.toggle("closed", mxIsClosed("chart"));
