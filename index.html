@@ -18950,7 +18950,7 @@ window.CDC_FLASH=(function(){
     // archivo completo sin caer en la paradoja de "el hash contiene su
     // propio hash". No cambiar este texto.
     var _PLACEHOLDER = "%%CDC_INTEGRITY_HASH%%";
-    var _HASH_ESPERADO = "1be9470a1fa3dd01b1937f8625bba3bb3626bbbd35bc43a6c46498903a87b930"; // ← se reemplaza por el hash real en el paso final
+    var _HASH_ESPERADO = "0c0affa33d1b1c82fdde9130d4d339469efb7b5507bec2298e1c90215355b1a3"; // ← se reemplaza por el hash real en el paso final
 
     function _bloquear(motivo) {
         try {
@@ -20647,6 +20647,90 @@ setTimeout(function(){setInterval(tick,CFG.TICK_MS);},CFG.ARRANQUE_MS);
     setTimeout(function () { envolverPanel(); setInterval(envolverPanel, 3000); }, 3000);
     setInterval(function () { try { muestrearDes(); cuadroDes(); } catch (e) {} }, 300);
     /* ═══ CUADRO "MONEDAS CON DESMAYO" — FIN ═══ */
+    /* ═══ 🧮 PLAN DESMAYO v1 — CDC FUTURO-PRO (Juan Pablo Ortiz Ortuño) — INICIO ═══
+       • TP NETO por capital:  capital < 50 USDT → 0.10 USDT · capital 100 USDT (o más) → 0.50 USDT · entre 50 y 100 sube en línea recta (0.10 → 0.50).
+       • MARCA DE SIGUIENTE INVERSIÓN: si la moneda sigue cayendo, el cuadro marca el precio de la próxima recompra. El % de caída AUMENTA en cada nivel (×1.5)
+         y el paso base se adapta a la volatilidad real de la moneda (velas 1m) y a la fase del desmayo (ACELERANDO más ancho · AGOTADO más corto).
+       • Con cada recompra se recalcula el precio promedio y el precio del TP (neto de comisiones) → salida más cerca = más rápido. */
+    var PL_KEY = "cdc_des_plan_v1", PL = { cap: 100, lev: 1, mult: 1, dir: 1, fee: 0.05, niv: 3, coins: {} };
+    try { var _pls = JSON.parse(localStorage.getItem(PL_KEY) || "null"); if (_pls && typeof _pls === "object") { ["cap", "lev", "mult", "dir", "fee", "niv"].forEach(function (q) { if (isFinite(+_pls[q]) && +_pls[q] > 0) PL[q] = +_pls[q]; }); if (_pls.coins) PL.coins = _pls.coins; } } catch (e) {}
+    function plGuardar() { try { localStorage.setItem(PL_KEY, JSON.stringify(PL)); } catch (e) {} }
+    function tpUsdt(cap) { cap = +cap || 0; if (cap < 50) return 0.10; if (cap >= 100) return 0.50; return Math.round((0.10 + (cap - 50) * 0.008) * 100) / 100; }
+    function plFmt(v) { return !isFinite(v) ? "—" : v < 0.01 ? v.toFixed(6) : v < 1 ? v.toFixed(4) : v < 100 ? v.toFixed(3) : v.toFixed(2); }
+    function volPct(sym) { var h = CK[sym], k = h && h.k; if (!k || k.length < 35) return null; var s = 0, m = 0, i, H, L;
+        for (i = k.length - 30; i < k.length; i++) { H = +k[i][2]; L = +k[i][3]; if (L > 0) { s += (H - L) / L * 100; m++; } } return m ? s / m : null; }
+    function plPaso(sym) { var v = volPct(sym), A = ACT[sym], b = v === null ? 1.5 : cl(v * 2.5, 1.2, 5);
+        if (A && A.fase === "ACELERANDO") b *= 1.25; else if (A && A.fase === "AGOTADO") b *= 0.8; return { s: Math.round(cl(b, 1, 6) * 100) / 100, v: v }; }
+    /* posición con k recompras ejecutadas (k=0 → solo la entrada): promedio, unidades, TP neto de comisiones */
+    function plPos(entry, lv, k, dir) {
+        var fee = PL.fee / 100, U = 0, N = 0, inv = 0, i, px, mo, no;
+        for (i = 0; i <= k; i++) { px = i === 0 ? entry : lv[i - 1].price; mo = i === 0 ? PL.cap : PL.cap * PL.mult; no = mo * PL.lev; U += no / px; N += no; inv += mo; }
+        var avg = N / U, feeIn = N * fee, tp = tpUsdt(PL.cap), P = dir > 0 ? (tp + feeIn + avg * U) / (U * (1 - fee)) : (avg * U - tp - feeIn) / (U * (1 + fee));
+        return { avg: avg, U: U, N: N, inv: inv, tpPx: P, tpPct: (P / avg - 1) * 100 * dir, tp: tp, feeIn: feeIn };
+    }
+    function plSimbolo() { var S = typeof selectedCoin !== "undefined" ? selectedCoin : null;
+        if ((S && DESHIST[S]) || (S && ACT[S] && ACT[S].dir < 0)) return S; return ultDesBtn(); }
+    function plPrecio(s) { try { var c = cachedData[s]; return c && +c.price > 0 ? +c.price : null; } catch (e) { return null; } }
+    function plEntrada(s, px) { s = s || plSimbolo(); if (!s) return; px = px || plPrecio(s); if (!px) return; PL.coins[s] = { entry: px, lo: px, ts: Date.now(), av: 0 }; plGuardar(); try { plTick(true); } catch (e) {} }
+    function plReset() { PL.coins = {}; plGuardar(); try { plTick(true); } catch (e) {} }
+    function plCfg(k, v) { v = +v; if (!(v > 0)) return; if (k === "dir") v = v > 0 ? 1 : -1; if (k === "niv") v = Math.min(5, Math.max(1, Math.round(v))); PL[k] = v; if (k === "dir") PL.coins = {}; plGuardar(); try { plTick(true); } catch (e) {} }
+    var plEl = null, plDin = null, plAv = {}, PL_BTN = "cursor:pointer;flex:1;text-align:center;font:800 10px Arial;padding:3px;border-radius:6px";
+    function plSkeleton() {
+        var ip = "box-sizing:border-box;width:100%;background:#050914;border:1px solid #334155;border-radius:6px;color:#fff;font:800 11px Arial;padding:3px 5px";
+        var lb = "font:700 8.5px Arial;color:#94a3b8;display:block;margin-bottom:1px";
+        return '<div style="box-sizing:border-box;width:100%;margin-top:6px;border:2px solid #f3ba2f;border-radius:10px;background:rgba(243,186,47,.06);padding:6px 7px;box-shadow:0 0 12px #f3ba2f44">' +
+            '<div style="display:flex;justify-content:space-between;align-items:center;gap:6px;margin-bottom:4px"><div style="font:900 10px Arial;color:#f3ba2f;letter-spacing:.4px">🧮 PLAN DESMAYO · siguiente inversión + TP</div>' +
+            '<span onclick="CDC_DESPERTAR.planEntrada()" title="Fija la entrada al precio actual y reinicia las marcas" style="cursor:pointer;font:800 9px Arial;padding:1px 6px;border-radius:6px;border:1px solid #f3ba2f;color:#f3ba2f">📍 entrada = ahora</span></div>' +
+            '<div style="display:grid;grid-template-columns:repeat(5,1fr);gap:4px;margin-bottom:5px">' +
+            '<div><span style="' + lb + '">Capital USDT</span><input id="plCap" type="number" min="1" step="1" value="' + PL.cap + '" onchange="CDC_DESPERTAR.planCfg(\'cap\',this.value)" style="' + ip + '"></div>' +
+            '<div><span style="' + lb + '">Apalanc. x</span><input id="plLev" type="number" min="1" step="1" value="' + PL.lev + '" onchange="CDC_DESPERTAR.planCfg(\'lev\',this.value)" style="' + ip + '"></div>' +
+            '<div><span style="' + lb + '">Recompra ×</span><input id="plMult" type="number" min="0.5" step="0.5" value="' + PL.mult + '" onchange="CDC_DESPERTAR.planCfg(\'mult\',this.value)" style="' + ip + '"></div>' +
+            '<div><span style="' + lb + '">Niveles</span><input id="plNiv" type="number" min="1" max="5" step="1" value="' + PL.niv + '" onchange="CDC_DESPERTAR.planCfg(\'niv\',this.value)" style="' + ip + '"></div>' +
+            '<div><span style="' + lb + '">Comisión %/lado</span><input id="plFee" type="number" min="0.01" step="0.01" value="' + PL.fee + '" onchange="CDC_DESPERTAR.planCfg(\'fee\',this.value)" style="' + ip + '"></div></div>' +
+            '<div style="display:flex;gap:5px;margin-bottom:5px"><span id="plDirL" onclick="CDC_DESPERTAR.planCfg(\'dir\',1)" style="cursor:pointer;flex:1;text-align:center;font:800 10px Arial;padding:3px;border-radius:6px"></span>' +
+            '<span id="plDirS" onclick="CDC_DESPERTAR.planCfg(\'dir\',-1)" style="cursor:pointer;flex:1;text-align:center;font:800 10px Arial;padding:3px;border-radius:6px"></span></div>' +
+            '<div id="plDin"></div></div>';
+    }
+    function plTick(force) {
+        var host = document.getElementById("cdcDesCuadroHost"); if (!host) return;
+        if (!plEl) { plEl = document.createElement("div"); plEl.id = "cdcDesPlan"; plEl.style.cssText = "width:100%"; plEl.innerHTML = plSkeleton(); plDin = plEl.querySelector("#plDin"); }
+        if (plEl.parentNode !== host) host.appendChild(plEl);
+        var dir = PL.dir, now = Date.now(), s;
+        /* seguimiento del extremo adverso de TODAS las monedas con plan (para saber qué marcas ya se tocaron) */
+        Object.keys(PL.coins).forEach(function (q) { var z = PL.coins[q], px = plPrecio(q); if (!z) return; if (now - z.ts > 12 * 3600000) { delete PL.coins[q]; return; }
+            if (px) { if (dir > 0 ? px < z.lo : px > z.lo) { z.lo = px; } } });
+        var bl = plEl.querySelector("#plDirL"), bs = plEl.querySelector("#plDirS");
+        if (bl) { bl.textContent = "🟢 LONG · recompro si BAJA"; bl.style.cssText = PL_BTN + ";border:1px solid " + (dir > 0 ? "#0ecb81" : "#334155") + ";color:" + (dir > 0 ? "#0ecb81" : "#64748b") + ";background:" + (dir > 0 ? "rgba(14,203,129,.15)" : "transparent"); }
+        if (bs) { bs.textContent = "🔴 SHORT · recompro si SUBE"; bs.style.cssText = PL_BTN + ";border:1px solid " + (dir < 0 ? "#f6465d" : "#334155") + ";color:" + (dir < 0 ? "#f6465d" : "#64748b") + ";background:" + (dir < 0 ? "rgba(246,70,93,.15)" : "transparent"); }
+        s = plSimbolo(); var out;
+        if (!s) out = '<div style="font:700 10px Arial;color:#94a3b8;text-align:center;padding:4px 0">Esperando una moneda con desmayo para calcular el plan…</div>';
+        else { var px = plPrecio(s); if (!px) out = '<div style="font:700 10px Arial;color:#94a3b8;text-align:center;padding:4px 0">Sin precio de ' + s.replace("USDT", "") + ' todavía…</div>';
+            else { if (!PL.coins[s]) { PL.coins[s] = { entry: px, lo: px, ts: now, av: 0 }; plGuardar(); }
+                var z = PL.coins[s], A = ACT[s], st = plPaso(s), lv = [], acc = 0, stp = st.s, i, nm = s.replace("USDT", "");
+                for (i = 1; i <= PL.niv; i++) { acc += stp; lv.push({ n: i, pct: acc, price: z.entry * (1 - dir * acc / 100) }); stp *= 1.5; }
+                var k = 0; lv.forEach(function (L) { if (dir > 0 ? z.lo <= L.price : z.lo >= L.price) k = Math.max(k, L.n); });
+                var P = plPos(z.entry, lv, k, dir), mov = (px / z.entry - 1) * 100 * dir, sig = k < lv.length ? lv[k] : null, falta = sig ? (dir > 0 ? (px / sig.price - 1) * 100 : (sig.price / px - 1) * 100) : null;
+                var enZona = sig && (dir > 0 ? px <= sig.price : px >= sig.price), tpOk = dir > 0 ? px >= P.tpPx : px <= P.tpPx;
+                var fase = A && A.fase, fz = fase === "AGOTADO" ? "⚠️ AGOTADO: la caída se frena, vigila rebote antes de recomprar" : fase === "ACELERANDO" ? "⚡ ACELERANDO: si vas a recomprar espera a que frene" : fase === "CAYENDO" ? "↘ sigue cayendo a ritmo normal" : "";
+                if (enZona && plAv[s + "|" + sig.n] !== z.ts) { plAv[s + "|" + sig.n] = z.ts; beep(true); try { hablar("Siguiente inversión, " + nm + ", nivel " + sig.n, true, { sym: s, dir: dir > 0 ? "LONG" : "SHORT" }); } catch (e) {} }
+                var o = '<div style="display:flex;justify-content:space-between;font:800 11px Arial;color:#fff;margin-bottom:3px"><span>' + (dir > 0 ? "🟢" : "🔴") + ' <b>' + nm + '</b> · ahora $' + plFmt(px) + '</span><span style="color:' + (mov >= 0 ? "#0ecb81" : "#f6465d") + '">' + (mov >= 0 ? "+" : "") + mov.toFixed(2) + '% vs entrada $' + plFmt(z.entry) + '</span></div>';
+                o += '<div style="font:900 10.5px Arial;padding:4px 6px;border-radius:7px;margin-bottom:4px;text-align:center;' + (tpOk ? 'background:rgba(14,203,129,.25);border:1px solid #0ecb81;color:#bbf7d0' : 'background:rgba(14,203,129,.08);border:1px solid #0ecb8166;color:#86efac') + '">' +
+                    (tpOk ? '🎯 TP ALCANZADO · ' : '🎯 TP ') + '+' + P.tp.toFixed(2) + ' USDT neto (capital ' + PL.cap + ') → vender a $' + plFmt(P.tpPx) + ' (' + (P.tpPct >= 0 ? "+" : "") + P.tpPct.toFixed(2) + '% desde el promedio $' + plFmt(P.avg) + ')</div>';
+                if (sig) { var mo = PL.cap * PL.mult; o += '<div class="' + (enZona ? 'cdcBlink' : '') + '" style="font:900 11px Arial;padding:5px 6px;border-radius:7px;margin-bottom:4px;text-align:center;background:' + (enZona ? 'rgba(246,70,93,.30)' : 'rgba(243,186,47,.14)') + ';border:2px solid ' + (enZona ? '#f6465d' : '#f3ba2f') + ';color:#fff">' +
+                    (enZona ? '⚡ PRECIO EN ZONA · SIGUIENTE INVERSIÓN #' + sig.n + ' AHORA' : '📌 MARCA SIGUIENTE INVERSIÓN #' + sig.n + ' si sigue ' + (dir > 0 ? 'cayendo' : 'subiendo') + ': $' + plFmt(sig.price)) +
+                    '<div style="font:700 9.5px Arial;color:#fde68a">' + (dir > 0 ? '−' : '+') + sig.pct.toFixed(2) + '% desde la entrada · invertir $' + mo.toFixed(2) + (falta !== null && !enZona ? ' · faltan ' + Math.abs(falta).toFixed(2) + '%' : '') + '</div></div>'; }
+                else o += '<div style="font:900 10.5px Arial;padding:4px 6px;border-radius:7px;margin-bottom:4px;text-align:center;background:rgba(246,70,93,.15);border:1px solid #f6465d;color:#fecaca">🛑 Ya se tocaron los ' + lv.length + ' niveles: no hay más recompras en el plan. Revisa el riesgo.</div>';
+                if (fz) o += '<div style="font:800 9.5px Arial;color:' + (fase === "AGOTADO" ? "#fbbf24" : "#fca5a5") + ';margin-bottom:3px;text-align:center">' + fz + (A && A.red != null ? ' · red neuronal: ' + Math.round(A.red) + '% sigue cayendo' : '') + '</div>';
+                o += '<div style="overflow-x:auto"><table style="width:100%;border-collapse:collapse;font:700 9.5px Arial;color:#e2e8f0"><tr style="color:#94a3b8;text-align:right"><td style="text-align:left">#</td><td>Precio</td><td>Caída</td><td>Monto</td><td>Promedio</td><td>TP</td></tr>';
+                for (i = 0; i <= lv.length; i++) { var Pi = plPos(z.entry, lv, i, dir), ic = i === 0 ? "▣" : (i <= k ? "✅" : (sig && i === sig.n ? "▶" : "·")), pr = i === 0 ? z.entry : lv[i - 1].price, pc = i === 0 ? 0 : lv[i - 1].pct, mt = i === 0 ? PL.cap : PL.cap * PL.mult;
+                    o += '<tr style="text-align:right;' + (sig && i === sig.n ? 'background:rgba(243,186,47,.18);color:#fde68a;' : '') + '"><td style="text-align:left">' + ic + ' ' + (i === 0 ? 'Entrada' : 'Recompra ' + i) + '</td><td>$' + plFmt(pr) + '</td><td>' + (i === 0 ? '—' : (dir > 0 ? '−' : '+') + pc.toFixed(2) + '%') + '</td><td>$' + mt.toFixed(2) + '</td><td>$' + plFmt(Pi.avg) + '</td><td style="color:#86efac">$' + plFmt(Pi.tpPx) + '</td></tr>'; }
+                var Pm = plPos(z.entry, lv, lv.length, dir);
+                o += '</table></div><div style="font:600 8.5px Arial;color:#94a3b8;line-height:1.35;margin-top:3px">Paso base ' + st.s.toFixed(2) + '% (' + (st.v === null ? 'sin velas aún: valor por defecto' : 'rango 1m medio ' + st.v.toFixed(2) + '%') + (fase ? ' · fase ' + fase : '') + ') · cada nivel cae ×1.5 más que el anterior · TP neto ya descuenta comisión ' + PL.fee + '%/lado · si se tocan todos los niveles inviertes $' + Pm.inv.toFixed(2) + ' (posición $' + Pm.N.toFixed(2) + (PL.lev > 1 ? ' con ' + PL.lev + 'x: ojo con la liquidación' : '') + ').</div>';
+                out = o; } }
+        if (force || plDin.getAttribute("data-h") !== out) { plDin.setAttribute("data-h", out); plDin.innerHTML = out; }
+    }
+    setInterval(function () { try { plTick(); } catch (e) {} }, 1000);
+    /* ═══ 🧮 PLAN DESMAYO v1 — FIN ═══ */
     setInterval(function () { try { panelDesmayo(); } catch (e) {} }, 2000);
     function autoAbrir() {
         if (typeof seleccionarMoneda !== "function") return;
@@ -20836,7 +20920,7 @@ setTimeout(function(){setInterval(tick,CFG.TICK_MS);},CFG.ARRANQUE_MS);
 
     window.CDC_DESPERTAR = {
         agotados: function () { return Object.keys(ACT).filter(function (s) { return ACT[s].fase === "AGOTADO" && ACT[s].dir < 0; }); }, CFG: CFG, estadoFuerza: function (s) { return FUEL[s] ? FUEL[s].estado : null; }, fuel: function (s) { return FUEL[s] || null; }, _combustible: combustible,
-        vetoCorto: function (s) { return !!(CFG.FUEL_VETO_SHORT && FUEL[s] && FUEL[s].estado === "CARGANDO" && FUEL[s].fuerza >= 75); }, reservaPanel: function () { return (!!ultRtTs && Date.now() - ultRtTs < CFG.RT_RESERVA_MS) || (Date.now() - (window.__dmAbrirTs || 0) < 60000 && Object.values(ACT).some(function (r) { return r.dir < 0; })); }, abrir: function (s) { try { fijar7(s); } catch (e) { try { seleccionarMoneda(s); } catch (e2) {} } }, fijar7: fijar7, autoDes: autoDes, evaluar: evaluar, aprueba: aprueba, prioridad: prioridad, activas: function () { return ACT; },
+        vetoCorto: function (s) { return !!(CFG.FUEL_VETO_SHORT && FUEL[s] && FUEL[s].estado === "CARGANDO" && FUEL[s].fuerza >= 75); }, reservaPanel: function () { return (!!ultRtTs && Date.now() - ultRtTs < CFG.RT_RESERVA_MS) || (Date.now() - (window.__dmAbrirTs || 0) < 60000 && Object.values(ACT).some(function (r) { return r.dir < 0; })); }, abrir: function (s) { try { fijar7(s); } catch (e) { try { seleccionarMoneda(s); } catch (e2) {} } }, fijar7: fijar7, autoDes: autoDes, planTP: tpUsdt, planEntrada: plEntrada, planReset: plReset, planCfg: plCfg, evaluar: evaluar, aprueba: aprueba, prioridad: prioridad, activas: function () { return ACT; },
         simbolosLista: function () { return Object.keys(ACT); }, forzar: forzarPanelDesmayo, slotDesmayo: slotDesmayo, hayDesmayo: function () { return listaDes().length > 0; }, fijarDes: fijarDes, lista: function () { return listaTodas(); }, hayAlerta: function () { return listaTodas().length > 0; }, verTodas: function () { try { document.getElementById("dspPill").onclick(); } catch (e) {} }, red: function () { return { sube: NET, cae: NETD, retroceso: NETR, caida: NETB, fondo: NETF, combustible: NETC }; },
         reiniciarRed: function () { try { localStorage.removeItem(KEY); localStorage.removeItem(KEY + "_dn"); localStorage.removeItem(KEY + "_rt"); localStorage.removeItem(KEY + "_ca"); localStorage.removeItem(KEY + "_fr"); localStorage.removeItem(KEY + "_fu"); } catch (e) {} NET = mkNet(KEY); NETD = mkNet(KEY + "_dn"); NETR = mkNet(KEY + "_rt"); NETB = mkNet(KEY + "_ca"); NETF = mkNet(KEY + "_fr"); NETC = mkNet(KEY + "_fu"); } };
     setTimeout(function () { ui(); tick(); setInterval(tick, CFG.TICK_MS); }, 4000);
