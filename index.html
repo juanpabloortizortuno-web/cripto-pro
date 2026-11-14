@@ -18302,7 +18302,7 @@ window.CDC_FLASH=(function(){
     // archivo completo sin caer en la paradoja de "el hash contiene su
     // propio hash". No cambiar este texto.
     var _PLACEHOLDER = "%%CDC_INTEGRITY_HASH%%";
-    var _HASH_ESPERADO = "6f7fb3ae1c378e61b9fa8bf161855a464dd2af1715ae17721041a062e9c56c78"; // ← se reemplaza por el hash real en el paso final
+    var _HASH_ESPERADO = "05c475941775660ec724ec622c380e621afd512cb8e4f43d56de75fc7f912904"; // ← se reemplaza por el hash real en el paso final
 
     function _bloquear(motivo) {
         try {
@@ -20809,4 +20809,1172 @@ window.CDC_TRACK=(function(){
   },2000);
 })();
 </script>
+<script>
+/* ══════════════════════════════════════════════════════════════════
+   🤖 BOT DESMAYO · SOLO LONG · FUTUROS USDT-M · MARGEN AISLADO · SIEMPRE 1x
+   Compra LONG las monedas en DESMAYO / CAÍDA BRUTAL del CDC. Las reglas
+   dependen del CAPITAL (perfiles editables en el panel):
+     · capital chico  → entra con casi todo, sale con +0.25 USDT, sin recompras
+     · desde 12 USDT  → entra con 50 %, sale +0.25; si cae recompra con el resto → +0.50
+     · desde 30 USDT  → entra con 20 %, sale +0.50; recompra 40 % libre → +1; luego 99 % → +2
+   La salida es una orden límite reduce-only puesta en Binance.
+   Una moneda ya cerrada no se vuelve a comprar hasta una NUEVA alerta del CDC.
+   MULTI-MONEDA (capital grande): desde X USDT el capital se reparte en partes iguales, una moneda por cada
+   «USDT por moneda» (100→2 · 150→3 · 200→4 con 50). Cada moneda usa SU parte con la misma regla (entrada %, recompras %, salida en %).
+   Arranca APAGADO y en TESTNET.
+   ══════════════════════════════════════════════════════════════════ */
+(function () {
+    "use strict";
+    var LS = "cdcBotDesmayo_v2", LEV = 1, logBuf = [], esperaLog = 0;
+    var DEF = { key: "", secret: "", testnet: true, activo: false, tpNeto: true, feeIn: 0.05, feeOut: 0.02, maxPos: 5, incInminente: false,
+        multi: { desde: 100, por: 50, ent: 20, tp: 1.67, adds: [{ caida: 5, pct: 40, tp: 3.33 }, { caida: 5, pct: 99, tp: 6.67 }] },
+        perfiles: [
+            { desde: 0,  ent: 99, tp: 0.25, adds: [] },
+            { desde: 12, ent: 50, tp: 0.25, adds: [{ caida: 5, pct: 99, tp: 0.5 }] },
+            { desde: 30, ent: 20, tp: 0.5,  adds: [{ caida: 5, pct: 40, tp: 1 }, { caida: 5, pct: 99, tp: 2 }] }
+        ] };
+    var cfg = cargar(), offset = 0, info = null, dual = null, busy = false, intentos = {}, intentosAdd = {};
+    var REARMAR_MS = 30000;                                   /* alerta ausente 30 s = alerta terminada */
+    var ELS = "cdcBotEspera_v1", PLS = "cdcBotPos_v1";
+    var espera = leerLS(ELS), misPos = leerLS(PLS);          /* espera: cerradas · misPos: abiertas por este bot (con su perfil) */
+
+    function leerLS(k) { try { return JSON.parse(localStorage.getItem(k) || "{}"); } catch (e) { return {}; } }
+    function escLS(k, v) { try { localStorage.setItem(k, JSON.stringify(v)); } catch (e) {} }
+    function cargar() {
+        var c = leerLS(LS), o = Object.assign({}, DEF, c, { activo: false });
+        if (!Array.isArray(o.perfiles) || !o.perfiles.length) o.perfiles = JSON.parse(JSON.stringify(DEF.perfiles));
+        if (!o.multi || typeof o.multi !== "object" || !Array.isArray(o.multi.adds)) o.multi = JSON.parse(JSON.stringify(DEF.multi));
+        return o;
+    }
+    function guardar() { escLS(LS, cfg); }
+    function base() { return cfg.testnet ? "https://testnet.binancefuture.com" : "https://fapi.binance.com"; }
+    function $(id) { return document.getElementById(id); }
+    function log(t, mal) {
+        try { logBuf.unshift({ t: Date.now(), s: t, mal: !!mal }); if (logBuf.length > 120) logBuf.pop(); fabLogNuevo(); } catch (e) {}
+        var b = $("bdLog"); if (!b) return;
+        var d = document.createElement("div");
+        d.style.color = mal ? "#ff6b7a" : "#9fe8c4";
+        d.textContent = new Date().toLocaleTimeString() + "  " + t;
+        b.insertBefore(d, b.firstChild); while (b.childNodes.length > 80) b.removeChild(b.lastChild);
+    }
+
+    /* ── perfil según el capital (saldo de la billetera de Futuros) ── */
+    function elegirPerfil(wallet) {
+        var ps = cfg.perfiles.slice().sort(function (a, b) { return a.desde - b.desde; }), r = null;
+        ps.forEach(function (p) { if (wallet >= p.desde) r = p; });
+        return r;
+    }
+    /* ── MULTI-MONEDA: el capital total se reparte en n partes iguales (una por moneda) ── */
+    function modoMulti(wallet) {
+        var m = cfg.multi; if (!m || !(m.por > 0) || !(wallet >= m.desde)) return null;
+        var n = Math.min(Math.max(1, Math.floor(wallet / m.por)), Math.max(1, cfg.maxPos));
+        return { n: n, presup: wallet / n };
+    }
+    function perfMulti(presup) {                      /* convierte los % de la parte de la moneda en USDT para esa posición */
+        var m = cfg.multi;
+        return { desde: m.desde, ent: m.ent, tp: presup * m.tp / 100, budget: presup, multi: true,
+            adds: m.adds.map(function (a) { return { caida: a.caida, pct: a.pct, tp: presup * a.tp / 100 }; }) };
+    }
+    function textoPerfil(p) {
+        var t = "entra " + p.ent + "% del capital, sale +" + p.tp + " USDT";
+        p.adds.forEach(function (a, i) { t += " · recompra " + (i + 1) + ": si cae " + a.caida + "% usa " + a.pct + "% del libre → sale +" + a.tp + " USDT"; });
+        return t + (p.adds.length ? "" : " · sin recompras");
+    }
+
+    /* ── API Binance Futures (firmada) ── */
+    function pista(c) {
+        var h = { "-2015": "API Key inválida, sin permiso de Futuros, o tu IP no está en la lista blanca. Revisa también si marcaste TESTNET solo cuando la clave es de testnet.",
+            "-2014": "La API Key tiene formato inválido.", "-1022": "Firma inválida: revisa que el Secret esté bien pegado, sin espacios.",
+            "-1021": "El reloj de tu computadora está desfasado respecto a Binance.", "-4168": "Tu cuenta está en modo Multi-Assets: cámbiala a Single-Asset para poder usar margen aislado.",
+            "-2019": "Margen insuficiente.", "-4164": "La orden no alcanza el valor mínimo de Binance.", "-2022": "Orden reduce-only rechazada.", "-2027": "Se superó el máximo de posición permitido." };
+        return h[String(c)] ? " → " + h[String(c)] : "";
+    }
+    async function hmac(msg) {
+        var k = await crypto.subtle.importKey("raw", new TextEncoder().encode(cfg.secret), { name: "HMAC", hash: "SHA-256" }, false, ["sign"]);
+        var s = await crypto.subtle.sign("HMAC", k, new TextEncoder().encode(msg));
+        return Array.from(new Uint8Array(s)).map(function (b) { return b.toString(16).padStart(2, "0"); }).join("");
+    }
+    async function api(metodo, path, params, firmado) {
+        var q = new URLSearchParams(); Object.keys(params || {}).forEach(function (k) { q.append(k, params[k]); });
+        var qs;
+        if (firmado) { q.append("timestamp", Date.now() + offset); q.append("recvWindow", 10000); qs = q.toString(); qs += "&signature=" + await hmac(qs); }
+        else qs = q.toString();
+        var r;
+        try { r = await fetch(base() + path + (qs ? "?" + qs : ""), { method: metodo, headers: (firmado && cfg.key) ? { "X-MBX-APIKEY": cfg.key } : {} }); }
+        catch (x) { throw new Error("No se pudo conectar con Binance (" + x.message + "). Revisa tu internet, bloqueos de red o antivirus."); }
+        var j = await r.json().catch(function () { return {}; });
+        if (!r.ok) { var e = new Error(((j && j.msg) || ("HTTP " + r.status)) + pista(j && j.code)); e.code = j && j.code; throw e; }
+        return j;
+    }
+    async function cargarInfo() {
+        if (info) return;
+        var t = await api("GET", "/fapi/v1/time", {}, false); offset = t.serverTime - Date.now();
+        var j = await api("GET", "/fapi/v1/exchangeInfo", {}, false); info = {};
+        j.symbols.forEach(function (s) {
+            if (s.contractType !== "PERPETUAL" || s.quoteAsset !== "USDT" || s.status !== "TRADING") return;
+            var f = {}; s.filters.forEach(function (x) { f[x.filterType] = x; });
+            var lot = f.MARKET_LOT_SIZE || f.LOT_SIZE;
+            info[s.symbol] = { step: parseFloat(lot.stepSize), minQty: parseFloat(lot.minQty), tick: parseFloat(f.PRICE_FILTER.tickSize),
+                minNot: f.MIN_NOTIONAL ? parseFloat(f.MIN_NOTIONAL.notional) : 5, pp: s.pricePrecision, qp: s.quantityPrecision };
+        });
+    }
+    function floorStep(x, step, p) { return (Math.floor(x / step + 1e-9) * step).toFixed(p); }
+    function ceilStep(x, step, p) { return (Math.ceil(x / step - 1e-9) * step).toFixed(p); }
+    async function modo() { if (dual === null) dual = !!(await api("GET", "/fapi/v1/positionSide/dual", {}, true)).dualSidePosition; }
+    async function saldo() {
+        var b = await api("GET", "/fapi/v2/balance", {}, true);
+        var u = b.filter(function (x) { return x.asset === "USDT"; })[0];
+        if (!u) throw new Error("No hay saldo USDT en Futuros");
+        return { wallet: parseFloat(u.balance), disp: parseFloat(u.availableBalance) };
+    }
+
+    /* ── COMPRA INICIAL ── */
+    async function comprar(sym, motivo) {
+        var inf = info[sym];
+        if (!inf) { log("⛔ " + sym + ": no es perpetuo USDT-M operable", true); return false; }
+        var pr0 = await api("GET", "/fapi/v2/positionRisk", {}, true);
+        var pos = pr0.filter(function (p) { return parseFloat(p.positionAmt) > 0; }), otras = pr0.filter(function (p) { return parseFloat(p.positionAmt) < 0; });
+        if (pos.some(function (p) { return p.symbol === sym; })) { log("⏭ " + sym + ": ya hay posición abierta, no se compra de nuevo"); return false; }
+        var s = await saldo(), mm = modoMulti(s.wallet), maxEf = mm ? mm.n : Math.min(1, cfg.maxPos);
+        if (!mm) {      /* capital chico: UNA operación a la vez, también si la abriste tú a mano → esperar a que termine */
+            var enCurso = pos.concat(otras).map(function (p) { return p.symbol; });
+            if (!enCurso.length) { try { (await api("GET", "/fapi/v1/openOrders", {}, true)).forEach(function (o) { if (!o.reduceOnly && !o.closePosition && enCurso.indexOf(o.symbol) < 0) enCurso.push(o.symbol); }); } catch (e) {} }
+            if (enCurso.length) {
+                if (Date.now() - esperaLog > 60000) { esperaLog = Date.now(); log("⏳ Hay una operación en curso (" + enCurso.join(", ") + (enCurso.some(function (x) { return !misPos[x]; }) ? " · abierta por ti" : "") + "). El bot ESPERA a que termine; después operará con la alerta vigente del CDC."); }
+                return false;
+            }
+        }
+        if (pos.length >= maxEf) { log("⏭ " + sym + ": ya hay " + pos.length + " posiciones (máx " + maxEf + (mm ? " según tu capital" : " con menos de " + cfg.multi.desde + " USDT") + ")"); return false; }
+        var perf = mm ? perfMulti(mm.presup) : elegirPerfil(s.disp);
+        if (!perf) { log("⏭ " + sym + ": ningún perfil aplica a un saldo disponible de " + s.disp.toFixed(2) + " USDT", true); return false; }
+        /* 🆘 EMERGENCIA: capital < 6 USDT → 2x y salida +0.25 USDT, sin recompras, hasta llegar a 6 USDT */
+        var lev = LEV, emerg = !mm && s.wallet < 6;
+        if (emerg) { lev = 2; perf = { desde: 0, ent: perf.ent, tp: 0.25, adds: [], emergencia: true }; }
+        var margen = Math.min((mm ? mm.presup * cfg.multi.ent / 100 : s.disp * perf.ent / 100), s.disp * 0.99);
+        var px = parseFloat((await api("GET", "/fapi/v1/ticker/price", { symbol: sym }, false)).price);
+        var qty = parseFloat(floorStep(margen * lev / px, inf.step, inf.qp));
+        if (qty < inf.minQty || qty * px < inf.minNot * 1.02) { log("⏭ " + sym + ": " + (qty * px).toFixed(2) + " USDT no alcanza el mínimo de Binance (" + inf.minNot + ") · saldo disponible " + s.disp.toFixed(2), true); return false; }
+        await modo();
+        try { await api("POST", "/fapi/v1/marginType", { symbol: sym, marginType: "ISOLATED" }, true); } catch (e) { if (e.code !== -4046) throw e; }
+        await api("POST", "/fapi/v1/leverage", { symbol: sym, leverage: lev }, true);
+
+        var p = { symbol: sym, side: "BUY", type: "MARKET", quantity: qty, newOrderRespType: "RESULT" };
+        if (dual) p.positionSide = "LONG";
+        var o = await api("POST", "/fapi/v1/order", p, true);
+        var entrada = parseFloat(o.avgPrice), cant = parseFloat(o.executedQty) || qty;
+        if (!(entrada > 0)) {
+            var pr = await api("GET", "/fapi/v2/positionRisk", { symbol: sym }, true);
+            entrada = parseFloat((pr.filter(function (x) { return parseFloat(x.positionAmt) > 0; })[0] || {}).entryPrice) || px;
+        }
+        log("🟢 COMPRA LONG " + sym + " · " + cant + " @ " + entrada + " · margen " + margen.toFixed(2) + " USDT x" + lev + " aislado" + (emerg ? " 🆘 EMERGENCIA (capital < 6 USDT, sale +0.25)" : "") + " · saldo disponible " + s.disp.toFixed(2) + " (perfil desde " + perf.desde + ") · " + motivo);
+        misPos[sym] = { adds: 0, t: Date.now(), perf: JSON.parse(JSON.stringify(perf)) }; escLS(PLS, misPos);
+        anotar({ tipo: "COMPRA", s: sym, qty: cant, px: entrada, margen: margen });   /* la posición conserva SU perfil */
+        await ponerSalida(sym, inf, cant, entrada, perf.tp);
+        return true;
+    }
+
+    /* Salida: venta límite reduce-only para ganar `objetivo` USDT sobre TODA la posición (precio medio) */
+    async function ponerSalida(sym, inf, cant, entrada, objetivo) {
+        var T = cfg.tpNeto
+            ? (objetivo + cant * entrada * (1 + cfg.feeIn / 100)) / (cant * (1 - cfg.feeOut / 100))
+            : entrada + objetivo / cant;
+        var tp = ceilStep(T, inf.tick, inf.pp);
+        var q = { symbol: sym, side: "SELL", type: "LIMIT", timeInForce: "GTC", quantity: cant.toFixed(inf.qp), price: tp };
+        if (dual) q.positionSide = "LONG"; else q.reduceOnly = "true";
+        for (var i = 0; i < 2; i++) {
+            try { await api("POST", "/fapi/v1/order", q, true); log("🎯 Salida colocada en Binance: vender " + q.quantity + " a " + tp + " (+" + objetivo + " USDT " + (cfg.tpNeto ? "netos" : "brutos") + ")"); anotar({ tipo: "SALIDA", s: sym, qty: q.quantity, px: tp, obj: objetivo }); return true; }
+            catch (e) { log("⚠️ No se pudo colocar la salida de " + sym + " (intento " + (i + 1) + "): " + e.message, true); }
+        }
+        log("🚨 " + sym + " QUEDÓ ABIERTA SIN ORDEN DE SALIDA. Ciérrala o ponle salida a mano en Binance.", true);
+        return false;
+    }
+    async function cancelarSalidas(sym) {
+        var ords = await api("GET", "/fapi/v1/openOrders", { symbol: sym }, true);
+        for (var i = 0; i < ords.length; i++) {
+            var o = ords[i];
+            if (o.side === "SELL" && o.type === "LIMIT" && (o.reduceOnly || o.positionSide === "LONG"))
+                await api("DELETE", "/fapi/v1/order", { symbol: sym, orderId: o.orderId }, true);
+        }
+    }
+
+    /* ── RECOMPRA según el perfil con el que se abrió la posición ── */
+    async function recomprar(sym, p, add, n, total) {
+        var inf = info[sym]; if (!inf) return false;
+        var s = await saldo(), rec0 = misPos[sym], margen;
+        if (rec0 && rec0.perf && rec0.perf.budget) {          /* multi-moneda: % de lo que le queda libre a ESA moneda */
+            var inv = Math.abs(parseFloat(p.positionAmt)) * parseFloat(p.entryPrice) / (parseFloat(p.leverage) || LEV);
+            margen = Math.min(Math.max(0, rec0.perf.budget - inv) * add.pct / 100, s.disp * 0.99);
+        } else margen = s.disp * add.pct / 100;
+        var mk = parseFloat(p.markPrice), lev = parseFloat(p.leverage) || LEV;
+        var qty = parseFloat(floorStep(margen * lev / mk, inf.step, inf.qp));
+        if (qty < inf.minQty || qty * mk < inf.minNot * 1.02) { log("⏭ Recompra " + sym + ": " + margen.toFixed(2) + " USDT libres no alcanzan el mínimo de Binance", true); return false; }
+        var o = { symbol: sym, side: "BUY", type: "MARKET", quantity: qty, newOrderRespType: "RESULT" };
+        if (dual) o.positionSide = "LONG";
+        await api("POST", "/fapi/v1/order", o, true);
+        misPos[sym].adds++; escLS(PLS, misPos);
+        log("🟠 RECOMPRA " + n + "/" + total + " " + sym + " · +" + qty + " @ ~" + mk + " · margen +" + margen.toFixed(2) + " USDT (x" + lev + " aislado, sin cambiar apalancamiento)");
+        anotar({ tipo: "RECOMPRA", s: sym, qty: qty, px: mk, margen: margen, n: n, total: total });
+        var np = (await api("GET", "/fapi/v2/positionRisk", { symbol: sym }, true)).filter(function (x) { return parseFloat(x.positionAmt) > 0; })[0];
+        if (!np) { log("ℹ️ " + sym + " ya no tiene posición abierta"); return true; }
+        await cancelarSalidas(sym);
+        np = (await api("GET", "/fapi/v2/positionRisk", { symbol: sym }, true)).filter(function (x) { return parseFloat(x.positionAmt) > 0; })[0];
+        if (!np) { log("ℹ️ " + sym + " se cerró antes de recolocar la salida (salida anterior ejecutada)"); return true; }
+        await ponerSalida(sym, inf, parseFloat(np.positionAmt), parseFloat(np.entryPrice), add.tp);
+        return true;
+    }
+    async function gestionar() {
+        var syms = Object.keys(misPos); if (!syms.length) return;
+        await modo();
+        var pr = await api("GET", "/fapi/v2/positionRisk", {}, true), abiertas = {};
+        pr.forEach(function (p) { if (parseFloat(p.positionAmt) > 0) abiertas[p.symbol] = p; });
+        for (var i = 0; i < syms.length; i++) {
+            var sym = syms[i], p = abiertas[sym];
+            if (!p) {                                                          /* cerrada (salida ejecutada) */
+                var recC = misPos[sym]; try { await cerrarOp(sym, recC); } catch (e) {}
+                delete misPos[sym]; escLS(PLS, misPos);
+                espera[sym] = { ausente: null }; escLS(ELS, espera);
+                log("✅ " + sym + " cerrada. No se vuelve a comprar hasta una NUEVA alerta del CDC");
+                continue;
+            }
+            var rec = misPos[sym], adds = (rec.perf && rec.perf.adds) || [], nx = adds[rec.adds];
+            if (!nx) continue;                                                 /* sin más recompras en su perfil */
+            var ent = parseFloat(p.entryPrice), mk = parseFloat(p.markPrice);   /* entryPrice = precio medio actual */
+            if (!(mk <= ent * (1 - nx.caida / 100))) continue;
+            if (Date.now() < (intentosAdd[sym] || 0)) continue;
+            intentosAdd[sym] = Date.now() + 60000;
+            try { if (!(await recomprar(sym, p, nx, rec.adds + 1, adds.length))) intentosAdd[sym] = Date.now() + 300000; }
+            catch (e) { log("❌ Recompra " + sym + ": " + e.message, true); }
+        }
+    }
+
+    /* ── BUCLE PRINCIPAL ── */
+    async function tick() {
+        if (!cfg.activo || busy || !window.CDC_DESPERTAR) return;
+        busy = true;
+        try {
+            await cargarInfo();
+            try { await gestionar(); } catch (e) { log("❌ Gestión de recompras: " + e.message, true); }
+            if (!cfg.activo) { busy = false; return; }
+            var lista = CDC_DESPERTAR.lista(), ahora = Date.now(), activos = {}, cand = [];
+            lista.forEach(function (it) {
+                var r = it.r; if (!r || !(r.dir < 0)) return;                        /* solo desmayo / caída brutal */
+                if (r.tipo === "DESMAYO_INMINENTE" && !cfg.incInminente) return;
+                if (!/USDT$/.test(it.s)) return;
+                activos[it.s] = 1; cand.push({ s: it.s, tipo: r.tipo });
+            });
+            var cambio = false;                                                      /* monedas cerradas: liberar al terminar su alerta */
+            Object.keys(espera).forEach(function (sym) {
+                if (activos[sym]) { if (espera[sym].ausente) { espera[sym].ausente = null; cambio = true; } return; }
+                if (!espera[sym].ausente) { espera[sym].ausente = ahora; cambio = true; }
+                else if (ahora - espera[sym].ausente >= REARMAR_MS) { delete espera[sym]; cambio = true; log("🔄 " + sym + ": su alerta terminó. Queda lista para una NUEVA alerta"); }
+            });
+            if (cambio) escLS(ELS, espera);
+            for (var i = 0; i < cand.length; i++) {
+                var sym = cand[i].s;
+                if (espera[sym] || misPos[sym]) continue;                           /* ya ganada (espera alerta nueva) o ya abierta */
+                var t0 = intentos[sym]; if (t0 && ahora - t0 < 60000) continue;
+                intentos[sym] = ahora;
+                try { await comprar(sym, cand[i].tipo); }
+                catch (e) { log("❌ " + sym + ": " + e.message, true); }
+                if (!cfg.activo) break;
+            }
+        } catch (e) { log("❌ " + e.message, true); }
+        busy = false;
+    }
+
+    /* ══ MONITOR: pantalla extra que refleja tu cuenta de Binance en vivo ══ */
+    var monAbierto = false, monBusy = false, monSel = null, monFrameSym = null, monIncome = { t: 0, v: null }, EQLS = "cdcBotEq_v1";
+    var hist = (function () { try { var a = JSON.parse(localStorage.getItem(EQLS) || "[]"); return Array.isArray(a) ? a : []; } catch (e) { return []; } })();
+    function nf(x, d) { return isFinite(x) ? Number(x).toFixed(d == null ? 2 : d) : "—"; }
+    function pf(x) { return nf(x, x >= 100 ? 2 : x >= 1 ? 4 : x >= 0.01 ? 5 : 7); }
+    function col(x) { return x > 0 ? "#0ecb81" : x < 0 ? "#ff6b7a" : "#cbd5e1"; }
+    function tarjeta(t, v, c, sub) { return '<div style="background:#090f1c;border:1px solid rgba(255,255,255,.08);border-radius:10px;padding:8px 10px"><div style="color:#94a3b8;font-size:10px">' + t + '</div><div style="font-size:17px;font-weight:800;color:' + (c || "#fff") + '">' + v + '</div>' + (sub ? '<div style="color:#64748b;font-size:10px">' + sub + '</div>' : '') + '</div>'; }
+    function ponerFrame() {
+        var f = $("bdMonFrame"), on = $("bdMonChartOn").checked;
+        f.style.display = on && monSel ? "block" : "none";
+        $("bdMonSym").textContent = monSel ? monSel + " (perpetuo)" : "";
+        if (on && monSel && monFrameSym !== monSel) {
+            monFrameSym = monSel;
+            f.src = "https://s.tradingview.com/widgetembed/?symbol=" + encodeURIComponent("BINANCE:" + monSel + ".P") + "&interval=5&theme=dark&style=1&locale=es&hide_side_toolbar=1&allow_symbol_change=0";
+        }
+    }
+    function spark() {
+        var h = hist.slice(-240); if (h.length < 2) return '<span style="color:#64748b">Se va dibujando mientras el monitor está abierto.</span>';
+        var v = h.map(function (x) { return x[1]; }), mn = Math.min.apply(null, v), mx = Math.max.apply(null, v), rg = (mx - mn) || 1e-9;
+        var pts = v.map(function (y, i) { return (i / (v.length - 1) * 600).toFixed(1) + "," + (66 - (y - mn) / rg * 60).toFixed(1); }).join(" ");
+        var c = v[v.length - 1] >= v[0] ? "#0ecb81" : "#ff6b7a";
+        return '<svg viewBox="0 0 600 72" preserveAspectRatio="none" style="width:100%;height:80px;background:#050914;border-radius:8px"><polyline fill="none" stroke="' + c + '" stroke-width="2" points="' + pts + '"/></svg>' +
+            '<div style="display:flex;justify-content:space-between;color:#94a3b8;font-size:10px"><span>mín ' + nf(mn, 3) + '</span><span>ahora ' + nf(v[v.length - 1], 3) + ' USDT</span><span>máx ' + nf(mx, 3) + '</span></div>';
+    }
+    async function refrescarMon() {
+        if (!monAbierto || monBusy) return;
+        var err = $("bdMonErr");
+        $("bdMonModo").innerHTML = cfg.testnet ? '<span style="color:#f3ba2f">· TESTNET</span>' : '<span style="color:#ff2a3b">· CUENTA REAL</span>';
+        if (!cfg.key || !cfg.secret) { err.textContent = "Guarda tu API Key y Secret en el panel del bot (botón 💾 GUARDAR) para ver tu cuenta aquí."; return; }
+        monBusy = true;
+        try {
+            await cargarInfo();
+            var r = await Promise.all([api("GET", "/fapi/v2/balance", {}, true), api("GET", "/fapi/v2/positionRisk", {}, true), api("GET", "/fapi/v1/openOrders", {}, true)]);
+            var u = r[0].filter(function (x) { return x.asset === "USDT"; })[0] || { balance: 0, availableBalance: 0 };
+            var wallet = parseFloat(u.balance), disp = parseFloat(u.availableBalance), ords = r[2];
+            var pos = r[1].filter(function (p) { return Math.abs(parseFloat(p.positionAmt)) > 0; }), unr = 0;
+            pos.forEach(function (p) { unr += parseFloat(p.unRealizedProfit) || 0; });
+            if (Date.now() - monIncome.t > 60000) {
+                try { var d0 = new Date(); d0.setHours(0, 0, 0, 0); var sum = 0;
+                    (await api("GET", "/fapi/v1/income", { startTime: d0.getTime(), limit: 1000 }, true)).forEach(function (x) { if (/^(REALIZED_PNL|COMMISSION|FUNDING_FEE)$/.test(x.incomeType)) sum += parseFloat(x.income) || 0; });
+                    monIncome = { t: Date.now(), v: sum }; } catch (e) { monIncome = { t: Date.now(), v: null }; }
+            }
+            hist.push([Date.now(), wallet + unr]); if (hist.length > 400) hist = hist.slice(-400); escLS(EQLS, hist);
+            $("bdMonCards").innerHTML = tarjeta("Capital (billetera)", nf(wallet, 2) + " USDT") + tarjeta("Disponible", nf(disp, 2) + " USDT") +
+                tarjeta("PnL no realizado", (unr >= 0 ? "+" : "") + nf(unr, 3), col(unr), "posiciones abiertas") + tarjeta("Cuenta total", nf(wallet + unr, 2) + " USDT") +
+                tarjeta("Resultado de hoy (neto)", monIncome.v == null ? "—" : (monIncome.v >= 0 ? "+" : "") + nf(monIncome.v, 3), col(monIncome.v || 0), "ganancias − comisiones") +
+                tarjeta("Bot", cfg.activo ? "ACTIVO" : "APAGADO", cfg.activo ? "#0ecb81" : "#94a3b8", pos.length + " posición(es)");
+            /* alertas actuales del CDC */
+            var al = [];
+            try { CDC_DESPERTAR.lista().forEach(function (it) { if (it.r && it.r.dir < 0) al.push({ s: it.s, t: it.r.tipo === "DESMAYO_INMINENTE" ? "inminente" : it.r.tipo === "CAIDA_BRUTAL" ? "caída brutal" : "desmayo" }); }); } catch (e) {}
+            $("bdMonChips").innerHTML = al.length ? al.slice(0, 24).map(function (a) { return '<span data-sym="' + a.s + '" style="display:inline-block;margin:2px 4px 2px 0;padding:3px 8px;border-radius:12px;border:1px solid rgba(255,159,26,.5);background:rgba(255,159,26,.1);cursor:pointer">' + a.s.replace("USDT", "") + ' · ' + a.t + '</span>'; }).join("") : '<span style="color:#64748b">Ninguna moneda en desmayo ahora.</span>';
+            if (!monSel || (!pos.some(function (p) { return p.symbol === monSel; }) && !al.some(function (a) { return a.s === monSel; }))) monSel = pos.length ? pos[0].symbol : (al[0] ? al[0].s : null);
+            /* tabla de posiciones */
+            var th = "padding:5px 8px;text-align:right;color:#94a3b8;font-weight:600;border-bottom:1px solid rgba(255,255,255,.1)", td = "padding:6px 8px;text-align:right;border-bottom:1px solid rgba(255,255,255,.05)";
+            var rows = pos.map(function (p) {
+                var sym = p.symbol, amt = parseFloat(p.positionAmt), qty = Math.abs(amt), ent = parseFloat(p.entryPrice), mk = parseFloat(p.markPrice), pnl = parseFloat(p.unRealizedProfit) || 0;
+                var tpO = ords.filter(function (o) { return o.symbol === sym && o.side === "SELL" && o.type === "LIMIT"; })[0], tpPx = tpO ? parseFloat(tpO.price) : null;
+                var rec = misPos[sym], adds = (rec && rec.perf && rec.perf.adds) || [], nx = rec ? adds[rec.adds] : null;
+                var rc = rec ? rec.adds + "/" + adds.length + (nx ? " · próxima a " + pf(ent * (1 - nx.caida / 100)) : " · sin más") : '<span style="color:#64748b">no es del bot</span>';
+                return '<tr data-sym="' + sym + '" style="cursor:pointer;' + (sym === monSel ? 'background:rgba(243,186,47,.1)' : '') + '"><td style="' + td + ';text-align:left;font-weight:800">' + sym.replace("USDT", "") + ' <span style="color:#64748b;font-weight:400">' + (amt > 0 ? "LONG" : "SHORT") + '</span></td>' +
+                    '<td style="' + td + '">' + qty + '</td><td style="' + td + '">' + pf(ent) + '</td><td style="' + td + '">' + pf(mk) + '</td>' +
+                    '<td style="' + td + ';color:' + col(pnl) + ';font-weight:700">' + (pnl >= 0 ? "+" : "") + nf(pnl, 3) + '</td><td style="' + td + ';color:' + col(pnl) + '">' + (ent ? nf((mk / ent - 1) * (amt > 0 ? 1 : -1) * 100, 2) + "%" : "—") + '</td>' +
+                    '<td style="' + td + '">' + (tpPx ? pf(tpPx) : '<span style="color:#ff6b7a">sin salida</span>') + '</td><td style="' + td + '">' + (tpPx && mk ? "+" + nf((tpPx / mk - 1) * 100, 2) + "%" : "—") + '</td><td style="' + td + '">' + rc + '</td></tr>';
+            }).join("");
+            $("bdMonTabla").innerHTML = '<tr><th style="' + th + ';text-align:left">Moneda</th><th style="' + th + '">Cantidad</th><th style="' + th + '">Precio medio</th><th style="' + th + '">Precio actual</th><th style="' + th + '">PnL USDT</th><th style="' + th + '">Precio vs medio</th><th style="' + th + '">Salida a</th><th style="' + th + '">Falta p/ salida</th><th style="' + th + '">Recompras</th></tr>' +
+                (rows || '<tr><td colspan="9" style="' + td + ';text-align:center;color:#64748b">Sin posiciones abiertas</td></tr>');
+            $("bdMonSpark").innerHTML = spark();
+            err.textContent = ""; $("bdMonHora").textContent = "Actualizado " + new Date().toLocaleTimeString();
+            ponerFrame();
+        } catch (e) { err.textContent = "❌ " + e.message; }
+        monBusy = false;
+    }
+    setInterval(refrescarMon, 8000);
+
+    /* ══════════════════════════════════════════════════════════════════
+       📈 PANEL FLOTANTE PRO · Monitor · Operaciones · Registro · Guía API · Antes de operar · Botones
+       Botón redondo en la columna de botones flotantes, justo ENCIMA del 🔄 Actualizar.
+       ══════════════════════════════════════════════════════════════════ */
+    var OPLS = "cdcBotOps_v1", CHL = "cdcBotChk_v1", ops = (function () { var a = leerLS(OPLS); return Array.isArray(a) ? a : []; })(), chk = leerLS(CHL);
+    var fabOpen = false, fabTab = "mon", fabSel = null, fabBusy = false, fabFrameSym = null, fabData = null, fabN = 0, fabIni = false, avT = 0;
+    var fabIP = "", ipBusy = false;
+    var URLS = { api: "https://www.binance.com/es-LA/my/settings/api-management", kyc: "https://www.binance.com/es-LA/my/settings/kyc",
+        fut: "https://www.binance.com/es-LA/futures/BTCUSDT", test: "https://testnet.binancefuture.com", panel: "https://www.binance.com/es-LA/my/dashboard" };
+    var TABS = [["mon", "📊 Monitor"], ["ops", "📒 Operaciones"], ["log", "🧾 Registro"], ["gui", "🔑 Guía API"], ["chk", "✅ Antes de operar"], ["bot", "❓ Botones"]];
+    function esc(s) { return String(s).replace(/[&<>"']/g, function (c) { return { "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]; }); }
+    function anotar(o) {
+        try { o.t = Date.now(); o.m = cfg.testnet ? "t" : "r"; ops.unshift(o); if (ops.length > 300) ops.length = 300; escLS(OPLS, ops); if (fabOpen && fabTab === "ops") pintarFab(); } catch (e) {}
+    }
+    async function cerrarOp(sym, rec) {
+        var t0 = rec && rec.t ? rec.t - 5000 : Date.now() - 86400000, neto = null;
+        try {
+            var inc = await api("GET", "/fapi/v1/income", { symbol: sym, startTime: t0, limit: 1000 }, true), sum = 0, hay = false;
+            inc.forEach(function (x) { if (/^(REALIZED_PNL|COMMISSION|FUNDING_FEE)$/.test(x.incomeType)) { sum += parseFloat(x.income) || 0; if (x.incomeType === "REALIZED_PNL") hay = true; } });
+            if (hay) neto = sum;
+        } catch (e) {}
+        anotar({ tipo: "CIERRE", s: sym, neto: neto, adds: rec ? rec.adds : 0 });
+        if (neto != null) log("💰 " + sym + " cerrada con " + (neto >= 0 ? "+" : "") + neto.toFixed(3) + " USDT netos (ganancia − comisiones)");
+    }
+    function fabLogNuevo() { if (fabOpen && fabTab === "log") pintarFab(); }
+    function pintarBadge() { var b = $("bdFabBadge"); if (!b) return; b.textContent = fabN; b.style.display = fabN > 0 ? "flex" : "none"; }
+    async function fabContar() {
+        try { await cargarInfo(); var r = await api("GET", "/fapi/v2/positionRisk", {}, true); fabN = r.filter(function (x) { return Math.abs(parseFloat(x.positionAmt)) > 0; }).length; pintarBadge(); } catch (e) {}
+    }
+    async function fabRefrescar() {
+        if (fabBusy) return; fabBusy = true;
+        try {
+            if (!cfg.key || !cfg.secret) { fabData = { err: "Falta tu API Key / Secret. Mira la pestaña «🔑 Guía API»: ahí te explico dónde conseguirlas." }; }
+            else {
+                await cargarInfo();
+                var r = await Promise.all([api("GET", "/fapi/v2/balance", {}, true), api("GET", "/fapi/v2/positionRisk", {}, true), api("GET", "/fapi/v1/openOrders", {}, true)]);
+                var u = r[0].filter(function (x) { return x.asset === "USDT"; })[0] || { balance: 0, availableBalance: 0 };
+                var pos = r[1].filter(function (x) { return Math.abs(parseFloat(x.positionAmt)) > 0; }), unr = 0;
+                pos.forEach(function (x) { unr += parseFloat(x.unRealizedProfit) || 0; });
+                if (Date.now() - monIncome.t > 60000) {
+                    try { var d0 = new Date(); d0.setHours(0, 0, 0, 0); var sum = 0;
+                        (await api("GET", "/fapi/v1/income", { startTime: d0.getTime(), limit: 1000 }, true)).forEach(function (x) { if (/^(REALIZED_PNL|COMMISSION|FUNDING_FEE)$/.test(x.incomeType)) sum += parseFloat(x.income) || 0; });
+                        monIncome = { t: Date.now(), v: sum }; } catch (e) { monIncome = { t: Date.now(), v: null }; }
+                }
+                var wallet = parseFloat(u.balance), disp = parseFloat(u.availableBalance);
+                if (!hist.length || Date.now() - hist[hist.length - 1][0] > 5000) { hist.push([Date.now(), wallet + unr]); if (hist.length > 400) hist = hist.slice(-400); escLS(EQLS, hist); }
+                var al = [];
+                try { CDC_DESPERTAR.lista().forEach(function (it) { if (it.r && it.r.dir < 0) al.push({ s: it.s, t: it.r.tipo === "DESMAYO_INMINENTE" ? "inminente" : it.r.tipo === "CAIDA_BRUTAL" ? "caída brutal" : "desmayo" }); }); } catch (e) {}
+                fabData = { wallet: wallet, disp: disp, unr: unr, pos: pos, ords: r[2], al: al };
+                fabN = pos.length; pintarBadge();
+                if (!fabSel || (!pos.some(function (x) { return x.symbol === fabSel; }) && !al.some(function (x) { return x.s === fabSel; }))) fabSel = pos.length ? pos[0].symbol : (al[0] ? al[0].s : null);
+            }
+        } catch (e) { fabData = { err: e.message + (e.code === -2015 ? " · Revisa tu IP: la actual es " + (fabIP && fabIP !== "?" ? fabIP : "(míra la pestaña «🔑 Guía API»)") + " y debe estar en las IPs de confianza de tu API en Binance." : "") }; if (e.code === -2015 && !fabIP) ipDetectar(); }
+        fabBusy = false; pintarFab();
+    }
+    function fabFrame() {
+        var wrap = $("bdFabChart"), f = $("bdFabFrame"); if (!wrap || !f) return;
+        var show = fabOpen && fabTab === "mon" && $("bdFabChartOn").checked && fabSel;
+        wrap.style.display = fabTab === "mon" ? "block" : "none"; f.style.display = show ? "block" : "none";
+        $("bdFabSym").textContent = fabSel ? fabSel + " (perpetuo)" : "";
+        if (show && fabFrameSym !== fabSel) { fabFrameSym = fabSel; f.src = "https://s.tradingview.com/widgetembed/?symbol=" + encodeURIComponent("BINANCE:" + fabSel + ".P") + "&interval=5&theme=dark&style=1&locale=es&hide_side_toolbar=1&allow_symbol_change=0"; }
+    }
+    function fHora(ms) { var d = new Date(ms), h = d.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }); return (new Date().toDateString() === d.toDateString() ? "" : d.toLocaleDateString([], { day: "2-digit", month: "2-digit" }) + " ") + h; }
+    async function ipDetectar() {
+        if (ipBusy) return; ipBusy = true;
+        var fu = ["https://api.ipify.org?format=json", "https://checkip.amazonaws.com"];
+        for (var i = 0; i < fu.length && !fabIP; i++) {
+            try { var r = await fetch(fu[i], { cache: "no-store" }), tx = (await r.text()).trim(), ip = tx; try { ip = JSON.parse(tx).ip || tx; } catch (e) {}
+                if (/^[0-9a-fA-F:.]{7,45}$/.test(ip)) fabIP = ip; } catch (e) {}
+        }
+        if (!fabIP) fabIP = "?"; ipBusy = false; if (fabOpen && fabTab === "gui") pintarFab();
+    }
+    function aviso(t, mal) {
+        var a = $("bdFabAv"); if (!a) return; a.innerHTML = t ? '<div class="bdf-av ' + (mal ? "bad" : "ok") + '">' + t + '</div>' : "";
+        clearTimeout(avT); if (t) avT = setTimeout(function () { a.innerHTML = ""; }, 9000);
+    }
+    /* ── piezas de diseño ── */
+    function card(t, b) { return '<div class="bdf-card"><h4>' + t + '</h4>' + b + '</div>'; }
+    function K(t) { return '<span class="bdf-k">' + t + '</span>'; }
+    function paso(n, t, b) { return '<div class="bdf-step"><div class="bdf-n">' + n + '</div><div style="flex:1;min-width:0"><b style="color:#fff">' + t + '</b><div style="color:#aab6c8;margin-top:2px">' + b + '</div></div></div>'; }
+    function enlace(u) {
+        return '<a class="bdf-url" href="' + u + '" target="_blank" rel="noopener">🔗 ' + u + '</a><div class="bdf-row"><a class="bdf-btn bdf-gold" href="' + u + '" target="_blank" rel="noopener">Abrir en Binance ↗</a><button class="bdf-btn bdf-blue" data-copy="' + u + '">📋 Copiar enlace</button></div>';
+    }
+    /* ── MONITOR ── */
+    function esperaBanner(d, mm) {
+        if (mm || !d.pos.length) return "";
+        var man = d.pos.filter(function (x) { return !misPos[x.symbol]; }).map(function (x) { return x.symbol.replace("USDT", ""); });
+        return '<div class="bdf-av" style="background:rgba(255,159,26,.12);border:1px solid #ff9f1a;color:#ffc27a">⏳ Hay una operación en curso' + (man.length ? ' (<b>' + esc(man.join(", ")) + '</b>, abierta por ti)' : ' (del bot)') + '. Con capital chico el bot opera <b>una a la vez</b>: ' + (cfg.activo ? 'ESPERA' : 'cuando lo enciendas esperará') + ' a que termine antes de comprar otra.</div>';
+    }
+    function fabMonitorHtml() {
+        var d = fabData; if (!d) return '<div style="color:#94a3b8;padding:14px;text-align:center">Conectando con Binance…</div>';
+        if (d.err) return '<div class="bdf-av bad">❌ ' + esc(d.err) + '</div>';
+        var mm = modoMulti(d.wallet), modo;
+        if (mm) modo = 'Modo <b style="color:#f3ba2f">MULTI-MONEDA</b>: hasta <b>' + mm.n + '</b> monedas · parte ≈ <b>' + nf(mm.presup, 2) + ' USDT</b> cada una · abiertas <b>' + d.pos.length + '/' + mm.n + '</b>';
+        else { var pr = elegirPerfil(d.disp), ix = pr ? cfg.perfiles.indexOf(pr) + 1 : 0; modo = pr ? 'Perfil <b style="color:#f3ba2f">' + ix + '</b> según tu saldo disponible · 1 moneda a la vez · abiertas <b>' + d.pos.length + '/1</b>' : 'Ningún perfil aplica a tu saldo disponible'; }
+        var h = '<div style="font-size:11px;color:#cbd5e1;margin-bottom:6px">' + modo + '</div>' + esperaBanner(d, mm) +
+            '<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(118px,1fr));gap:6px">' +
+            tarjeta("Capital (billetera)", nf(d.wallet, 2) + " USDT") + tarjeta("Disponible", nf(d.disp, 2) + " USDT") +
+            tarjeta("PnL no realizado", (d.unr >= 0 ? "+" : "") + nf(d.unr, 3), col(d.unr), "posiciones abiertas") +
+            tarjeta("Cuenta total", nf(d.wallet + d.unr, 2) + " USDT") +
+            tarjeta("Resultado de hoy (neto)", monIncome.v == null ? "—" : (monIncome.v >= 0 ? "+" : "") + nf(monIncome.v, 3), col(monIncome.v || 0), "ganancias − comisiones") + '</div>';
+        h += '<div class="bdf-sec">Posiciones abiertas <span>(toca una para ver su gráfico)</span></div>';
+        if (!d.pos.length) h += '<div style="color:#64748b;padding:6px 2px">Sin posiciones abiertas.</div>';
+        d.pos.forEach(function (x) {
+            var sym = x.symbol, amt = parseFloat(x.positionAmt), ent = parseFloat(x.entryPrice), mk = parseFloat(x.markPrice), pnl = parseFloat(x.unRealizedProfit) || 0;
+            var tpO = d.ords.filter(function (o) { return o.symbol === sym && o.side === "SELL" && o.type === "LIMIT"; })[0], tpPx = tpO ? parseFloat(tpO.price) : null;
+            var rec = misPos[sym], adds = (rec && rec.perf && rec.perf.adds) || [], nx = rec ? adds[rec.adds] : null;
+            var rc = rec ? "recompras " + rec.adds + "/" + adds.length + (nx ? " · próxima a " + pf(ent * (1 - nx.caida / 100)) : " · sin más") : "no es del bot";
+            h += '<div data-sym="' + esc(sym) + '" class="bdf-pos' + (sym === fabSel ? " sel" : "") + '">' +
+                '<div style="display:flex;justify-content:space-between;align-items:center"><b style="font-size:13px">' + esc(sym.replace("USDT", "")) + ' <span style="color:#64748b;font-weight:400;font-size:10px">' + (amt > 0 ? "LONG" : "SHORT") + '</span></b>' +
+                '<b style="color:' + col(pnl) + '">' + (pnl >= 0 ? "+" : "") + nf(pnl, 3) + ' USDT · ' + (ent ? nf((mk / ent - 1) * (amt > 0 ? 1 : -1) * 100, 2) : "—") + ' %</b></div>' +
+                '<div style="color:#94a3b8;font-size:10.5px;margin-top:3px">medio ' + pf(ent) + ' → actual ' + pf(mk) + ' · sale a ' + (tpPx ? pf(tpPx) + ' (falta +' + nf((tpPx / mk - 1) * 100, 2) + ' %)' : '<span style="color:#ff6b7a">SIN SALIDA</span>') + '</div>' +
+                '<div style="color:#64748b;font-size:10.5px">' + esc(rc) + '</div></div>';
+        });
+        h += '<div class="bdf-sec">Monedas en alerta ahora en el CDC</div>';
+        h += d.al.length ? d.al.slice(0, 20).map(function (a) { return '<span data-sym="' + esc(a.s) + '" class="bdf-chip">' + esc(a.s.replace("USDT", "")) + ' · ' + a.t + '</span>'; }).join("") : '<span style="color:#64748b">Ninguna en este momento.</span>';
+        h += '<div class="bdf-sec">Evolución de tu cuenta</div>' + spark();
+        return h;
+    }
+    /* ── OPERACIONES ── */
+    function fabOpsHtml() {
+        var mi = cfg.testnet ? "t" : "r", L = ops.filter(function (o) { return o.m === mi; });
+        var cierres = L.filter(function (o) { return o.tipo === "CIERRE" && o.neto != null; }), gan = cierres.filter(function (o) { return o.neto > 0; }), tot = 0, hoy = 0, d0 = new Date(); d0.setHours(0, 0, 0, 0);
+        cierres.forEach(function (o) { tot += o.neto; if (o.t >= d0.getTime()) hoy += o.neto; });
+        var h = '<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(105px,1fr));gap:6px">' +
+            tarjeta("Operaciones cerradas", String(cierres.length), "#fff", gan.length + " con ganancia") +
+            tarjeta("Resultado de hoy", (hoy >= 0 ? "+" : "") + nf(hoy, 3), col(hoy), "USDT netos") +
+            tarjeta("Resultado total", (tot >= 0 ? "+" : "") + nf(tot, 3), col(tot), "USDT netos") + '</div>' +
+            '<div class="bdf-sec" style="display:flex;justify-content:space-between;align-items:center"><span style="color:#f3ba2f;font-weight:800">Historial (' + (cfg.testnet ? "TESTNET" : "CUENTA REAL") + ')</span><a data-act="borrar" style="color:#94a3b8;font-size:10px;cursor:pointer;text-decoration:underline">borrar historial</a></div>';
+        if (!L.length) return h + '<div style="color:#64748b;padding:8px 2px">Todavía no hay operaciones. Aquí aparecerá cada compra, recompra, salida y cierre del bot.</div>';
+        L.slice(0, 80).forEach(function (o) {
+            var ic, det, cl = "#cbd5e1", s = esc(String(o.s).replace("USDT", ""));
+            if (o.tipo === "COMPRA") { ic = "🟢"; det = "<b>COMPRA " + s + "</b> · " + o.qty + " @ " + pf(o.px) + " · margen " + nf(o.margen, 2) + " USDT"; }
+            else if (o.tipo === "RECOMPRA") { ic = "🟠"; det = "<b>RECOMPRA " + o.n + "/" + o.total + " " + s + "</b> · +" + o.qty + " @ ~" + pf(o.px) + " · margen +" + nf(o.margen, 2) + " USDT"; }
+            else if (o.tipo === "SALIDA") { ic = "🎯"; det = "<b>Salida " + s + "</b> · vender " + o.qty + " a " + o.px + " (+" + nf(o.obj, 3) + " USDT)"; }
+            else { ic = o.neto == null ? "✅" : o.neto >= 0 ? "💰" : "🔻"; cl = o.neto == null ? "#cbd5e1" : col(o.neto); det = "<b>CIERRE " + s + "</b> · " + (o.neto == null ? "resultado no disponible" : (o.neto >= 0 ? "+" : "") + nf(o.neto, 3) + " USDT netos") + (o.adds ? " · " + o.adds + " recompra(s)" : ""); }
+            h += '<div class="bdf-op" style="color:' + cl + '"><span style="color:#64748b;white-space:nowrap;min-width:46px">' + fHora(o.t) + '</span><span>' + ic + '</span><span style="flex:1">' + det + '</span></div>';
+        });
+        return h;
+    }
+    function fabLogHtml() {
+        if (!logBuf.length) return '<div style="color:#64748b;padding:8px 2px">Sin mensajes todavía.</div>';
+        return '<div style="font:11px/1.5 monospace">' + logBuf.map(function (l) { return '<div style="color:' + (l.mal ? "#ff6b7a" : "#9fe8c4") + ';padding:1px 0">' + new Date(l.t).toLocaleTimeString() + "  " + esc(l.s) + '</div>'; }).join("") + '</div>';
+    }
+    /* ── GUÍA API: dónde conseguir la API Key y el Secret ── */
+    function guiaHtml() {
+        var kk = !!cfg.key, ss = !!cfg.secret;
+        var h = card("🔑 ¿Qué son la API Key y el Secret?",
+            '<div><b style="color:#fff">API Key</b> = tu «usuario»: identifica al bot ante Binance.<br><b style="color:#fff">Secret (clave secreta)</b> = tu «contraseña»: con ella el bot FIRMA cada orden.<br>' +
+            'Con las dos, el bot puede <b>leer tu saldo, comprar y poner la salida</b>. Si no activas «retiros», <b style="color:#0ecb81">nadie puede sacar tu dinero</b> con esas claves.<br>' +
+            '<span style="color:#94a3b8">Se guardan solo en este navegador y se envían directo a Binance.</span></div>');
+        h += card("📍 Paso a paso (según tus capturas de Binance)",
+            paso(1, "Abre «Gestión de API»", 'Ruta: ' + K("Panel de usuario") + ' → menú izquierdo ' + K("Cuenta") + ' → ' + K("Gestión de API") + '. O entra directo:' + enlace(URLS.api)) +
+            paso(2, "Crea la API", 'Arriba a la derecha pulsa el botón amarillo ' + K("Crear API") + '. Elige ' + K("Generada por el sistema") + ', ponle un nombre (ej. <i>CDC-BOT</i>) y confirma la verificación de seguridad (código del correo / Authenticator / passkey).') +
+            paso(3, "Copia las dos claves", 'Binance muestra la <b>API Key</b> y la <b>Secret Key</b>. Pulsa el icono 📋 de copiar al lado de cada una. <b style="color:#ff9aa5">La Secret se muestra UNA SOLA VEZ</b>: si la pierdes, borra esa API y crea otra.') +
+            paso(4, "Edita las restricciones", 'En la API creada pulsa ' + K("Editar restricciones") + ':<br>✅ activa ' + K("Habilitar Futuros") + '<br>❌ deja <b>desactivado</b> ' + K("Habilitar retiros") + '<br>🔒 recomendado: ' + K("Restringir acceso solo a IPs de confianza") + ' y agrega tu IP (mira la tarjeta «🌐 Tu IP pública» más abajo; si tu internet cambia de IP, el bot dará error −2015).<br><span style="color:#94a3b8">Los nombres exactos pueden variar un poco según la versión de Binance.</span>') +
+            paso(5, "Pega las claves en el bot", 'Copia la <b>API Key</b> y pulsa «Pegar API Key»; luego copia la <b>Secret</b> y pulsa «Pegar Secret». Después «Guardar y probar».' +
+                '<div class="bdf-row" style="margin-top:6px"><button class="bdf-btn bdf-gold" data-act="pk">📋 Pegar API Key</button><button class="bdf-btn bdf-gold" data-act="ps">📋 Pegar Secret</button></div>' +
+                '<div class="bdf-row"><button class="bdf-btn bdf-green" data-act="gp" style="flex:1">💾 Guardar y probar conexión</button></div>' +
+                '<div style="margin-top:6px">Estado: <b class="' + (kk ? "bdf-okc" : "bdf-badc") + '">' + (kk ? "✔ Key guardada" : "✖ falta Key") + '</b> · <b class="' + (ss ? "bdf-okc" : "bdf-badc") + '">' + (ss ? "✔ Secret guardada" : "✖ falta Secret") + '</b></div>'));
+        h += card("☑️ La casilla «Controles de seguridad predeterminados»",
+            '<div>En «Gestión de API», Binance muestra arriba esta casilla (sale marcada). <b style="color:#0ecb81">Déjala MARCADA.</b></div>' +
+            '<div style="margin-top:5px;color:#aab6c8">Con ella marcada, las claves <b>sin IP restringida</b> no pueden tener permiso de trading y Binance se lo quita. Por eso el bot necesita que hagas esto:</div>' +
+            paso(1, "Crea la API y activa «Habilitar Futuros»", 'Deja los retiros <b>desactivados</b>.') +
+            paso(2, "Restringe la API a tu IP", 'En ' + K("Editar restricciones") + ' elige ' + K("Restringir acceso solo a IPs de confianza") + ' y pega tu IP (la detecta la tarjeta de abajo).') +
+            '<div style="color:#94a3b8">Si desmarcas la casilla y dejas la API sin IP, Binance advierte que aumenta el riesgo de acceso no autorizado a tu cuenta: no se recomienda. En TESTNET esto no aplica.</div>');
+        var ipOk = fabIP && fabIP !== "?";
+        h += card("🌐 Tu IP pública (se detecta sola)",
+            (ipOk ? '<div class="bdf-url" style="font-size:16px;color:#0ecb81;text-align:center;font-weight:800">' + esc(fabIP) + '</div>' +
+                '<div class="bdf-row"><button class="bdf-btn bdf-blue" data-copy="' + esc(fabIP) + '">📋 Copiar IP</button><button class="bdf-btn bdf-gold" data-act="ip">🔄 Volver a detectar</button></div>' +
+                (fabIP.indexOf(":") >= 0 ? '<div style="color:#ff9f1a;margin-top:5px">Esta es una IP tipo IPv6. Si Binance no la acepta, avísame y lo ajustamos.</div>' : "")
+              : fabIP === "?" ? '<div style="color:#ff9aa5">No se pudo detectar (un bloqueador, el antivirus o Brave Shields pueden impedirlo). Abre <a class="bdf-a" href="https://api.ipify.org" target="_blank" rel="noopener">api.ipify.org</a> en otra pestaña para verla.</div><div class="bdf-row"><button class="bdf-btn bdf-gold" data-act="ip">🔄 Reintentar</button></div>'
+              : '<div style="color:#94a3b8">Detectando tu IP…</div>') +
+            '<div style="margin-top:7px;color:#aab6c8">Es la IP con la que Binance ve a este navegador (la que usará el bot). En Binance: ' + K("Editar restricciones") + ' → ' + K("Restringir acceso solo a IPs de confianza") + ' → pega la IP → ' + K("Confirmar") + '.<br><span style="color:#94a3b8">El bot no puede agregarla solo: Binance no permite que una API edite su propia lista. Si tu proveedor cambia la IP, el bot mostrará el error −2015 junto con la IP actual para que la actualices.</span></div>');
+        h += card("🧪 Cómo usar TESTNET (práctica sin riesgo)",
+            '<div style="color:#94a3b8">Dinero de mentira en una copia de Binance Futuros. Sus claves son DISTINTAS a las de Binance real.</div>' +
+            paso(1, "Entra a la web de pruebas", 'Es una página aparte; tu cuenta real no sirve ahí.' + enlace(URLS.test)) +
+            paso(2, "Revisa el saldo falso", 'Dentro verás USDT de prueba. Si está en cero, la misma web suele tener un botón para pedir más.') +
+            paso(3, "Crea las claves de testnet", 'Abajo, pestaña ' + K("API Key") + ': genera y copia la <b>Key</b> y el <b>Secret</b> (el Secret se ve una sola vez).') +
+            paso(4, "Pégalas en el bot", 'Usa «Pegar API Key» y «Pegar Secret» de la guía de arriba, o ⚙ Ajustes.') +
+            paso(5, "Marca " + K("Usar TESTNET"), 'En ⚙ Ajustes. <b style="color:#ff9aa5">Es el paso que más se olvida</b>: sin él, el bot prueba esas claves en Binance real y da error.') +
+            paso(6, "Guarda y prueba", '«💾 GUARDAR» y «Probar conexión»: debe decir ✅ Conexión OK (TESTNET).') +
+            paso(7, "Pulsa ▶ RUN", 'Cuando el CDC marque un desmayo, el bot compra y pone la salida. Míralo en <b>Operaciones</b> y <b>Registro</b>.') +
+            '<div style="margin-top:6px;color:#94a3b8">Ojo: a veces la moneda en alerta no existe en testnet (sale «no es perpetuo USDT-M operable»): espera otra. Con tanto saldo falso no se prueba el modo emergencia &lt; 6 USDT. Para pasar a real: desmarca TESTNET y pega las claves reales.</div>');
+        h += card("🧭 Otros enlaces útiles",
+            '<div>Tu panel: <a class="bdf-a" href="' + URLS.panel + '" target="_blank" rel="noopener">binance.com/es-LA/my/dashboard</a><br>Identificación (KYC): <a class="bdf-a" href="' + URLS.kyc + '" target="_blank" rel="noopener">binance.com/es-LA/my/settings/kyc</a><br>Futuros: <a class="bdf-a" href="' + URLS.fut + '" target="_blank" rel="noopener">binance.com/es-LA/futures</a></div>');
+        return h;
+    }
+    /* ── ANTES DE OPERAR: revisión en vivo + lista manual ── */
+    function checkHtml() {
+        var d = fabData, ok = !!(d && !d.err), llaves = !!(cfg.key && cfg.secret);
+        var sinTp = ok ? d.pos.filter(function (x) { return !d.ords.some(function (o) { return o.symbol === x.symbol && o.side === "SELL" && o.type === "LIMIT"; }); }) : [];
+        var au = [
+            [llaves ? "ok" : "bad", "API Key y Secret guardadas", llaves ? "" : "Mira la pestaña «🔑 Guía API»."],
+            [ok ? "ok" : "bad", "Conexión con Binance funcionando", ok ? "" : (d && d.err ? esc(d.err) : "Todavía no conectó.")],
+            [!ok ? "bad" : d.disp >= 5 ? "ok" : "warn", "Saldo disponible en Futuros USDⓈ-M", ok ? nf(d.disp, 2) + " USDT disponibles. Binance pide ≈ 5 USDT mínimo por orden (algunas monedas más). El saldo de «Spot/Financiación» NO cuenta: hay que transferirlo a Futuros." : "Sin datos."],
+            [!ok ? "warn" : sinTp.length ? "bad" : "ok", "Posiciones abiertas con su salida", ok ? (sinTp.length ? "SIN salida: " + sinTp.map(function (x) { return esc(x.symbol); }).join(", ") : "Todo en orden (" + d.pos.length + " abiertas).") : "Sin datos."],
+            [cfg.testnet ? "ok" : "warn", cfg.testnet ? "Modo TESTNET (práctica)" : "Modo CUENTA REAL: opera con dinero de verdad", cfg.testnet ? "Perfecto para probar sin riesgo." : "Revisa bien todo lo de abajo antes de pulsar RUN."]
+        ];
+        var man = [["m1", "Mi API tiene «Habilitar Futuros» activado"], ["m2", "«Habilitar retiros» está DESACTIVADO"], ["m3", "Restringí la API a mi IP de confianza (la veo en 🔑 Guía API)"],
+            ["m4", "Pasé USDT a la billetera de Futuros USDⓈ-M (Activos → Futuros → Transferir)"], ["m5", "Mi cuenta de Futuros está en modo Single-Asset (el botón «Probar conexión» lo avisa)"],
+            ["m6", "Probé antes en TESTNET y vi una compra con su salida"], ["m7", "Entiendo que el bot compra LONG, sin stop loss, a 1x aislado (2x y salida +0.25 si tu capital es menor a 6 USDT): si la moneda sigue cayendo, la posición espera abierta hasta que suba"],
+            ["m8", "Solo uso dinero que puedo permitirme perder"]];
+        var total = au.length + man.length, hechos = au.filter(function (a) { return a[0] === "ok"; }).length + man.filter(function (m) { return chk[m[0]]; }).length, pc = Math.round(hechos / total * 100);
+        var ic = { ok: "✅", bad: "❌", warn: "⚠️" };
+        var h = '<div class="bdf-card"><div style="display:flex;justify-content:space-between"><b style="color:#fff">Listo para operar</b><b style="color:' + (pc === 100 ? "#0ecb81" : "#f3ba2f") + '">' + hechos + '/' + total + '</b></div><div class="bdf-bar"><i style="width:' + pc + '%;background:' + (pc === 100 ? "#0ecb81" : "#f3ba2f") + '"></i></div>' +
+            '<div style="color:#94a3b8;margin-top:4px">' + (pc === 100 ? "Todo revisado. Puedes pulsar ▶ RUN." : "Completa los puntos pendientes antes de encender el bot.") + '</div></div>';
+        h += card("🔎 Revisión automática (en vivo)", au.map(function (a) { return '<div class="bdf-chk"><span>' + ic[a[0]] + '</span><div><b style="color:#fff">' + a[1] + '</b>' + (a[2] ? '<div style="color:#94a3b8;font-size:11px">' + a[2] + '</div>' : "") + '</div></div>'; }).join(""));
+        h += card("📝 Revisión manual (marca lo que ya hiciste)", man.map(function (m) { return '<label class="bdf-chk" style="cursor:pointer"><input type="checkbox" data-chk="' + m[0] + '"' + (chk[m[0]] ? " checked" : "") + '><div style="color:#cbd5e1">' + m[1] + '</div></label>'; }).join(""));
+        return h;
+    }
+    /* ── BOTONES: para qué sirve cada uno ── */
+    function botonesHtml() {
+        function it(b, t) { return '<div class="bdf-chk"><span class="bdf-k" style="align-self:flex-start;white-space:nowrap">' + b + '</span><div style="color:#cbd5e1">' + t + '</div></div>'; }
+        var h = card("🎛 Este panel",
+            it("▶ RUN", "Enciende el bot: desde ese momento compra solo cuando el CDC marca DESMAYO / CAÍDA BRUTAL. En modo real pide confirmación.") + it("⏹ PARAR BOT", "Apaga el bot. <b>No cierra</b> posiciones ni cancela salidas ya puestas en Binance.") +
+            it("⚙ Ajustes", "Abre el panel de configuración: claves, perfiles de capital y multi-moneda.") + it("📈", "Este botón flotante. El número verde indica cuántas posiciones tienes abiertas.") + it("🔄", "Botón de abajo: actualiza la página a la última versión (no borra tus claves)."));
+        h += card("⚙ Dentro de Ajustes",
+            it("💾 GUARDAR", "Guarda claves y reglas en este navegador y se conecta para elegir tu perfil.") + it("Probar conexión", "Verifica claves, permisos, saldo y modo de cuenta. Úsalo siempre antes del primer RUN.") +
+            it("TESTNET", "Dinero de prueba. Desmárcalo solo para operar en real (sale un aviso rojo).") + it("Ganancias NETAS", "La salida se calcula descontando comisiones, para ganar de verdad lo que indica el perfil.") +
+            it("DESMAYO INMINENTE", "Si lo marcas, el bot también compra en alertas «inminentes» (más temprano, más riesgo).") + it("Máx. posiciones", "Tope de monedas abiertas a la vez.") +
+            it("Perfiles 1·2·3", "Reglas según tu saldo disponible: % de entrada, cuánto ganar al vender y recompras si cae.") + it("Multi-moneda", "Con capital grande reparte el saldo en partes iguales, una moneda por parte.") +
+            it("borrar claves", "Elimina la Key y el Secret de este navegador (no toca Binance).") );
+        h += card("📒 En las pestañas", it("borrar historial", "Vacía la lista de la pestaña Operaciones. No toca tu cuenta de Binance."));
+        return h;
+    }
+    function pintarFab() {
+        try { conPintar(); } catch (e) {}
+        var P = $("bdFab"); if (!P || !fabOpen) return;
+        var sc = P.scrollTop, a = cfg.activo;
+        $("bdFabModo").className = "bdf-pill " + (cfg.testnet ? "t" : "r"); $("bdFabModo").textContent = cfg.testnet ? "TESTNET" : "CUENTA REAL";
+        var run = $("bdFabRun"); run.textContent = a ? "⏹ PARAR BOT" : "▶ RUN"; run.className = "bdf-btn " + (a ? "bdf-red" : "bdf-green");
+        $("bdFabEst").textContent = a ? "● ACTIVO" : "○ APAGADO"; $("bdFabEst").style.color = a ? (cfg.testnet ? "#f3ba2f" : "#ff2a3b") : "#94a3b8";
+        TABS.forEach(function (x) { $("bdFabT" + x[0]).className = x[0] === fabTab ? "on" : ""; });
+        $("bdFabBody").innerHTML = { mon: fabMonitorHtml, ops: fabOpsHtml, log: fabLogHtml, gui: guiaHtml, chk: checkHtml, bot: botonesHtml }[fabTab]();
+        fabFrame(); P.scrollTop = sc;
+    }
+    function abrirFab(v) {
+        fabOpen = v; $("bdFab").style.display = v ? "block" : "none";
+        $("bdFabBtn").style.boxShadow = v ? "0 0 14px rgba(243,186,47,.8)" : "0 0 10px rgba(37,99,235,.5)";
+        if (v) { if (!fabIni) { fabIni = true; if (!(cfg.key && cfg.secret)) fabTab = "gui"; } if (fabTab === "gui" && !fabIP) ipDetectar(); pintarFab(); fabRefrescar(); } else fabFrame();
+    }
+    async function pegar(cual) {
+        try {
+            var tx = ((await navigator.clipboard.readText()) || "").trim();
+            if (!tx) { aviso("El portapapeles está vacío. Copia primero la clave en Binance (icono 📋).", true); return; }
+            if (/\s/.test(tx)) { aviso("Lo copiado tiene espacios o varias líneas: copia SOLO la clave.", true); return; }
+            if (cual === "k") { $("bdKey").value = tx; aviso("✅ API Key pegada (" + tx.length + " caracteres; suelen ser 64). Ahora pega el Secret y pulsa «Guardar y probar»."); }
+            else { if (tx === $("bdKey").value.trim() || tx === cfg.key) { aviso("Ese texto es igual a la API Key. El Secret es OTRA clave distinta.", true); return; } $("bdSec").value = tx; aviso("✅ Secret pegado (" + tx.length + " caracteres). Ahora pulsa «Guardar y probar»."); }
+        } catch (e) { aviso("El navegador no permitió leer el portapapeles. Pégala a mano (Ctrl+V) en ⚙ Ajustes.", true); }
+    }
+    function montarFab() {
+        if ($("bdFabBtn")) return;
+        var css = document.createElement("style");
+        css.textContent = "#bdFab{display:none;position:fixed;right:78px;bottom:10px;z-index:9700;width:min(520px,calc(100vw - 92px));max-height:calc(100vh - 20px);overflow:auto;background:linear-gradient(180deg,#0d1526,#070c18);color:#cbd5e1;border:1px solid rgba(243,186,47,.5);border-radius:16px;font:12px/1.5 Inter,Arial,sans-serif;box-shadow:0 12px 40px rgba(0,0,0,.7)}" +
+            "@media (max-width:700px){#bdFab{left:8px;right:70px;width:auto;bottom:calc(10px + env(safe-area-inset-bottom,0px))}}" +
+            "#bdFab *{box-sizing:border-box}#bdFab button{font-family:inherit}" +
+            ".bdf-h{position:sticky;top:0;z-index:3;padding:10px 12px;background:linear-gradient(135deg,#241a04,#0d1526);border-bottom:1px solid rgba(243,186,47,.3);display:flex;justify-content:space-between;align-items:center;gap:8px}" +
+            ".bdf-in{padding:10px 12px 14px}.bdf-pill{display:inline-block;margin-left:6px;padding:1px 8px;border-radius:10px;font-size:10px;font-weight:900}.bdf-pill.t{background:rgba(243,186,47,.15);color:#f3ba2f;border:1px solid #f3ba2f}.bdf-pill.r{background:rgba(255,42,59,.15);color:#ff6b7a;border:1px solid #ff2a3b}" +
+            ".bdf-tabs{display:grid;grid-template-columns:repeat(3,1fr);gap:5px;margin:8px 0}.bdf-tabs button{padding:6px 3px;border-radius:9px;border:1px solid rgba(255,255,255,.14);background:#0b1220;color:#94a3b8;font-weight:800;font-size:11px;cursor:pointer}.bdf-tabs button.on{background:linear-gradient(135deg,#3a2c08,#2a2108);color:#f3ba2f;border-color:#f3ba2f}" +
+            ".bdf-card{background:#0b1220;border:1px solid rgba(255,255,255,.09);border-radius:12px;padding:10px 12px;margin:8px 0}.bdf-card h4{margin:0 0 7px;color:#f3ba2f;font-size:12.5px}" +
+            ".bdf-step{display:flex;gap:9px;margin:9px 0}.bdf-n{flex:none;width:22px;height:22px;border-radius:50%;background:#f3ba2f;color:#000;font-weight:900;display:flex;align-items:center;justify-content:center;font-size:11px}" +
+            ".bdf-k{display:inline-block;padding:0 7px;border-radius:6px;background:rgba(243,186,47,.14);border:1px solid rgba(243,186,47,.5);color:#f3ba2f;font-weight:800;font-size:11px}" +
+            ".bdf-url{display:block;margin:5px 0;padding:6px 8px;border-radius:8px;background:#050914;border:1px dashed rgba(243,186,47,.5);color:#9db8ff;font:11px monospace;word-break:break-all;text-decoration:none}.bdf-a{color:#9db8ff}" +
+            ".bdf-row{display:flex;gap:6px;flex-wrap:wrap;margin-top:4px}.bdf-btn{padding:7px 10px;border-radius:8px;border:1px solid;cursor:pointer;font-weight:800;font-size:11.5px;text-decoration:none;display:inline-block;text-align:center}" +
+            ".bdf-gold{background:#2a2108;color:#f3ba2f;border-color:#f3ba2f}.bdf-blue{background:#0b1630;color:#9db8ff;border-color:#2563eb}.bdf-green{background:#08241a;color:#0ecb81;border-color:#0ecb81}.bdf-red{background:#2a0b10;color:#ff9aa5;border-color:#ff2a3b}" +
+            ".bdf-okc{color:#0ecb81}.bdf-badc{color:#ff6b7a}.bdf-sec{margin:12px 0 5px;color:#f3ba2f;font-weight:800}.bdf-sec span{color:#94a3b8;font-weight:400}" +
+            ".bdf-pos{cursor:pointer;margin:5px 0;padding:8px 10px;border-radius:10px;border:1px solid rgba(255,255,255,.1);background:#0b1220}.bdf-pos.sel{border-color:rgba(243,186,47,.7);background:rgba(243,186,47,.08)}" +
+            ".bdf-chip{display:inline-block;margin:2px 4px 2px 0;padding:3px 9px;border-radius:12px;border:1px solid rgba(255,159,26,.5);background:rgba(255,159,26,.1);cursor:pointer;font-size:11px}" +
+            ".bdf-op{display:flex;gap:7px;padding:6px 2px;border-bottom:1px solid rgba(255,255,255,.06);font-size:11.5px}.bdf-chk{display:flex;gap:8px;align-items:flex-start;margin:6px 0}.bdf-chk input{margin-top:3px;flex:none}" +
+            ".bdf-bar{height:7px;border-radius:5px;background:#1a2438;margin-top:6px;overflow:hidden}.bdf-bar i{display:block;height:100%;border-radius:5px;transition:width .3s}" +
+            ".bdf-av{margin:6px 0;padding:7px 10px;border-radius:9px;font-weight:700}.bdf-av.ok{background:rgba(14,203,129,.12);border:1px solid #0ecb81;color:#9fe8c4}.bdf-av.bad{background:rgba(255,42,59,.12);border:1px solid #ff2a3b;color:#ff9aa5}";
+        document.head.appendChild(css);
+        var btn = document.createElement("button");
+        btn.id = "bdFabBtn"; btn.type = "button"; btn.title = "Operaciones y monitor del bot"; btn.setAttribute("aria-label", "Operaciones y monitor");
+        btn.innerHTML = '📈<span id="bdFabBadge" style="display:none;position:absolute;top:-3px;right:-3px;min-width:18px;height:18px;border-radius:9px;background:#0ecb81;color:#04130b;font:900 11px Arial;align-items:center;justify-content:center;padding:0 4px">0</span>';
+        btn.style.cssText = "position:relative;width:48px;height:48px;border-radius:50%;border:2px solid #2563eb;background:rgba(11,18,32,.92);color:#fff;font:900 20px Arial;cursor:pointer;box-shadow:0 0 10px rgba(37,99,235,.5);padding:0;flex:none;touch-action:manipulation";
+        var fb = document.querySelector(".floating-buttons"), upd = $("cdcUpdBtn");
+        if (fb) fb.insertBefore(btn, upd && upd.parentNode === fb ? upd : fb.firstChild);
+        else { btn.style.position = "fixed"; btn.style.right = "10px"; btn.style.bottom = "calc(290px + env(safe-area-inset-bottom,0px))"; btn.style.zIndex = "9400"; document.body.appendChild(btn); }
+        var P = document.createElement("div"); P.id = "bdFab";
+        P.innerHTML = '<div class="bdf-h"><b style="color:#f3ba2f;font-size:13px">📈 OPERACIONES · MONITOR<span id="bdFabModo" class="bdf-pill t"></span></b>' +
+            '<span style="white-space:nowrap"><b id="bdFabEst" style="margin-right:8px;font-size:11px"></b><button data-act="x" style="padding:4px 10px;border-radius:8px;border:1px solid #475569;background:#0b1220;color:#fff;cursor:pointer;font-weight:700">✕</button></span></div>' +
+            '<div class="bdf-in"><div style="display:flex;gap:6px"><button id="bdFabRun" data-act="run" class="bdf-btn bdf-green" style="flex:1;font-size:13px"></button>' +
+            '<button data-act="ajustes" class="bdf-btn bdf-gold" style="flex:1;font-size:12px">⚙ Ajustes (API · perfiles)</button></div>' +
+            '<div class="bdf-tabs">' + TABS.map(function (x) { return '<button id="bdFabT' + x[0] + '" data-tab="' + x[0] + '">' + x[1] + '</button>'; }).join("") + '</div>' +
+            '<div id="bdFabAv"></div><div id="bdFabBody"></div>' +
+            '<div id="bdFabChart" style="display:none;margin-top:10px"><label><input type="checkbox" id="bdFabChartOn" checked> Mostrar gráfico en vivo</label> <b id="bdFabSym" style="margin-left:6px"></b>' +
+            '<iframe id="bdFabFrame" style="display:none;width:100%;height:300px;border:1px solid rgba(255,255,255,.1);border-radius:8px;background:#050914;margin-top:6px"></iframe></div></div>';
+        document.body.appendChild(P);
+        btn.onclick = function () { if (fabOpen) abrirFab(false); abrirCon(!conOpen); };
+        P.addEventListener("click", function (e) {
+            var el = e.target.closest ? e.target.closest("[data-act],[data-tab],[data-sym],[data-copy]") : null; if (!el) return;
+            var act = el.getAttribute("data-act"), tab = el.getAttribute("data-tab"), sy = el.getAttribute("data-sym"), cp = el.getAttribute("data-copy");
+            if (act === "x") abrirFab(false);
+            else if (act === "run") { $("bdOn").click(); setTimeout(pintarFab, 400); }
+            else if (act === "ajustes") { $("bdPanel").style.display = "block"; autoConectar(true); }
+            else if (act === "ip") { fabIP = ""; ipDetectar(); pintarFab(); }
+            else if (act === "pk") pegar("k");
+            else if (act === "ps") pegar("s");
+            else if (act === "gp") { $("bdGuardar").click(); aviso("💾 Guardado. Probando conexión… mira el resultado en la pestaña 🧾 Registro."); setTimeout(function () { $("bdProbar").click(); setTimeout(pintarFab, 1500); }, 800); }
+            else if (act === "borrar") { if (confirm("¿Borrar el historial de operaciones guardado en este navegador? (No toca tu cuenta de Binance)")) { ops = []; escLS(OPLS, ops); pintarFab(); } }
+            else if (cp) { var ok = function () { var o = el.textContent; el.textContent = "✅ Copiado"; setTimeout(function () { el.textContent = o; }, 1500); }; try { navigator.clipboard.writeText(cp).then(ok, function () { prompt("Copia el enlace:", cp); }); } catch (x) { prompt("Copia el enlace:", cp); } }
+            else if (tab) { fabTab = tab; if (tab === "gui" && !fabIP) ipDetectar(); pintarFab(); }
+            else if (sy) { fabSel = sy; pintarFab(); }
+        });
+        P.addEventListener("change", function (e) { var c = e.target.getAttribute && e.target.getAttribute("data-chk"); if (c) { chk[c] = e.target.checked; escLS(CHL, chk); pintarFab(); } });
+        $("bdFabChartOn").onchange = fabFrame;
+        setInterval(function () { if (fabOpen || conOpen) fabRefrescar(); }, 8000);
+        setInterval(function () { if (!fabOpen && cfg.key && cfg.secret && !fabBusy) fabContar(); }, 30000);
+        setTimeout(function () { if (cfg.key && cfg.secret) fabContar(); }, 6000);
+    }
+
+    /* ══════════════════════════════════════════════════════════════════
+       🔌 PANTALLA DE CONEXIÓN (celular) · 📄 TUTORIAL PDF · 📊 MI MONITOR
+       Todo corre en el dispositivo del usuario: las claves se guardan solo en su navegador (localStorage)
+       y se envían directo a Binance. La página alojada en GitHub es estática y NO recibe ninguna clave.
+       ══════════════════════════════════════════════════════════════════ */
+    var IPLS = "cdcBotIp_v1", TUT_PDF = "Guia_CDC_Bot_Binance.pdf";
+    var conOpen = false, conTab = "con", conIP = "", conIPBusy = false, conIPTimer = 0, conIPInfo = leerLS(IPLS), conFrameSym = null, avCon = 0;
+    function esMovil() { try { return window.matchMedia("(max-width:820px)").matches || /Android|iPhone|iPad|iPod/i.test(navigator.userAgent); } catch (e) { return false; } }
+    function tipoRed() {
+        var c = navigator.connection || navigator.mozConnection || navigator.webkitConnection; if (!c) return "";
+        if (c.type === "wifi") return "📶 WiFi"; if (c.type === "cellular") return "📱 Datos móviles"; if (c.type === "ethernet") return "🔌 Cable";
+        return c.effectiveType ? "🌐 Red " + c.effectiveType : "";
+    }
+    async function conIPDetect() {
+        if (conIPBusy) return; conIPBusy = true; conIPPaint();
+        var fu = ["https://api.ipify.org?format=json", "https://checkip.amazonaws.com", "https://api64.ipify.org?format=json"], ip = "";
+        for (var i = 0; i < fu.length && !ip; i++) {
+            try {
+                var ctl = new AbortController(), to = setTimeout(function () { ctl.abort(); }, 6000);
+                var r = await fetch(fu[i], { cache: "no-store", signal: ctl.signal }); clearTimeout(to);
+                var tx = (await r.text()).trim(), v = tx; try { v = JSON.parse(tx).ip || tx; } catch (e) {}
+                if (/^[0-9a-fA-F:.]{7,45}$/.test(v)) ip = v;
+            } catch (e) {}
+        }
+        conIPBusy = false; conIP = ip || "?";
+        if (ip) { fabIP = ip; if (conIPInfo.ult !== ip) { conIPInfo.ult = ip; conIPInfo.cuando = Date.now(); escLS(IPLS, conIPInfo); } }
+        conIPPaint();
+    }
+    function conIPPaint() {
+        var b = $("bcIP"); if (!b) return;
+        var ok = conIP && conIP !== "?";
+        b.value = ok ? conIP : conIP === "?" ? "No se pudo detectar" : "Escaneando…";
+        b.style.color = ok ? "#0ecb81" : conIP === "?" ? "#ff9aa5" : "#f3ba2f";
+        $("bcIPnet").textContent = (tipoRed() ? tipoRed() + " · " : "") + (conIPBusy ? "escaneando…" : ok ? "escaneada " + new Date().toLocaleTimeString() : "");
+        var w = $("bcIPwarn"), h = "";
+        if (ok && conIPInfo.okIp && conIPInfo.okIp !== conIP) h = '<div class="bdf-av bad">⚠️ Tu IP <b>cambió</b> (la última que funcionó fue <b>' + esc(conIPInfo.okIp) + '</b>). Pasa al cambiar entre WiFi y datos móviles. Agrega <b>esta IP nueva</b> en Binance (Editar restricciones → IPs de confianza) o el bot dará error −2015.</div>';
+        else if (ok && conIPInfo.okIp === conIP) h = '<div class="bdf-av ok">✅ Esta IP ya funcionó con tu API.</div>';
+        else if (conIP === "?") h = '<div class="bdf-av bad">No se pudo detectar (bloqueador, antivirus o sin internet). Reintenta o abre <a class="bdf-a" href="https://api.ipify.org" target="_blank" rel="noopener">api.ipify.org</a>.</div>';
+        else if (ok && conIP.indexOf(":") >= 0) h = '<div style="color:#ff9f1a;font-size:11px">Es una IP tipo IPv6. Si Binance no la acepta, prueba con otra red.</div>';
+        w.innerHTML = h;
+    }
+    function conAviso(t, mal) {
+        var a = $("bcAv"); if (!a) return; a.innerHTML = t ? '<div class="bdf-av ' + (mal ? "bad" : "ok") + '">' + t + '</div>' : "";
+        clearTimeout(avCon); if (t) avCon = setTimeout(function () { a.innerHTML = ""; }, 9000);
+    }
+    async function conPegar(cual) {
+        try {
+            var tx = ((await navigator.clipboard.readText()) || "").trim();
+            if (!tx) return conAviso("El portapapeles está vacío. Copia la clave en Binance (icono 📋).", true);
+            if (/\s/.test(tx)) return conAviso("Lo copiado tiene espacios o varias líneas: copia SOLO la clave.", true);
+            if (cual === "k") { $("bcKey").value = tx; conAviso("✅ API Key pegada (" + tx.length + " caracteres; suelen ser 64). Ahora el Secret."); }
+            else {
+                if (tx === $("bcKey").value.trim() || tx === cfg.key) return conAviso("Ese texto es igual a la API Key. El Secret es OTRA clave distinta.", true);
+                $("bcSec").value = tx; conAviso("✅ Secret pegado (" + tx.length + " caracteres). Ahora pulsa «Guardar y probar».");
+            }
+        } catch (e) { conAviso("El navegador no permitió leer el portapapeles. Mantén pulsado el campo y elige «Pegar».", true); }
+    }
+    async function conGuardar() {
+        var k = $("bcKey").value.trim(), s = $("bcSec").value.trim(), res = $("bcRes");
+        if (!k && !cfg.key) return conAviso("Falta la API Key.", true);
+        if (!s && !cfg.secret) return conAviso("Falta el Secret.", true);
+        if (/\s/.test(k + s)) return conAviso("La clave tiene espacios: cópiala de nuevo, solo la clave.", true);
+        $("bdKey").value = k || cfg.key; $("bdSec").value = s; $("bdTest").checked = $("bcTest").checked;
+        $("bdGuardar").click();
+        $("bcSec").value = ""; $("bcSec").placeholder = "•••••••• (guardado)";
+        res.innerHTML = '<div class="bdf-av" style="border:1px solid #475569;color:#cbd5e1">⏳ Guardado en este dispositivo. Probando conexión con Binance…</div>';
+        try {
+            info = null; dual = null; await cargarInfo();
+            var sd = await saldo(), d = await api("GET", "/fapi/v1/positionSide/dual", {}, true);
+            if (conIP && conIP !== "?") { conIPInfo.okIp = conIP; escLS(IPLS, conIPInfo); }
+            res.innerHTML = '<div class="bdf-av ok">✅ Conexión OK (' + (cfg.testnet ? "TESTNET" : "CUENTA REAL") + ')<br>Capital: <b>' + nf(sd.wallet, 2) + ' USDT</b> · disponible <b>' + nf(sd.disp, 2) + ' USDT</b><br>Modo de posición: ' + (d.dualSidePosition ? "HEDGE" : "ONE-WAY") + (sd.disp < 5 ? '<br><span style="color:#ffc27a">⚠️ Disponible menor a 5 USDT: transfiere USDT a la billetera de Futuros USDⓈ-M.</span>' : "") + '</div>';
+        } catch (e) {
+            res.innerHTML = '<div class="bdf-av bad">❌ ' + esc(e.message) + (e.code === -2015 ? '<br>Tu IP actual es <b>' + esc(conIP && conIP !== "?" ? conIP : "(escaneando…)") + '</b>: debe estar en las IPs de confianza de tu API en Binance, y la API debe tener «Habilitar Futuros». Revisa también la casilla TESTNET.' : "") + '</div>';
+            if (e.code === -2015) conIPDetect();
+        }
+        persistir();
+        conIPPaint(); await fabRefrescar(); if (fabData && !fabData.err) conEdit = false; conPintar();
+    }
+    function persistir() { try { if (navigator.storage && navigator.storage.persist) navigator.storage.persist(); } catch (e) {} }
+    function ipAviso() {
+        var ok = conIP && conIP !== "?";
+        if (!(ok && conIPInfo.okIp && conIPInfo.okIp !== conIP)) return "";
+        return '<div class="bdf-av bad">⚠️ Tu IP cambió (WiFi ↔ datos). Agrega <b>' + esc(conIP) + '</b> en las IPs de confianza de tu API en Binance.<div class="bdf-row"><button class="bdf-btn bdf-blue" data-ca="copyip" style="flex:1">📋 Copiar IP</button><button class="bdf-btn bdf-gold" data-ca="tab-con" style="flex:1">🔌 Ver detalle</button></div></div>';
+    }
+    function conMonHtml() {
+        var d = fabData, av = ipAviso();
+        if (!(cfg.key && cfg.secret)) return av + '<div class="bdf-av bad">Primero guarda tu API Key y tu Secret en la pestaña 🔌 Conectar.</div>';
+        if (!d) return av + '<div style="color:#94a3b8;padding:14px;text-align:center">Conectando con Binance…</div>';
+        if (d.err) return av + '<div class="bdf-av bad">❌ ' + esc(d.err) + '</div><div class="bdf-row"><button class="bdf-btn bdf-gold" data-ca="tab-con">🔌 Revisar conexión / IP</button></div>';
+        var tot = d.wallet + d.unr, hoy = monIncome.v;
+        var hero = '<div class="bc-hero"><div style="font-size:11px;color:#94a3b8;letter-spacing:.5px">CUENTA TOTAL · ' + (cfg.testnet ? "TESTNET" : "CUENTA REAL") + '</div>' +
+            '<div style="font-size:34px;font-weight:900;color:#fff;line-height:1.15">' + nf(tot, 2) + ' <span style="font-size:14px;color:#94a3b8;font-weight:700">USDT</span></div>' +
+            '<div style="margin-top:2px">PnL abierto <b style="color:' + col(d.unr) + '">' + (d.unr >= 0 ? "+" : "") + nf(d.unr, 3) + '</b> · Hoy <b style="color:' + col(hoy || 0) + '">' + (hoy == null ? "—" : (hoy >= 0 ? "+" : "") + nf(hoy, 3)) + '</b></div>' +
+            '<div style="margin-top:4px;font-size:11px;color:#94a3b8">Bot: <b style="color:' + (cfg.activo ? (cfg.testnet ? "#f3ba2f" : "#ff2a3b") : "#94a3b8") + '">' + (cfg.activo ? "● ACTIVO" : "○ APAGADO") + '</b> · ' + d.pos.length + ' posición(es) · actualizado ' + new Date().toLocaleTimeString() + '</div></div>';
+        return av + hero + fabMonitorHtml();
+    }
+    function conPintar() {
+        if (!conOpen) return;
+        var P = $("bdCon"), sc = P.scrollTop, a = cfg.activo;
+        var pill = $("bcModo"); pill.className = "bdf-pill " + (cfg.testnet ? "t" : "r"); pill.textContent = cfg.testnet ? "TESTNET" : "CUENTA REAL";
+        var run = $("bcRun"); run.textContent = a ? "⏹ PARAR BOT" : "▶ RUN · EMPEZAR A OPERAR"; run.className = "bdf-btn bc-big " + (a ? "bdf-red" : "bdf-green");
+        $("bcEst").textContent = a ? "● BOT ACTIVO" : "○ BOT APAGADO"; $("bcEst").style.color = a ? (cfg.testnet ? "#f3ba2f" : "#ff2a3b") : "#94a3b8";
+        var kk = !!cfg.key, ss = !!cfg.secret, d = fabData, conectado = d && !d.err && kk && ss;
+        var guardadas = kk && ss, verForm = !guardadas || conEdit || !!(d && d.err);
+        $("bcForm").style.display = verForm ? "block" : "none";
+        $("bcSaved").innerHTML = guardadas && !verForm ? '<div class="bdf-av ok">🔒 Tu API Key (' + esc(cfg.key.slice(0, 4)) + '…' + esc(cfg.key.slice(-4)) + ') y tu Secret están guardados en este dispositivo. No tienes que volver a escribirlos.</div><div class="bdf-row"><button class="bdf-btn bdf-gold" data-ca="edit" style="flex:1">✏ Cambiar claves / modo TESTNET</button></div>'
+            : guardadas && d && d.err ? '<div style="color:#ffc27a;font-size:11.5px;margin-bottom:4px">Hay un error de conexión: revisa la IP (arriba) o corrige las claves. Tus claves siguen guardadas; si dejas el Secret vacío se conserva el actual.</div>' : "";
+        $("bcEstado").innerHTML = 'Estado: <b class="' + (kk ? "bdf-okc" : "bdf-badc") + '">' + (kk ? "✔ Key guardada" : "✖ falta Key") + '</b> · <b class="' + (ss ? "bdf-okc" : "bdf-badc") + '">' + (ss ? "✔ Secret guardado" : "✖ falta Secret") + '</b>' +
+            (conectado ? '<div class="bdf-row"><button class="bdf-btn bdf-blue" data-ca="tab-mon" style="flex:1">✅ Conectado · ' + nf(d.wallet, 2) + ' USDT · ver mi monitor →</button></div>' : "");
+        ["con", "opc", "mon"].forEach(function (t) { $("bcV" + t).style.display = conTab === t ? "block" : "none"; $("bcT" + t).className = conTab === t ? "on" : ""; });
+        if (conTab === "mon") $("bcMon").innerHTML = conMonHtml();
+        var wrap = $("bcChart"), f = $("bcFrame"), showF = conTab === "mon" && fabSel && d && !d.err;
+        wrap.style.display = showF ? "block" : "none";
+        if (showF) { $("bcSym").textContent = fabSel + " (perpetuo)"; if (conFrameSym !== fabSel) { conFrameSym = fabSel; f.src = "https://s.tradingview.com/widgetembed/?symbol=" + encodeURIComponent("BINANCE:" + fabSel + ".P") + "&interval=5&theme=dark&style=1&locale=es&hide_side_toolbar=1&allow_symbol_change=0"; } }
+        conIPPaint(); P.scrollTop = sc;
+    }
+    function abrirCon(v) {
+        conOpen = v; $("bdCon").style.display = v ? "block" : "none"; document.body.style.overflow = v ? "hidden" : "";
+        clearInterval(conIPTimer);
+        if (v) {
+            $("bcWake").checked = wakePref; instPintar(); wakePaint(); persistir(); conEdit = false; conTab = (cfg.key && cfg.secret) ? "mon" : "con"; $("bcKey").value = cfg.key; $("bcTest").checked = cfg.testnet;
+            $("bcSec").placeholder = cfg.secret ? "•••••••• (guardado)" : "pega aquí tu API Secret";
+            conIPDetect(); conIPTimer = setInterval(function () { if (conOpen) conIPDetect(); }, 20000);
+            conPintar(); fabRefrescar();
+        }
+    }
+    function copiar(txt, el) {
+        var ok = function () { if (!el) return; var o = el.textContent; el.textContent = "✅ Copiado"; setTimeout(function () { el.textContent = o; }, 1500); };
+        try { navigator.clipboard.writeText(txt).then(ok, function () { prompt("Copia el texto:", txt); }); } catch (x) { prompt("Copia el texto:", txt); }
+    }
+    /* ── TUTORIAL: PDF + resumen en pantalla ── */
+    function tutHtml() {
+        var pdf = TUT_PDF;
+        var h = '<div class="bdf-row"><a class="bdf-btn bdf-green" href="' + pdf + '" download="' + pdf + '" style="flex:1">⬇ Descargar PDF</a><a class="bdf-btn bdf-blue" href="' + pdf + '" target="_blank" rel="noopener" style="flex:1">↗ Abrir en otra pestaña</a></div>' +
+            '<div class="bdf-row"><button class="bdf-btn bdf-gold" data-ta="ver" style="flex:1">👁 Ver el PDF aquí</button><button class="bdf-btn bdf-gold" data-ta="guia" style="flex:1">🔑 Guía interactiva</button></div>' +
+            '<div id="bdTutSt" style="margin:8px 0;font-size:11px;color:#94a3b8">Comprobando el PDF…</div>' +
+            '<div id="bdTutFrameBox" style="display:none"><iframe id="bdTutFrame" style="width:100%;height:68vh;border:1px solid rgba(255,255,255,.12);border-radius:8px;background:#fff"></iframe>' +
+            '<div style="font-size:11px;color:#94a3b8;margin-top:4px">Si en tu celular solo se ve la primera página, usa «Abrir en otra pestaña» o «Descargar PDF».</div></div>';
+        h += card("📋 Resumen rápido (todo el detalle está en el PDF)",
+            paso(1, "Crea la API en Binance", 'Panel de usuario → Cuenta → Gestión de API → ' + K("Crear API") + ' → ' + K("Generada por el sistema") + ' (HMAC). Requiere KYC.') +
+            paso(2, "Copia Key y Secret", 'El <b>Secret se muestra una sola vez</b>. No lo compartas ni lo muestres en capturas.') +
+            paso(3, "Restringe la IP primero", 'Editar restricciones → ' + K("Restringir acceso solo a IPs de confianza") + ' → pega la IP que escanea la pantalla 🔌.') +
+            paso(4, "Habilita Futuros", 'Marca ' + K("Habilitar Futuros") + '. Deja <b>desactivados</b> retiros, Spot/Margen y transferencias.') +
+            paso(5, "Pega las claves en esta pantalla", 'Pulsa el botón 📈 → pega Key y Secret → «Guardar y probar». TESTNET solo con claves de testnet.') +
+            paso(6, "Transfiere USDT a Futuros", 'Activos → Futuros → Transferir. Mínimo ≈ 5 USDT por orden. Cuenta en modo Single-Asset.'));
+        h += card("🆘 Errores frecuentes",
+            '<div><b>−2015</b>: sin permiso de Futuros, IP distinta a la lista, cambios sin guardar o TESTNET mal marcada.<br><b>−1022</b>: Secret mal pegado o con espacios.<br><b>−1021</b>: reloj del dispositivo desfasado.<br><b>−4168</b>: cuenta en Multi-Assets → cámbiala a Single-Asset.<br><b>Saldo 0</b>: tu USDT está en la cuenta general, no en Futuros.</div>');
+        h += card("📱 En celular: ¡ojo con la IP y el navegador!",
+            '<div>• WiFi y datos móviles tienen <b>IP pública distinta</b>. Si cambias de red, agrega la IP nueva en Binance (la pantalla 🔌 te avisa).<br>• Las IP de datos móviles suelen cambiar seguido: puede dar −2015 de vez en cuando.<br>• El bot corre dentro de la página: <b>mantén la pestaña abierta y la pantalla encendida</b>. Si el celular bloquea o suspende el navegador, el bot se detiene (las órdenes de salida ya puestas en Binance siguen ahí).<br>• Recuerda: el bot no usa stop loss. Usa solo dinero que puedas perder.</div>');
+        return h;
+    }
+    async function tutChequear() {
+        var st = $("bdTutSt"); if (!st) return;
+        try { var r = await fetch(TUT_PDF, { method: "HEAD", cache: "no-store" }); if (!r.ok) throw 0; st.innerHTML = '<span style="color:#0ecb81">✅ PDF disponible: ' + TUT_PDF + '</span>'; }
+        catch (e) { st.innerHTML = '<span style="color:#ff9aa5">⚠️ No encuentro «' + TUT_PDF + '» junto a esta página. Súbelo al mismo repositorio de GitHub con ese nombre exacto (si abres el HTML desde un archivo local, ponlos en la misma carpeta y ábrelos desde un servidor).</span>'; }
+    }
+    function abrirTut(v) {
+        $("bdTut").style.display = v ? "block" : "none";
+        if (v) { $("bdTutBody").innerHTML = tutHtml(); tutChequear(); }
+    }
+    function montarCon() {
+        if ($("bdCon")) return;
+        var css = document.createElement("style");
+        css.textContent = "#bdCon,#bdTut{display:none;position:fixed;top:0;left:0;right:0;bottom:0;z-index:10000;background:linear-gradient(180deg,#0d1526,#070c18);color:#cbd5e1;font:13px/1.5 Inter,Arial,sans-serif;overflow:auto;-webkit-overflow-scrolling:touch;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}" +
+            "#bdTut{z-index:10001}#bdCon *,#bdTut *{box-sizing:border-box}#bdCon button,#bdTut button{font-family:inherit}" +
+            ".bc-in{max-width:560px;margin:0 auto;padding:0 12px 30px}" +
+            ".bc-h{position:sticky;top:0;z-index:3;padding:10px 12px;background:linear-gradient(135deg,#241a04,#0d1526);border-bottom:1px solid rgba(243,186,47,.35);display:flex;justify-content:space-between;align-items:center;gap:8px}" +
+            ".bc-h .x{padding:7px 12px;border-radius:9px;border:1px solid #475569;background:#0b1220;color:#fff;font-weight:800;cursor:pointer;font-size:14px}" +
+            ".bc-lab{display:block;margin:10px 0 3px;color:#f3ba2f;font-weight:800;font-size:12px}" +
+            ".bc-inp{width:100%;padding:12px;border-radius:10px;border:1px solid rgba(255,255,255,.22);background:#050914;color:#fff;font:16px monospace}" +
+            ".bc-ip{display:block;width:100%;padding:14px 10px;margin:6px 0 2px;border-radius:12px;background:#050914;border:2px dashed rgba(14,203,129,.6);text-align:center;font:900 22px monospace;word-break:break-all}" +
+            ".bc-big{width:100%;padding:14px;font-size:15px}.bc-hero{background:linear-gradient(135deg,#0b1630,#0b1220);border:1px solid rgba(37,99,235,.5);border-radius:14px;padding:12px 14px;margin:8px 0;text-align:center}" +
+            "#bdCon .bdf-btn,#bdTut .bdf-btn{padding:10px 12px;font-size:13px;min-height:42px}#bdCon .bdf-tabs{grid-template-columns:repeat(2,1fr)}#bdCon .bdf-tabs button{padding:9px 3px;font-size:12px}";
+        document.head.appendChild(css);
+        var C = document.createElement("div"); C.id = "bdCon";
+        C.innerHTML = '<div class="bc-h"><b style="color:#f3ba2f;font-size:14px">🔌 CONEXIÓN BINANCE<span id="bcModo" class="bdf-pill t"></span></b><span style="white-space:nowrap"><button class="x" data-ca="tut" title="Tutorial en PDF">📄</button> <button class="x" data-ca="x">✕</button></span></div>' +
+            '<div class="bc-in"><div class="bdf-tabs"><button id="bcTcon" data-ca="tab-con">🔌 Conectar</button><button id="bcTopc" data-ca="tab-opc">🤖 Bot Desmayo</button><button id="bcTmon" data-ca="tab-mon">📊 Monitor</button><button data-ca="panel">📒 Operaciones / Registro</button></div><div id="bcAv"></div>' +
+            '<div id="bcVcon"><div class="bdf-card"><h4>📲 Instalar como aplicación</h4><div id="bcInst"></div></div>' +
+              '<div class="bdf-card"><h4>🌐 1 · IP para pegar en Binance (se escribe sola)</h4><input id="bcIP" class="bc-ip" readonly value="Escaneando…" onfocus="this.select()" aria-label="IP pública"><div id="bcIPnet" style="text-align:center;color:#94a3b8;font-size:11px"></div><div id="bcIPwarn"></div>' +
+              '<div class="bdf-row"><button class="bdf-btn bdf-blue" data-ca="copyip" style="flex:1">📋 Copiar IP</button><button class="bdf-btn bdf-gold" data-ca="ip" style="flex:1">🔄 Re-escanear</button></div>' +
+              '<div class="bdf-row"><a class="bdf-btn bdf-gold" href="' + URLS.api + '" target="_blank" rel="noopener" style="flex:1">Abrir Gestión de API en Binance ↗</a></div>' +
+              '<div style="margin-top:7px;color:#94a3b8;font-size:11.5px">En Binance: Editar restricciones → «Restringir acceso solo a IPs de confianza» → pega esta IP → Confirmar → marca «Habilitar Futuros» → Guardar. <b>Cada red (WiFi / datos móviles) tiene IP distinta</b>: la pantalla se actualiza sola cuando cambias de red. El bot no puede agregar la IP por ti: Binance no lo permite.</div></div>' +
+              '<div class="bdf-card"><h4>🔑 2 · API Key y Secret</h4><div id="bcSaved"></div><div id="bcForm">' +
+              '<label class="bc-lab" for="bcKey">API Key</label><input id="bcKey" class="bc-inp" autocomplete="off" autocapitalize="none" autocorrect="off" spellcheck="false" placeholder="pega aquí tu API Key">' +
+              '<div class="bdf-row"><button class="bdf-btn bdf-gold" data-ca="pk" style="flex:1">📋 Pegar API Key</button></div>' +
+              '<label class="bc-lab" for="bcSec">API Secret (clave secreta)</label><div style="display:flex;gap:6px"><input id="bcSec" class="bc-inp" type="password" autocomplete="off" autocapitalize="none" autocorrect="off" spellcheck="false" placeholder="pega aquí tu API Secret"><button class="bdf-btn bdf-blue" data-ca="eye" style="flex:none;min-width:48px">👁</button></div>' +
+              '<div class="bdf-row"><button class="bdf-btn bdf-gold" data-ca="ps" style="flex:1">📋 Pegar Secret</button></div>' +
+              '<label style="display:block;margin:10px 0 2px"><input type="checkbox" id="bcTest"> Usar TESTNET <span style="color:#94a3b8;font-size:11px">(solo con claves de testnet.binancefuture.com)</span></label>' +
+              '<div class="bdf-row"><button class="bdf-btn bdf-green bc-big" data-ca="gp">💾 Guardar y probar conexión</button></div></div><div id="bcRes"></div><div id="bcEstado" style="margin-top:8px"></div>' +
+              '<div style="text-align:right;margin-top:6px"><a data-ca="borrar" style="color:#94a3b8;font-size:11px;cursor:pointer;text-decoration:underline">borrar claves de este dispositivo</a></div></div>' +
+              '<div class="bdf-card"><h4>🤖 3 · Bot Desmayo</h4><div style="margin-bottom:6px"><b id="bcEst"></b></div><button id="bcRun" data-ca="run" class="bdf-btn bc-big"></button><div id="bcResume"></div><label style="display:block;margin:8px 0 2px"><input type="checkbox" id="bcWake"> 🔆 Mantener la pantalla encendida mientras el bot esté activo</label><div id="bcWakeSt" style="font-size:11px"></div><div style="margin-top:6px;color:#94a3b8;font-size:11px">El bot trabaja solo mientras la app esté abierta y visible: no la cierres ni cambies a otra app. Si se cierra, el bot se apaga (tus salidas puestas en Binance siguen ahí). Sin stop loss: usa solo dinero que puedas perder.</div></div>' +
+              '<div style="color:#64748b;font-size:11px;text-align:center;margin-top:8px">🔒 Las claves se guardan solo en este dispositivo y se envían directo a Binance. La página en GitHub es estática y no recibe ni guarda ninguna clave.</div>' +
+            '</div>' +
+            '<div id="bcVopc" style="display:none"></div><div id="bcVmon" style="display:none"><div id="bcMon"></div><div id="bcChart" style="display:none;margin-top:10px"><b>Gráfico en vivo</b> <b id="bcSym" style="margin-left:6px"></b><iframe id="bcFrame" style="width:100%;height:300px;border:1px solid rgba(255,255,255,.1);border-radius:8px;background:#050914;margin-top:6px"></iframe></div></div></div>';
+        document.body.appendChild(C);
+        try {
+            var pills = $("bdBtn") ? $("bdBtn").parentNode : null, pn = $("bdPanel");
+            if (pn) {
+                pn.style.cssText = "display:block;position:static;width:100%;max-height:none;overflow:visible;background:transparent;border:0;padding:0;color:#cbd5e1";
+                $("bcVopc").appendChild(pn);
+                ["bdKey", "bdSec"].forEach(function (id) { var e = $(id); if (!e) return; var l = e.previousElementSibling; if (l && l.tagName === "SPAN") l.style.display = "none"; e.style.display = "none"; });
+                if ($("bdTest")) $("bdTest").parentNode.style.display = "none";
+                var nota = document.createElement("div"); nota.style.cssText = "margin:0 0 8px;padding:6px 9px;border-radius:8px;background:rgba(37,99,235,.1);border:1px solid rgba(37,99,235,.4);color:#9db8ff;font-size:11px";
+                nota.innerHTML = "🔌 La API Key, el Secret, la IP y el modo TESTNET se configuran en la pestaña <b>Conectar</b>."; pn.insertBefore(nota, pn.children[1] || null);
+            }
+            if (pills) pills.style.display = "none";
+        } catch (e) {}
+        var T = document.createElement("div"); T.id = "bdTut";
+        T.innerHTML = '<div class="bc-h"><b style="color:#f3ba2f;font-size:14px">📄 TUTORIAL · Bot Desmayo</b><button class="x" data-ta="x">✕</button></div><div class="bc-in"><div id="bdTutBody"></div></div>';
+        document.body.appendChild(T);
+        /* botón flotante del tutorial (columna de botones flotantes) */
+        var tb = document.createElement("button"); tb.id = "bdTutBtn"; tb.type = "button"; tb.title = "Tutorial en PDF"; tb.setAttribute("aria-label", "Tutorial en PDF"); tb.textContent = "📄";
+        tb.style.cssText = "position:relative;width:48px;height:48px;border-radius:50%;border:2px solid #f3ba2f;background:rgba(11,18,32,.92);color:#fff;font:900 20px Arial;cursor:pointer;box-shadow:0 0 10px rgba(243,186,47,.45);padding:0;flex:none;touch-action:manipulation";
+        var fb = document.querySelector(".floating-buttons"), ref = $("bdFabBtn");
+        if (fb) fb.insertBefore(tb, ref && ref.parentNode === fb ? ref : fb.firstChild);
+        else { tb.style.position = "fixed"; tb.style.right = "10px"; tb.style.bottom = "calc(345px + env(safe-area-inset-bottom,0px))"; tb.style.zIndex = "9400"; document.body.appendChild(tb); }
+        tb.onclick = function () { abrirTut(true); };
+        C.addEventListener("click", function (e) {
+            var el = e.target.closest ? e.target.closest("[data-ca],[data-sym]") : null; if (!el) return;
+            var a = el.getAttribute("data-ca"), sy = el.getAttribute("data-sym");
+            if (sy) { fabSel = sy; conPintar(); return; }
+            if (a === "x") abrirCon(false);
+            else if (a === "tut") abrirTut(true);
+            else if (a === "edit") { conEdit = true; conPintar(); }
+            else if (a === "tab-con") { conTab = "con"; conPintar(); }
+            else if (a === "tab-opc") { conTab = "opc"; conPintar(); autoConectar(true); }
+            else if (a === "tab-mon") { conTab = "mon"; conPintar(); fabRefrescar(); }
+            else if (a === "panel") { abrirCon(false); abrirFab(true); }
+            else if (a === "ip") { conIP = ""; conIPDetect(); }
+            else if (a === "copyip") { if (conIP && conIP !== "?") copiar(conIP, el); else conAviso("Todavía no hay IP detectada. Pulsa «Re-escanear».", true); }
+            else if (a === "pk") conPegar("k");
+            else if (a === "ps") conPegar("s");
+            else if (a === "eye") { var s = $("bcSec"); s.type = s.type === "password" ? "text" : "password"; }
+            else if (a === "gp") conGuardar();
+            else if (a === "inst") { try { instEv.prompt(); instEv.userChoice.then(function () { instEv = null; instPintar(); }); } catch (x) { instPintar(); } }
+            else if (a === "run") { $("bdTest").checked = cfg.testnet; $("bdOn").click(); setTimeout(conPintar, 400); }
+            else if (a === "borrar") { $("bdBorrar").click(); $("bcKey").value = cfg.key; $("bcSec").value = ""; $("bcSec").placeholder = "pega aquí tu API Secret"; $("bcRes").innerHTML = ""; conPintar(); }
+        });
+        T.addEventListener("click", function (e) {
+            var el = e.target.closest ? e.target.closest("[data-ta]") : null; if (!el) return;
+            var a = el.getAttribute("data-ta");
+            if (a === "x") abrirTut(false);
+            else if (a === "ver") { var b = $("bdTutFrameBox"), f = $("bdTutFrame"); if (b.style.display === "none") { if (!f.getAttribute("src")) f.src = TUT_PDF + "#view=FitH"; b.style.display = "block"; el.textContent = "🙈 Ocultar PDF"; } else { b.style.display = "none"; el.textContent = "👁 Ver el PDF aquí"; } }
+            else if (a === "guia") { abrirTut(false); if (conOpen) abrirCon(false); fabTab = "gui"; fabIni = true; abrirFab(true); }
+        });
+        $("bcWake").onchange = function () { wakePref = this.checked; escLS(WLS, { on: wakePref }); wakeTick(); };
+        window.addEventListener("online", function () { if (conOpen) setTimeout(function () { conIP = ""; conIPDetect(); }, 800); });
+        try { var nc = navigator.connection; if (nc && nc.addEventListener) nc.addEventListener("change", function () { if (conOpen) { conIP = ""; conIPDetect(); } }); } catch (e) {}
+    }
+
+    /* ── 📲 INSTALAR COMO APP · 🔆 PANTALLA ENCENDIDA · ♻ AVISO DE REANUDACIÓN ── */
+    var conEdit = false, WLS = "cdcBotWake_v1", ONLS = "cdcBotOn_v1", wakePref = leerLS(WLS).on !== false, wl = null, instEv = null, habiaOn = leerLS(ONLS), prevAct = false;
+    function enApp() { try { return window.matchMedia("(display-mode: standalone)").matches || window.navigator.standalone === true; } catch (e) { return false; } }
+    window.addEventListener("beforeinstallprompt", function (e) { e.preventDefault(); instEv = e; instPintar(); });
+    window.addEventListener("appinstalled", function () { instEv = null; instPintar(); });
+    function instPintar() {
+        var b = $("bcInst"); if (!b) return;
+        var ios = /iPhone|iPad|iPod/i.test(navigator.userAgent), h;
+        if (enApp()) h = '<div class="bdf-av ok">✅ Estás usando la app instalada. Se abre en pantalla completa desde tu inicio.</div>';
+        else if (instEv) h = '<button class="bdf-btn bdf-green bc-big" data-ca="inst">📲 Instalar como aplicación</button><div style="color:#94a3b8;font-size:11px;margin-top:5px">Se agrega a tu pantalla de inicio y abre como una app, sin barra del navegador.</div>';
+        else if (ios) h = '<div style="color:#cbd5e1">En iPhone/iPad (Safari): toca <b>Compartir ⬆</b> → <b>«Añadir a pantalla de inicio»</b>.</div>';
+        else h = '<div style="color:#cbd5e1">Abre el menú del navegador <b>⋮</b> y elige <b>«Instalar aplicación»</b> (o «Añadir a la pantalla de inicio»).</div><div style="color:#94a3b8;font-size:11px;margin-top:4px">Si no aparece: la página debe abrirse por https (tu enlace de GitHub) y no como archivo local.</div>';
+        b.innerHTML = h;
+    }
+    async function wakePedir() {
+        try { if (!("wakeLock" in navigator)) return; if (wl && !wl.released) return; wl = await navigator.wakeLock.request("screen"); wl.addEventListener("release", function () { wakePaint(); }); } catch (e) {}
+    }
+    function wakePaint() {
+        var s = $("bcWakeSt"), r = $("bcResume"); if (!s) return;
+        var on = wl && !wl.released;
+        s.innerHTML = !("wakeLock" in navigator) ? '<span style="color:#ff9f1a">⚠️ Este navegador no puede mantener la pantalla encendida. Desactiva el bloqueo automático en los Ajustes del celular mientras el bot trabaja.</span>'
+            : cfg.activo && wakePref ? (on ? '<span style="color:#0ecb81">🔆 Pantalla encendida mientras el bot esté activo.</span>' : '<span style="color:#f3ba2f">⏳ Pidiendo mantener la pantalla encendida…</span>')
+            : '<span style="color:#94a3b8">' + (wakePref ? "Se activará al encender el bot." : "Desactivado: el celular puede apagar la pantalla y pausar el bot.") + '</span>';
+        if (r) r.innerHTML = habiaOn && habiaOn.on && !cfg.activo ? '<div class="bdf-av bad">♻ El bot estaba <b>ENCENDIDO</b> (' + (habiaOn.m === "t" ? "TESTNET" : "CUENTA REAL") + ', ' + fHora(habiaOn.t) + ') cuando la app se cerró o se recargó, y ahora está apagado. Pulsa <b>RUN</b> para reanudarlo. Tus posiciones y sus salidas siguen en Binance.</div>' : "";
+    }
+    function wakeTick() {
+        if (cfg.activo !== prevAct) { prevAct = cfg.activo; habiaOn = { on: prevAct, t: Date.now(), m: cfg.testnet ? "t" : "r" }; escLS(ONLS, habiaOn); }
+        var need = cfg.activo && wakePref;
+        if (need && document.visibilityState === "visible") wakePedir();
+        else if (!need && wl) { try { wl.release(); } catch (e) {} wl = null; }
+        wakePaint();
+    }
+    setInterval(wakeTick, 3000); document.addEventListener("visibilitychange", wakeTick);
+    window.addEventListener("beforeunload", function (e) { if (cfg.activo) { e.preventDefault(); e.returnValue = ""; return ""; } });
+
+    /* ── PANEL ── */
+    var CAMPOS = ["d", "e", "t", "c1", "p1", "t1", "c2", "p2", "t2"];
+    function pintarPerfiles() {
+        cfg.perfiles.forEach(function (p, i) {
+            if (i > 2) return;
+            var v = { d: p.desde, e: p.ent, t: p.tp };
+            [0, 1].forEach(function (k) { var a = p.adds[k]; v["c" + (k + 1)] = a ? a.caida : ""; v["p" + (k + 1)] = a ? a.pct : ""; v["t" + (k + 1)] = a ? a.tp : ""; });
+            CAMPOS.forEach(function (c) { $("bdP" + i + c).value = v[c]; });
+        });
+    }
+    function leer() {
+        cfg.key = $("bdKey").value.trim(); if ($("bdSec").value) cfg.secret = $("bdSec").value.trim();
+        var tn = $("bdTest").checked; if (tn !== cfg.testnet) { misPos = {}; escLS(PLS, misPos); espera = {}; escLS(ELS, espera); } cfg.testnet = tn;
+        cfg.incInminente = $("bdInm").checked; cfg.tpNeto = $("bdNeto").checked;
+        var mp = parseInt($("bdMax").value, 10); cfg.maxPos = isNaN(mp) ? 5 : Math.max(1, mp);
+        var ps = [];
+        for (var i = 0; i < 3; i++) {
+            var g = function (c) { return parseFloat($("bdP" + i + c).value); }, D0 = DEF.perfiles[i];
+            var pr = { desde: i === 0 ? 0 : (isNaN(g("d")) ? D0.desde : Math.max(0, g("d"))),
+                ent: isNaN(g("e")) ? D0.ent : Math.min(99, Math.max(1, g("e"))),
+                tp: isNaN(g("t")) ? D0.tp : Math.max(0.01, g("t")), adds: [] };
+            [1, 2].forEach(function (k) {
+                var c = g("c" + k), p = g("p" + k), t = g("t" + k);
+                if (c > 0 && p > 0 && t > 0 && pr.adds.length === k - 1) pr.adds.push({ caida: c, pct: Math.min(99, p), tp: t });
+            });
+            ps.push(pr);
+        }
+        ps.sort(function (a, b) { return a.desde - b.desde; }); cfg.perfiles = ps;
+        var gm = function (k) { return parseFloat($("bdM" + k).value); }, M0 = DEF.multi;
+        var mu = { desde: isNaN(gm("d")) ? M0.desde : Math.max(1, gm("d")), por: isNaN(gm("u")) ? M0.por : Math.max(10, gm("u")),
+            ent: isNaN(gm("e")) ? M0.ent : Math.min(99, Math.max(1, gm("e"))), tp: isNaN(gm("t")) ? M0.tp : Math.max(0.05, gm("t")), adds: [] };
+        [1, 2].forEach(function (k) { var c = gm("c" + k), q = gm("p" + k), x = gm("t" + k); if (c > 0 && q > 0 && x > 0 && mu.adds.length === k - 1) mu.adds.push({ caida: c, pct: Math.min(99, q), tp: x }); });
+        cfg.multi = mu; guardar(); pintarPerfiles(); pintarMulti();
+    }
+    function pintar() {
+        var a = cfg.activo;
+        $("bdEstado").textContent = a ? "● ACTIVO · " + (cfg.testnet ? "TESTNET" : "DINERO REAL") : "○ APAGADO";
+        $("bdBanner").style.display = cfg.testnet ? "none" : "block";
+        $("bdEstado").style.color = a ? (cfg.testnet ? "#f3ba2f" : "#ff2a3b") : "#94a3b8";
+        $("bdOn").textContent = a ? "⏹ PARAR BOT" : "▶ RUN · EMPEZAR A OPERAR";
+        $("bdBtn").style.borderColor = a ? (cfg.testnet ? "#f3ba2f" : "#ff2a3b") : "rgba(255,255,255,.2)";
+    }
+    function multiHtml() {
+        var inp = "background:#050914;color:#fff;border:1px solid rgba(255,255,255,.15);border-radius:6px;padding:4px 6px;width:100%;box-sizing:border-box;";
+        function c(id, lab) { return '<div>' + lab + '<input id="bdM' + id + '" type="number" step="any" style="' + inp + '"></div>'; }
+        return '<div id="bdMultiBox" style="border:1px solid rgba(255,255,255,.1);border-radius:8px;padding:6px;margin:6px 0"><b data-tip="multi" style="color:#f3ba2f;font-size:11px;cursor:help">Multi-moneda · capital grande ⓘ</b> <b id="bdMultiTag" style="color:#0ecb81;font-size:10px"></b>' +
+            '<div style="font-size:10px;color:#94a3b8;margin:2px 0 3px">Reparte tu capital en partes iguales: una moneda por cada «USDT por moneda». Todo en % de la parte de cada moneda.</div>' +
+            '<div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:4px;font-size:10px">' +
+            c("d", "Desde (USDT)") + c("u", "USDT por moneda") + c("e", "% entrada") +
+            c("t", "Sale +% (entrada)") + c("c1", "Recomp.1 cae %") + c("p1", "% libre") +
+            c("t1", "Sale +% (recomp.1)") + c("c2", "Recomp.2 cae %") + c("p2", "% libre") +
+            c("t2", "Sale +% (recomp.2)") + '</div></div>';
+    }
+    function pintarMulti() {
+        var m = cfg.multi, a = m.adds, v = { d: m.desde, u: m.por, e: m.ent, t: m.tp };
+        [0, 1].forEach(function (k) { var x = a[k]; v["c" + (k + 1)] = x ? x.caida : ""; v["p" + (k + 1)] = x ? x.pct : ""; v["t" + (k + 1)] = x ? x.tp : ""; });
+        Object.keys(v).forEach(function (k) { var el = $("bdM" + k); if (el) el.value = v[k]; });
+    }
+    function montar() {
+        var inp = "background:#050914;color:#fff;border:1px solid rgba(255,255,255,.15);border-radius:6px;padding:4px 6px;width:100%;box-sizing:border-box;";
+        var w = document.createElement("div"); w.style.cssText = "position:fixed;left:12px;bottom:12px;z-index:9500;font:12px/1.4 Inter,Arial,sans-serif;";
+        var nombres = ["Perfil 1 · capital chico", "Perfil 2 · capital medio", "Perfil 3 · capital grande"];
+        function campo(i, id, lab) { return '<div>' + lab + '<input id="bdP' + i + id + '" type="number" step="any" style="' + inp + '"></div>'; }
+        var perf = "";
+        for (var i = 0; i < 3; i++) perf += '<div id="bdPerfBox' + i + '" style="border:1px solid rgba(255,255,255,.1);border-radius:8px;padding:6px;margin:6px 0"><b style="color:#f3ba2f;font-size:11px">' + nombres[i] + '</b> <b id="bdPerfTag' + i + '" style="color:#0ecb81;font-size:10px"></b>' +
+            '<div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:4px;font-size:10px;margin-top:3px">' +
+            campo(i, "d", "Saldo desde") + campo(i, "e", "% entrada") + campo(i, "t", "Sale +USDT") +
+            campo(i, "c1", "Recomp.1 cae %") + campo(i, "p1", "% libre") + campo(i, "t1", "Sale +USDT") +
+            campo(i, "c2", "Recomp.2 cae %") + campo(i, "p2", "% libre") + campo(i, "t2", "Sale +USDT") + '</div></div>';
+        w.innerHTML =
+            '<button id="bdBtn" style="background:#090f1c;color:#fff;border:2px solid rgba(255,255,255,.2);border-radius:20px;padding:8px 14px;font-weight:800;cursor:pointer">🤖 BOT DESMAYO</button> ' +
+            '<button id="bdMonBtn" style="background:#090f1c;color:#fff;border:2px solid rgba(37,99,235,.7);border-radius:20px;padding:8px 14px;font-weight:800;cursor:pointer">📊 MONITOR</button>' +
+            '<div id="bdPanel" style="display:none;position:absolute;left:0;bottom:44px;width:350px;max-height:80vh;overflow:auto;background:#090f1c;color:#cbd5e1;border:1px solid rgba(243,186,47,.5);border-radius:12px;padding:12px">' +
+            '<div style="display:flex;justify-content:space-between;margin-bottom:6px"><b style="color:#f3ba2f">🤖 BOT DESMAYO · LONG</b><b id="bdEstado"></b></div>' +
+            '<div id="bdBanner" style="display:none;margin-bottom:6px;padding:5px 8px;border-radius:6px;background:rgba(255,42,59,.15);border:1px solid #ff2a3b;color:#ff9aa5;font-weight:700;font-size:11px">⚠️ MODO REAL: opera con el dinero de tu cuenta de Binance</div>' +
+            '<div style="font-size:11px;color:#94a3b8;margin-bottom:8px">Futuros USDT-M · margen aislado · siempre 1x · nunca SHORT. Las reglas se eligen según tu SALDO DISPONIBLE en cada operación.</div>' +
+            '<div id="bdAuto" style="margin-bottom:8px;padding:7px 9px;border-radius:8px;border:1px solid rgba(255,255,255,.12);background:#0b1220;font-size:11px;line-height:1.5;color:#94a3b8">Guarda tu API Key y tu Secret: el bot se conecta solo, lee tu capital y elige el perfil que te toca.</div>' +
+            '<span data-tip="key" style="cursor:help">API Key <span style="color:#f3ba2f">ⓘ</span></span><input id="bdKey" data-tip="key" style="' + inp + '" autocomplete="off">' +
+            '<span data-tip="sec" style="cursor:help">API Secret <span style="color:#f3ba2f">ⓘ</span></span><input id="bdSec" data-tip="sec" type="password" placeholder="(guardado)" style="' + inp + '" autocomplete="off">' +
+            '<label data-tip="test" style="display:block;margin:6px 0 2px;cursor:help"><input type="checkbox" id="bdTest"> Usar TESTNET (testnet.binancefuture.com) <span style="color:#f3ba2f">ⓘ</span></label>' +
+            '<label style="display:block;margin:2px 0"><input type="checkbox" id="bdNeto"> Ganancias NETAS (descuentan comisiones)</label>' +
+            '<label style="display:block;margin:2px 0 6px"><input type="checkbox" id="bdInm"> Incluir DESMAYO INMINENTE</label>' +
+            '<div><span data-tip="max" style="cursor:help">Máx. posiciones <span style="color:#f3ba2f">ⓘ</span></span> <span style="font-size:10px;color:#94a3b8">(monedas abiertas a la vez)</span><div style="width:50%"><input id="bdMax" data-tip="max" type="number" style="' + inp + '"></div></div>' + perf +
+            multiHtml() + '<div style="font-size:10px;color:#94a3b8">Recompra: deja vacío el "cae %" para no usarla. "% libre" = % del saldo disponible en ese momento.</div>' +
+            '<div style="display:flex;gap:6px;margin-top:8px"><button id="bdGuardar" style="flex:1;padding:8px;border-radius:8px;border:1px solid #f3ba2f;background:#2a2108;color:#f3ba2f;cursor:pointer;font-weight:800">💾 GUARDAR</button>' +
+            '<button id="bdProbar" style="flex:1;padding:8px;border-radius:8px;border:1px solid #2563eb;background:#0b1630;color:#9db8ff;cursor:pointer;font-weight:700">Probar conexión</button></div>' +
+            '<button id="bdOn" style="width:100%;margin-top:6px;padding:10px;border-radius:8px;border:1px solid #0ecb81;background:#08241a;color:#0ecb81;cursor:pointer;font-weight:900;font-size:13px"></button>' +
+            '<div style="text-align:right;margin-top:4px"><a id="bdBorrar" style="color:#94a3b8;font-size:10px;cursor:pointer;text-decoration:underline">borrar claves guardadas</a></div>' +
+            '<div id="bdLog" style="margin-top:8px;max-height:170px;overflow:auto;font:11px/1.45 monospace"></div></div>';
+        document.body.appendChild(w);
+        $("bdKey").value = cfg.key; $("bdTest").checked = cfg.testnet; $("bdInm").checked = cfg.incInminente; $("bdNeto").checked = cfg.tpNeto;
+        $("bdMax").value = cfg.maxPos; pintarPerfiles(); pintarMulti();
+        $("bdP0d").readOnly = true;
+        var m = document.createElement("div"); m.id = "bdMonWrap";
+        m.style.cssText = "display:none;position:fixed;top:0;left:0;right:0;bottom:0;z-index:9600;background:rgba(3,7,18,.96);overflow:auto;font:12px/1.4 Inter,Arial,sans-serif;color:#cbd5e1;padding:14px";
+        m.innerHTML = '<div style="max-width:1000px;margin:0 auto">' +
+            '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px"><b style="color:#f3ba2f;font-size:15px">📊 MONITOR · BINANCE FUTUROS USDT-M <span id="bdMonModo"></span></b>' +
+            '<span><span id="bdMonHora" style="color:#94a3b8;margin-right:10px"></span><button id="bdMonX" style="padding:5px 12px;border-radius:8px;border:1px solid #475569;background:#0b1220;color:#fff;cursor:pointer;font-weight:700">✕ Cerrar</button></span></div>' +
+            '<div id="bdMonErr" style="color:#ff6b7a;margin-bottom:6px"></div>' +
+            '<div id="bdMonCards" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:8px"></div>' +
+            '<div style="margin:12px 0 4px;color:#f3ba2f;font-weight:800">Posiciones abiertas <span style="color:#94a3b8;font-weight:400">(toca una fila para ver su gráfico)</span></div>' +
+            '<div style="overflow-x:auto"><table id="bdMonTabla" style="width:100%;border-collapse:collapse;min-width:640px"></table></div>' +
+            '<div style="margin:12px 0 4px;color:#f3ba2f;font-weight:800">Monedas en alerta ahora en el CDC</div><div id="bdMonChips"></div>' +
+            '<div style="margin:12px 0 4px;color:#f3ba2f;font-weight:800">Evolución de tu cuenta <span style="color:#94a3b8;font-weight:400">(capital + PnL no realizado)</span></div><div id="bdMonSpark"></div>' +
+            '<div style="margin-top:12px"><label><input type="checkbox" id="bdMonChartOn" checked> Mostrar gráfico en vivo</label> <b id="bdMonSym" style="margin-left:8px"></b>' +
+            '<iframe id="bdMonFrame" style="display:none;width:100%;height:400px;border:1px solid rgba(255,255,255,.1);border-radius:8px;background:#050914;margin-top:6px"></iframe></div></div>';
+        document.body.appendChild(m);
+        $("bdMonBtn").onclick = function () { monAbierto = true; $("bdMonWrap").style.display = "block"; return refrescarMon(); };
+        $("bdMonX").onclick = function () { monAbierto = false; $("bdMonWrap").style.display = "none"; };
+        $("bdMonChartOn").onchange = ponerFrame;
+        var selFila = function (e) { var t = e.target && e.target.closest ? e.target.closest("[data-sym]") : null; if (t) { monSel = t.getAttribute("data-sym"); ponerFrame(); } };
+        $("bdMonTabla").onclick = selFila; $("bdMonChips").onclick = selFila;
+        $("bdSec").placeholder = cfg.secret ? "•••••••• (guardado)" : "pega aquí tu API Secret";
+        $("bdTest").onchange = function () { $("bdBanner").style.display = $("bdTest").checked ? "none" : "block"; };
+        $("bdBanner").style.display = cfg.testnet ? "none" : "block";
+        $("bdGuardar").onclick = function () { leer(); $("bdSec").value = ""; $("bdSec").placeholder = cfg.secret ? "•••••••• (guardado)" : "pega aquí tu API Secret"; pintar();
+            log(cfg.key && cfg.secret ? "💾 Datos guardados en este navegador. Conectando para elegir tu perfil… (luego pulsa RUN)" : "💾 Guardado, pero faltan API Key o Secret.", !(cfg.key && cfg.secret)); autoUlt = ""; autoConectar(false); };
+        $("bdBorrar").onclick = function () { if (!confirm("¿Borrar la API Key y el Secret guardados en este navegador?")) return;
+            cfg.key = ""; cfg.secret = ""; cfg.activo = false; guardar(); $("bdKey").value = ""; $("bdSec").value = ""; $("bdSec").placeholder = "pega aquí tu API Secret"; pintar(); log("🗑 Claves borradas"); };
+        $("bdBtn").onclick = function () { var p = $("bdPanel"); p.style.display = p.style.display === "none" ? "block" : "none"; if (p.style.display === "block") autoConectar(true); };
+        $("bdProbar").onclick = async function () {
+            leer(); info = null; dual = null;
+            try { await cargarInfo(); var s = await saldo(), d = await api("GET", "/fapi/v1/positionSide/dual", {}, true), pf = elegirPerfil(s.disp);
+                log("✅ Conexión OK (" + (cfg.testnet ? "TESTNET" : "REAL") + ") · capital " + s.wallet.toFixed(2) + " USDT · disponible " + s.disp.toFixed(2) + " · modo " + (d.dualSidePosition ? "HEDGE" : "ONE-WAY"));
+                log(modoMulti(s.wallet) ? ("📋 Modo MULTI-MONEDA: hasta " + modoMulti(s.wallet).n + " monedas a la vez · ≈ " + modoMulti(s.wallet).presup.toFixed(2) + " USDT por moneda · entrada " + cfg.multi.ent + " % de su parte") : pf ? "📋 Perfil activo según tu saldo disponible (desde " + pf.desde + " USDT): " + textoPerfil(pf) + " · entrada ≈ " + Math.min(s.disp * pf.ent / 100, s.disp * 0.99).toFixed(2) + " USDT" : "⚠️ Ningún perfil aplica a este saldo disponible", !pf && !modoMulti(s.wallet)); }
+            catch (e) { log("❌ " + e.message, true); }
+        };
+        $("bdOn").onclick = function () {
+            leer();
+            if (!cfg.activo) {
+                if (!cfg.key || !cfg.secret) { log("Falta API Key / Secret", true); return; }
+                if (!cfg.testnet && !confirm("⚠️ Vas a encender el bot con DINERO REAL en Binance Futures.\n\nCompra LONG sin stop loss, según tu perfil de capital.\n¿Continuar?")) return;
+                cfg.activo = true; log("▶ Bot ENCENDIDO (" + (cfg.testnet ? "testnet" : "REAL") + ")");
+            } else { cfg.activo = false; log("⏹ Bot APAGADO"); }
+            pintar();
+        };
+        pintar();
+
+        /* ── Mensajes de ayuda al pasar el mouse (o tocar la casilla) ── */
+        var TIPS = {
+            key: "API KEY: dónde conseguirla\n1) Entra a Binance (web) → icono de tu perfil → «Administración de API».\n2) «Crear API» → «Generada por el sistema» → ponle un nombre.\n3) Copia aquí la «API Key» (la clave pública, letras y números largos).\n4) En «Editar restricciones» activa «Habilitar Futuros», deja los RETIROS desactivados y restringe el acceso a tu IP.\nPara TESTNET las claves se crean en testnet.binancefuture.com (son distintas a las reales).",
+            sec: "API SECRET (clave secreta): dónde conseguirla\nEs la «Secret Key» que Binance muestra UNA SOLA VEZ, justo al crear la API. Después ya no se puede ver.\nCópiala completa y sin espacios. Si la perdiste, borra esa API en Binance y crea otra.\nNunca la compartas con nadie: con ella se puede operar tu cuenta. Al guardar, este campo se oculta.",
+            max: "MÁXIMO DE POSICIONES\nCuántas monedas distintas puede tener abiertas el bot AL MISMO TIEMPO.\nCon 5: si ya hay 5 monedas abiertas, el bot NO compra una sexta hasta que se cierre alguna.\nEs el TOPE: con menos del capital «Desde» del bloque Multi-moneda (100 USDT) el bot usa 1 moneda a la vez; con más capital, el modo Multi-moneda decide cuántas (2, 3, 4…) y este número es el máximo permitido.",
+            multi: "MULTI-MONEDA (capital grande)\nEn vez de depender de una cifra fija, el capital se reparte en partes iguales: una moneda por cada «USDT por moneda» (50).\n100 USDT → 2 monedas · 150 → 3 · 200 → 4, ≈ 50 USDT cada una.\nCada moneda usa SOLO su parte, con la misma regla: entra con un % de su parte, recompra con un % de lo que le queda libre y sale con una ganancia en % de su parte.\nLas monedas son las que el CDC marque en DESMAYO o CAÍDA BRUTAL.",
+            test: "TESTNET = modo PRÁCTICA con dinero de mentira, sin riesgo.\nCÓMO USARLO:\n1) Entra a testnet.binancefuture.com (es una web aparte de Binance real).\n2) Abajo, pestaña «API Key»: genera y copia la Key y el Secret de TESTNET.\n3) Pégalas aquí, marca esta casilla y pulsa GUARDAR → Probar conexión.\n4) Pulsa RUN: el bot compra y pone la salida con saldo falso.\nDesmárcala solo para operar con tu cuenta real (saldrá un aviso rojo).\nLas claves de testnet y las reales NO son intercambiables. Con tanto saldo falso no se prueba el modo emergencia (< 6 USDT)."
+        };
+        var tip = document.createElement("div");
+        tip.style.cssText = "display:none;position:fixed;z-index:10050;max-width:310px;background:#111a2e;color:#e2e8f0;border:1px solid #f3ba2f;border-radius:8px;padding:9px 11px;font:12px/1.5 Inter,Arial,sans-serif;box-shadow:0 6px 24px rgba(0,0,0,.6);pointer-events:none;white-space:pre-line";
+        document.body.appendChild(tip);
+        function verTip(el) {
+            var s = TIPS[el.getAttribute("data-tip")]; if (!s) return;
+            tip.textContent = s; tip.style.display = "block";
+            var r = el.getBoundingClientRect(), w = tip.offsetWidth, h = tip.offsetHeight, x = r.right + 12;
+            if (x + w > window.innerWidth - 8) x = Math.max(8, r.left - w - 12);
+            tip.style.left = x + "px"; tip.style.top = Math.min(Math.max(8, r.top - 6), Math.max(8, window.innerHeight - h - 8)) + "px";
+        }
+        var panelTip = $("bdPanel");
+        panelTip.addEventListener("mouseover", function (e) { var el = e.target.closest ? e.target.closest("[data-tip]") : null; if (el) verTip(el); else tip.style.display = "none"; });
+        panelTip.addEventListener("mouseleave", function () { tip.style.display = "none"; });
+        panelTip.addEventListener("focusin", function (e) { var el = e.target.closest ? e.target.closest("[data-tip]") : null; if (el) verTip(el); });
+        panelTip.addEventListener("focusout", function () { tip.style.display = "none"; });
+        panelTip.addEventListener("scroll", function () { tip.style.display = "none"; });
+
+        /* ── Conexión automática: lee el capital y muestra el perfil que te toca ── */
+        if (cfg.key && cfg.secret) setTimeout(function () { autoConectar(false); }, 2500);
+        setInterval(function () { if (cfg.key && cfg.secret && !busy) autoConectar(true); }, 60000);
+        montarFab(); montarCon();
+    }
+
+    var autoUlt = "", autoErr = "";
+    async function autoConectar(silencioso) {
+        var box = $("bdAuto"); if (!box) return;
+        if (!cfg.key || !cfg.secret) { box.style.color = "#94a3b8"; box.textContent = "Guarda tu API Key y tu Secret: el bot se conecta solo, lee tu capital y elige el perfil que te toca."; return; }
+        try {
+            await cargarInfo();
+            var s = await saldo(), mm = modoMulti(s.wallet), pf = mm ? null : elegirPerfil(s.disp), idx = pf ? cfg.perfiles.indexOf(pf) : -1;
+            for (var i = 0; i < 3; i++) {
+                var b = $("bdPerfBox" + i), tg = $("bdPerfTag" + i); if (!b || !tg) continue;
+                b.style.borderColor = i === idx ? "#0ecb81" : "rgba(255,255,255,.1)"; b.style.background = i === idx ? "rgba(14,203,129,.07)" : "transparent";
+                tg.textContent = i === idx ? "★ ACTIVO según tu saldo" : "";
+            }
+            var mb = $("bdMultiBox"), mtg = $("bdMultiTag");
+            if (mb && mtg) { mb.style.borderColor = mm ? "#0ecb81" : "rgba(255,255,255,.1)"; mb.style.background = mm ? "rgba(14,203,129,.07)" : "transparent"; mtg.textContent = mm ? "★ ACTIVO según tu capital" : ""; }
+            if (mm) {
+                var m = cfg.multi, ent0 = Math.min(mm.presup * m.ent / 100, s.disp * 0.99), lib = mm.presup - ent0;
+                var hm = '<b style="color:#0ecb81">✅ Conectado (' + (cfg.testnet ? "TESTNET" : "CUENTA REAL") + ')</b><br>' +
+                    'Capital: <b style="color:#fff">' + s.wallet.toFixed(2) + ' USDT</b> → modo <b style="color:#f3ba2f">MULTI-MONEDA</b>: hasta <b style="color:#fff">' + mm.n + ' monedas</b> a la vez<br>' +
+                    'Parte de cada moneda: <b style="color:#fff">≈ ' + mm.presup.toFixed(2) + ' USDT</b> (' + (100 / mm.n).toFixed(1) + ' % de tu capital)<br>' +
+                    'Entrada: <b style="color:#fff">≈ ' + ent0.toFixed(2) + ' USDT</b> (' + m.ent + ' % de su parte)<br>' +
+                    'Ganancia al vender: <b style="color:#0ecb81">+' + m.tp + ' % de su parte ≈ +' + (mm.presup * m.tp / 100).toFixed(2) + ' USDT</b>';
+                m.adds.forEach(function (a, k) { var u = lib * a.pct / 100; lib -= u; hm += '<br>Recompra ' + (k + 1) + ': si cae ' + a.caida + ' % compra ≈ ' + u.toFixed(2) + ' USDT (' + a.pct + ' % de lo libre de su parte) → sale con +' + a.tp + ' % ≈ +' + (mm.presup * a.tp / 100).toFixed(2) + ' USDT'; });
+                hm += '<br>Saldo disponible ahora: ' + s.disp.toFixed(2) + ' USDT';
+                box.style.color = "#cbd5e1"; box.innerHTML = hm;
+                var marcaM = "M" + mm.n + "|" + (cfg.testnet ? "t" : "r");
+                if (marcaM !== autoUlt) { log((autoUlt ? "🔄 Tu capital cambió: " : "📋 ") + "modo MULTI-MONEDA · capital " + s.wallet.toFixed(2) + " USDT · " + mm.n + " monedas · ≈ " + mm.presup.toFixed(2) + " USDT por moneda · entrada ≈ " + ent0.toFixed(2) + " USDT · sale +" + m.tp + " % de su parte"); autoUlt = marcaM; }
+                autoErr = ""; return;
+            }
+            if (!pf) { box.style.color = "#ff9aa5"; box.textContent = "⚠️ Conectado, pero ningún perfil aplica a un saldo disponible de " + s.disp.toFixed(2) + " USDT."; return; }
+            var ent = Math.min(s.disp * pf.ent / 100, s.disp * 0.99), gp = ent > 0 ? pf.tp / ent * 100 : 0;
+            var h = '<b style="color:#0ecb81">✅ Conectado (' + (cfg.testnet ? "TESTNET" : "CUENTA REAL") + ')</b><br>' +
+                'Saldo disponible para la siguiente operación: <b style="color:#fff">' + s.disp.toFixed(2) + ' USDT</b> · billetera total ' + s.wallet.toFixed(2) + '<br>' +
+                'Perfil automático: <b style="color:#f3ba2f">Perfil ' + (idx + 1) + '</b> (desde ' + pf.desde + ' USDT)<br>' +
+                'Invierte en cada compra: <b style="color:#fff">≈ ' + ent.toFixed(2) + ' USDT</b> (' + pf.ent + ' % del saldo disponible)<br>' +
+                'Ganancia al vender: <b style="color:#0ecb81">+' + pf.tp + ' USDT</b> ≈ <b style="color:#0ecb81">' + gp.toFixed(2) + ' %</b> de lo invertido';
+            pf.adds.forEach(function (a, k) { h += '<br>Recompra ' + (k + 1) + ': si cae ' + a.caida + ' % usa ' + a.pct + ' % del saldo libre → sale con +' + a.tp + ' USDT'; });
+            if (!pf.adds.length) h += '<br>Sin recompras en este perfil.';
+            if (s.wallet < 6) h += '<br><b style="color:#ff9f1a">🆘 MODO EMERGENCIA: capital < 6 USDT → opera a 2x y sale con +0.25 USDT, hasta llegar a 6 USDT.</b>';
+            box.style.color = "#cbd5e1"; box.innerHTML = h;
+            var marca = idx + "|" + (cfg.testnet ? "t" : "r");
+            if (marca !== autoUlt) { log((autoUlt ? "🔄 Tu saldo disponible cambió: ahora aplica el Perfil " : "📋 Perfil elegido automáticamente: Perfil ") + (idx + 1) + " · saldo disponible " + s.disp.toFixed(2) + " USDT · entrada ≈ " + ent.toFixed(2) + " USDT · sale +" + pf.tp + " USDT (≈ " + gp.toFixed(2) + " %)"); autoUlt = marca; }
+            autoErr = "";
+        } catch (e) {
+            box.style.color = "#ff9aa5"; box.textContent = "❌ No se pudo conectar: " + e.message;
+            if (e.message !== autoErr && !silencioso) log("❌ " + e.message, true);
+            autoErr = e.message;
+        }
+    }
+
+    if (document.readyState === "loading") document.addEventListener("DOMContentLoaded", montar); else montar();
+    setInterval(tick, 4000);
+})();
+</script>
+
 </body></html>
