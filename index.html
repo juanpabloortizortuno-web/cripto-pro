@@ -20404,7 +20404,7 @@ window.CDC_WS24=(function(){
   /* 🛑 freno general: durante la pausa de Binance, NINGUNA parte del CDC consulta la API (cada intento alarga el castigo) */
   var _f=window.fetch;
   if(_f)window.fetch=function(u){try{var url=typeof u==='string'?u:(u&&u.url)||'';
-    if(/^https:\/\/(fapi|api|data-api)\.binance\.(com|vision)\//.test(url)&&typeof estaPausadoPorRateLimit==='function'&&estaPausadoPorRateLimit())
+    if(/^https:\/\/(fapi|api|data-api)\.binance\.(com|vision)\//.test(url)&&typeof estaPausadoPorRateLimit==='function'&&estaPausadoPorRateLimit()&&!/[?&]signature=|\/fapi\/v1\/time|\/fapi\/v1\/exchangeInfo/.test(url))
       return Promise.resolve(new Response('{"msg":"pausa local CDC"}',{status:503}));}catch(e){}return _f.apply(this,arguments)};
   /* 🔎 indicador de estado (abajo a la izquierda) */
   var bd=document.createElement('div');bd.id='cdcEstado';bd.style.cssText='position:fixed;left:8px;bottom:30px;z-index:8000;font:700 10px Inter,Arial,sans-serif;padding:3px 7px;border-radius:6px;background:rgba(6,11,22,.85);pointer-events:none';
@@ -20909,7 +20909,7 @@ window.CDC_TRACK=(function(){
         try { r = await fetch(base() + path + (qs ? "?" + qs : ""), { method: metodo, headers: (firmado && cfg.key) ? { "X-MBX-APIKEY": cfg.key } : {} }); }
         catch (x) { throw new Error("No se pudo conectar con Binance (" + x.message + "). Revisa tu internet, bloqueos de red o antivirus."); }
         var j = await r.json().catch(function () { return {}; });
-        if (!r.ok) { var e = new Error(((j && j.msg) || ("HTTP " + r.status)) + pista(j && j.code)); e.code = j && j.code; throw e; }
+        if (!r.ok) { if (r.status === 429 || r.status === 418) { var ra = 0; try { ra = parseInt(r.headers.get("Retry-After")) || 0; } catch (x) {} window.__cdcApiLim = { s: r.status, until: Date.now() + (ra ? ra * 1000 : r.status === 418 ? 120000 : 20000) }; } var e = new Error(((j && j.msg) || ("HTTP " + r.status)) + pista(j && j.code)); e.code = j && j.code; throw e; }
         return j;
     }
     async function cargarInfo() {
@@ -21193,6 +21193,8 @@ window.CDC_TRACK=(function(){
     }
     async function fabRefrescar() {
         if (fabBusy) return; fabBusy = true;
+        var L0 = window.__cdcApiLim;
+        if (L0 && fabData && !fabData.err && fabData.wallet != null && Date.now() < L0.until) { fabData.stale = { until: L0.until, s: L0.s }; fabBusy = false; pintarFab(); return; }
         try {
             if (!cfg.key || !cfg.secret) { fabData = { err: "Falta tu API Key / Secret. Mira la pestaña «🔑 Guía API»: ahí te explico dónde conseguirlas." }; }
             else {
@@ -21210,11 +21212,15 @@ window.CDC_TRACK=(function(){
                 if (!hist.length || Date.now() - hist[hist.length - 1][0] > 5000) { hist.push([Date.now(), wallet + unr]); if (hist.length > 400) hist = hist.slice(-400); escLS(EQLS, hist); }
                 var al = [];
                 try { CDC_DESPERTAR.lista().forEach(function (it) { if (it.r && it.r.dir < 0) al.push({ s: it.s, t: it.r.tipo === "DESMAYO_INMINENTE" ? "inminente" : it.r.tipo === "CAIDA_BRUTAL" ? "caída brutal" : "desmayo" }); }); } catch (e) {}
-                fabData = { wallet: wallet, disp: disp, unr: unr, pos: pos, ords: r[2], al: al };
+                fabData = { wallet: wallet, disp: disp, unr: unr, pos: pos, ords: r[2], al: al, t: Date.now() };
                 fabN = pos.length; pintarBadge();
                 if (!fabSel || (!pos.some(function (x) { return x.symbol === fabSel; }) && !al.some(function (x) { return x.s === fabSel; }))) fabSel = pos.length ? pos[0].symbol : (al[0] ? al[0].s : null);
             }
-        } catch (e) { fabData = { err: e.message + (e.code === -2015 ? " · Revisa tu IP: la actual es " + (fabIP && fabIP !== "?" ? fabIP : "(míra la pestaña «🔑 Guía API»)") + " y debe estar en las IPs de confianza de tu API en Binance." : "") }; if (e.code === -2015 && !fabIP) ipDetectar(); }
+        } catch (e) {
+            var limit = /pausa local|HTTP 429|HTTP 418|Too many|too many|banned|HTTP 503|No se pudo conectar/.test(e.message || "");
+            if (limit && fabData && !fabData.err && fabData.wallet != null) { var LL = window.__cdcApiLim || {}; fabData.stale = { until: LL.until || (Date.now() + 15000), s: LL.s || 0 }; }
+            else if (limit) fabData = { err: "⏸ Binance está limitando las peticiones por un momento. Es normal si el CDC escanea muchas monedas: tus claves y tu IP están bien. Se reintenta solo cada pocos segundos." };
+            else { fabData = { err: e.message + (e.code === -2015 ? " · Revisa tu IP: la actual es " + (fabIP && fabIP !== "?" ? fabIP : "(míra la pestaña «🔑 Guía API»)") + " y debe estar en las IPs de confianza de tu API en Binance." : "") }; if (e.code === -2015 && !fabIP) ipDetectar(); } }
         fabBusy = false; pintarFab();
     }
     function fabFrame() {
@@ -21434,14 +21440,49 @@ window.CDC_TRACK=(function(){
             ".bdf-op{display:flex;gap:7px;padding:6px 2px;border-bottom:1px solid rgba(255,255,255,.06);font-size:11.5px}.bdf-chk{display:flex;gap:8px;align-items:flex-start;margin:6px 0}.bdf-chk input{margin-top:3px;flex:none}" +
             ".bdf-bar{height:7px;border-radius:5px;background:#1a2438;margin-top:6px;overflow:hidden}.bdf-bar i{display:block;height:100%;border-radius:5px;transition:width .3s}" +
             ".bdf-av{margin:6px 0;padding:7px 10px;border-radius:9px;font-weight:700}.bdf-av.ok{background:rgba(14,203,129,.12);border:1px solid #0ecb81;color:#9fe8c4}.bdf-av.bad{background:rgba(255,42,59,.12);border:1px solid #ff2a3b;color:#ff9aa5}";
+        css.textContent += 
+            "#bdFabBtn{width:56px !important;height:56px !important;border:2px solid #f3ba2f !important;background:radial-gradient(circle at 30% 25%,#2563eb,#0b1220 72%) !important;touch-action:none !important;user-select:none;-webkit-user-select:none;animation:bdfGlow 2.2s ease-in-out infinite,bdfFloat 3.2s ease-in-out infinite}" +
+            "#bdFabBtn.bdf-drag{animation:none;cursor:grabbing;transform:scale(1.12);box-shadow:0 8px 26px rgba(243,186,47,.7) !important}" +
+            ".bdf-botico{font-size:26px;line-height:1;display:block;pointer-events:none}" +
+            ".bdf-botlab{position:absolute;left:50%;bottom:-8px;transform:translateX(-50%);padding:1px 7px;border-radius:9px;background:#f3ba2f;color:#000;font:900 9px Arial,sans-serif;letter-spacing:.4px;white-space:nowrap;pointer-events:none}" +
+            "@keyframes bdfGlow{0%,100%{box-shadow:0 0 8px rgba(37,99,235,.55),0 0 0 0 rgba(243,186,47,.5)}50%{box-shadow:0 0 18px rgba(37,99,235,.9),0 0 0 8px rgba(243,186,47,0)}}" +
+            "@keyframes bdfFloat{0%,100%{margin-top:0}50%{margin-top:-4px}}" +
+            "body.menu-movil-abierto #bdFabBtn{display:none !important}" +
+            "";
         document.head.appendChild(css);
         var btn = document.createElement("button");
-        btn.id = "bdFabBtn"; btn.type = "button"; btn.title = "Operaciones y monitor del bot"; btn.setAttribute("aria-label", "Operaciones y monitor");
-        btn.innerHTML = '📈<span id="bdFabBadge" style="display:none;position:absolute;top:-3px;right:-3px;min-width:18px;height:18px;border-radius:9px;background:#0ecb81;color:#04130b;font:900 11px Arial;align-items:center;justify-content:center;padding:0 4px">0</span>';
+        btn.id = "bdFabBtn"; btn.type = "button"; btn.title = "Generador IA · Bot — toca para abrir, mantén y arrastra para moverlo"; btn.setAttribute("aria-label", "Generador IA Bot");
+        btn.innerHTML = '<span class="bdf-botico">🤖</span><span class="bdf-botlab">IA BOT</span><span id="bdFabBadge" style="display:none;position:absolute;top:-3px;right:-3px;min-width:18px;height:18px;border-radius:9px;background:#0ecb81;color:#04130b;font:900 11px Arial;align-items:center;justify-content:center;padding:0 4px">0</span>';
         btn.style.cssText = "position:relative;width:48px;height:48px;border-radius:50%;border:2px solid #2563eb;background:rgba(11,18,32,.92);color:#fff;font:900 20px Arial;cursor:pointer;box-shadow:0 0 10px rgba(37,99,235,.5);padding:0;flex:none;touch-action:manipulation";
         var fb = document.querySelector(".floating-buttons"), upd = $("cdcUpdBtn");
         if (fb) fb.insertBefore(btn, upd && upd.parentNode === fb ? upd : fb.firstChild);
         else { btn.style.position = "fixed"; btn.style.right = "10px"; btn.style.bottom = "calc(290px + env(safe-area-inset-bottom,0px))"; btn.style.zIndex = "9400"; document.body.appendChild(btn); }
+
+        /* 🤖 botón IA movible: arrástralo donde quieras (se acuerda de su lugar). Doble toque = volver a su sitio. */
+        (function () {
+            var KEY = "cdcBotIaPos_v1", st = null, movido = false, bloqueaClick = false;
+            function lim(x, y) { var w = window.innerWidth, h = window.innerHeight; return { x: Math.max(6, Math.min(w - 62, x)), y: Math.max(6, Math.min(h - 70, y)) }; }
+            function poner(x, y) { var p = lim(x, y); if (btn.parentNode !== document.body) document.body.appendChild(btn); btn.style.position = "fixed"; btn.style.left = p.x + "px"; btn.style.top = p.y + "px"; btn.style.right = "auto"; btn.style.bottom = "auto"; btn.style.zIndex = "9650"; return p; }
+            var g = leerLS(KEY); if (typeof g.x === "number" && typeof g.y === "number") poner(g.x, g.y);
+            btn.addEventListener("pointerdown", function (e) { if (e.button > 0) return; var r = btn.getBoundingClientRect(); st = { sx: e.clientX, sy: e.clientY, x: r.left, y: r.top, id: e.pointerId }; movido = false; });
+            window.addEventListener("pointermove", function (e) {
+                if (!st) return; var dx = e.clientX - st.sx, dy = e.clientY - st.sy;
+                if (!movido && Math.hypot(dx, dy) > 7) { movido = true; btn.classList.add("bdf-drag"); try { btn.setPointerCapture(st.id); } catch (x) {} }
+                if (movido) { poner(st.x + dx, st.y + dy); e.preventDefault(); }
+            }, { passive: false });
+            function soltar() {
+                if (!st) return; var fue = movido; st = null; btn.classList.remove("bdf-drag");
+                if (fue) { var r = btn.getBoundingClientRect(), x = (r.left + 28 < window.innerWidth / 2) ? 8 : window.innerWidth - 64, p = poner(x, r.top); escLS(KEY, { x: p.x, y: p.y }); bloqueaClick = true; setTimeout(function () { bloqueaClick = false; }, 350); }
+            }
+            window.addEventListener("pointerup", soltar); window.addEventListener("pointercancel", soltar);
+            btn.addEventListener("click", function (e) { if (bloqueaClick) { e.stopImmediatePropagation(); e.preventDefault(); } }, true);
+            btn.addEventListener("dblclick", function () {
+                escLS(KEY, {}); var f2 = document.querySelector(".floating-buttons");
+                ["position", "left", "top", "right", "bottom", "zIndex"].forEach(function (k) { btn.style[k] = ""; }); btn.style.position = "relative";
+                if (f2) f2.insertBefore(btn, f2.firstChild);
+            });
+            window.addEventListener("resize", function () { if (btn.style.position === "fixed") { var r = btn.getBoundingClientRect(); var p = poner(r.left, r.top); escLS(KEY, { x: p.x, y: p.y }); } });
+        })();
         var P = document.createElement("div"); P.id = "bdFab";
         P.innerHTML = '<div class="bdf-h"><b style="color:#f3ba2f;font-size:13px">📈 OPERACIONES · MONITOR<span id="bdFabModo" class="bdf-pill t"></span></b>' +
             '<span style="white-space:nowrap"><b id="bdFabEst" style="margin-right:8px;font-size:11px"></b><button data-act="x" style="padding:4px 10px;border-radius:8px;border:1px solid #475569;background:#0b1220;color:#fff;cursor:pointer;font-weight:700">✕</button></span></div>' +
@@ -21569,11 +21610,69 @@ window.CDC_TRACK=(function(){
             '<div style="font-size:34px;font-weight:900;color:#fff;line-height:1.15">' + nf(tot, 2) + ' <span style="font-size:14px;color:#94a3b8;font-weight:700">USDT</span></div>' +
             '<div style="margin-top:2px">PnL abierto <b style="color:' + col(d.unr) + '">' + (d.unr >= 0 ? "+" : "") + nf(d.unr, 3) + '</b> · Hoy <b style="color:' + col(hoy || 0) + '">' + (hoy == null ? "—" : (hoy >= 0 ? "+" : "") + nf(hoy, 3)) + '</b></div>' +
             '<div style="margin-top:4px;font-size:11px;color:#94a3b8">Bot: <b style="color:' + (cfg.activo ? (cfg.testnet ? "#f3ba2f" : "#ff2a3b") : "#94a3b8") + '">' + (cfg.activo ? "● ACTIVO" : "○ APAGADO") + '</b> · ' + d.pos.length + ' posición(es) · actualizado ' + new Date().toLocaleTimeString() + '</div></div>';
-        return av + hero + fabMonitorHtml();
+        return mxDash(av);
     }
+
+    /* ══ TABLERO DEL MONITOR · PC: 3 columnas · CELULAR: 1 columna con secciones desplegables ══ */
+    var MXLS = "cdcMxSec_v1", mxCl = leerLS(MXLS), MXDEF = { bot: false, alr: true, evo: true, ops: true, chart: false };
+    function mxIsClosed(k) { return (k in mxCl) ? !!mxCl[k] : !!MXDEF[k]; }
+    function mxSec(k, tit, extra, cuerpo) {
+        return '<section class="mx-sec' + (mxIsClosed(k) ? ' closed' : '') + '"><button type="button" class="mx-h" data-mx="' + k + '"><span>' + tit + '</span><span class="mx-x">' + (extra || '') + '<i>▾</i></span></button><div class="mx-b">' + cuerpo + '</div></section>';
+    }
+    function mxCelda(t, v, c) { return '<div><small>' + t + '</small><b' + (c ? ' style="color:' + c + '"' : '') + '>' + v + '</b></div>'; }
+    function mxOp(o) {
+        var s2 = esc(String(o.s).replace("USDT", "")), h = new Date(o.t).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }), ic, tx;
+        if (o.tipo === "COMPRA") { ic = "🟢"; tx = "<b>Compra " + s2 + "</b> · " + o.qty + " @ " + pf(o.px); }
+        else if (o.tipo === "RECOMPRA") { ic = "🟠"; tx = "<b>Recompra " + o.n + "/" + o.total + " " + s2 + "</b> · +" + o.qty + " @ ~" + pf(o.px); }
+        else if (o.tipo === "SALIDA") { ic = "🎯"; tx = "<b>Salida " + s2 + "</b> · " + o.qty + " a " + o.px; }
+        else { ic = o.neto == null ? "✅" : o.neto >= 0 ? "💰" : "🔻"; tx = "<b>Cierre " + s2 + "</b> · " + (o.neto == null ? "sin dato" : '<span style="color:' + col(o.neto) + '">' + (o.neto >= 0 ? "+" : "") + nf(o.neto, 3) + " USDT</span>"); }
+        return '<div class="mx-op"><span>' + ic + '</span><span>' + tx + '</span><em>' + h + '</em></div>';
+    }
+    function mxDash(av) {
+        var d = fabData, tot = d.wallet + d.unr, hoy = monIncome.v, top = av || "";
+        if (d.stale) {
+            var seg = Math.max(0, Math.round((Date.now() - (d.t || Date.now())) / 1000)), esp = Math.max(0, Math.round((d.stale.until - Date.now()) / 1000));
+            top += '<div class="bdf-av" style="background:rgba(243,186,47,.1);border:1px solid #f3ba2f;color:#ffd978">⏸ Binance está limitando las peticiones. Te muestro los últimos datos <span id="mxStaleT" data-t="' + (d.t || Date.now()) + '" data-u="' + d.stale.until + '">(hace ' + seg + ' s' + (esp ? ' · reintento en ' + esp + ' s' : ' · reintentando…') + ')</span>. Tu conexión y tus claves están bien.</div>';
+        }
+        var hero = '<div class="bc-hero"><div style="font-size:11px;color:#94a3b8;letter-spacing:.5px">CUENTA TOTAL · ' + (cfg.testnet ? "TESTNET" : "CUENTA REAL") + '</div>' +
+            '<div style="font-size:34px;font-weight:900;color:#fff;line-height:1.15">' + nf(tot, 2) + ' <span style="font-size:14px;color:#94a3b8;font-weight:700">USDT</span></div>' +
+            '<div style="margin-top:2px">PnL abierto <b style="color:' + col(d.unr) + '">' + (d.unr >= 0 ? "+" : "") + nf(d.unr, 3) + '</b> · Hoy <b style="color:' + col(hoy || 0) + '">' + (hoy == null ? "—" : (hoy >= 0 ? "+" : "") + nf(hoy, 3)) + '</b></div>' +
+            '<div style="margin-top:4px;font-size:11px;color:#94a3b8">Bot: <b style="color:' + (cfg.activo ? (cfg.testnet ? "#f3ba2f" : "#ff2a3b") : "#94a3b8") + '">' + (cfg.activo ? "● ACTIVO" : "○ APAGADO") + '</b> · ' + d.pos.length + ' posición(es) · actualizado ' + new Date(d.t || Date.now()).toLocaleTimeString() + '</div></div>';
+        var runb = '<button type="button" class="bdf-btn bc-big ' + (cfg.activo ? "bdf-red" : "bdf-green") + '" data-ca="run">' + (cfg.activo ? "⏹ PARAR BOT" : "▶ RUN · EMPEZAR A OPERAR") + '</button>';
+        var cards = '<div class="mx-cards">' + tarjeta("Capital (billetera)", nf(d.wallet, 2) + " USDT") + tarjeta("Disponible", nf(d.disp, 2) + " USDT") +
+            tarjeta("PnL no realizado", (d.unr >= 0 ? "+" : "") + nf(d.unr, 3), col(d.unr), "posiciones abiertas") + tarjeta("Cuenta total", nf(tot, 2) + " USDT") +
+            tarjeta("Resultado de hoy (neto)", hoy == null ? "—" : (hoy >= 0 ? "+" : "") + nf(hoy, 3), col(hoy || 0), "ganancias − comisiones") + '</div>';
+        var mm = modoMulti(d.wallet), modo;
+        if (mm) modo = 'Modo <b style="color:#f3ba2f">MULTI-MONEDA</b>: hasta <b>' + mm.n + '</b> monedas · parte ≈ <b>' + nf(mm.presup, 2) + ' USDT</b> cada una · abiertas <b>' + d.pos.length + '/' + mm.n + '</b>';
+        else { var pr = elegirPerfil(d.disp), ix = pr ? cfg.perfiles.indexOf(pr) + 1 : 0; modo = pr ? 'Perfil <b style="color:#f3ba2f">' + ix + '</b> según tu saldo disponible · 1 moneda a la vez · abiertas <b>' + d.pos.length + '/1</b>' : "Ningún perfil aplica a tu saldo disponible"; }
+        var c1 = mxSec("cta", "💼 Cuenta", "", hero + runb + cards) + mxSec("bot", "🤖 Estado del bot", cfg.activo ? "● activo" : "○ apagado", '<div style="font-size:11.5px;color:#cbd5e1">' + modo + '</div>' + esperaBanner(d, mm));
+        var pos = d.pos.length ? d.pos.map(function (x) {
+            var sym = x.symbol, amt = parseFloat(x.positionAmt), qty = Math.abs(amt), ent = parseFloat(x.entryPrice), mk = parseFloat(x.markPrice), pnl = parseFloat(x.unRealizedProfit) || 0, lq = parseFloat(x.liquidationPrice) || 0, lev = x.leverage;
+            var tpO = d.ords.filter(function (o) { return o.symbol === sym && o.side === "SELL" && o.type === "LIMIT"; })[0], tpPx = tpO ? parseFloat(tpO.price) : null;
+            var rec = misPos[sym], adds = (rec && rec.perf && rec.perf.adds) || [], nx = rec ? adds[rec.adds] : null;
+            var rc = rec ? rec.adds + "/" + adds.length + (nx ? " · próxima a " + pf(ent * (1 - nx.caida / 100)) : " · sin más") : "no es del bot";
+            var pc = ent ? (mk / ent - 1) * (amt > 0 ? 1 : -1) * 100 : null, prog = (tpPx && ent && tpPx !== ent) ? Math.max(0, Math.min(100, (mk - ent) / (tpPx - ent) * 100)) : null;
+            return '<div data-sym="' + esc(sym) + '" class="mx-pos' + (sym === fabSel ? " sel" : "") + '"><div class="mx-ph"><span><b style="font-size:14px">' + esc(sym.replace("USDT", "")) + '</b><span class="mx-lado ' + (amt > 0 ? "mx-long" : "mx-short") + '">' + (amt > 0 ? "LONG" : "SHORT") + (lev ? " " + lev + "x" : "") + '</span></span>' +
+                '<b style="color:' + col(pnl) + '">' + (pnl >= 0 ? "+" : "") + nf(pnl, 3) + ' USDT · ' + (pc == null ? "—" : nf(pc, 2)) + ' %</b></div>' +
+                '<div class="mx-g">' + mxCelda("Cantidad", qty) + mxCelda("Precio medio", pf(ent)) + mxCelda("Precio actual", pf(mk)) + mxCelda("Valor posición", nf(qty * mk, 2) + " USDT") +
+                mxCelda("Sale a", tpPx ? pf(tpPx) : "SIN SALIDA", tpPx ? "" : "#ff6b7a") + mxCelda("Falta p/ salida", tpPx && mk ? "+" + nf((tpPx / mk - 1) * 100, 2) + " %" : "—") +
+                (lq > 0 ? mxCelda("Liquidación", pf(lq), "#ff9f1a") : "") + mxCelda("Recompras", esc(rc)) + '</div>' +
+                (prog == null ? "" : '<div class="mx-bar"><i style="width:' + prog.toFixed(0) + '%;background:#0ecb81"></i></div><div style="font-size:10px;color:#64748b;margin-top:2px">Avance hacia la salida: ' + prog.toFixed(0) + ' %</div>') + '</div>';
+        }).join("") : '<div style="color:#64748b;padding:6px 2px">Sin posiciones abiertas.</div>';
+        var chips = d.al.length ? d.al.slice(0, 24).map(function (a) { return '<span data-sym="' + esc(a.s) + '" class="bdf-chip">' + esc(a.s.replace("USDT", "")) + ' · ' + a.t + '</span>'; }).join("") : '<span style="color:#64748b">Ninguna en este momento.</span>';
+        var c2 = mxSec("pos", "📌 Posiciones abiertas", d.pos.length + " abierta(s)", '<div style="color:#94a3b8;font-size:10.5px;margin-bottom:6px">Toca una para ver su gráfico</div>' + pos) + mxSec("alr", "🔔 Monedas en alerta en el CDC", d.al.length + "", chips);
+        var mi = cfg.testnet ? "t" : "r", L = (typeof ops !== "undefined" ? ops : []).filter(function (o) { return o.m === mi; });
+        var c3 = mxSec("evo", "📈 Evolución de tu cuenta", "capital + PnL", spark()) + mxSec("ops", "🧾 Últimas operaciones", L.length + "", L.length ? L.slice(0, 10).map(mxOp).join("") : '<div style="color:#64748b">Todavía no hay operaciones. Aquí aparecerá cada compra, recompra, salida y cierre.</div>');
+        return '<div class="mx-grid"><div class="mx-top">' + top + '</div><div class="mx-c mx-c1">' + c1 + '</div><div class="mx-c mx-c2">' + c2 + '</div><div class="mx-c mx-c3">' + c3 + '</div></div>';
+    }
+    setInterval(function () {
+        var e = $("mxStaleT"); if (!e) return;
+        var seg = Math.max(0, Math.round((Date.now() - +e.getAttribute("data-t")) / 1000)), esp = Math.max(0, Math.round((+e.getAttribute("data-u") - Date.now()) / 1000));
+        e.textContent = "(hace " + seg + " s" + (esp ? " · reintento en " + esp + " s" : " · reintentando…") + ")";
+    }, 1000);
     function conPintar() {
         if (!conOpen) return;
-        var P = $("bdCon"), sc = P.scrollTop, a = cfg.activo;
+        var P = $("bdCon"), sc = P.scrollTop, a = cfg.activo; P.classList.toggle("mx-wide", conTab === "mon");
         var pill = $("bcModo"); pill.className = "bdf-pill " + (cfg.testnet ? "t" : "r"); pill.textContent = cfg.testnet ? "TESTNET" : "CUENTA REAL";
         var run = $("bcRun"); run.textContent = a ? "⏹ PARAR BOT" : "▶ RUN · EMPEZAR A OPERAR"; run.className = "bdf-btn bc-big " + (a ? "bdf-red" : "bdf-green");
         $("bcEst").textContent = a ? "● BOT ACTIVO" : "○ BOT APAGADO"; $("bcEst").style.color = a ? (cfg.testnet ? "#f3ba2f" : "#ff2a3b") : "#94a3b8";
@@ -21587,7 +21686,7 @@ window.CDC_TRACK=(function(){
         ["con", "opc", "mon"].forEach(function (t) { $("bcV" + t).style.display = conTab === t ? "block" : "none"; $("bcT" + t).className = conTab === t ? "on" : ""; });
         if (conTab === "mon") $("bcMon").innerHTML = conMonHtml();
         var wrap = $("bcChart"), f = $("bcFrame"), showF = conTab === "mon" && fabSel && d && !d.err;
-        wrap.style.display = showF ? "block" : "none";
+        wrap.style.display = showF ? "block" : "none"; wrap.classList.toggle("closed", mxIsClosed("chart"));
         if (showF) { $("bcSym").textContent = fabSel + " (perpetuo)"; if (conFrameSym !== fabSel) { conFrameSym = fabSel; f.src = "https://s.tradingview.com/widgetembed/?symbol=" + encodeURIComponent("BINANCE:" + fabSel + ".P") + "&interval=5&theme=dark&style=1&locale=es&hide_side_toolbar=1&allow_symbol_change=0"; } }
         conIPPaint(); P.scrollTop = sc;
     }
@@ -21673,6 +21772,52 @@ window.CDC_TRACK=(function(){
             "#ttFrame{position:absolute;top:0;left:0;width:100%;height:100%;border:0;background:#050914}" +
             "#ttLoad{position:absolute;top:0;left:0;right:0;bottom:0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:10px;padding:24px;text-align:center;color:#94a3b8;background:#050914}" +
             "";
+        css.textContent += 
+            '#bcMon,.mx-grid{display:block}' +
+            '.mx-c{display:flex;flex-direction:column;gap:10px;min-width:0}' +
+            '.mx-top:empty{display:none}' +
+            '.mx-sec{background:#0b1220;border:1px solid rgba(255,255,255,.09);border-radius:14px;overflow:hidden;margin:0 0 10px}' +
+            '.mx-c .mx-sec{margin:0}' +
+            '.mx-h{width:100%;display:flex;justify-content:space-between;align-items:center;gap:8px;padding:12px 14px;background:linear-gradient(135deg,#101a30,#0b1220);border:0;color:#f3ba2f;font:800 13px Inter,Arial,sans-serif;cursor:pointer;text-align:left;min-height:46px}' +
+            '.mx-x{display:flex;align-items:center;gap:8px;color:#94a3b8;font-weight:700;font-size:11px}' +
+            '.mx-x i{font-style:normal;font-size:14px;transition:transform .2s}' +
+            '.mx-sec.closed .mx-x i{transform:rotate(-90deg)}' +
+            '.mx-sec.closed .mx-b{display:none}' +
+            '.mx-b{padding:10px 12px 12px}' +
+            '.mx-b .bc-hero{margin:0 0 8px}' +
+            '.mx-cards{display:grid;grid-template-columns:repeat(2,1fr);gap:8px;margin-top:8px}' +
+            '.mx-pos{cursor:pointer;margin:0 0 8px;padding:10px 12px;border-radius:12px;border:1px solid rgba(255,255,255,.1);background:#080e1c}' +
+            '.mx-pos.sel{border-color:rgba(243,186,47,.7);background:rgba(243,186,47,.07)}' +
+            '.mx-ph{display:flex;justify-content:space-between;align-items:center;gap:8px;flex-wrap:wrap}' +
+            '.mx-lado{font-size:10px;padding:1px 7px;border-radius:8px;font-weight:900;margin-left:6px}' +
+            '.mx-long{background:rgba(14,203,129,.15);color:#0ecb81}' +
+            '.mx-short{background:rgba(255,42,59,.15);color:#ff6b7a}' +
+            '.mx-g{display:grid;grid-template-columns:repeat(2,1fr);gap:6px 10px;margin-top:8px}' +
+            '.mx-g small{display:block;color:#64748b;font-size:10px}' +
+            '.mx-g b{font-size:12.5px;color:#e2e8f0;word-break:break-word}' +
+            '.mx-bar{height:6px;background:#1a2438;border-radius:4px;margin-top:8px;overflow:hidden}' +
+            '.mx-bar i{display:block;height:100%;border-radius:4px}' +
+            '.mx-op{display:flex;gap:8px;padding:6px 0;border-bottom:1px solid rgba(255,255,255,.06);font-size:11.5px;align-items:flex-start}' +
+            '.mx-op span:nth-child(2){flex:1;min-width:0}' +
+            '.mx-op em{color:#64748b;font-style:normal;font-size:10.5px}' +
+            '@media (min-width:560px) and (max-width:980px){.mx-g{grid-template-columns:repeat(4,1fr)}.bc-in{max-width:760px !important}}' +
+            '@media (min-width:981px){' +
+            '#bdCon.mx-wide .bc-in{max-width:1500px;padding:0 18px 30px}' +
+            '#bdCon.mx-wide .bdf-tabs{grid-template-columns:repeat(4,1fr);max-width:920px}' +
+            '#bcVmon{display:grid;grid-template-columns:minmax(290px,.85fr) minmax(360px,1.15fr) minmax(380px,1.2fr);gap:14px;align-items:start}' +
+            '#bcMon,.mx-grid{display:contents}' +
+            '.mx-top{grid-column:1/-1;order:-1}' +
+            '.mx-c1{grid-column:1;grid-row:span 2}' +
+            '.mx-c2{grid-column:2;grid-row:span 2}' +
+            '#bcChart{grid-column:3;order:1;margin:0}' +
+            '.mx-c3{grid-column:3;order:2}' +
+            '.mx-h{cursor:default;pointer-events:none}' +
+            '.mx-x i{display:none}' +
+            '.mx-sec.closed .mx-b{display:block !important}' +
+            '#bcFrame{height:380px !important}' +
+            '.mx-g{grid-template-columns:repeat(3,1fr)}' +
+            '}' +
+            "";
         var C = document.createElement("div"); C.id = "bdCon";
         C.innerHTML = '<div class="bc-h"><b style="color:#f3ba2f;font-size:14px">🔌 CONEXIÓN BINANCE<span id="bcModo" class="bdf-pill t"></span></b><span style="white-space:nowrap"><button class="x" data-ca="tut" title="Tutorial">📄</button> <button class="x" data-ca="upd" title="Actualizar a la última versión (no borra tus claves)">🔄</button> <button class="x" data-ca="x">✕</button></span></div>' +
             '<div class="bc-in"><div class="bdf-tabs"><button id="bcTcon" data-ca="tab-con">🔌 Conectar</button><button id="bcTopc" data-ca="tab-opc">🤖 Bot Desmayo</button><button id="bcTmon" data-ca="tab-mon">📊 Monitor</button><button data-ca="panel">📒 Operaciones / Registro</button></div><div id="bcAv"></div>' +
@@ -21692,7 +21837,7 @@ window.CDC_TRACK=(function(){
               '<div class="bdf-card"><h4>🤖 3 · Bot Desmayo</h4><div style="margin-bottom:6px"><b id="bcEst"></b></div><button id="bcRun" data-ca="run" class="bdf-btn bc-big"></button><div id="bcResume"></div><label style="display:block;margin:8px 0 2px"><input type="checkbox" id="bcWake"> 🔆 Mantener la pantalla encendida mientras el bot esté activo</label><div id="bcWakeSt" style="font-size:11px"></div><div style="margin-top:6px;color:#94a3b8;font-size:11px">El bot trabaja solo mientras la app esté abierta y visible: no la cierres ni cambies a otra app. Si se cierra, el bot se apaga (tus salidas puestas en Binance siguen ahí). Sin stop loss: usa solo dinero que puedas perder.</div></div>' +
               '<div style="color:#64748b;font-size:11px;text-align:center;margin-top:8px">🔒 Las claves se guardan solo en este dispositivo y se envían directo a Binance. La página en GitHub es estática y no recibe ni guarda ninguna clave.</div>' +
             '</div>' +
-            '<div id="bcVopc" style="display:none"></div><div id="bcVmon" style="display:none"><div id="bcMon"></div><div id="bcChart" style="display:none;margin-top:10px"><b>Gráfico en vivo</b> <b id="bcSym" style="margin-left:6px"></b><iframe id="bcFrame" style="width:100%;height:300px;border:1px solid rgba(255,255,255,.1);border-radius:8px;background:#050914;margin-top:6px"></iframe></div></div></div>';
+            '<div id="bcVopc" style="display:none"></div><div id="bcVmon" style="display:none"><div id="bcMon"></div><div id="bcChart" class="mx-sec" style="display:none"><button type="button" class="mx-h" data-mx="chart"><span>📈 Gráfico en vivo <b id="bcSym" style="margin-left:6px;color:#fff"></b></span><span class="mx-x"><i>▾</i></span></button><div class="mx-b"><iframe id="bcFrame" style="width:100%;height:300px;border:0;border-radius:8px;background:#050914"></iframe></div></div></div></div>';
         document.body.appendChild(C);
         try {
             var pills = $("bdBtn") ? $("bdBtn").parentNode : null, pn = $("bdPanel");
@@ -21741,6 +21886,11 @@ window.CDC_TRACK=(function(){
             else if (a === "inst") { try { instEv.prompt(); instEv.userChoice.then(function () { instEv = null; instPintar(); }); } catch (x) { instPintar(); } }
             else if (a === "run") { $("bdTest").checked = cfg.testnet; $("bdOn").click(); setTimeout(conPintar, 400); }
             else if (a === "borrar") { $("bdBorrar").click(); $("bcKey").value = cfg.key; $("bcSec").value = ""; $("bcSec").placeholder = "pega aquí tu API Secret"; $("bcRes").innerHTML = ""; conPintar(); }
+        });
+        C.addEventListener("click", function (e) {
+            var h = e.target.closest ? e.target.closest("[data-mx]") : null; if (!h) return;
+            var k = h.getAttribute("data-mx"), sec = h.closest(".mx-sec"); mxCl[k] = !mxIsClosed(k); escLS(MXLS, mxCl);
+            if (sec) sec.classList.toggle("closed", mxCl[k]);
         });
         T.addEventListener("click", function (e) {
             var el = e.target.closest ? e.target.closest("[data-ta]") : null; if (!el) return;
