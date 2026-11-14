@@ -18954,7 +18954,7 @@ window.CDC_FLASH=(function(){
     // archivo completo sin caer en la paradoja de "el hash contiene su
     // propio hash". No cambiar este texto.
     var _PLACEHOLDER = "%%CDC_INTEGRITY_HASH%%";
-    var _HASH_ESPERADO = "33e6b9ad6d0d8679ef63151778e75cea32ac164559d099106987c7ede2907926"; // ← se reemplaza por el hash real en el paso final
+    var _HASH_ESPERADO = "1340045112738025e624cdf648a17d6b9eadb7bc1e126a0cc38adf5244244515"; // ← se reemplaza por el hash real en el paso final
 
     function _bloquear(motivo) {
         try {
@@ -20694,7 +20694,11 @@ setTimeout(function(){setInterval(tick,CFG.TICK_MS);},CFG.ARRANQUE_MS);
             '<div><span style="' + lb + '">Comisión %/lado</span><input id="plFee" type="number" min="0.01" step="0.01" value="' + PL.fee + '" onchange="CDC_DESPERTAR.planCfg(\'fee\',this.value)" style="' + ip + '"></div></div>' +
             '<div style="display:flex;gap:5px;margin-bottom:5px"><span id="plDirL" onclick="CDC_DESPERTAR.planCfg(\'dir\',1)" style="cursor:pointer;flex:1;text-align:center;font:800 10px Arial;padding:3px;border-radius:6px"></span>' +
             '<span id="plDirS" onclick="CDC_DESPERTAR.planCfg(\'dir\',-1)" style="cursor:pointer;flex:1;text-align:center;font:800 10px Arial;padding:3px;border-radius:6px"></span></div>' +
-            '<div id="plDin"></div></div>';
+            '<div id="plDin"></div>' +
+            '<div style="display:flex;flex-wrap:wrap;align-items:center;gap:5px;margin-top:5px;padding-top:5px;border-top:1px dashed #334155"><span id="plRegInfo" style="flex:1 1 100%;font:700 9px Arial;color:#94a3b8">📊 registro…</span>' +
+            '<span onclick="CDC_DESPERTAR.registro.descargar()" style="cursor:pointer;font:800 9px Arial;padding:2px 7px;border-radius:6px;border:1px solid #38bdf8;color:#38bdf8">⬇ Descargar informe</span>' +
+            '<span onclick="CDC_DESPERTAR.registro.copiar()" style="cursor:pointer;font:800 9px Arial;padding:2px 7px;border-radius:6px;border:1px solid #0ecb81;color:#0ecb81">📋 Copiar informe</span>' +
+            '<span onclick="CDC_DESPERTAR.registro.borrar()" style="cursor:pointer;font:800 9px Arial;padding:2px 7px;border-radius:6px;border:1px solid #64748b;color:#94a3b8">🗑 Borrar</span></div></div>';
     }
     function plTick(force) {
         var host = document.getElementById("cdcDesCuadroHost"); if (!host) return;
@@ -20736,6 +20740,68 @@ setTimeout(function(){setInterval(tick,CFG.TICK_MS);},CFG.ARRANQUE_MS);
     }
     setInterval(function () { try { plTick(); } catch (e) {} }, 1000);
     /* ═══ 🧮 PLAN DESMAYO v1 — FIN ═══ */
+    /* ═══ 📊 MOTOR DE REGISTRO DESMAYO v1 — CDC FUTURO-PRO (Juan Pablo Ortiz Ortuño) — INICIO ═══
+       Anota cada alerta de DESMAYO / CAÍDA BRUTAL con TODOS sus datos y la sigue 60 min: cuánto cayó más, cuánto rebotó, cuánto tardó en
+       llegar al TP, qué marcas de recompra se tocaron. Con eso se arma un INFORME (botón «Descargar informe» o «Copiar») para pasárselo
+       a Claude y mejorar las reglas con datos reales. No guarda claves ni secretos. */
+    var RG_KEY = "cdc_reg_des_v1", RG_MAX = 400, RG_SEG_MIN = 60, RG_SNAPS = [1, 3, 5, 10, 15, 30, 60], RG = { v: 1, recs: [] };
+    try { var _rgs = JSON.parse(localStorage.getItem(RG_KEY) || "null"); if (_rgs && Array.isArray(_rgs.recs)) RG = _rgs; } catch (e) {}
+    function rgGuardar() { try { while (RG.recs.length > RG_MAX) RG.recs.shift(); localStorage.setItem(RG_KEY, JSON.stringify(RG)); } catch (e) { try { RG.recs = RG.recs.slice(-150); localStorage.setItem(RG_KEY, JSON.stringify(RG)); } catch (e2) {} } }
+    function rg2(v) { return v === null || v === undefined || !isFinite(v) ? null : Math.round(v * 100) / 100; }
+    function rgNuevo(sym, r) {
+        var px = plPrecio(sym) || r.price; if (!(px > 0)) return;
+        var st = plPaso(sym), s = st.s, tpPct = PL.tp / (PL.cap * PL.lev) * 100 + PL.fee * 2, btc = null;
+        try { btc = cachedData.BTCUSDT ? cachedData.BTCUSDT.cambioReal2Min : null; } catch (e) {}
+        RG.recs.push({ id: sym + "_" + Date.now(), s: sym, t0: Date.now(), p0: px, tipo: r.tipo, fase: r.fase || null, origen: r.origen || null, score: Math.round(r.score || 0), reglas: r.reglas, red: r.red,
+            cerebro: r.cerebro != null ? Math.round(r.cerebro) : null, g3: rg2(r.g3), g5: rg2(r.g5), cmax: rg2(r.cmax), vr: rg2(r.vr), vola: rg2(r.vola), rsi: rg2(r.rsi), c24: rg2(r.c24), btc2m: rg2(btc),
+            hora: new Date().getHours(), paso: s, vol1m: rg2(st.v), tpPct: rg2(tpPct), niv: [s, s * 2.5, s * 4.75].map(rg2),
+            hi: 0, lo: 0, tHi: 0, tLo: 0, tTP: null, loAntesTP: null, tN: [null, null, null], snap: {}, fin: false });
+        rgGuardar();
+    }
+    function rgTick() {
+        var now = Date.now(), cambio = false;
+        Object.keys(ACT).forEach(function (s) { var r = ACT[s]; if (!r || r.dir >= 0) return;
+            var ab = RG.recs.some(function (x) { return x.s === s && now - x.t0 < 15 * 60000; }); if (!ab) { rgNuevo(s, r); cambio = true; } });
+        RG.recs.forEach(function (x) { if (x.fin) return; var px = plPrecio(x.s), m = (now - x.t0) / 60000; if (!px) return;
+            var ret = (px / x.p0 - 1) * 100;
+            if (ret > x.hi) { x.hi = ret; x.tHi = m; cambio = true; }
+            if (ret < x.lo) { x.lo = ret; x.tLo = m; cambio = true; }
+            if (x.tTP === null && ret >= x.tpPct) { x.tTP = m; x.loAntesTP = x.lo; cambio = true; }
+            for (var i = 0; i < 3; i++) if (x.tN[i] === null && ret <= -x.niv[i]) { x.tN[i] = m; cambio = true; }
+            RG_SNAPS.forEach(function (k) { if (m >= k && x.snap[k] === undefined) { x.snap[k] = rg2(ret); cambio = true; } });
+            if (m >= RG_SEG_MIN) { x.fin = true; x.hi = rg2(x.hi); x.lo = rg2(x.lo); x.tHi = rg2(x.tHi); x.tLo = rg2(x.tLo); x.tTP = rg2(x.tTP); x.loAntesTP = rg2(x.loAntesTP); x.tN = x.tN.map(rg2); cambio = true; } });
+        if (cambio) rgGuardar();
+        var el = document.getElementById("plRegInfo"); if (el) { var tx = "📊 " + RG.recs.length + " alertas registradas · " + RG.recs.filter(function (x) { return !x.fin; }).length + " en seguimiento"; if (el.textContent !== tx) el.textContent = tx; }
+    }
+    function rgPct(a, p) { if (!a.length) return null; a = a.slice().sort(function (x, y) { return x - y; }); return rg2(a[Math.min(a.length - 1, Math.floor(p / 100 * a.length))]); }
+    function rgGrupo(L) {
+        var n = L.length; if (!n) return null; var tp = L.filter(function (x) { return x.tTP !== null; }), tt = tp.map(function (x) { return x.tTP; }), da = tp.map(function (x) { return x.loAntesTP; }).map(function (v) { return -v; });
+        return { n: n, pctTP: rg2(tp.length / n * 100), minTPmediana: rgPct(tt, 50), caidaMasAntesTP_p50: rgPct(da, 50), caidaMasAntesTP_p90: rgPct(da, 90), caidaMaxMediana: rgPct(L.map(function (x) { return -x.lo; }), 50),
+            tocoNivel1: rg2(L.filter(function (x) { return x.tN[0] !== null; }).length / n * 100), tocoNivel2: rg2(L.filter(function (x) { return x.tN[1] !== null; }).length / n * 100), tocoNivel3: rg2(L.filter(function (x) { return x.tN[2] !== null; }).length / n * 100) };
+    }
+    function rgResumen() {
+        var F = RG.recs.filter(function (x) { return x.fin; }), por = function (f) { var o = {}; F.forEach(function (x) { var k = f(x); if (k === null || k === undefined) k = "n/d"; (o[k] = o[k] || []).push(x); }); var r = {}; Object.keys(o).forEach(function (k) { r[k] = rgGrupo(o[k]); }); return r; };
+        var ops = []; try { ops = JSON.parse(localStorage.getItem("cdcBotOps_v1") || "[]"); } catch (e) {} if (!Array.isArray(ops)) ops = [];
+        var ci = ops.filter(function (o) { return o.tipo === "CIERRE" && typeof o.neto === "number"; });
+        return { alertasCerradas: F.length, alertasEnSeguimiento: RG.recs.length - F.length, global: rgGrupo(F),
+            porFase: por(function (x) { return x.fase; }), porOrigen: por(function (x) { return x.origen; }), porTipo: por(function (x) { return x.tipo; }),
+            porPuntaje: por(function (x) { return x.score >= 80 ? "80-100" : x.score >= 60 ? "60-79" : "<60"; }), porHora: por(function (x) { return x.hora; }),
+            bot: { compras: ops.filter(function (o) { return o.tipo === "COMPRA"; }).length, recompras: ops.filter(function (o) { return o.tipo === "RECOMPRA"; }).length, cierres: ci.length,
+                ganados: ci.filter(function (o) { return o.neto > 0; }).length, perdidos: ci.filter(function (o) { return o.neto <= 0; }).length, netoTotalUSDT: rg2(ci.reduce(function (a, o) { return a + o.neto; }, 0)) } };
+    }
+    function rgInforme() {
+        return JSON.stringify({ informe: "CDC DESMAYO", generado: new Date().toISOString(), version: "v9", config: { capital: PL.cap, apalancamiento: PL.lev, recompraX: PL.mult, niveles: PL.niv, tpUSDT: PL.tp, comisionPctLado: PL.fee, direccion: PL.dir > 0 ? "LONG" : "SHORT",
+            detector: { DROP3: CFG.DROP3, DROP5: CFG.DROP5, DROP_VOL: CFG.DROP_VOL, DM_DD_MIN: CFG.DM_DD_MIN, DES_RANGO_MIN: CFG.DES_RANGO_MIN, DES_VOLA_X: CFG.DES_VOLA_X, BRUTAL5: CFG.BRUTAL5, TICK_MS: CFG.TICK_MS } },
+            resumen: rgResumen(), registros: RG.recs }, null, 1);
+    }
+    function rgDescargar() { try { var d = new Date(), z = function (n) { return (n < 10 ? "0" : "") + n; }, nm = "informe_desmayo_" + d.getFullYear() + z(d.getMonth() + 1) + z(d.getDate()) + "_" + z(d.getHours()) + z(d.getMinutes()) + ".json",
+            b = new Blob([rgInforme()], { type: "application/json" }), a = document.createElement("a"); a.href = URL.createObjectURL(b); a.download = nm; document.body.appendChild(a); a.click(); setTimeout(function () { URL.revokeObjectURL(a.href); a.remove(); }, 500); } catch (e) { alert("No se pudo descargar: " + e.message); } }
+    function rgCopiar() { var tx = rgInforme(), ok = function () { var el = document.getElementById("plRegInfo"); if (el) el.textContent = "✅ Informe copiado: pégalo en el chat con Claude"; };
+        try { navigator.clipboard.writeText(tx).then(ok, function () { rgCopiarViejo(tx, ok); }); } catch (e) { rgCopiarViejo(tx, ok); } }
+    function rgCopiarViejo(tx, ok) { try { var t = document.createElement("textarea"); t.value = tx; t.style.cssText = "position:fixed;opacity:0"; document.body.appendChild(t); t.select(); document.execCommand("copy"); t.remove(); ok(); } catch (e) { alert("No se pudo copiar: usa «Descargar informe»."); } }
+    function rgBorrar() { if (!confirm("¿Borrar todo el registro de alertas?")) return; RG.recs = []; rgGuardar(); rgTick(); }
+    setInterval(function () { try { rgTick(); } catch (e) {} }, 2000);
+    /* ═══ 📊 MOTOR DE REGISTRO DESMAYO v1 — FIN ═══ */
     setInterval(function () { try { panelDesmayo(); } catch (e) {} }, 2000);
     function autoAbrir() {
         if (typeof seleccionarMoneda !== "function") return;
@@ -20848,19 +20914,20 @@ setTimeout(function(){setInterval(tick,CFG.TICK_MS);},CFG.ARRANQUE_MS);
 
     var _primerTickDes = true;   // ⚡ el primer ciclo solo revisa las 16 más movidas para mostrar los DESMAYOS rápido
     async function tick() {
-        if (busy) return; busy = true;
+        if (busy) return; busy = true; var _salto = false;
         try {
-            if (window.__cdcApiLim && window.__cdcApiLim.until > Date.now()) return;   /* v9: Binance está limitando (429/418): el escáner descansa y deja respirar al bot */
+            /* v9: Binance está limitando (429/418): el escáner descansa y deja respirar al bot. Antes, durante la pausa las velas llegaban vacías y las alertas DESMAYO se borraban solas. */
+            if ((window.__cdcApiLim && window.__cdcApiLim.until > Date.now()) || (typeof estaPausadoPorRateLimit === "function" && estaPausadoPorRateLimit())) { _salto = true; return; }
             if (typeof cachedData === "undefined" || typeof obtenerKlines !== "function") return;
             if (!Object.keys(cachedData).length) return;
             resolver(); resolverFuel();
             var lista = Object.values(cachedData).filter(function (c) { return c && c.volume >= CFG.LIQ_MIN && (c.cambioReal2Min >= 0.3 || c.ciclosSubiendo >= 3 || c.cambioReal2Min <= -0.5 || c.ciclosBajando >= 3 || (c.posicionPorcentaje >= 85 && Math.abs(c.cambioReal2Min || 0) >= 0.2) || (c.change >= CFG.CA_CAMBIO_MIN && (c.cambioReal2Min || 0) <= -0.2) || (c.change >= CFG.RT2_CAMBIO_MIN) || (c.change >= CFG.INY_CAMBIO && (c.caidaDesdeMaximo || 0) >= 1.5) || (c.posicionPorcentaje >= 70 && (c.cambioReal2Min || 0) <= -0.3)); })
-                .sort(function (a, b) { var f = function (z) { var d = z.cambioReal2Min || 0; return Math.abs(d) + (d < 0 ? 1 : 0) + ((z.change >= CFG.INY_CAMBIO && (z.caidaDesdeMaximo || 0) >= 1.5) ? 5 : 0); }; return f(b) - f(a); }).slice(0, _primerTickDes ? 16 : CFG.MAX_CAND), nuevo = false, nuevos = [];
+                .sort(function (a, b) { var f = function (z) { var d = z.cambioReal2Min || 0; return Math.abs(d) + (d < 0 ? 3 : 0) + ((z.change >= CFG.INY_CAMBIO && (z.caidaDesdeMaximo || 0) >= 1.5) ? 5 : 0); }; return f(b) - f(a); }).slice(0, _primerTickDes ? 16 : CFG.MAX_CAND), nuevo = false, nuevos = [];
             Object.keys(ACT).forEach(function (s) { if (cachedData[s] && !lista.some(function (z) { return z.symbol === s; })) lista.push(cachedData[s]); });   // las alertas activas se re-evalúan siempre
             try { if (selectedCoin && cachedData[selectedCoin] && !lista.some(function (z) { return z.symbol === selectedCoin; })) lista.push(cachedData[selectedCoin]); } catch (e) {}   // y la moneda del panel central
-            try { for (var q = 0; q < lista.length; q += 10) await Promise.all(lista.slice(q, q + 10).map(function (z) { return Promise.all([klines(z.symbol), klines1h(z.symbol)]); })); } catch (e) {}   // red: descarga en paralelo (10 a la vez)
+            try { for (var q = 0; q < lista.length; q += 10) await Promise.all(lista.slice(q, q + 10).map(function (z) { return (ACT[z.symbol] || (typeof selectedCoin !== "undefined" && z.symbol === selectedCoin)) ? Promise.all([klines(z.symbol), klines1h(z.symbol)]) : klines(z.symbol); })); } catch (e) {}   /* v9: las velas de 1h (combustible) solo para alertas y la moneda del panel */   // red: descarga en paralelo (10 a la vez)
             for (var i = 0; i < lista.length; i++) { var c = lista[i], k1 = await klines(c.symbol), r = evaluar(c.symbol, k1, c), fu = null;
-                try { fu = combustible(c.symbol, c, k1, await klines1h(c.symbol)); } catch (e) {} if (fu) { FUEL[c.symbol] = fu; muestrear(c.symbol, fu); if (r) ajustar(r, fu); }
+                try { if (r || (typeof selectedCoin !== "undefined" && c.symbol === selectedCoin)) fu = combustible(c.symbol, c, k1, await klines1h(c.symbol)); } catch (e) {} if (fu) { FUEL[c.symbol] = fu; muestrear(c.symbol, fu); if (r) ajustar(r, fu); }
                 if (r) { var prev = ACT[c.symbol];
                     if (!prev || prev.tipo !== r.tipo || prev.estado !== r.estado) { nuevo = true; PEND.push({ s: c.symbol, p0: r.price, t: Date.now(), hi: 0, lo: 0, x: r.x, d: r.dir, rt: r.tipo === "RETROCESO", ca: r.tipo === "CAIDA_ALCISTA", fr: r.tipo === "FONDO_REBOTE" });
                         var ak = c.symbol + "_" + r.tipo, anun = r.tipo !== "RETROCESO" || r.estado === "IMPULSO";
@@ -20871,7 +20938,7 @@ setTimeout(function(){setInterval(tick,CFG.TICK_MS);},CFG.ARRANQUE_MS);
             pintar(); try { fijarDes(); } catch (e) {} try { chipsRebote(); } catch (e) {} try { chipsDesmayo(); btnDes(); } catch (e) {} PENDVOZ = nuevos.sort(function (a, b) { return prioridad(b.symbol) - prioridad(a.symbol); })[0] || null;
             var antes = ultAutoTs; autoAbrir(); if (PENDVOZ && ultAutoTs === antes) anunciar(PENDVOZ);   // la voz nombra la misma moneda que abrió el panel
             if (nuevo) { try { actualizarTablaIzquierda(); } catch (e) {} }
-        } catch (e) { console.warn("DESPERTAR:", e); } finally { busy = false; try { if (Object.keys(cachedData).length) _primerTickDes = false; } catch (e) {} }
+        } catch (e) { console.warn("DESPERTAR:", e); } finally { busy = false; try { if (!_salto && Object.keys(cachedData).length) _primerTickDes = false; } catch (e) {} }
     }
 
     /* ── Aviso por voz: "Moneda acelerada" / "Moneda con desmayo" ── */
@@ -20926,10 +20993,10 @@ setTimeout(function(){setInterval(tick,CFG.TICK_MS);},CFG.ARRANQUE_MS);
 
     window.CDC_DESPERTAR = {
         agotados: function () { return Object.keys(ACT).filter(function (s) { return ACT[s].fase === "AGOTADO" && ACT[s].dir < 0; }); }, CFG: CFG, estadoFuerza: function (s) { return FUEL[s] ? FUEL[s].estado : null; }, fuel: function (s) { return FUEL[s] || null; }, _combustible: combustible,
-        vetoCorto: function (s) { return !!(CFG.FUEL_VETO_SHORT && FUEL[s] && FUEL[s].estado === "CARGANDO" && FUEL[s].fuerza >= 75); }, reservaPanel: function () { return (!!ultRtTs && Date.now() - ultRtTs < CFG.RT_RESERVA_MS) || (Date.now() - (window.__dmAbrirTs || 0) < 60000 && Object.values(ACT).some(function (r) { return r.dir < 0; })); }, abrir: function (s) { try { fijar7(s); } catch (e) { try { seleccionarMoneda(s); } catch (e2) {} } }, fijar7: fijar7, autoDes: autoDes, planTP: tpUsdt, planEntrada: plEntrada, planReset: plReset, planCfg: plCfg, evaluar: evaluar, aprueba: aprueba, prioridad: prioridad, activas: function () { return ACT; },
+        vetoCorto: function (s) { return !!(CFG.FUEL_VETO_SHORT && FUEL[s] && FUEL[s].estado === "CARGANDO" && FUEL[s].fuerza >= 75); }, reservaPanel: function () { return (!!ultRtTs && Date.now() - ultRtTs < CFG.RT_RESERVA_MS) || (Date.now() - (window.__dmAbrirTs || 0) < 60000 && Object.values(ACT).some(function (r) { return r.dir < 0; })); }, abrir: function (s) { try { fijar7(s); } catch (e) { try { seleccionarMoneda(s); } catch (e2) {} } }, fijar7: fijar7, autoDes: autoDes, registro: { descargar: rgDescargar, copiar: rgCopiar, borrar: rgBorrar, resumen: rgResumen, informe: rgInforme }, planTP: tpUsdt, planEntrada: plEntrada, planReset: plReset, planCfg: plCfg, evaluar: evaluar, aprueba: aprueba, prioridad: prioridad, activas: function () { return ACT; },
         simbolosLista: function () { return Object.keys(ACT); }, forzar: forzarPanelDesmayo, slotDesmayo: slotDesmayo, hayDesmayo: function () { return listaDes().length > 0; }, fijarDes: fijarDes, lista: function () { return listaTodas(); }, hayAlerta: function () { return listaTodas().length > 0; }, verTodas: function () { try { document.getElementById("dspPill").onclick(); } catch (e) {} }, red: function () { return { sube: NET, cae: NETD, retroceso: NETR, caida: NETB, fondo: NETF, combustible: NETC }; },
         reiniciarRed: function () { try { localStorage.removeItem(KEY); localStorage.removeItem(KEY + "_dn"); localStorage.removeItem(KEY + "_rt"); localStorage.removeItem(KEY + "_ca"); localStorage.removeItem(KEY + "_fr"); localStorage.removeItem(KEY + "_fu"); } catch (e) {} NET = mkNet(KEY); NETD = mkNet(KEY + "_dn"); NETR = mkNet(KEY + "_rt"); NETB = mkNet(KEY + "_ca"); NETF = mkNet(KEY + "_fr"); NETC = mkNet(KEY + "_fu"); } };
-    setTimeout(function () { ui(); tick(); setInterval(tick, CFG.TICK_MS); }, 4000);
+    setTimeout(function () { ui(); tick(); setInterval(tick, CFG.TICK_MS); var _fb = setInterval(function () { if (!_primerTickDes) { clearInterval(_fb); return; } tick(); }, 2000); }, 2500);
 })();
 </script>
 
