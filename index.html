@@ -20474,7 +20474,7 @@ setTimeout(function(){setInterval(tick,CFG.TICK_MS);},CFG.ARRANQUE_MS);
                  sob: sob, tarde: baja ? cmax > CFG.TARDE_PCT : sob > CFG.TARDE_PCT, sl: sl, riesgo: Math.abs(sl - p) / p * 100, c24: c ? c.change : null, x: x, ts: Date.now(), origen: dmx ? dmx.origen : null, vola: dmx ? dmx.vola : 0, dpk: dmx ? dmx.dpk : 0, iny: dmx ? dmx.iny : 0, fase: fase, rsi: rs };
     }
 
-    async function klines(sym) { var h = CK[sym], t = Date.now(); if (h && t - h.ts < CFG.CACHE_MS) return h.k; var k = null;
+    async function klines(sym) { var h = CK[sym], t = Date.now(); if (h && t - h.ts < ((window.__cdcFast && window.__cdcFast[sym]) ? 3000 : CFG.CACHE_MS)) return h.k; var k = null;
         try { k = await obtenerKlines(sym, "1m", CFG.VELAS); } catch (e) {} if (k) CK[sym] = { ts: t, k: k }; return k; }
     function beep(f2) { if (!CFG.SONIDO) return; try { var A = window.AudioContext || window.webkitAudioContext, x = new A(), o = x.createOscillator(), g = x.createGain();
         o.frequency.value = f2 ? 660 : 880; g.gain.value = 0.08; o.connect(g); g.connect(x.destination); o.start(); setTimeout(function () { o.frequency.value = f2 ? 330 : 1320; }, 120); setTimeout(function () { o.stop(); x.close(); }, 280); } catch (e) {} }
@@ -20921,8 +20921,8 @@ setTimeout(function(){setInterval(tick,CFG.TICK_MS);},CFG.ARRANQUE_MS);
             if (typeof cachedData === "undefined" || typeof obtenerKlines !== "function") return;
             if (!Object.keys(cachedData).length) return;
             resolver(); resolverFuel();
-            var lista = Object.values(cachedData).filter(function (c) { return c && c.volume >= CFG.LIQ_MIN && (c.cambioReal2Min >= 0.3 || c.ciclosSubiendo >= 3 || c.cambioReal2Min <= -0.5 || c.ciclosBajando >= 3 || (c.posicionPorcentaje >= 85 && Math.abs(c.cambioReal2Min || 0) >= 0.2) || (c.change >= CFG.CA_CAMBIO_MIN && (c.cambioReal2Min || 0) <= -0.2) || (c.change >= CFG.RT2_CAMBIO_MIN) || (c.change >= CFG.INY_CAMBIO && (c.caidaDesdeMaximo || 0) >= 1.5) || (c.posicionPorcentaje >= 70 && (c.cambioReal2Min || 0) <= -0.3)); })
-                .sort(function (a, b) { var f = function (z) { var d = z.cambioReal2Min || 0; return Math.abs(d) + (d < 0 ? 3 : 0) + ((z.change >= CFG.INY_CAMBIO && (z.caidaDesdeMaximo || 0) >= 1.5) ? 5 : 0); }; return f(b) - f(a); }).slice(0, _primerTickDes ? 16 : CFG.MAX_CAND), nuevo = false, nuevos = [];
+            var lista = Object.values(cachedData).filter(function (c) { return c && c.volume >= CFG.LIQ_MIN && ((window.__cdcFast && window.__cdcFast[c.symbol]) || c.cambioReal2Min >= 0.3 || c.ciclosSubiendo >= 3 || c.cambioReal2Min <= -0.5 || c.ciclosBajando >= 3 || (c.posicionPorcentaje >= 85 && Math.abs(c.cambioReal2Min || 0) >= 0.2) || (c.change >= CFG.CA_CAMBIO_MIN && (c.cambioReal2Min || 0) <= -0.2) || (c.change >= CFG.RT2_CAMBIO_MIN) || (c.change >= CFG.INY_CAMBIO && (c.caidaDesdeMaximo || 0) >= 1.5) || (c.posicionPorcentaje >= 70 && (c.cambioReal2Min || 0) <= -0.3)); })
+                .sort(function (a, b) { var f = function (z) { var d = z.cambioReal2Min || 0; return ((window.__cdcFast && window.__cdcFast[z.symbol]) ? 100 : 0) + Math.abs(d) + (d < 0 ? 3 : 0) + ((z.change >= CFG.INY_CAMBIO && (z.caidaDesdeMaximo || 0) >= 1.5) ? 5 : 0); }; return f(b) - f(a); }).slice(0, _primerTickDes ? 16 : CFG.MAX_CAND), nuevo = false, nuevos = [];
             Object.keys(ACT).forEach(function (s) { if (cachedData[s] && !lista.some(function (z) { return z.symbol === s; })) lista.push(cachedData[s]); });   // las alertas activas se re-evalúan siempre
             try { if (selectedCoin && cachedData[selectedCoin] && !lista.some(function (z) { return z.symbol === selectedCoin; })) lista.push(cachedData[selectedCoin]); } catch (e) {}   // y la moneda del panel central
             try { for (var q = 0; q < lista.length; q += 10) await Promise.all(lista.slice(q, q + 10).map(function (z) { return (ACT[z.symbol] || (typeof selectedCoin !== "undefined" && z.symbol === selectedCoin)) ? Promise.all([klines(z.symbol), klines1h(z.symbol)]) : klines(z.symbol); })); } catch (e) {}   /* v9: las velas de 1h (combustible) solo para alertas y la moneda del panel */   // red: descarga en paralelo (10 a la vez)
@@ -20996,6 +20996,7 @@ setTimeout(function(){setInterval(tick,CFG.TICK_MS);},CFG.ARRANQUE_MS);
         vetoCorto: function (s) { return !!(CFG.FUEL_VETO_SHORT && FUEL[s] && FUEL[s].estado === "CARGANDO" && FUEL[s].fuerza >= 75); }, reservaPanel: function () { return (!!ultRtTs && Date.now() - ultRtTs < CFG.RT_RESERVA_MS) || (Date.now() - (window.__dmAbrirTs || 0) < 60000 && Object.values(ACT).some(function (r) { return r.dir < 0; })); }, abrir: function (s) { try { fijar7(s); } catch (e) { try { seleccionarMoneda(s); } catch (e2) {} } }, fijar7: fijar7, autoDes: autoDes, registro: { descargar: rgDescargar, copiar: rgCopiar, borrar: rgBorrar, resumen: rgResumen, informe: rgInforme }, planTP: tpUsdt, planEntrada: plEntrada, planReset: plReset, planCfg: plCfg, evaluar: evaluar, aprueba: aprueba, prioridad: prioridad, activas: function () { return ACT; },
         simbolosLista: function () { return Object.keys(ACT); }, forzar: forzarPanelDesmayo, slotDesmayo: slotDesmayo, hayDesmayo: function () { return listaDes().length > 0; }, fijarDes: fijarDes, lista: function () { return listaTodas(); }, hayAlerta: function () { return listaTodas().length > 0; }, verTodas: function () { try { document.getElementById("dspPill").onclick(); } catch (e) {} }, red: function () { return { sube: NET, cae: NETD, retroceso: NETR, caida: NETB, fondo: NETF, combustible: NETC }; },
         reiniciarRed: function () { try { localStorage.removeItem(KEY); localStorage.removeItem(KEY + "_dn"); localStorage.removeItem(KEY + "_rt"); localStorage.removeItem(KEY + "_ca"); localStorage.removeItem(KEY + "_fr"); localStorage.removeItem(KEY + "_fu"); } catch (e) {} NET = mkNet(KEY); NETD = mkNet(KEY + "_dn"); NETR = mkNet(KEY + "_rt"); NETB = mkNet(KEY + "_ca"); NETF = mkNet(KEY + "_fr"); NETC = mkNet(KEY + "_fu"); } };
+    window.__cdcDesTick = function () { try { tick(); } catch (e) {} };   // ⚡ lo usa CDC_DESMAYO_RAPIDO
     setTimeout(function () { ui(); tick(); setInterval(tick, CFG.TICK_MS); var _fb = setInterval(function () { if (!_primerTickDes) { clearInterval(_fb); return; } tick(); }, 2000); }, 2500);
 })();
 </script>
@@ -21286,6 +21287,45 @@ window.CDC_WS24=(function(){
     todos:function(){return Object.keys(C).map(function(s){return C[s]})},
     pocos:function(l){return l.filter(function(s){return C[s]}).map(function(s){return C[s]})}
   };
+})();
+</script>
+
+<script>
+/* ⚡ CDC_DESMAYO_RAPIDO · carril rápido para DESMAYO (LONG)  — Juan Pablo Ortiz Ortuño
+   Usa la conexión en vivo de CDC_WS24 (0 consultas REST). Marca al instante las monedas ALCISTAS que se desploman
+   a toda velocidad con salida fuerte de capital y despierta al escáner DESMAYO sin esperar su turno de 6 s.
+   No clasifica ni alerta por sí solo: la alerta sigue siendo la del módulo DESMAYO.
+   Ajustable en vivo:  CDC_DESMAYO_RAPIDO.cfg.DROP_MIN = 2  */
+window.CDC_DESMAYO_RAPIDO=(function(){
+  "use strict";
+  var CFG={ON:true,VENT_MS:180000,DROP_MIN:2.5,ALC_MIN:3,VOLX_MIN:2,TTL_MS:120000,MUESTREO_MS:1000,WAKE_MS:1500};
+  var H={},FAST={},ultWake=0;
+  window.__cdcFast=FAST;
+  function despertar(){var n=Date.now();if(n-ultWake<CFG.WAKE_MS)return;ultWake=n;
+    setTimeout(function(){try{if(window.__cdcDesTick)window.__cdcDesTick()}catch(e){}},0)}
+  function proc(a){
+    if(!CFG.ON||!a||!a.length)return;
+    var now=Date.now(),pmax=(typeof PRECIO_MAX_ESCANEO_USDT==="number")?PRECIO_MAX_ESCANEO_USDT:0.5,i,k;
+    for(i=0;i<a.length;i++){
+      var x=a[i],s=x&&x.s;if(!s||s.slice(-4)!=="USDT")continue;
+      var p=+x.c,q=+x.q,ch=+x.P;if(!(p>0)||!(q>0))continue;
+      var h=H[s]||(H[s]=[]),l=h[h.length-1];
+      if(!l||now-l.t>=CFG.MUESTREO_MS)h.push({t:now,p:p,q:q});else{l.p=p;l.q=q}
+      while(h.length&&now-h[0].t>CFG.VENT_MS+30000)h.shift();
+      if(h.length<5||!(ch>=CFG.ALC_MIN)||p>pmax)continue;           // solo alcistas y dentro del rango de precio del bot
+      var mx=0,r=null;
+      for(k=0;k<h.length;k++){if(now-h[k].t<=CFG.VENT_MS){if(h[k].p>mx)mx=h[k].p;if(!r)r=h[k]}}
+      if(!r||!(mx>0))continue;
+      var drop=(mx-p)/mx*100;if(drop<CFG.DROP_MIN)continue;          // caída fuerte en la ventana
+      var mins=Math.max((now-r.t)/60000,0.5),vx=(q-r.q)/((q/1440)*mins);if(vx<CFG.VOLX_MIN)continue;   // salida de capital: volumen vs lo normal
+      var nueva=!FAST[s];FAST[s]=now;if(nueva)despertar();
+    }
+  }
+  setInterval(function(){var n=Date.now(),s;for(s in FAST)if(n-FAST[s]>CFG.TTL_MS)delete FAST[s];
+    for(s in H)if(!H[s].length||n-H[s][H[s].length-1].t>900000)delete H[s]},10000);
+  var prev=window.__cpProc;
+  window.__cpProc=function(a){try{if(prev)prev(a)}catch(e){}try{proc(a)}catch(e){}};
+  return{cfg:CFG,fast:FAST};
 })();
 </script>
 
