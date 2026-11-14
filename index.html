@@ -59,6 +59,47 @@ try{new PerformanceObserver(function(l){l.getEntries().forEach(function(e){var L
 }
 @media (min-width:1100px){.mx-c1,.mx-c2,.mx-c3{min-width:0}}
 </style>
+<style id="cdc-mx-v6">
+/* 🖥️ Monitor v6 · 3 paneles: menú | centro (feed) | widgets */
+#bdCon .bc-hero{border-color:rgba(14,203,129,.45) !important;background:linear-gradient(145deg,#0b1f1a,#0b1220) !important;box-shadow:0 0 26px rgba(14,203,129,.12)}
+.mx-pill{font-size:10px;font-weight:900;padding:3px 9px;border-radius:20px;letter-spacing:.4px}
+.mx-pill.on{background:rgba(14,203,129,.15);color:#0ecb81;border:1px solid rgba(14,203,129,.4)}
+.mx-pill.off{background:rgba(148,163,184,.12);color:#94a3b8;border:1px solid rgba(148,163,184,.3)}
+#bdCon .mx-nav{display:none}
+.mx-navbox{background:#060b16;border:1px solid rgba(255,255,255,.06);border-radius:14px;padding:12px;display:flex;flex-direction:column;gap:7px;position:sticky;top:8px}
+.mx-navt{display:flex;justify-content:space-between;align-items:center;gap:6px;font-size:12px;font-weight:900;color:#f3ba2f;padding-bottom:9px;border-bottom:1px solid rgba(255,255,255,.07)}
+.mx-nav-i{display:flex;justify-content:space-between;align-items:center;gap:6px;padding:10px 12px;border-radius:10px;background:rgba(255,255,255,.02);border:1px solid rgba(255,255,255,.05);color:#94a3b8;font:800 12px Inter,Arial;cursor:pointer;text-align:left;transition:all .2s}
+.mx-nav-i:hover{background:rgba(243,186,47,.12);border-color:rgba(243,186,47,.45);color:#f3ba2f}
+.mx-nav-i b{font-size:11px;color:#f3ba2f;background:rgba(243,186,47,.12);border-radius:8px;padding:1px 7px}
+.mx-rules{margin-top:6px;background:#090f1c;border:1px solid rgba(243,186,47,.18);border-radius:10px;padding:10px;font-size:11px;line-height:1.5;color:#94a3b8}
+.mx-rt{font-size:10px;font-weight:900;color:#f3ba2f;margin-bottom:4px}
+.mx-feedh{position:sticky;top:0;z-index:4;display:flex;justify-content:space-between;align-items:center;gap:10px;padding:12px 14px;background:rgba(6,11,22,.94);backdrop-filter:blur(8px);border:1px solid rgba(243,186,47,.2);border-radius:14px}
+.mx-feedh b{display:block;font-size:14px;color:#fff;font-weight:900}.mx-feedh small{font-size:11px;color:#64748b}
+.mx-donut{display:flex;align-items:center;gap:14px;flex-wrap:wrap}
+.mx-ring{width:96px;height:96px;border-radius:50%;display:grid;place-items:center;position:relative;flex:none}
+.mx-ring:before{content:"";position:absolute;inset:14px;border-radius:50%;background:#0b1220}
+.mx-ring span{position:relative;text-align:center;font:900 20px Inter,Arial;color:#fff;line-height:1}.mx-ring small{display:block;font-size:9px;color:#7f95b3;font-weight:600;margin-top:2px}
+.mx-leg{flex:1;min-width:130px;font-size:11.5px;color:#cbd5e1;display:flex;flex-direction:column;gap:5px}
+.mx-leg i{display:inline-block;width:9px;height:9px;border-radius:3px;margin-right:6px}.mx-leg em{font-style:normal;color:#64748b;font-size:10px}
+@media (min-width:720px) and (max-width:1099px){
+ #bdCon.mx-wide #bcVmon{display:grid;grid-template-columns:1fr 1fr;gap:12px;align-items:start}
+ #bdCon.mx-wide #bcMon,#bdCon.mx-wide .mx-grid{display:contents}
+ #bdCon.mx-wide .mx-top{grid-column:1/-1;grid-row:1}
+ #bdCon.mx-wide .mx-cenA{grid-column:1;grid-row:2}#bdCon.mx-wide .mx-cenB{grid-column:1;grid-row:3}
+ #bdCon.mx-wide .mx-der{grid-column:2;grid-row:2/span 2}
+ #bdCon.mx-wide #bcChart{grid-column:1/-1;grid-row:4;order:0}
+}
+@media (min-width:1100px){
+ #bdCon.mx-wide #bcVmon{display:grid;grid-template-columns:215px minmax(0,1fr) 350px;gap:14px;align-items:start}
+ #bdCon.mx-wide #bcMon,#bdCon.mx-wide .mx-grid{display:contents}
+ #bdCon.mx-wide .mx-top{grid-column:1/-1;grid-row:1}
+ #bdCon.mx-wide .mx-nav{display:block;grid-column:1;grid-row:2/span 3;align-self:stretch}
+ #bdCon.mx-wide .mx-cenA{grid-column:2;grid-row:2}
+ #bdCon.mx-wide #bcChart{grid-column:2;grid-row:3;order:0}
+ #bdCon.mx-wide .mx-cenB{grid-column:2;grid-row:4}
+ #bdCon.mx-wide .mx-der{grid-column:3;grid-row:2/span 3}
+}
+</style>
 <script id="cdc-net-guard">
     /* 🛡️ CDC NET-GUARD: evita llamadas repetidas a Binance (dedupe + caché corto + freno ante 429/418).
        Solo toca peticiones GET públicas sin firma; las firmadas/privadas pasan intactas. */
@@ -18760,7 +18801,7 @@ window.CDC_FLASH=(function(){
     // archivo completo sin caer en la paradoja de "el hash contiene su
     // propio hash". No cambiar este texto.
     var _PLACEHOLDER = "%%CDC_INTEGRITY_HASH%%";
-    var _HASH_ESPERADO = "7c17a74483d42e4bb6071382e21e0b852b9bf0cb2e88cda10c0c205bbb22f186"; // ← se reemplaza por el hash real en el paso final
+    var _HASH_ESPERADO = "9af9a4bbbf6a23a3763429dd19f01846a37f2aee36a97f36480efd4ec11591a7"; // ← se reemplaza por el hash real en el paso final
 
     function _bloquear(motivo) {
         try {
@@ -22116,6 +22157,7 @@ window.CDC_TRACK=(function(){
         if (!(ok && conIPInfo.okIp && conIPInfo.okIp !== conIP)) return "";
         return '<div class="bdf-av bad">⚠️ Tu IP cambió (WiFi ↔ datos). Agrega <b>' + esc(conIP) + '</b> en las IPs de confianza de tu API en Binance.<div class="bdf-row"><button class="bdf-btn bdf-blue" data-ca="copyip" style="flex:1">📋 Copiar IP</button><button class="bdf-btn bdf-gold" data-ca="tab-con" style="flex:1">🔌 Ver detalle</button></div></div>';
     }
+    document.addEventListener("click", function (e) { var b = e.target && e.target.closest ? e.target.closest(".mx-nav-i") : null; if (!b) return; var k = b.getAttribute("data-go"), t = k === "chart" ? $("bcChart") : document.querySelector('.mx-sec[data-k="' + k + '"]'); if (t && t.scrollIntoView) t.scrollIntoView({ behavior: "smooth", block: "start" }); });
     function conMonHtml() {
         var d = fabData, av = ipAviso();
         if (!(cfg.key && cfg.secret)) return av + '<div class="bdf-av bad">Primero guarda tu API Key y tu Secret en la pestaña 🔌 Conectar.</div>';
@@ -22133,7 +22175,7 @@ window.CDC_TRACK=(function(){
     var MXLS = "cdcMxSec_v1", mxCl = leerLS(MXLS), MXDEF = { bot: false, alr: true, evo: true, ops: true, chart: false };
     function mxIsClosed(k) { return (k in mxCl) ? !!mxCl[k] : !!MXDEF[k]; }
     function mxSec(k, tit, extra, cuerpo) {
-        return '<section class="mx-sec' + (mxIsClosed(k) ? ' closed' : '') + '"><button type="button" class="mx-h" data-mx="' + k + '"><span>' + tit + '</span><span class="mx-x">' + (extra || '') + '<i>▾</i></span></button><div class="mx-b">' + cuerpo + '</div></section>';
+        return '<section class="mx-sec' + (mxIsClosed(k) ? ' closed' : '') + '" data-k="' + k + '"><button type="button" class="mx-h" data-mx="' + k + '"><span>' + tit + '</span><span class="mx-x">' + (extra || '') + '<i>▾</i></span></button><div class="mx-b">' + cuerpo + '</div></section>';
     }
     function mxCelda(t, v, c) { return '<div><small>' + t + '</small><b' + (c ? ' style="color:' + c + '"' : '') + '>' + v + '</b></div>'; }
     function mxOp(o) {
@@ -22176,7 +22218,10 @@ window.CDC_TRACK=(function(){
             _co=_L.filter(function(o){return o.tipo==="COMPRA";}).length,_rc=_L.filter(function(o){return o.tipo==="RECOMPRA";}).length,
             _wr=_cl.length?_gn/_cl.length*100:null;
         var stats='<div class="mx-kpis">'+kp("Cierres hoy",_cl.length+"","#f3ba2f",_co+" compras · "+_rc+" recompras")+kp("Ganadas / perdidas",_gn+" / "+(_cl.length-_gn),"#7fe9ff","operaciones cerradas")+kp("Acierto",_wr==null?"—":nf(_wr,0)+" %",_wr==null?"":_wr>=50?"#0ecb81":"#ff9f1a","win rate de hoy")+kp("Neto de cierres",_cl.length?(_nt>=0?"+":"")+nf(_nt,3):"—",_cl.length?col(_nt):"","USDT")+kp("Mejor cierre",_bc==null?"—":(_bc>=0?"+":"")+nf(_bc,3),_bc==null?"":col(_bc),"USDT")+kp("Peor cierre",_wc==null?"—":(_wc>=0?"+":"")+nf(_wc,3),_wc==null?"":col(_wc),"USDT")+'</div>';
-        var c1 = mxSec("cta", "💼 Cuenta", "", hero + runb + cards) + mxSec("rsk", "🛡️ Riesgo y exposición", nf(_pm,0)+" % margen", riesgo) + mxSec("sts", "📊 Estadísticas de hoy", _cl.length+" cierres", stats) + mxSec("bot", "🤖 Estado del bot", cfg.activo ? "● activo" : "○ apagado", '<div style="font-size:11.5px;color:#cbd5e1">' + modo + '</div>' + esperaBanner(d, mm));
+        var _PAL=["#f3ba2f","#0ecb81","#7fe9ff","#b58cff","#ff4d6d","#ff9f1a"],_ps=d.pos.map(function(x){return {s:x.symbol.replace("USDT",""),v:Math.abs(parseFloat(x.positionAmt))*parseFloat(x.markPrice)||0};}).sort(function(a,b){return b.v-a.v;}),_tv=_ps.reduce(function(a,x){return a+x.v;},0),_ac=0,_cg=[];
+        _ps.forEach(function(x,i){var p=_tv?x.v/_tv*100:0,c=_PAL[Math.min(i,5)];_cg.push(c+" "+_ac.toFixed(2)+"% "+(_ac+p).toFixed(2)+"%");_ac+=p;x.p=p;x.c=c;});
+        var donut=_ps.length?'<div class="mx-donut"><div class="mx-ring" style="background:conic-gradient('+_cg.join(",")+')"><span>'+_ps.length+'<small>posición(es)</small></span></div><div class="mx-leg">'+_ps.slice(0,6).map(function(x){return '<div><i style="background:'+x.c+'"></i>'+esc(x.s)+' <b>'+nf(x.p,0)+' %</b> <em>'+nf(x.v,2)+' USDT</em></div>';}).join("")+'</div></div>':'<div style="color:#64748b">Sin posiciones abiertas.</div>';
+        var c1 = mxSec("cta", "💼 Cuenta", "", hero + runb + cards) + mxSec("rsk", "🛡️ Riesgo y exposición", nf(_pm,0)+" % margen", riesgo) + mxSec("dis", "🍩 Distribución de posiciones", "", donut) + mxSec("sts", "📊 Estadísticas de hoy", _cl.length+" cierres", stats) + mxSec("bot", "🤖 Estado del bot", cfg.activo ? "● activo" : "○ apagado", '<div style="font-size:11.5px;color:#cbd5e1">' + modo + '</div>' + esperaBanner(d, mm));
         var pos = d.pos.length ? d.pos.map(function (x) {
             var sym = x.symbol, amt = parseFloat(x.positionAmt), qty = Math.abs(amt), ent = parseFloat(x.entryPrice), mk = parseFloat(x.markPrice), pnl = parseFloat(x.unRealizedProfit) || 0, lq = parseFloat(x.liquidationPrice) || 0, lev = x.leverage;
             var tpO = d.ords.filter(function (o) { return o.symbol === sym && o.side === "SELL" && o.type === "LIMIT"; })[0], tpPx = tpO ? parseFloat(tpO.price) : null;
@@ -22194,7 +22239,12 @@ window.CDC_TRACK=(function(){
         var c2 = mxSec("pos", "📌 Posiciones abiertas", d.pos.length + " abierta(s)", '<div style="color:#94a3b8;font-size:10.5px;margin-bottom:6px">Toca una para ver su gráfico</div>' + pos) + mxSec("alr", "🔔 Monedas en alerta en el CDC", d.al.length + "", chips);
         var mi = cfg.testnet ? "t" : "r", L = (typeof ops !== "undefined" ? ops : []).filter(function (o) { return o.m === mi; });
         var c3 = mxSec("evo", "📈 Evolución de tu cuenta", "capital + PnL", spark()) + mxSec("ops", "🧾 Últimas operaciones", L.length + "", L.length ? L.slice(0, 10).map(mxOp).join("") : '<div style="color:#64748b">Todavía no hay operaciones. Aquí aparecerá cada compra, recompra, salida y cierre.</div>');
-        return '<div class="mx-grid"><div class="mx-top">' + top + '</div><div class="mx-c mx-c1">' + c1 + '</div><div class="mx-c mx-c2">' + c2 + '</div><div class="mx-c mx-c3">' + c3 + '</div></div>';
+        var _p2 = c2.split("<section ").filter(Boolean).map(function (x) { return "<section " + x; });
+        function ni(k, t, n) { return '<button type="button" class="mx-nav-i" data-go="' + k + '"><span>' + t + '</span>' + (n !== "" && n != null ? '<b>' + n + '</b>' : '') + '</button>'; }
+        var on = !!cfg.activo, pill = '<span class="mx-pill ' + (on ? "on" : "off") + '">' + (on ? "ACTIVO" : "APAGADO") + '</span>';
+        var nav = '<div class="mx-navbox"><div class="mx-navt">🤖 PANEL BOT CDC ' + pill + '</div>' + ni("pos", "⚡ Operación en vivo", d.pos.length) + ni("chart", "📈 Gráfico en vivo", "") + ni("ops", "🧾 Operaciones", L.length) + ni("evo", "📉 Evolución de cuenta", "") + ni("rsk", "🛡️ Riesgo", nf(_pm, 0) + "%") + ni("dis", "🍩 Distribución", "") + ni("sts", "📊 Estadísticas", _cl.length) + ni("alr", "🔔 Alertas CDC", d.al.length) + '<div class="mx-rules"><div class="mx-rt">MODO DE OPERACIÓN</div>' + modo + '</div></div>';
+        var feedh = '<div class="mx-feedh"><div><b>CENTRO DE COMANDO DEL BOT</b><small>Ejecución conectada al radar CDC · ' + (cfg.testnet ? "TESTNET" : "CUENTA REAL") + '</small></div>' + pill + '</div>';
+        return '<div class="mx-grid"><div class="mx-top">' + top + '</div><div class="mx-c mx-nav">' + nav + '</div><div class="mx-c mx-der">' + c1 + (_p2[1] || "") + '</div><div class="mx-c mx-cenA">' + feedh + (_p2[0] || "") + '</div><div class="mx-c mx-cenB">' + c3 + '</div></div>';
     }
     setInterval(function () {
         var e = $("mxStaleT"); if (!e) return;
