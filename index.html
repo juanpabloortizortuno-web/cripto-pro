@@ -18954,7 +18954,7 @@ window.CDC_FLASH=(function(){
     // archivo completo sin caer en la paradoja de "el hash contiene su
     // propio hash". No cambiar este texto.
     var _PLACEHOLDER = "%%CDC_INTEGRITY_HASH%%";
-    var _HASH_ESPERADO = "39fc147183f532eabbfb516332112df29af8fe75032231095c821cdf2687fa98"; // ← se reemplaza por el hash real en el paso final
+    var _HASH_ESPERADO = "7432f22141f2da8038adc3ebd02c698fd44df3aac2d10bea942a0386270a1510"; // ← se reemplaza por el hash real en el paso final
 
     function _bloquear(motivo) {
         try {
@@ -20700,8 +20700,45 @@ setTimeout(function(){setInterval(tick,CFG.TICK_MS);},CFG.ARRANQUE_MS);
             '<span onclick="CDC_DESPERTAR.registro.copiar()" style="cursor:pointer;font:800 9px Arial;padding:2px 7px;border-radius:6px;border:1px solid #0ecb81;color:#0ecb81">📋 Copiar informe</span>' +
             '<span onclick="CDC_DESPERTAR.registro.borrar()" style="cursor:pointer;font:800 9px Arial;padding:2px 7px;border-radius:6px;border:1px solid #64748b;color:#94a3b8">🗑 Borrar</span></div></div>';
     }
+    /* 🧮 el cuadro PLAN ya no ocupa lugar en el panel central: trabaja igual (se recalcula cada segundo) pero dentro de un
+       panel flotante, oculto por defecto. Botón «🧮 PLAN» (arrastrable) para abrirlo/cerrarlo. */
+    var plFlot = null;
+    function planFlotHost() {
+        if (plFlot && plFlot.cuerpo && plFlot.cuerpo.isConnected) return plFlot.cuerpo;
+        if (!document.body) return null;
+        var o1 = document.getElementById("cdcPlanBtn"); if (o1) o1.remove(); o1 = document.getElementById("cdcPlanFlot"); if (o1) o1.remove();
+        var pos = null; try { pos = JSON.parse(localStorage.getItem("cdc_plan_btn_pos") || "null"); } catch (e) {}
+        var btn = document.createElement("div"); btn.id = "cdcPlanBtn"; btn.textContent = "🧮 PLAN";
+        btn.title = "Plan DESMAYO (siguiente inversión + TP) · click: abrir/cerrar · arrastra para mover";
+        btn.style.cssText = "position:fixed;z-index:9000;right:14px;bottom:14px;padding:6px 11px;border-radius:999px;background:#1a1405;border:1px solid #f3ba2f;color:#f3ba2f;font:800 11px Arial,sans-serif;cursor:pointer;user-select:none;-webkit-user-select:none;touch-action:none;box-shadow:0 0 10px rgba(243,186,47,.35)";
+        var box = document.createElement("div"); box.id = "cdcPlanFlot";
+        box.style.cssText = "position:fixed;z-index:9001;display:none;width:min(430px,94vw);max-height:72vh;overflow-y:auto;box-sizing:border-box;background:#060b14;border:1px solid #f3ba2f;border-radius:12px;padding:6px;box-shadow:0 8px 30px rgba(0,0,0,.65)";
+        var cab = document.createElement("div"); cab.style.cssText = "display:flex;justify-content:flex-end;margin-bottom:2px";
+        var xx = document.createElement("span"); xx.textContent = "✕ cerrar"; xx.style.cssText = "cursor:pointer;font:800 10px Arial,sans-serif;color:#94a3b8;padding:2px 6px"; cab.appendChild(xx);
+        var cuerpo = document.createElement("div"); cuerpo.id = "cdcPlanFlotCuerpo";
+        box.appendChild(cab); box.appendChild(cuerpo); document.body.appendChild(btn); document.body.appendChild(box);
+        function limitar() { var r = btn.getBoundingClientRect(), W = window.innerWidth, H = window.innerHeight;
+            if (btn.style.left) { btn.style.left = Math.max(4, Math.min(W - r.width - 4, parseFloat(btn.style.left))) + "px"; btn.style.top = Math.max(4, Math.min(H - r.height - 4, parseFloat(btn.style.top))) + "px"; } }
+        function colocar() { var r = btn.getBoundingClientRect(), W = window.innerWidth, H = window.innerHeight, bw = box.offsetWidth || 430;
+            box.style.left = Math.max(6, Math.min(W - bw - 6, r.right - bw)) + "px";
+            if (r.top > H / 2) { box.style.top = "auto"; box.style.bottom = Math.max(6, H - r.top + 6) + "px"; box.style.maxHeight = Math.max(160, r.top - 16) + "px"; }
+            else { box.style.bottom = "auto"; box.style.top = (r.bottom + 6) + "px"; box.style.maxHeight = Math.max(160, H - r.bottom - 16) + "px"; } }
+        function abrir(v) { box.style.display = v ? "block" : "none"; if (v) colocar(); }
+        xx.onclick = function () { abrir(false); };
+        if (pos && isFinite(pos.l) && isFinite(pos.t)) { btn.style.right = "auto"; btn.style.bottom = "auto"; btn.style.left = pos.l + "px"; btn.style.top = pos.t + "px"; limitar(); }
+        var d0 = null;
+        btn.addEventListener("pointerdown", function (e) { var r = btn.getBoundingClientRect(); d0 = { x: e.clientX, y: e.clientY, l: r.left, t: r.top, mv: false }; try { btn.setPointerCapture(e.pointerId); } catch (x) {} });
+        btn.addEventListener("pointermove", function (e) { if (!d0) return; var dx = e.clientX - d0.x, dy = e.clientY - d0.y;
+            if (!d0.mv && Math.abs(dx) + Math.abs(dy) < 6) return; d0.mv = true;
+            btn.style.right = "auto"; btn.style.bottom = "auto"; btn.style.left = (d0.l + dx) + "px"; btn.style.top = (d0.t + dy) + "px"; limitar(); if (box.style.display === "block") colocar(); });
+        btn.addEventListener("pointerup", function () { if (!d0) return; var mv = d0.mv; d0 = null;
+            if (mv) { try { localStorage.setItem("cdc_plan_btn_pos", JSON.stringify({ l: parseFloat(btn.style.left), t: parseFloat(btn.style.top) })); } catch (e) {} }
+            else abrir(box.style.display !== "block"); });
+        window.addEventListener("resize", function () { limitar(); if (box.style.display === "block") colocar(); });
+        plFlot = { btn: btn, box: box, cuerpo: cuerpo }; return cuerpo;
+    }
     function plTick(force) {
-        var host = document.getElementById("cdcDesCuadroHost"); if (!host) return;
+        var host = planFlotHost(); if (!host) return;
         if (!plEl) { plEl = document.createElement("div"); plEl.id = "cdcDesPlan"; plEl.style.cssText = "width:100%"; plEl.innerHTML = plSkeleton(); plDin = plEl.querySelector("#plDin"); }
         if (plEl.parentNode !== host) host.appendChild(plEl);
         var dir = PL.dir, now = Date.now(), s;
@@ -23176,4 +23213,50 @@ window.CDC_TRACK=(function(){
 })();
 </script>
 
+
+<style id="cdcAjustesUI">
+/* ↔ panel central: Máximo / Valor / Mínimo pegados a la moneda (antes la columna del medio se estiraba hasta el borde) */
+@container cdcbn (min-width:601px){
+  #detailView .cdcbn-hero .cdcbn-main{grid-template-columns:clamp(58px,10cqw,78px) minmax(150px,230px) minmax(130px,190px);justify-content:start;column-gap:clamp(14px,2.6cqw,26px);}
+}
+/* ☰ botón para ocultar/mostrar el menú de botones (solo escritorio; en móvil el menú ya tiene su propio control) */
+#cdcMenuToggle{position:fixed;z-index:8500;left:8px;top:8px;width:30px;height:30px;padding:0;border-radius:8px;border:1px solid rgba(243,186,47,.55);background:#0b1220;color:#f3ba2f;cursor:pointer;display:none;align-items:center;justify-content:center;box-shadow:0 0 8px rgba(243,186,47,.25);transition:background .15s}
+#cdcMenuToggle:hover{background:#1a1405}
+#cdcMenuToggle .p{opacity:.9;transition:opacity .15s}
+body.cdc-menu-oculto #cdcMenuToggle .p{opacity:0}
+@media (min-width:951px){
+  #cdcMenuToggle{display:flex}
+  body.cdc-menu-oculto .sidebar{display:none !important}
+  body.cdc-menu-oculto .container{padding-left:42px !important}
+}
+</style>
+<script id="cdcAjustesUIjs">
+/* Ajustes de interfaz — CDC FUTURO-PRO (Juan Pablo Ortiz Ortuño): botón para ocultar el menú lateral, estilo TikTok */
+(function () {
+  "use strict";
+  var KEY = "cdc_menu_oculto", btn = document.createElement("button");
+  btn.id = "cdcMenuToggle"; btn.type = "button";
+  btn.innerHTML = '<svg width="18" height="18" viewBox="0 0 18 18" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"><rect x="2" y="3" width="14" height="12" rx="2.5"/><rect class="p" x="2" y="3" width="5.5" height="12" rx="2" fill="currentColor" stroke="none"/></svg>';
+  function titulo() { btn.title = document.body.classList.contains("cdc-menu-oculto") ? "Mostrar el menú de botones" : "Ocultar el menú de botones"; }
+  function colocar() {
+    var c = document.querySelector(".container"), sb = document.getElementById("sidebar"), ok = !!(c && c.offsetHeight > 50);
+    btn.style.visibility = ok ? "visible" : "hidden"; if (!ok) return;
+    var r = c.getBoundingClientRect(), oculto = document.body.classList.contains("cdc-menu-oculto"), sr = (!oculto && sb) ? sb.getBoundingClientRect() : null;
+    btn.style.top = Math.max(4, r.top + 6) + "px";
+    btn.style.left = (sr && sr.width > 0 ? sr.right + 6 : 6) + "px";
+  }
+  function alternar() {
+    var on = document.body.classList.toggle("cdc-menu-oculto");
+    try { localStorage.setItem(KEY, on ? "1" : "0"); } catch (e) {}
+    titulo(); colocar();
+    setTimeout(function () { colocar(); try { window.dispatchEvent(new Event("resize")); } catch (e) {} }, 60);   // los gráficos se reacomodan al nuevo ancho
+  }
+  btn.addEventListener("click", alternar);
+  try { if (localStorage.getItem(KEY) === "1") document.body.classList.add("cdc-menu-oculto"); } catch (e) {}
+  document.body.appendChild(btn); titulo(); colocar();
+  window.addEventListener("resize", colocar);
+  try { var ro = new ResizeObserver(colocar), c0 = document.querySelector(".container"); if (c0) ro.observe(c0); } catch (e) {}
+  setInterval(colocar, 1500);
+})();
+</script>
 </body></html>
