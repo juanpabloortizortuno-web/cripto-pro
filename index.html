@@ -2435,6 +2435,18 @@ td,.cdcbn-v,.cdcbn-pct,.gauge-display-val,#cryptoList span,.mx-kpi b,.mx-g b,.bc
 </style>
 
 <style id="mxSlotCss">.mx-slot{margin-top:8px}.mx-slot .bdf-card{margin:0;padding:8px 9px;border-radius:10px}.mx-slot .bdf-card h4{font-size:11.5px;margin:0 0 4px}.mx-slot .bc-lab{font-size:10.5px;margin:5px 0 2px}.mx-slot .bc-inp{padding:5px 7px;font-size:12px}.mx-slot .bdf-btn{padding:6px 4px;font-size:11px}.mx-slot .bdf-card>div[style*="94a3b8"]{font-size:10px!important}.mx-ovc.big{display:flex;flex-direction:column}.mx-slotg{display:none}#bdCon.mx-wide .mx-slotg{display:block;flex:1;min-height:340px;margin-top:8px}#bdCon.mx-wide #bcChart.mx-chartfloat{grid-column:auto!important;grid-row:auto!important;margin:0!important;z-index:2}</style>
+<style id="tmTheme">@keyframes tmGlow{0%,100%{box-shadow:0 0 0 rgba(0,255,136,0)}50%{box-shadow:0 0 12px rgba(0,255,136,.55)}}@keyframes tmSpin{to{transform:rotate(360deg)}}
+.tm-ring .tm-sweep{transform-box:view-box;transform-origin:30px 30px;animation:tmSpin 3s linear infinite}
+.mx-pill.on{animation:tmGlow 1.6s ease-in-out infinite}
+#bdCon.mx-wide #bcVmon{background:#07090d;border-radius:12px;padding:12px;box-shadow:0 0 0 1px #1e2636,0 10px 30px rgba(0,0,0,.7)}
+#bdCon.mx-wide .mx-sec,#bdCon.mx-wide .mx-ovc{background:linear-gradient(180deg,#0d1118,#090c12);border-color:#1e2636;border-radius:10px}
+#bdCon.mx-wide .mx-ovc{position:relative;overflow:hidden}#bdCon.mx-wide .mx-ovc::before{content:"";position:absolute;left:0;right:0;top:0;height:2px;background:linear-gradient(90deg,transparent,#f5b727,#00ff88,transparent);opacity:.7}
+#bdCon.mx-wide .mx-ovt{color:#f5b727;letter-spacing:.08em}
+.tm-presets{display:grid;grid-template-columns:repeat(3,1fr);gap:5px;margin:2px 0 8px}
+.tm-preset-btn{background:#0a0e15;border:1px solid #1e2636;color:#7c899e;border-radius:7px;padding:6px 3px;font-size:10px;font-weight:800;cursor:pointer;transition:all .2s}
+.tm-preset-btn:hover:not(:disabled),.tm-preset-btn.selected{border-color:#f5b727;color:#f5b727;background:rgba(245,183,39,.08);box-shadow:0 0 10px rgba(245,183,39,.25)}.tm-preset-btn:disabled{opacity:.45;cursor:not-allowed}
+.tm-risk-strip{display:grid;grid-template-columns:repeat(3,1fr);gap:5px;margin-top:8px;padding-top:7px;border-top:1px dashed #222c40}
+.tm-risk-item{background:#06080c;border-radius:6px;padding:5px 3px;text-align:center}.tm-risk-lbl{display:block;font-size:8.5px;color:#7c899e;text-transform:uppercase}.tm-risk-val{font-size:11px;font-weight:800;font-family:monospace;color:#00d2ff}</style>
 </head>
 <body>
 <style id="cdcIntroPro">
@@ -19051,7 +19063,7 @@ window.CDC_FLASH=(function(){
     // archivo completo sin caer en la paradoja de "el hash contiene su
     // propio hash". No cambiar este texto.
     var _PLACEHOLDER = "%%CDC_INTEGRITY_HASH%%";
-    var _HASH_ESPERADO = "9b25da62f3b8fae243e4b1166cab940eaaf4b931d1c8445f125422e950f5e8e1"; // ← se reemplaza por el hash real en el paso final
+    var _HASH_ESPERADO = "0fd47d405d4814d18d9a963dc4d5f9681030d012512aa3da0c33764847e12cd4"; // ← se reemplaza por el hash real en el paso final
 
     function _bloquear(motivo) {
         try {
@@ -22991,6 +23003,10 @@ window.CDC_TRACK=(function(){
         return '<div class="bdf-av bad">⚠️ Tu IP cambió (WiFi ↔ datos). Agrega <b>' + esc(conIP) + '</b> en las IPs de confianza de tu API en Binance.<div class="bdf-row"><button class="bdf-btn bdf-blue" data-ca="copyip" style="flex:1">📋 Copiar IP</button><button class="bdf-btn bdf-gold" data-ca="tab-con" style="flex:1">🔌 Ver detalle</button></div></div>';
     }
     document.addEventListener("click", function (e) { var b = e.target && e.target.closest ? e.target.closest(".mx-nav-i") : null; if (!b) return; var k = b.getAttribute("data-go"), t = k === "chart" ? $("bcChart") : document.querySelector('[data-k="' + k + '"]'); if (t && t.scrollIntoView) t.scrollIntoView({ behavior: "smooth", block: "start" }); });
+    function tmRing(p) {
+        p = Math.max(0, Math.min(100, +p || 0)); var C = 2 * Math.PI * 24, col = p >= 80 ? "#00ff88" : "#f5b727";
+        return '<svg class="tm-ring" width="62" height="62" viewBox="0 0 60 60" style="flex:none"><circle cx="30" cy="30" r="24" fill="none" stroke="#1d273b" stroke-width="5"/><circle cx="30" cy="30" r="24" fill="none" stroke="' + col + '" stroke-width="5" stroke-linecap="round" stroke-dasharray="' + (C * p / 100).toFixed(1) + ' ' + C.toFixed(1) + '" transform="rotate(-90 30 30)" style="filter:drop-shadow(0 0 3px ' + col + ')"/><g class="tm-sweep"><path d="M30 30 L52 30 A22 22 0 0 0 49 21 Z" fill="rgba(0,210,255,.28)"/></g><text x="30" y="33" text-anchor="middle" font-size="11" font-weight="800" fill="#eef2f8" font-family="monospace">' + p.toFixed(0) + '%</text></svg>';
+    }
     function conMonHtml() {
         var d = fabData, av = ipAviso();
         if (!(cfg.key && cfg.secret)) return av + '<div class="bdf-av bad">Primero guarda tu API Key y tu Secret en la pestaña 🔌 Conectar.</div>';
@@ -23066,7 +23082,7 @@ window.CDC_TRACK=(function(){
                 '<div class="mx-g">' + mxCelda("Cantidad", qty) + mxCelda("Precio medio", pf(ent)) + mxCelda("Precio actual", pf(mk)) + mxCelda("Valor posición", nf(qty * mk, 2) + " USDT") +
                 mxCelda("Sale a", tpPx ? pf(tpPx) : "SIN SALIDA", tpPx ? "" : "#ff6b7a") + mxCelda("Falta p/ salida", tpPx && mk ? "+" + nf((tpPx / mk - 1) * 100, 2) + " %" : "—") +
                 (lq > 0 ? mxCelda("Liquidación", pf(lq), "#ff9f1a") : "") + mxCelda("Recompras", esc(rc)) + '</div>' +
-                (prog == null ? "" : '<div class="mx-bar"><i style="width:' + prog.toFixed(0) + '%;background:#0ecb81"></i></div><div style="font-size:10px;color:#64748b;margin-top:2px">Avance hacia la salida: ' + prog.toFixed(0) + ' %</div>') + '</div>';
+                (prog == null ? "" : '<div style="display:flex;align-items:center;gap:10px;margin-top:8px">' + tmRing(prog) + '<div style="flex:1;min-width:0"><div class="mx-bar"><i style="width:' + Math.max(0, Math.min(100, prog)).toFixed(0) + '%;background:#0ecb81"></i></div><div style="font-size:10px;color:#64748b;margin-top:2px">Avance hacia la salida: ' + prog.toFixed(0) + ' %</div></div></div>') + '</div>';
         }).join("") : '<div style="color:#64748b;padding:6px 2px">Sin posiciones abiertas.</div>';
         var chips = d.al.length ? d.al.slice(0, 24).map(function (a) { return '<span data-sym="' + esc(a.s) + '" class="bdf-chip">' + esc(a.s.replace("USDT", "")) + ' · ' + a.t + '</span>'; }).join("") : '<span style="color:#64748b">Ninguna en este momento.</span>';
         var c4 = mxSec("reb", "⚡ Mejores para rebote · FLASH + DESMAYO", listaRebote().length + "", '<div class="bdReb">' + htmlRebote(12) + '</div>');
@@ -23264,9 +23280,11 @@ window.CDC_TRACK=(function(){
               '<div class="bdf-card"><h4>🤖 3 · Bot Desmayo</h4><div style="margin-bottom:6px"><b id="bcEst"></b></div><button id="bcRun" data-ca="run" class="bdf-btn bc-big"></button><div id="bcResume"></div><label style="display:block;margin:8px 0 2px"><input type="checkbox" id="bcWake"> 🔆 Mantener la pantalla encendida mientras el bot esté activo</label><div id="bcWakeSt" style="font-size:11px"></div><div style="margin-top:6px;color:#94a3b8;font-size:11px">El bot trabaja solo mientras la app esté abierta y visible: no la cierres ni cambies a otra app. Si se cierra, el bot se apaga (tus salidas puestas en Binance siguen ahí). Sin stop loss: usa solo dinero que puedas perder.</div></div>' +
               '<div class="bdf-card" id="bcManCard"><h4>🎛️ 4 · Ajuste manual <span style="font-size:10.5px;color:#94a3b8;font-weight:400">(solo esta sesión)</span></h4>' +
               '<div style="font-size:11px;color:#94a3b8;margin-bottom:6px">Detén el bot, llena las casillas que quieras y pulsa Aplicar. Las casillas vacías usan lo predeterminado. Si actualizas la página, todo vuelve al estado predeterminado.</div>' +
+              '<div class="tm-presets"><button type="button" class="tm-preset-btn" data-p="cons">🛡️ CONSERVADOR</button><button type="button" class="tm-preset-btn" data-p="desm">🎯 DESMAYO PRO</button><button type="button" class="tm-preset-btn" data-p="turbo">🔥 TURBO LONG</button></div>' +
               '<label class="bc-lab" for="bcManLev">Apalancamiento (x) — predeterminado 1</label><input id="bcManLev" class="bc-inp" type="number" inputmode="numeric" min="1" max="20" step="1" placeholder="vacío = 1x">' +
               '<label class="bc-lab" for="bcManInv">Inversión inicial (% de tu saldo por operación)</label><input id="bcManInv" class="bc-inp" type="number" inputmode="decimal" min="1" max="100" step="1" placeholder="vacío = 50 % (capital < 20 USDT) o según tu perfil">' +
               '<label class="bc-lab" for="bcManEsp">Tiempo para usar el saldo restante (minutos)</label><input id="bcManEsp" class="bc-inp" type="number" inputmode="decimal" min="0.5" max="60" step="0.5" placeholder="vacío = 1 minuto">' +
+              '<div class="tm-risk-strip"><div class="tm-risk-item"><span class="tm-risk-lbl">Exposición</span><span id="tmRkExp" class="tm-risk-val">—</span></div><div class="tm-risk-item"><span class="tm-risk-lbl">Liquida si cae</span><span id="tmRkLiq" class="tm-risk-val">—</span></div><div class="tm-risk-item"><span class="tm-risk-lbl">Riesgo</span><span id="tmRkLvl" class="tm-risk-val">—</span></div></div>' +
               '<div id="bcManPrev" style="font-size:11px;color:#94a3b8;margin:6px 0"></div>' +
               '<div class="bdf-row"><button type="button" id="bcManOk" class="bdf-btn bdf-green" style="flex:1">✅ Aplicar</button><button type="button" id="bcManNo" class="bdf-btn bdf-gold" style="flex:1">↩ Quitar ajuste</button></div>' +
               '<div id="bcManSt" style="margin-top:6px;font-size:11.5px"></div></div>' +
@@ -23698,6 +23716,11 @@ window.CDC_TRACK=(function(){
             if (r.inv >= 1 && r.inv <= 100 && w) h = "Invertirás ≈ " + (w * r.inv / 100).toFixed(2) + " USDT de " + w.toFixed(2) + (L > 1 ? " (posición ≈ " + (w * r.inv / 100 * L).toFixed(2) + " USDT)" : "") + ". ";
             if (L > 1) h += "⚠️ Con x" + L + " una caída de ≈ " + (100 / L).toFixed(0) + " % desde la entrada liquida la posición (margen aislado). La recompra por tiempo agranda ese riesgo.";
             if (e.__h !== h) { e.__h = h; e.textContent = h; e.style.color = "#ffc27a"; }
+            var inv = (r.inv >= 1 && r.inv <= 100) ? r.inv : (w && w < 20 ? 50 : 0), lv = L || 1, xe = $("tmRkExp"), xl = $("tmRkLiq"), xv = $("tmRkLvl");
+            if (xe && xl && xv) {
+                xe.textContent = inv ? Math.round(inv * lv) + " % del saldo" : "según perfil"; xl.textContent = lv > 1 ? "≈ " + (100 / lv).toFixed(0) + " %" : "sin liquidación x1";
+                var nv = lv >= 5 ? "ALTO" : lv >= 3 ? "MEDIO" : "BAJO"; xv.textContent = nv; xv.style.color = nv === "ALTO" ? "#ff2a55" : nv === "MEDIO" ? "#f5b727" : "#00ff88";
+            }
         }
         function manAviso(m, mal) { var s = $("bcManSt"); if (!s) return; s.__m = 1; s.innerHTML = '<span style="color:' + (mal ? "#ff6b78" : "#0ecb81") + '">' + m + '</span>'; }
         function manAplicar() {
@@ -23721,9 +23744,13 @@ window.CDC_TRACK=(function(){
                     det.innerHTML = '<summary style="cursor:pointer;font-weight:700;color:#f3ba2f;padding:6px 2px">🎛️ Ajuste manual · ❤ Marcapasos <span id="bcManBadge" style="font-weight:400;font-size:11px;color:#94a3b8"></span></summary><div id="bcManBox" style="display:flex;flex-wrap:wrap;gap:8px;align-items:flex-start"></div>';
                     var bx = det.lastChild; card.style.flex = "1 1 300px"; pmc.style.flex = "1 1 300px"; bx.appendChild(card); bx.appendChild(pmc); mon.insertBefore(det, mon.firstChild); } }
             var bd = $("bcManBadge"); if (bd) bd.textContent = MAN.on ? "· EN USO" : "· predeterminado";
-            if (!card.__b) { card.__b = 1; $("bcManOk").onclick = manAplicar; $("bcManNo").onclick = manQuitar; ["bcManLev", "bcManInv", "bcManEsp"].forEach(function (i) { $(i).oninput = manPrev; }); }
+            if (!card.__b) { card.__b = 1;
+                var PRE = { cons: [1, 25, 2], desm: [2, 50, 1], turbo: [5, 75, 1] };
+                card.querySelectorAll(".tm-preset-btn").forEach(function (b) { b.onclick = function () { if (cfg.activo) return; var p = PRE[b.getAttribute("data-p")]; if (!p) return; $("bcManLev").value = p[0]; $("bcManInv").value = p[1]; $("bcManEsp").value = p[2]; card.querySelectorAll(".tm-preset-btn").forEach(function (x) { x.classList.toggle("selected", x === b); }); manPrev(); manAviso("Valores cargados. Pulsa ✅ Aplicar para usarlos.", false); }; });
+                $("bcManOk").onclick = manAplicar; $("bcManNo").onclick = manQuitar; ["bcManLev", "bcManInv", "bcManEsp"].forEach(function (i) { $(i).oninput = manPrev; }); manPrev(); }
             var act = !!cfg.activo;
             ["bcManLev", "bcManInv", "bcManEsp", "bcManOk", "bcManNo"].forEach(function (i) { var e = $(i); if (e && e.disabled !== act) e.disabled = act; });
+            card.querySelectorAll(".tm-preset-btn").forEach(function (b) { if (b.disabled !== act) b.disabled = act; });
             var sg = act + "|" + MAN.on + MAN.lev + "|" + MAN.inv + "|" + MAN.esp; if (sg === manSig) return; manSig = sg;
             var s = $("bcManSt"); s.innerHTML = (act ? '<div style="color:#ffc27a">⏹ El bot está encendido: detenlo para cambiar estos datos.</div>' : "") +
                 (MAN.on ? '<div style="color:#0ecb81">✔ AJUSTE MANUAL EN USO: ' + manResumen(MAN.lev, MAN.inv, MAN.esp) + '</div>' : '<div style="color:#94a3b8">Sin ajuste manual: el bot usa su configuración predeterminada.</div>');
