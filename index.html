@@ -2434,7 +2434,7 @@ td,.cdcbn-v,.cdcbn-pct,.gauge-display-val,#cryptoList span,.mx-kpi b,.mx-g b,.bc
 }
 </style>
 
-<style id="mxSlotCss">.mx-slot{margin-top:8px}.mx-slot .bdf-card{margin:0;padding:8px 9px;border-radius:10px}.mx-slot .bdf-card h4{font-size:11.5px;margin:0 0 4px}.mx-slot .bc-lab{font-size:10.5px;margin:5px 0 2px}.mx-slot .bc-inp{padding:5px 7px;font-size:12px}.mx-slot .bdf-btn{padding:6px 4px;font-size:11px}.mx-slot .bdf-card>div[style*="94a3b8"]{font-size:10px!important}.mx-ovc.big{display:flex;flex-direction:column}.mx-slotg{flex:1;min-height:110px;margin-top:8px;position:relative;overflow:hidden;border:1px solid rgba(14,203,129,.28);border-radius:10px;background:linear-gradient(180deg,#07121a,#060d16)}</style>
+<style id="mxSlotCss">.mx-slot{margin-top:8px}.mx-slot .bdf-card{margin:0;padding:8px 9px;border-radius:10px}.mx-slot .bdf-card h4{font-size:11.5px;margin:0 0 4px}.mx-slot .bc-lab{font-size:10.5px;margin:5px 0 2px}.mx-slot .bc-inp{padding:5px 7px;font-size:12px}.mx-slot .bdf-btn{padding:6px 4px;font-size:11px}.mx-slot .bdf-card>div[style*="94a3b8"]{font-size:10px!important}.mx-ovc.big{display:flex;flex-direction:column}.mx-slotg{display:none}#bdCon.mx-wide .mx-slotg{display:block;flex:1;min-height:340px;margin-top:8px}#bdCon.mx-wide #bcChart.mx-chartfloat{grid-column:auto!important;grid-row:auto!important;margin:0!important;z-index:2}</style>
 </head>
 <body>
 <style id="cdcIntroPro">
@@ -19051,7 +19051,7 @@ window.CDC_FLASH=(function(){
     // archivo completo sin caer en la paradoja de "el hash contiene su
     // propio hash". No cambiar este texto.
     var _PLACEHOLDER = "%%CDC_INTEGRITY_HASH%%";
-    var _HASH_ESPERADO = "075ab2f3cdb5bca7a79feb8c7a6932bc736cf74e5caac15efa9b7ab1196f2baf"; // ← se reemplaza por el hash real en el paso final
+    var _HASH_ESPERADO = "9b25da62f3b8fae243e4b1166cab940eaaf4b931d1c8445f125422e950f5e8e1"; // ← se reemplaza por el hash real en el paso final
 
     function _bloquear(motivo) {
         try {
@@ -21983,7 +21983,7 @@ window.CDC_TRACK=(function(){
         var lev = (MAN.on && MAN.lev) || LEV, emerg = !mm && s.wallet < 6;
         if (emerg) { if (!(MAN.on && MAN.lev)) lev = 2; perf = { desde: 0, ent: perf.ent, tp: TP_FIJO, adds: [], emergencia: true }; }
         if (MAN.on) { perf = JSON.parse(JSON.stringify(perf)); if (!perf.adds || !perf.adds.length) perf.adds = [{ caida: 25, pct: 99, tp: TP_FIJO }]; }   /* ajuste manual: siempre hay recompra con el saldo restante */
-        var entPct = (MAN.on && MAN.inv > 0) ? MAN.inv : (mm ? cfg.multi.ent : perf.ent);   /* ajuste manual: % del saldo */
+        var entPct = (MAN.on && MAN.inv > 0) ? MAN.inv : (mm ? cfg.multi.ent : (s.wallet < 20 ? 50 : perf.ent));   /* capital < 20 USDT: siempre 50 % del saldo; desde 20 USDT, la configuración del perfil */   /* ajuste manual: % del saldo */
         var baseM = mm ? mm.presup * entPct / 100 : s.disp * entPct / 100;
         var margen = Math.min(baseM, margenSeguro(s.disp, lev));
         if (MAN.on && MAN.inv > 0 && margen < baseM - 0.005) log("⚠️ " + sym + ": pediste invertir " + MAN.inv + " % (" + baseM.toFixed(2) + " USDT) pero el saldo disponible solo alcanza para " + margen.toFixed(2) + " USDT; se usa esa cantidad.", true);
@@ -23265,7 +23265,7 @@ window.CDC_TRACK=(function(){
               '<div class="bdf-card" id="bcManCard"><h4>🎛️ 4 · Ajuste manual <span style="font-size:10.5px;color:#94a3b8;font-weight:400">(solo esta sesión)</span></h4>' +
               '<div style="font-size:11px;color:#94a3b8;margin-bottom:6px">Detén el bot, llena las casillas que quieras y pulsa Aplicar. Las casillas vacías usan lo predeterminado. Si actualizas la página, todo vuelve al estado predeterminado.</div>' +
               '<label class="bc-lab" for="bcManLev">Apalancamiento (x) — predeterminado 1</label><input id="bcManLev" class="bc-inp" type="number" inputmode="numeric" min="1" max="20" step="1" placeholder="vacío = 1x">' +
-              '<label class="bc-lab" for="bcManInv">Inversión inicial (% de tu saldo por operación)</label><input id="bcManInv" class="bc-inp" type="number" inputmode="decimal" min="1" max="100" step="1" placeholder="vacío = automática según tu perfil">' +
+              '<label class="bc-lab" for="bcManInv">Inversión inicial (% de tu saldo por operación)</label><input id="bcManInv" class="bc-inp" type="number" inputmode="decimal" min="1" max="100" step="1" placeholder="vacío = 50 % (capital < 20 USDT) o según tu perfil">' +
               '<label class="bc-lab" for="bcManEsp">Tiempo para usar el saldo restante (minutos)</label><input id="bcManEsp" class="bc-inp" type="number" inputmode="decimal" min="0.5" max="60" step="0.5" placeholder="vacío = 1 minuto">' +
               '<div id="bcManPrev" style="font-size:11px;color:#94a3b8;margin:6px 0"></div>' +
               '<div class="bdf-row"><button type="button" id="bcManOk" class="bdf-btn bdf-green" style="flex:1">✅ Aplicar</button><button type="button" id="bcManNo" class="bdf-btn bdf-gold" style="flex:1">↩ Quitar ajuste</button></div>' +
@@ -23597,11 +23597,11 @@ window.CDC_TRACK=(function(){
                 autoErr = ""; return;
             }
             if (!pf) { box.style.color = "#ff9aa5"; box.textContent = "⚠️ Conectado, pero ningún perfil aplica a un saldo disponible de " + s.disp.toFixed(2) + " USDT."; return; }
-            var ent = Math.min(s.disp * pf.ent / 100, s.disp * 0.99), gp = ent > 0 ? pf.tp / ent * 100 : 0;
+            var entP = s.wallet < 20 ? 50 : pf.ent, ent = Math.min(s.disp * entP / 100, s.disp * 0.99), gp = ent > 0 ? pf.tp / ent * 100 : 0;
             var h = '<b style="color:#0ecb81">✅ Conectado (' + (cfg.testnet ? "TESTNET" : "CUENTA REAL") + ')</b><br>' +
                 'Saldo disponible para la siguiente operación: <b style="color:#fff">' + s.disp.toFixed(2) + ' USDT</b> · billetera total ' + s.wallet.toFixed(2) + '<br>' +
                 'Perfil automático: <b style="color:#f3ba2f">Perfil ' + (idx + 1) + '</b> (desde ' + pf.desde + ' USDT)<br>' +
-                'Invierte en cada compra: <b style="color:#fff">≈ ' + ent.toFixed(2) + ' USDT</b> (' + pf.ent + ' % del saldo disponible)<br>' +
+                'Invierte en cada compra: <b style="color:#fff">≈ ' + ent.toFixed(2) + ' USDT</b> (' + entP + ' % del saldo disponible' + (s.wallet < 20 ? ' · fijo en 50 % mientras tu capital sea menor a 20 USDT' : '') + ')<br>' +
                 'Ganancia al vender: <b style="color:#0ecb81">+' + pf.tp + ' USDT</b> ≈ <b style="color:#0ecb81">' + gp.toFixed(2) + ' %</b> de lo invertido';
             pf.adds.forEach(function (a, k) { h += '<br>Recompra ' + (k + 1) + ': si cae ' + a.caida + ' % usa ' + a.pct + ' % del saldo libre → sale con +' + a.tp + ' USDT'; });
             if (!pf.adds.length) h += '<br>Sin recompras en este perfil.';
@@ -23636,22 +23636,17 @@ window.CDC_TRACK=(function(){
         function reanudar() { if (aud && aud.ctx && aud.ctx.state === "suspended") { try { aud.ctx.resume(); } catch (e) {} } }
         document.addEventListener("click", reanudar, { passive: true }); document.addEventListener("touchstart", reanudar, { passive: true });
 
-        var HB = [];
-        function grafPintar() {
-            var g = $("mxSlotGraf"); if (!g) return;
-            var act = !!cfg.activo, ok = PM.lag < 1500 && (Date.now() - lastBeat) < 3000;
-            var col = !act ? "#64748b" : ok ? "#0ecb81" : PM.lag < 5000 ? "#f3ba2f" : "#ff2a3b", W = 8, N = 30, pts = [], i, b, x, a, k;
-            for (i = 0; i < N; i++) {
-                b = HB[HB.length - N + i]; x = i * W; a = b ? (b.a ? (b.l > 1500 ? 1.4 : 1) : 0) : 0; k = b && b.a && b.l > 1500 ? 6 : 0;
-                pts.push([x, 60], [x + 2, 60], [x + 3, 60 - 8 * a], [x + 4, 60], [x + 5, 60], [x + 6, 60 - 38 * a], [x + 7, 60 + 24 * a + k], [x + 8, 60]);
-            }
-            var d = pts.map(function (p) { return p[0] + "," + p[1]; }).join(" "), gl = "";
-            for (i = 1; i < 4; i++) gl += '<line x1="0" x2="240" y1="' + (i * 25) + '" y2="' + (i * 25) + '" stroke="rgba(255,255,255,.06)"/>';
-            for (i = 1; i < 12; i++) gl += '<line y1="0" y2="100" x1="' + (i * 20) + '" x2="' + (i * 20) + '" stroke="rgba(255,255,255,.04)"/>';
-            g.innerHTML = '<div style="position:absolute;left:8px;top:5px;font-size:10px;font-weight:800;color:' + col + '">❤ LATIDO EN VIVO</div><div style="position:absolute;right:8px;top:5px;font-size:10px;color:#94a3b8">' + (act ? Math.round(PM.lag) + " ms" : "en reposo") + '</div>' +
-                '<svg viewBox="0 0 240 100" preserveAspectRatio="none" style="width:100%;height:100%;display:block">' + gl + '<polyline points="' + d + '" fill="none" stroke="' + col + '" stroke-width="2" stroke-linejoin="round" stroke-linecap="round" vector-effect="non-scaling-stroke" style="filter:drop-shadow(0 0 3px ' + col + ')"/></svg>';
+        function chartPos() {
+            var c = $("bcChart"), s = $("mxSlotGraf"), m = $("bcVmon"), bd = document.getElementById("bdCon");
+            if (!c || !m) return;
+            var wide = bd && bd.classList.contains("mx-wide"), vis = wide && s && s.offsetParent !== null && c.style.display !== "none";
+            if (!vis) { if (c.classList.contains("mx-chartfloat")) { c.classList.remove("mx-chartfloat"); c.style.position = c.style.left = c.style.top = c.style.width = c.style.height = ""; var f0 = $("bcFrame"); if (f0) f0.style.height = ""; } return; }
+            var mr = m.getBoundingClientRect(), sr = s.getBoundingClientRect(); if (sr.width < 50) return;
+            m.style.position = "relative"; c.classList.add("mx-chartfloat");
+            c.style.position = "absolute"; c.style.left = Math.round(sr.left - mr.left) + "px"; c.style.top = Math.round(sr.top - mr.top) + "px"; c.style.width = Math.round(sr.width) + "px"; c.style.height = Math.round(sr.height) + "px"; c.style.overflow = "hidden";
+            var h = c.querySelector(".mx-h"), f = $("bcFrame"); if (f) f.style.height = Math.max(150, Math.round(sr.height - (h ? h.offsetHeight : 34) - 26)) + "px";
         }
-        window.__mxGraf = grafPintar;
+        window.__mxGraf = chartPos; setInterval(chartPos, 400); window.addEventListener("resize", chartPos);
         function pmPintar() {
             var e = $("bcPM"); if (!e) return;
             var act = !!cfg.activo, ok = PM.lag < 1500 && (Date.now() - lastBeat) < 3000;
@@ -23677,7 +23672,6 @@ window.CDC_TRACK=(function(){
                 if (now - (PM.wk || 0) > 5000) { PM.wk = now; try { wakeTick(); } catch (e) {} }
                 if (audioOn && !aud) audioIniciar();
             } else if (aud) audioParar();
-            HB.push({ l: PM.lag, a: !!cfg.activo }); if (HB.length > 30) HB.shift(); grafPintar();
             pmPintar(); manPaint();
         }
         try {
@@ -23698,7 +23692,7 @@ window.CDC_TRACK=(function(){
         }
         function manWallet() { return (typeof fabData !== "undefined" && fabData && fabData.wallet > 0) ? fabData.wallet : 0; }
         function manResumen(lev, inv, esp) { var m = inv && manWallet() ? manWallet() * inv / 100 : 0;
-            return "apalancamiento x" + (lev || LEV) + " · inversión inicial " + (inv ? inv + " % del saldo" + (m ? " (≈ " + m.toFixed(2) + " USDT" + (lev > 1 ? ", posición ≈ " + (m * lev).toFixed(2) + " USDT" : "") + ")" : "") : "automática") + " · recompra con el saldo a los " + (esp || 1) + " min"; }
+            return "apalancamiento x" + (lev || LEV) + " · inversión inicial " + (inv ? inv + " % del saldo" + (m ? " (≈ " + m.toFixed(2) + " USDT" + (lev > 1 ? ", posición ≈ " + (m * lev).toFixed(2) + " USDT" : "") + ")" : "") : "automática (50 % si tu capital es menor a 20 USDT; desde 20 USDT, según tu perfil)") + " · recompra con el saldo a los " + (esp || 1) + " min"; }
         function manPrev() {
             var e = $("bcManPrev"); if (!e) return; var r = manLeer(), L = r.lev || 0, h = "", w = manWallet();
             if (r.inv >= 1 && r.inv <= 100 && w) h = "Invertirás ≈ " + (w * r.inv / 100).toFixed(2) + " USDT de " + w.toFixed(2) + (L > 1 ? " (posición ≈ " + (w * r.inv / 100 * L).toFixed(2) + " USDT)" : "") + ". ";
