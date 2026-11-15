@@ -18723,7 +18723,7 @@ setTimeout(function(){setInterval(tick,CFG.TICK_MS);},CFG.ARRANQUE_MS);
    Ajustes en vivo: CDC_FLASH.cfg.POS_MAX = 25 · Volver a mostrar las otras tarjetas: CDC_FLASH.solo(false) · Apagar: CDC_FLASH.cfg.ON = false */
 window.CDC_FLASH=(function(){
   "use strict";
-  var CFG={ON:true,SOLO_FLASH:true,PRECIO_MAX:0.5,POS_MAX:45,RANGO_MIN:10,LIQ_MIN:150000,SCORE_MIN:45,SCORE_VOZ:55,MAX_CAND:20,TICK_MS:15000,KL_TTL:90000,
+  var CFG={ON:true,SOLO_FLASH:true,PRECIO_MAX:0.5,POS_MAX:20,RANGO_MIN:10,LIQ_MIN:150000,SCORE_MIN:45,SCORE_VOZ:55,MAX_CAND:20,TICK_MS:15000,KL_TTL:90000,
     DWELL_MS:15000,CAMBIO_MARGEN:5,TP:2,SL:3,SOMBRA_MS:300000,SEG_MAX_MS:2700000,MANUAL_PAUSA_MS:120000,ROT_MS:10000,SCORE_OBS:30,HOLD_MAX_MS:40000,DESCANSO_MS:150000,DESC_TP_MS:1200000,VOZ:true,SONIDO:true,VOZ_CD_MS:600000,ARRANQUE_MS:12000};
   var ACT=null,OTROS=[],vistoTs={},descanso={},uTs=0,lastForce=0,M={},manualTs=0,flashPass=false,busy=false,ultCambio=0,vozTs={},AC=null,orig=null,aviso=null;
   function cd(){try{return cachedData;}catch(e){return null;}}
@@ -18935,7 +18935,7 @@ window.CDC_FLASH=(function(){
     return orig.apply(this,arguments);};}
   css();
   setTimeout(tick,CFG.ARRANQUE_MS);setInterval(tick,CFG.TICK_MS);setInterval(fijar,1000);
-  return{version:"5",cfg:CFG,slotHTML:slotHTML,hay:function(){return !!ACT;},ir:ir,ver:ver,seguir:abrir,solo:solo,actual:function(){return ACT;},rayo:RAYO,
+  return{version:"5",cfg:CFG,slotHTML:slotHTML,hay:function(){return !!ACT;},ir:ir,ver:ver,seguir:abrir,solo:solo,actual:function(){return ACT;},candidatas:function(){var a=[];if(ACT)a.push(ACT);OTROS.forEach(function(x){a.push(x);});return a;},rayo:RAYO,
     cerebro:function(){return{muestras:NET.n,aciertos:NET.ok,pendientes:PEND.length};},_t:{pre:pre,metricas:metricas,puntuar:puntuar,aprender:aprender,fwd:fwd}};
 })();
 </script>
@@ -18954,7 +18954,7 @@ window.CDC_FLASH=(function(){
     // archivo completo sin caer en la paradoja de "el hash contiene su
     // propio hash". No cambiar este texto.
     var _PLACEHOLDER = "%%CDC_INTEGRITY_HASH%%";
-    var _HASH_ESPERADO = "6a4b6d454402c7c07d2a1e8f40db4d0993e056f1b26cc72048dbeadca127a5ac"; // ← se reemplaza por el hash real en el paso final
+    var _HASH_ESPERADO = "11ae2ea501b8add4ba6319f7a9e950226a372c4b4632b2c5b97485c84ab0c026"; // ← se reemplaza por el hash real en el paso final
 
     function _bloquear(motivo) {
         try {
@@ -21718,7 +21718,7 @@ window.CDC_TRACK=(function(){
    ══════════════════════════════════════════════════════════════════ */
 (function () {
     "use strict";
-    var LS = "cdcBotDesmayo_v2", TP_FIJO = 0.13, LEV = 1, logBuf = [], esperaLog = 0;
+    var LS = "cdcBotDesmayo_v2", TP_FIJO = 0.13, LEV = 1, FLASH_POS_MAX = 20, FLASH_SCORE_MIN = 55, logBuf = [], esperaLog = 0;
     var DEF = { key: "", secret: "", testnet: true, activo: false, tpNeto: true, feeIn: 0.05, feeOut: 0.02, maxPos: 5, incInminente: false,
         multi: { desde: 100, por: 50, ent: 20, tp: 1.67, adds: [{ caida: 5, pct: 40, tp: 3.33 }, { caida: 5, pct: 99, tp: 6.67 }] },
         perfiles: [
@@ -21959,6 +21959,12 @@ window.CDC_TRACK=(function(){
                 if (!/USDT$/.test(it.s)) return;
                 activos[it.s] = 1; cand.push({ s: it.s, tipo: r.tipo });
             });
+            /* ⚡ FLASH · REBOTE · LONG: monedas en el fondo del rango (posición <= FLASH_POS_MAX %), puntaje >= FLASH_SCORE_MIN y que ya no estén cayendo fuerte */
+            try { if (window.CDC_FLASH && CDC_FLASH.candidatas && CDC_FLASH.cfg && CDC_FLASH.cfg.ON) CDC_FLASH.candidatas().forEach(function (f) {
+                if (!f || !/USDT$/.test(f.sym) || activos[f.sym]) return;
+                if (!(f.pos <= FLASH_POS_MAX) || !(f.score >= FLASH_SCORE_MIN) || f.cae) return;
+                activos[f.sym] = 1; cand.push({ s: f.sym, tipo: "FLASH REBOTE LONG · puntaje " + f.score + " · posición " + Math.round(f.pos) + "%" });
+            }); } catch (e) {}
             var cambio = false;                                                      /* monedas cerradas: liberar al terminar su alerta */
             Object.keys(espera).forEach(function (sym) {
                 if (activos[sym]) { if (espera[sym].ausente) { espera[sym].ausente = null; cambio = true; } return; }
