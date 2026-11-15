@@ -18725,7 +18725,7 @@ window.CDC_FLASH=(function(){
   "use strict";
   var CFG={ON:true,SOLO_FLASH:true,PRECIO_MAX:0.5,POS_MAX:20,RANGO_MIN:10,LIQ_MIN:150000,SCORE_MIN:45,SCORE_VOZ:55,MAX_CAND:20,TICK_MS:15000,KL_TTL:90000,
     DWELL_MS:15000,CAMBIO_MARGEN:5,TP:2,SL:3,SOMBRA_MS:300000,SEG_MAX_MS:2700000,MANUAL_PAUSA_MS:120000,ROT_MS:10000,SCORE_OBS:30,HOLD_MAX_MS:40000,DESCANSO_MS:150000,DESC_TP_MS:1200000,VOZ:true,SONIDO:true,VOZ_CD_MS:600000,ARRANQUE_MS:12000};
-  var ACT=null,OTROS=[],vistoTs={},descanso={},uTs=0,lastForce=0,M={},manualTs=0,flashPass=false,busy=false,ultCambio=0,vozTs={},AC=null,orig=null,aviso=null;
+  var ACT=null,ULT=[],OTROS=[],vistoTs={},descanso={},uTs=0,lastForce=0,M={},manualTs=0,flashPass=false,busy=false,ultCambio=0,vozTs={},AC=null,orig=null,aviso=null;
   function cd(){try{return cachedData;}catch(e){return null;}}
   /* 🧠 CEREBRO FLASH: red 8-6-1 que aprende de cada rebote. Se guardan "operaciones sombra" de las mejores monedas y a los 45 min (o al llegar a +TP% / -SL%) se entrena. */
   var NI=8,NH=6,KN="cdc_flash_net",KP="cdc_flash_pend",NET=null,PEND=[],sombraTs={};
@@ -18849,7 +18849,7 @@ window.CDC_FLASH=(function(){
     var now=Date.now(),arr=[];
     var D=desmayos();
     lst.forEach(function(p){var m=M[p.sym]&&M[p.sym].r,c=cd()&&cd()[p.sym];if(m&&c)arr.push(puntuar(p,m,c,D[p.sym]));});
-    arr.sort(function(a,b){return b.score-a.score||a.pos-b.pos;});
+    arr.sort(function(a,b){return b.score-a.score||a.pos-b.pos;});ULT=arr.slice();
     arr.slice(0,3).forEach(function(r){sombra(r,r.x);});
     var ok=arr.filter(function(x){return !(descanso[x.sym]>now);}),el=null,
         best=ok.filter(function(x){return x.score>=CFG.SCORE_OBS;})[0]||null;
@@ -18935,7 +18935,7 @@ window.CDC_FLASH=(function(){
     return orig.apply(this,arguments);};}
   css();
   setTimeout(tick,CFG.ARRANQUE_MS);setInterval(tick,CFG.TICK_MS);setInterval(fijar,1000);
-  return{version:"5",cfg:CFG,slotHTML:slotHTML,hay:function(){return !!ACT;},ir:ir,ver:ver,seguir:abrir,solo:solo,actual:function(){return ACT;},candidatas:function(){var a=[];if(ACT)a.push(ACT);OTROS.forEach(function(x){a.push(x);});return a;},rayo:RAYO,
+  return{version:"5",cfg:CFG,slotHTML:slotHTML,hay:function(){return !!ACT;},ir:ir,ver:ver,seguir:abrir,solo:solo,actual:function(){return ACT;},candidatas:function(){return ULT.filter(function(x){return x.score>=CFG.SCORE_OBS;});},rayo:RAYO,
     cerebro:function(){return{muestras:NET.n,aciertos:NET.ok,pendientes:PEND.length};},_t:{pre:pre,metricas:metricas,puntuar:puntuar,aprender:aprender,fwd:fwd}};
 })();
 </script>
@@ -18954,7 +18954,7 @@ window.CDC_FLASH=(function(){
     // archivo completo sin caer en la paradoja de "el hash contiene su
     // propio hash". No cambiar este texto.
     var _PLACEHOLDER = "%%CDC_INTEGRITY_HASH%%";
-    var _HASH_ESPERADO = "33a346ad00953aaee22c7a82a4b8e04bd4191a7e4e86a0634f13c58dd9f2b90b"; // ← se reemplaza por el hash real en el paso final
+    var _HASH_ESPERADO = "aaae9e634353e376d9e58ef9966143e22ae55804704209fae73da267c2da1ff1"; // ← se reemplaza por el hash real en el paso final
 
     function _bloquear(motivo) {
         try {
@@ -22055,8 +22055,7 @@ window.CDC_TRACK=(function(){
                 tarjeta("Resultado de hoy (neto)", monIncome.v == null ? "—" : (monIncome.v >= 0 ? "+" : "") + nf(monIncome.v, 3), col(monIncome.v || 0), "ganancias − comisiones") +
                 tarjeta("Bot", cfg.activo ? "ACTIVO" : "APAGADO", cfg.activo ? "#0ecb81" : "#94a3b8", pos.length + " posición(es)");
             /* alertas actuales del CDC */
-            var al = [];
-            try { CDC_DESPERTAR.lista().forEach(function (it) { if (it.r && it.r.dir < 0) al.push({ s: it.s, t: it.r.tipo === "DESMAYO_INMINENTE" ? "inminente" : it.r.tipo === "CAIDA_BRUTAL" ? "caída brutal" : "desmayo" }); }); } catch (e) {}
+            var al = alertasCDC();
             $("bdMonChips").innerHTML = al.length ? al.slice(0, 24).map(function (a) { return '<span data-sym="' + a.s + '" style="display:inline-block;margin:2px 4px 2px 0;padding:3px 8px;border-radius:12px;border:1px solid rgba(255,159,26,.5);background:rgba(255,159,26,.1);cursor:pointer">' + a.s.replace("USDT", "") + ' · ' + a.t + '</span>'; }).join("") : '<span style="color:#64748b">Ninguna moneda en desmayo ahora.</span>';
             if (!monSel || (!pos.some(function (p) { return p.symbol === monSel; }) && !al.some(function (a) { return a.s === monSel; }))) monSel = pos.length ? pos[0].symbol : (al[0] ? al[0].s : null);
             /* tabla de posiciones */
@@ -22086,6 +22085,49 @@ window.CDC_TRACK=(function(){
        Botón redondo en la columna de botones flotantes, justo ENCIMA del 🔄 Actualizar.
        ══════════════════════════════════════════════════════════════════ */
     var OPLS = "cdcBotOps_v1", CHL = "cdcBotChk_v1", ops = (function () { var a = leerLS(OPLS); return Array.isArray(a) ? a : []; })(), chk = leerLS(CHL);
+    /* ⚡ LISTA DE REBOTE v1 — junta FLASH (rebote) + DESMAYO + CAÍDA BRUTAL en una sola lista ordenada de mejor a peor.
+       Se arma con los datos del CDC (no depende de Binance), así que se ve y se actualiza aunque Binance esté limitando las peticiones. */
+    function botTomaFlash(f) { return f.pos <= FLASH_POS_MAX && f.score >= FLASH_SCORE_MIN && !f.cae; }
+    function listaRebote() {
+        var vistos = {}, r = [];
+        try { if (window.CDC_FLASH && CDC_FLASH.candidatas) CDC_FLASH.candidatas().forEach(function (f) {
+            if (!f || !/USDT$/.test(f.sym)) return; vistos[f.sym] = 1;
+            r.push({ s: f.sym, sc: f.score, pos: f.pos, ch: f.ch, px: f.price, cae: !!f.cae, dm: !!f.dm, dg: !!f.dg, fl: true, bot: botTomaFlash(f) || !!f.dm });
+        }); } catch (e) {}
+        try { CDC_DESPERTAR.lista().forEach(function (it) {
+            var q = it.r; if (!q || !(q.dir < 0) || vistos[it.s] || !/USDT$/.test(it.s)) return;
+            var c = (typeof cachedData !== "undefined" && cachedData[it.s]) || {};
+            r.push({ s: it.s, sc: q.score, pos: +c.posicionPorcentaje, ch: +(q.c24 != null ? q.c24 : c.change), px: q.price, cae: false, dm: true, dg: false, fl: false,
+                brutal: q.tipo === "CAIDA_BRUTAL", agot: /AGOT/i.test(String(q.fase || "")), bot: !(q.tipo === "DESMAYO_INMINENTE" && !cfg.incInminente) });
+        }); } catch (e) {}
+        r.sort(function (a, b) { return (b.sc || 0) - (a.sc || 0); });
+        return r;
+    }
+    function alertasCDC() {
+        var al = [], v = {};
+        try { CDC_DESPERTAR.lista().forEach(function (it) { if (it.r && it.r.dir < 0) { v[it.s] = 1; al.push({ s: it.s, t: it.r.tipo === "DESMAYO_INMINENTE" ? "inminente" : it.r.tipo === "CAIDA_BRUTAL" ? "caída brutal" : "desmayo" }); } }); } catch (e) {}
+        try { listaRebote().forEach(function (x) { if (x.fl && !v[x.s]) al.push({ s: x.s, t: "⚡ flash " + x.sc }); }); } catch (e) {}
+        return al;
+    }
+    function htmlRebote(max) {
+        var L = listaRebote().slice(0, max || 12);
+        if (!L.length) return '<div style="color:#64748b;padding:6px 2px">Ninguna moneda con rebote por ahora. FLASH y DESMAYO siguen buscando (precio menor a 0.50 USDT, en rojo y en el fondo).</div>';
+        return '<div style="color:#94a3b8;font-size:10.5px;margin-bottom:6px">De mejor a peor · toca una para ver su gráfico · 🤖 = el bot la compra con su regla (fondo ≤ ' + FLASH_POS_MAX + ' % y puntaje ≥ ' + FLASH_SCORE_MIN + ')</div>' +
+            L.map(function (x, i) {
+                var tags = [x.fl ? "⚡ FLASH" : "", x.dm ? (x.brutal ? "💥 caída brutal" : "🔻 desmayo") : "", x.dg ? "✈️ despegue" : "", x.agot ? "agotado" : "", x.cae ? "⚠️ aún cayendo" : ""].filter(Boolean).join(" · ");
+                var chc = x.ch < 0 ? "#ff6b7a" : "#0ecb81";
+                return '<div data-sym="' + esc(x.s) + '" style="display:flex;justify-content:space-between;align-items:center;gap:8px;padding:6px 8px;margin:3px 0;border-radius:8px;cursor:pointer;border:1px solid ' + (x.bot ? "rgba(14,203,129,.55)" : "rgba(255,255,255,.08)") + ';background:' + (x.bot ? "rgba(14,203,129,.08)" : "#090f1c") + '">' +
+                    '<div><b style="font-size:13px">#' + (i + 1) + ' ' + esc(x.s.replace("USDT", "")) + '</b> <span style="color:#94a3b8;font-size:10.5px">' + (isFinite(x.px) ? pf(x.px) : "—") + ' USDT</span>' +
+                    '<div style="color:#64748b;font-size:10px">' + esc(tags) + '</div></div>' +
+                    '<div style="text-align:right;font-size:10.5px"><b style="color:' + chc + '">' + (isFinite(x.ch) ? nf(x.ch, 1) + " %" : "—") + '</b> · fondo ' + (isFinite(x.pos) ? nf(x.pos, 0) + " %" : "—") +
+                    '<div><b style="color:#f3ba2f">puntaje ' + (x.sc == null ? "—" : x.sc) + '</b>' + (x.bot ? ' · 🤖' : '') + '</div></div></div>';
+            }).join("");
+    }
+    setInterval(function () {      /* se refresca solo cada 4 s, sin esperar a Binance */
+        try { var els = document.querySelectorAll(".bdReb"); if (!els.length) return; var h = htmlRebote(12);
+            for (var i = 0; i < els.length; i++) if (els[i].__sig !== h) { els[i].__sig = h; els[i].innerHTML = h; } } catch (e) {}
+    }, 4000);
+
     var fabOpen = false, fabTab = "mon", fabSel = null, fabBusy = false, fabFrameSym = null, fabData = null, fabN = 0, fabIni = false, avT = 0;
     var fabIP = "", ipBusy = false, fabFallos = 0;
     var URLS = { api: "https://www.binance.com/es-LA/my/settings/api-management", kyc: "https://www.binance.com/es-LA/my/settings/kyc",
@@ -22129,8 +22171,7 @@ window.CDC_TRACK=(function(){
                 }
                 var wallet = parseFloat(u.balance), disp = parseFloat(u.availableBalance);
                 if (!hist.length || Date.now() - hist[hist.length - 1][0] > 5000) { hist.push([Date.now(), wallet + unr]); if (hist.length > 400) hist = hist.slice(-400); escLS(EQLS, hist); }
-                var al = [];
-                try { CDC_DESPERTAR.lista().forEach(function (it) { if (it.r && it.r.dir < 0) al.push({ s: it.s, t: it.r.tipo === "DESMAYO_INMINENTE" ? "inminente" : it.r.tipo === "CAIDA_BRUTAL" ? "caída brutal" : "desmayo" }); }); } catch (e) {}
+                var al = alertasCDC();
                 fabData = { wallet: wallet, disp: disp, unr: unr, pos: pos, ords: r[2], al: al, t: Date.now() }; fabFallos = 0;
                 fabN = pos.length; pintarBadge();
                 if (!fabSel || (!pos.some(function (x) { return x.symbol === fabSel; }) && !al.some(function (x) { return x.s === fabSel; }))) fabSel = pos.length ? pos[0].symbol : (al[0] ? al[0].s : null);
@@ -22208,6 +22249,7 @@ window.CDC_TRACK=(function(){
                 '<div style="color:#94a3b8;font-size:10.5px;margin-top:3px">medio ' + pf(ent) + ' → actual ' + pf(mk) + ' · sale a ' + (tpPx ? pf(tpPx) + ' (falta +' + nf((tpPx / mk - 1) * 100, 2) + ' %)' : '<span style="color:#ff6b7a">SIN SALIDA</span>') + '</div>' +
                 '<div style="color:#64748b;font-size:10.5px">' + esc(rc) + '</div></div>';
         });
+        h += '<div class="bdf-sec">⚡ Mejores para rebote <span>(FLASH + DESMAYO)</span></div><div class="bdReb">' + htmlRebote(10) + '</div>';
         h += '<div class="bdf-sec">Monedas en alerta ahora en el CDC</div>';
         h += d.al.length ? d.al.slice(0, 20).map(function (a) { return '<span data-sym="' + esc(a.s) + '" class="bdf-chip">' + esc(a.s.replace("USDT", "")) + ' · ' + a.t + '</span>'; }).join("") : '<span style="color:#64748b">Ninguna en este momento.</span>';
         h += '<div class="bdf-sec">Evolución de tu cuenta</div>' + spark();
@@ -22623,6 +22665,7 @@ window.CDC_TRACK=(function(){
                 (prog == null ? "" : '<div class="mx-bar"><i style="width:' + prog.toFixed(0) + '%;background:#0ecb81"></i></div><div style="font-size:10px;color:#64748b;margin-top:2px">Avance hacia la salida: ' + prog.toFixed(0) + ' %</div>') + '</div>';
         }).join("") : '<div style="color:#64748b;padding:6px 2px">Sin posiciones abiertas.</div>';
         var chips = d.al.length ? d.al.slice(0, 24).map(function (a) { return '<span data-sym="' + esc(a.s) + '" class="bdf-chip">' + esc(a.s.replace("USDT", "")) + ' · ' + a.t + '</span>'; }).join("") : '<span style="color:#64748b">Ninguna en este momento.</span>';
+        var c4 = mxSec("reb", "⚡ Mejores para rebote · FLASH + DESMAYO", listaRebote().length + "", '<div class="bdReb">' + htmlRebote(12) + '</div>');
         var c2 = mxSec("pos", "📌 Posiciones abiertas", d.pos.length + " abierta(s)", '<div style="color:#94a3b8;font-size:10.5px;margin-bottom:6px">Toca una para ver su gráfico</div>' + pos) + mxSec("alr", "🔔 Monedas en alerta en el CDC", d.al.length + "", chips);
         var mi = cfg.testnet ? "t" : "r", L = (typeof ops !== "undefined" ? ops : []).filter(function (o) { return o.m === mi; });
         var c3 = mxSec("evo", "📈 Evolución de tu cuenta", "capital + PnL", spark()) + mxSec("ops", "🧾 Últimas operaciones", L.length + "", L.length ? L.slice(0, 10).map(mxOp).join("") : '<div style="color:#64748b">Todavía no hay operaciones. Aquí aparecerá cada compra, recompra, salida y cierre.</div>');
@@ -22633,9 +22676,9 @@ window.CDC_TRACK=(function(){
         var ov = '<div class="mx-ov" data-k="dis"><div class="mx-ovc big"><div class="mx-ovt">💰 BALANCE TOTAL</div>' + hero + spark() + '</div><div class="mx-ovc"><div class="mx-ovt">🍩 DISTRIBUCIÓN</div>' + donut + '</div><div class="mx-ovc"><div class="mx-ovt">📊 RENDIMIENTO</div>' + perf + '</div></div>';
         function ni(k, t, n) { return '<button type="button" class="mx-nav-i" data-go="' + k + '"><span>' + t + '</span>' + (n !== "" && n != null ? '<b>' + n + '</b>' : '') + '</button>'; }
         var on = !!cfg.activo, pill = '<span class="mx-pill ' + (on ? "on" : "off") + '">' + (on ? "ACTIVO" : "APAGADO") + '</span>';
-        var nav = '<div class="mx-navbox"><div class="mx-navt">🤖 PANEL BOT CDC ' + pill + '</div>' + ni("pos", "⚡ Operación en vivo", d.pos.length) + ni("chart", "📈 Gráfico en vivo", "") + ni("ops", "🧾 Operaciones", L.length) + ni("evo", "📉 Evolución de cuenta", "") + ni("rsk", "🛡️ Riesgo", nf(_pm, 0) + "%") + ni("dis", "🍩 Distribución", "") + ni("sts", "📊 Estadísticas", _cl.length) + ni("alr", "🔔 Alertas CDC", d.al.length) + '<div class="mx-rules"><div class="mx-rt">MODO DE OPERACIÓN</div>' + modo + '</div></div>';
+        var nav = '<div class="mx-navbox"><div class="mx-navt">🤖 PANEL BOT CDC ' + pill + '</div>' + ni("pos", "⚡ Operación en vivo", d.pos.length) + ni("chart", "📈 Gráfico en vivo", "") + ni("ops", "🧾 Operaciones", L.length) + ni("evo", "📉 Evolución de cuenta", "") + ni("rsk", "🛡️ Riesgo", nf(_pm, 0) + "%") + ni("dis", "🍩 Distribución", "") + ni("sts", "📊 Estadísticas", _cl.length) + ni("reb", "⚡ Mejores para rebote", listaRebote().length) + ni("alr", "🔔 Alertas CDC", d.al.length) + '<div class="mx-rules"><div class="mx-rt">MODO DE OPERACIÓN</div>' + modo + '</div></div>';
         var feedh = '<div class="mx-feedh"><div><b>CENTRO DE COMANDO DEL BOT</b><small>Ejecución conectada al radar CDC · ' + (cfg.testnet ? "TESTNET" : "CUENTA REAL") + '</small></div>' + pill + '</div>';
-        return '<div class="mx-grid"><div class="mx-top">' + top + '</div><div class="mx-c mx-nav">' + nav + '</div><div class="mx-c mx-der">' + (_p1[0] || "") + (_p3[1] || "") + (_p1[1] || "") + (_p1[2] || "") + (_p1[3] || "") + (_p2[1] || "") + '</div><div class="mx-c mx-cenA">' + feedh + ov + (_p2[0] || "") + '</div><div class="mx-c mx-cenB">' + (_p3[0] || "") + '</div></div>';
+        return '<div class="mx-grid"><div class="mx-top">' + top + '</div><div class="mx-c mx-nav">' + nav + '</div><div class="mx-c mx-der">' + (_p1[0] || "") + (_p3[1] || "") + (_p1[1] || "") + (_p1[2] || "") + (_p1[3] || "") + (_p2[1] || "") + '</div><div class="mx-c mx-cenA">' + feedh + ov + c4 + (_p2[0] || "") + '</div><div class="mx-c mx-cenB">' + (_p3[0] || "") + '</div></div>';
     }
     setInterval(function () {
         var e = $("mxStaleT"); if (!e) return;
