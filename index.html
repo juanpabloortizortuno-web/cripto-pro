@@ -110,6 +110,102 @@ try{new PerformanceObserver(function(l){l.getEntries().forEach(function(e){var L
 .mx-cap{font-size:10px;color:#64748b;margin-top:5px}
 @media (min-width:1100px){.mx-ov{grid-template-columns:1.5fr 1fr 1fr}}
 </style>
+<script id="cdc-net-motor">
+/* 📡 CDC NET-MOTOR v1 — CDC FUTURO-PRO (Juan Pablo Ortiz Ortuño)
+   Mide la salud de la conexión con Binance y se ajusta solo para que la página no se cuelgue ni abuse de las llamadas.
+   • MIDE (sin cambiar ninguna petición): latencia (promedio y p95), llamadas por minuto, peso estimado/real, peticiones colgadas, errores, 429/418 y congelones de pantalla.
+   • SE AJUSTA: si la red va lenta o Binance limita, sube el tiempo de caché de velas y baja cuántas monedas buscan FLASH/DESPEGUE/DESMAYO
+     (siempre empezando por las mejores candidatas); cuando todo está sano 60 s seguidos, vuelve a los valores normales.
+   • NUNCA toca las órdenes ni las llamadas firmadas de tu cuenta: esas pasan intactas.
+   • Recuerda en el navegador qué horas del día son más lentas. Apagar el ajuste: CDC_NET.auto(false) */
+(function(){
+  if(window.__cdcNetMotor)return; var of=window.fetch; if(!of)return; window.__cdcNetMotor=1;
+  var BN=/^https:\/\/(fapi|api|data-api)\.binance\.(com|vision)\//, LK="cdcNet_v1";
+  var R=[],PEND={},pid=0,WH={v:null,t:0},ADAPT=true,NIV=0,sano=0,ORIG={},LAST={},EV=[],HORA=[],gTs=0,i;
+  for(i=0;i<24;i++)HORA.push({n:0,ms:0,e:0,l:0});
+  try{var d=JSON.parse(localStorage.getItem(LK)||"{}")||{};if(d.ad===false)ADAPT=false;if(Array.isArray(d.h)&&d.h.length===24)HORA=d.h;if(Array.isArray(d.ev))EV=d.ev.slice(-20);}catch(e){}
+  function guardar(){try{localStorage.setItem(LK,JSON.stringify({ad:ADAPT,h:HORA,ev:EV}));}catch(e){}}
+  function tipo(u){ if(/signature=/.test(u))return "cuenta"; if(/\/klines/.test(u))return "velas"; if(/ticker|premiumIndex|markPrice/.test(u))return "precios"; return "otros"; }
+  function peso(u,k){ try{
+    if(k==="cuenta"){ if(/positionRisk|balance/.test(u))return 5; if(/openOrders/.test(u))return /symbol=/.test(u)?1:40; return 1; }
+    if(/\/klines/.test(u)){var m=u.match(/limit=(\d+)/),l=m?+m[1]:500;return l<100?1:l<500?2:l<1000?5:10;}
+    if(/ticker\/24hr/.test(u))return /symbol=/.test(u)?1:40; if(/premiumIndex/.test(u))return /symbol=/.test(u)?1:10; if(/futures\/data/.test(u))return 0; return 1;
+  }catch(e){return 1;} }
+  function reg(k,u,ms,st,r){ try{
+    var n=Date.now(); R.push({t:n,k:k,ms:ms,s:st,w:peso(u,k)}); while(R.length>800||(R.length&&n-R[0].t>300000))R.shift();
+    var h=new Date().getHours(),B=HORA[h]; B.n++; B.ms+=ms; if(st===0||st>=500)B.e++; if(st===429||st===418)B.l++;
+    if(r&&r.headers){var wv=r.headers.get("x-mbx-used-weight-1m"); if(wv!=null&&wv!==""){WH={v:+wv,t:n};}}
+  }catch(e){} }
+  /* observador transparente: no cambia la petición ni consume la respuesta */
+  window.fetch=function(u,o){
+    var url=typeof u==="string"?u:(u&&u.url)||""; if(!BN.test(url))return of.apply(this,arguments);
+    var k=tipo(url),id=++pid,t0=performance.now(); PEND[id]={t:Date.now(),k:k};
+    var p=of.apply(this,arguments);
+    try{p.then(function(r){delete PEND[id];reg(k,url,performance.now()-t0,r.status,r);},function(){delete PEND[id];reg(k,url,performance.now()-t0,0,null);});}catch(e){delete PEND[id];}
+    return p;
+  };
+  function stats(){
+    var now=Date.now(),w=[],j,K={velas:0,precios:0,cuenta:0,otros:0},L=[],er=0,pw=0;
+    for(j=R.length-1;j>=0;j--){if(now-R[j].t>60000)break;w.push(R[j]);}
+    w.forEach(function(x){K[x.k]=(K[x.k]||0)+1;if(x.ms>0)L.push(x.ms);if(x.s===0||x.s>=500||x.s===429||x.s===418)er++;pw+=x.w;});
+    L.sort(function(a,b){return a-b;});
+    var p50=L.length?L[Math.floor(L.length*0.5)]:0,p95=L.length?L[Math.min(L.length-1,Math.floor(L.length*0.95))]:0,avg=L.length?L.reduce(function(a,b){return a+b;},0)/L.length:0;
+    var colg=0;Object.keys(PEND).forEach(function(q){if(now-PEND[q].t>10000)colg++;});
+    var hdr=(WH.v!=null&&now-WH.t<30000)?WH.v:null,peso=hdr!=null?hdr:pw;
+    var cong=0,cmax=0;try{var Lg=window.__cdcLong||[],s0=performance.now()/1000-60;Lg.forEach(function(e){if(e[0]>=s0&&e[1]>=200){cong++;if(e[1]>cmax)cmax=e[1];}});}catch(e){}
+    var lim=false;try{lim=!!((window.__cdcApiLim&&window.__cdcApiLim.until>now)||(typeof estaPausadoPorRateLimit==="function"&&estaPausadoPorRateLimit()));}catch(e){}
+    return {calls:w.length,K:K,p50:p50,p95:p95,avg:avg,err:er,errPct:w.length>=5?er/w.length*100:0,pend:Object.keys(PEND).length,colg:colg,peso:peso,pesoReal:hdr!=null,pesoPct:peso/24,cong:cong,congMax:cmax,lim:lim};
+  }
+  function salud(st){   /* 0 = fluido · 1 = cargado · 2 = limitado  (la latencia solo cuenta con 8+ llamadas: pocas muestras engañan) */
+    var ok=st.calls>=8;
+    if(st.lim||st.colg>=3||st.pesoPct>=80||(ok&&(st.p95>4000||st.errPct>=30)))return 2;
+    if(st.colg>=1||st.pesoPct>=50||st.cong>=4||(ok&&(st.p95>1800||st.errPct>=10)))return 1; return 0;
+  }
+  function motivo(st){var m=[];if(st.lim)m.push("Binance limitando");if(st.p95>1800)m.push("latencia p95 "+Math.round(st.p95)+" ms");if(st.colg)m.push(st.colg+" petición(es) colgada(s)");
+    if(st.pesoPct>=50)m.push("peso "+Math.round(st.pesoPct)+" %");if(st.errPct>=10)m.push("errores "+Math.round(st.errPct)+" %");if(st.cong>=4)m.push(st.cong+" congelones de pantalla");return m.join(" · ")||"red normal";}
+  function knob(obj,key,id,f,min){      /* ajusta un valor SIN pisar lo que tú cambies a mano desde la consola */
+    var cur=obj[key],o=ORIG[id];
+    if(o===undefined)o=ORIG[id]=cur; else if(cur!==o&&cur!==LAST[id])o=ORIG[id]=cur;
+    var nv=Math.max(min||0,Math.round(o*f)); obj[key]=(f===1)?o:nv; LAST[id]=obj[key];
+  }
+  function aplicar(n){
+    var fT=[1,1.5,2.2][n],fC=[1,0.7,0.45][n],fD=[1,0.8,0.6][n];
+    try{if(typeof _KL_TTL!=="undefined")Object.keys(_KL_TTL).forEach(function(k){knob(_KL_TTL,k,"kl"+k,fT,1000);});}catch(e){}
+    try{if(window.CDC_FLASH&&CDC_FLASH.cfg){knob(CDC_FLASH.cfg,"MAX_CAND","fl_mc",fC,6);knob(CDC_FLASH.cfg,"KL_TTL","fl_ttl",fT,10000);}}catch(e){}
+    try{if(window.CDC_DESPEGUE&&CDC_DESPEGUE.cfg)knob(CDC_DESPEGUE.cfg,"MAX_CAND","dp_mc",fC,10);}catch(e){}
+    try{if(window.CDC_DESPERTAR&&CDC_DESPERTAR.CFG)knob(CDC_DESPERTAR.CFG,"MAX_CAND","dd_mc",fD,20);}catch(e){}
+    NIV=n;
+  }
+  function detalle(){
+    if(!NIV)return "sin ajustes: todo al ritmo normal";
+    return "velas se refrescan "+["","1.5","2.2"][NIV]+"× más despacio · candidatas FLASH "+(ORIG.fl_mc||"?")+" → "+(LAST.fl_mc||"?")+" · DESPEGUE "+(ORIG.dp_mc||"?")+" → "+(LAST.dp_mc||"?");
+  }
+  var malo=0,HIS=[];
+  function control(){
+    try{
+      var st=stats(),obj=salud(st),now=Date.now();
+      HIS.push({t:now,p:Math.round(st.p95),c:st.calls,s:obj});if(HIS.length>36)HIS.shift();
+      if(!ADAPT){if(NIV!==0){aplicar(0);}return;}
+      if(typeof document!=="undefined"&&document.hidden)return;   /* pestaña oculta: los relojes se frenan y los datos engañan */
+      if(obj>NIV){
+        malo++;   /* se confirma 2 lecturas seguidas (10 s) para no reaccionar a un pico suelto; Binance limitando actúa al instante */
+        if(malo>=2||st.lim){aplicar(obj);malo=0;sano=0;EV.push({t:now,n:obj,m:motivo(st)});if(EV.length>20)EV.shift();guardar();}
+      }else{
+        malo=0;
+        if(obj<NIV){if(!sano)sano=now;if(now-sano>=60000){aplicar(NIV-1);sano=now;EV.push({t:now,n:NIV,m:"red recuperada"});if(EV.length>20)EV.shift();guardar();}}
+        else sano=0;
+      }
+      if(now-gTs>60000){gTs=now;guardar();}
+    }catch(e){}
+  }
+  setInterval(control,5000);
+  function peoresHoras(){var a=[];HORA.forEach(function(b,h){if(b.n>=15)a.push({h:h,ms:b.ms/b.n,e:b.e,l:b.l,n:b.n});});a.sort(function(x,y){return y.ms-x.ms;});return a.slice(0,2);}
+  function reporte(){var st=stats(),sl=["FLUIDO","CARGADO","LIMITADO"][salud(st)];
+    return "CDC NET-MOTOR · "+new Date().toLocaleString()+"\nEstado: "+sl+" (nivel de ajuste "+NIV+", auto "+(ADAPT?"ACTIVO":"APAGADO")+")\nLatencia: prom "+Math.round(st.avg)+" ms · p50 "+Math.round(st.p50)+" ms · p95 "+Math.round(st.p95)+" ms\nLlamadas/min: "+st.calls+" (velas "+st.K.velas+", precios "+st.K.precios+", cuenta "+st.K.cuenta+", otras "+st.K.otros+")\nPeso: "+Math.round(st.peso)+"/2400 ("+Math.round(st.pesoPct)+" %)"+(st.pesoReal?" real":" estimado")+"\nColgadas: "+st.colg+" · Errores: "+st.err+" · Congelones: "+st.cong+"\nAjuste: "+detalle()+"\nMotivo: "+motivo(st);}
+  window.CDC_NET={reporte:reporte,historial:function(){return HIS.slice();},stats:stats,salud:function(){return salud(stats());},nivel:function(){return NIV;},detalle:detalle,motivo:function(){return motivo(stats());},
+    auto:function(v){if(v===undefined)return ADAPT;ADAPT=!!v;if(!ADAPT)aplicar(0);guardar();return ADAPT;},eventos:function(){return EV.slice();},peoresHoras:peoresHoras,horas:function(){return HORA;}};
+})();
+</script>
 <script id="cdc-net-guard">
     /* 🛡️ CDC NET-GUARD: evita llamadas repetidas a Binance (dedupe + caché corto + freno ante 429/418).
        Solo toca peticiones GET públicas sin firma; las firmadas/privadas pasan intactas. */
@@ -18954,7 +19050,7 @@ window.CDC_FLASH=(function(){
     // archivo completo sin caer en la paradoja de "el hash contiene su
     // propio hash". No cambiar este texto.
     var _PLACEHOLDER = "%%CDC_INTEGRITY_HASH%%";
-    var _HASH_ESPERADO = "aaae9e634353e376d9e58ef9966143e22ae55804704209fae73da267c2da1ff1"; // ← se reemplaza por el hash real en el paso final
+    var _HASH_ESPERADO = "4d59b7527e7bdeca1ad7ccf6859274ef3cd5067cd57c7898f43d61792744ccb8"; // ← se reemplaza por el hash real en el paso final
 
     function _bloquear(motivo) {
         try {
@@ -21996,7 +22092,8 @@ window.CDC_TRACK=(function(){
             if (cambio) escLS(ELS, espera);
             for (var i = 0; i < cand.length; i++) {
                 var sym = cand[i].s;
-                if (espera[sym] || misPos[sym]) continue;                           /* ya ganada (espera alerta nueva) o ya abierta */
+                if (espera[sym] || misPos[sym]) continue;
+                if (motorBloquea(sym)) continue;                                   /* 🧠 filtro del motor (solo si está ACTIVO y listo) */                           /* ya ganada (espera alerta nueva) o ya abierta */
                 var t0 = intentos[sym]; if (t0 && ahora - t0 < 60000) continue;
                 intentos[sym] = ahora;
                 try { await comprar(sym, cand[i].tipo); }
@@ -22092,7 +22189,7 @@ window.CDC_TRACK=(function(){
         var vistos = {}, r = [];
         try { if (window.CDC_FLASH && CDC_FLASH.candidatas) CDC_FLASH.candidatas().forEach(function (f) {
             if (!f || !/USDT$/.test(f.sym)) return; vistos[f.sym] = 1;
-            r.push({ s: f.sym, sc: f.score, pos: f.pos, ch: f.ch, px: f.price, cae: !!f.cae, dm: !!f.dm, dg: !!f.dg, fl: true, bot: botTomaFlash(f) || !!f.dm });
+            r.push({ s: f.sym, x: f.x, sc: f.score, pos: f.pos, ch: f.ch, px: f.price, cae: !!f.cae, dm: !!f.dm, dg: !!f.dg, fl: true, bot: botTomaFlash(f) || !!f.dm });
         }); } catch (e) {}
         try { CDC_DESPERTAR.lista().forEach(function (it) {
             var q = it.r; if (!q || !(q.dir < 0) || vistos[it.s] || !/USDT$/.test(it.s)) return;
@@ -22100,7 +22197,10 @@ window.CDC_TRACK=(function(){
             r.push({ s: it.s, sc: q.score, pos: +c.posicionPorcentaje, ch: +(q.c24 != null ? q.c24 : c.change), px: q.price, cae: false, dm: true, dg: false, fl: false,
                 brutal: q.tipo === "CAIDA_BRUTAL", agot: /AGOT/i.test(String(q.fase || "")), bot: !(q.tipo === "DESMAYO_INMINENTE" && !cfg.incInminente) });
         }); } catch (e) {}
-        r.sort(function (a, b) { return (b.sc || 0) - (a.sc || 0); });
+        var lis = false, um = 0.5; try { lis = motorActivo(); um = motorUmbral(); } catch (e) {}
+        r.forEach(function (q) { try { q.pm = mPred(mVec(q)); } catch (e) { q.pm = null; } if (lis && q.pm != null && q.pm < um) { q.bot = false; q.blk = true; } });
+        var ord = false; try { ord = mMetricas().listo; } catch (e) {}
+        r.sort(function (a, b) { return ord ? ((b.pm || 0) - (a.pm || 0)) : ((b.sc || 0) - (a.sc || 0)); });
         return r;
     }
     function alertasCDC() {
@@ -22111,22 +22211,163 @@ window.CDC_TRACK=(function(){
     }
     function htmlRebote(max) {
         var L = listaRebote().slice(0, max || 12);
-        if (!L.length) return '<div style="color:#64748b;padding:6px 2px">Ninguna moneda con rebote por ahora. FLASH y DESMAYO siguen buscando (precio menor a 0.50 USDT, en rojo y en el fondo).</div>';
-        return '<div style="color:#94a3b8;font-size:10.5px;margin-bottom:6px">De mejor a peor · toca una para ver su gráfico · 🤖 = el bot la compra con su regla (fondo ≤ ' + FLASH_POS_MAX + ' % y puntaje ≥ ' + FLASH_SCORE_MIN + ')</div>' +
+        if (!L.length) return htmlMotor() + '<div style="color:#64748b;padding:6px 2px">Ninguna moneda con rebote por ahora. FLASH y DESMAYO siguen buscando (precio menor a 0.50 USDT, en rojo y en el fondo).</div>';
+        return htmlMotor() + '<div style="color:#94a3b8;font-size:10.5px;margin-bottom:6px">De mejor a peor · toca una para ver su gráfico · 🤖 = el bot la compra con su regla (fondo ≤ ' + FLASH_POS_MAX + ' % y puntaje ≥ ' + FLASH_SCORE_MIN + ')</div>' +
             L.map(function (x, i) {
-                var tags = [x.fl ? "⚡ FLASH" : "", x.dm ? (x.brutal ? "💥 caída brutal" : "🔻 desmayo") : "", x.dg ? "✈️ despegue" : "", x.agot ? "agotado" : "", x.cae ? "⚠️ aún cayendo" : ""].filter(Boolean).join(" · ");
+                var tags = [x.fl ? "⚡ FLASH" : "", x.dm ? (x.brutal ? "💥 caída brutal" : "🔻 desmayo") : "", x.dg ? "✈️ despegue" : "", x.agot ? "agotado" : "", x.cae ? "⚠️ aún cayendo" : "", x.blk ? "🧠 filtro: baja probabilidad" : ""].filter(Boolean).join(" · ");
                 var chc = x.ch < 0 ? "#ff6b7a" : "#0ecb81";
                 return '<div data-sym="' + esc(x.s) + '" style="display:flex;justify-content:space-between;align-items:center;gap:8px;padding:6px 8px;margin:3px 0;border-radius:8px;cursor:pointer;border:1px solid ' + (x.bot ? "rgba(14,203,129,.55)" : "rgba(255,255,255,.08)") + ';background:' + (x.bot ? "rgba(14,203,129,.08)" : "#090f1c") + '">' +
                     '<div><b style="font-size:13px">#' + (i + 1) + ' ' + esc(x.s.replace("USDT", "")) + '</b> <span style="color:#94a3b8;font-size:10.5px">' + (isFinite(x.px) ? pf(x.px) : "—") + ' USDT</span>' +
                     '<div style="color:#64748b;font-size:10px">' + esc(tags) + '</div></div>' +
                     '<div style="text-align:right;font-size:10.5px"><b style="color:' + chc + '">' + (isFinite(x.ch) ? nf(x.ch, 1) + " %" : "—") + '</b> · fondo ' + (isFinite(x.pos) ? nf(x.pos, 0) + " %" : "—") +
-                    '<div><b style="color:#f3ba2f">puntaje ' + (x.sc == null ? "—" : x.sc) + '</b>' + (x.bot ? ' · 🤖' : '') + '</div></div></div>';
+                    '<div><b style="color:#f3ba2f">puntaje ' + (x.sc == null ? "—" : x.sc) + '</b>' + (x.pm != null && MS.n >= 10 ? ' · <b style="color:#7dd3fc">🧠 ' + Math.round(x.pm * 100) + ' %</b>' : '') + (x.bot ? ' · 🤖' : '') + '</div></div></div>';
             }).join("");
     }
     setInterval(function () {      /* se refresca solo cada 4 s, sin esperar a Binance */
         try { var els = document.querySelectorAll(".bdReb"); if (!els.length) return; var h = htmlRebote(12);
             for (var i = 0; i < els.length; i++) if (els[i].__sig !== h) { els[i].__sig = h; els[i].innerHTML = h; } } catch (e) {}
     }, 4000);
+
+    /* ═══ 🧠 MOTOR DE APRENDIZAJE v1 — CDC FUTURO-PRO (Juan Pablo Ortiz Ortuño) ═══
+       Aprende de CADA señal (FLASH · DESMAYO · CAÍDA BRUTAL): guarda sus datos al momento de aparecer y mide qué pasó después con el precio real:
+         ✅ GANA  = el precio llega al nivel de salida (+0.13 USDT netos según tu capital) ANTES de caer 25 % y en menos de 2 horas
+         ❌ PIERDE = cae 25 % primero (habría necesitado la recompra) o pasan 2 horas sin llegar
+       Con eso entrena una regresión logística pequeña (corre en tu navegador) que da la probabilidad de GANAR de cada moneda.
+       • La memoria se guarda en el navegador (localStorage, pidiendo almacenamiento persistente) y se puede exportar/importar.
+       • FASE 1 (siempre): solo observa y muestra la probabilidad 🧠 en la lista de rebote.
+       • FASE 2 (interruptor, apagado por defecto): el bot SOLO deja de comprar monedas con probabilidad baja. Se activa únicamente si hay ≥100 muestras
+         y el modelo le gana al azar (Brier). Nunca sube el monto ni cambia las reglas (+0.13, recompra al 25 %). */
+    var MK = "cdcMotor_v1", MIN_N = 100, WIN_MS = 7200000, COOL_MS = 1800000, MAXP = 60, HMAX = 400, NF = 12, mGuard = 0, mLogBloq = {};
+    var MS = (function () {
+        var d = {}; try { d = JSON.parse(localStorage.getItem(MK) || "{}") || {}; } catch (e) {}
+        var w = (Array.isArray(d.w) && d.w.length === NF) ? d.w.map(Number) : []; if (!w.length) for (var i = 0; i < NF; i++) w.push(0);
+        return { v: 1, w: w, b: +d.b || 0, n: +d.n || 0, wins: +d.wins || 0, twSum: +d.twSum || 0, on: !!d.on,
+            hist: Array.isArray(d.hist) ? d.hist : [], pend: Array.isArray(d.pend) ? d.pend : [], cool: (d.cool && typeof d.cool === "object") ? d.cool : {} };
+    })();
+    try { if (navigator.storage && navigator.storage.persist) navigator.storage.persist(); } catch (e) {}
+    function motorGuardar() {
+        try { var t = Date.now(); Object.keys(MS.cool).forEach(function (k) { if (t - MS.cool[k] > 86400000) delete MS.cool[k]; }); localStorage.setItem(MK, JSON.stringify(MS)); } catch (e) {}
+    }
+    function mSig(z) { return 1 / (1 + Math.exp(-Math.max(-30, Math.min(30, z)))); }
+    function mPred(v) { var z = MS.b; for (var i = 0; i < NF; i++) z += MS.w[i] * (+v[i] || 0); return mSig(z); }
+    function mVec(r) {
+        var c = (typeof cachedData !== "undefined" && cachedData[r.s]) || {}, x;
+        if (r.x && r.x.length === 8) x = r.x.slice(); else x = [1 - Math.min(100, Math.max(0, +r.pos || 0)) / 100, Math.min(+c.rangoPct24h || 0, 60) / 60, Math.min(Math.max(-(+r.ch || 0), 0), 40) / 40, 0, 0, 0, 0, 0];
+        for (var i = 0; i < 8; i++) x[i] = Math.round((+x[i] || 0) * 10000) / 10000;
+        x.push(r.dm ? 1 : 0, r.dg ? 1 : 0, r.fl ? 1 : 0, Math.round(Math.min(100, Math.max(0, +r.sc || 0)) * 10) / 1000);
+        return x;
+    }
+    function mEntrenar() {
+        var H = MS.hist.slice(-200), lr = 0.08;
+        for (var e = 0; e < 6; e++) H.forEach(function (h) { var er = h.y - mPred(h.x); for (var i = 0; i < NF; i++) MS.w[i] += lr * (er * h.x[i] - 0.005 * MS.w[i]); MS.b += lr * er; });
+    }
+    function mMetricas() {
+        var H = MS.hist.slice(-100);
+        if (!H.length) return { n: MS.n, base: null, brier: null, ref: null, listo: false };
+        var s = 0, b = 0; H.forEach(function (h) { s += h.y; b += Math.pow((h.p == null ? 0.5 : h.p) - h.y, 2); });
+        var base = s / H.length, brier = b / H.length, ref = base * (1 - base);
+        return { n: MS.n, base: base, brier: brier, ref: ref, listo: MS.n >= MIN_N && H.length >= MIN_N && brier < ref * 0.97 };
+    }
+    function motorUmbral() { var m = mMetricas(); return m.base == null ? 0.5 : Math.min(0.7, Math.max(0.3, m.base + 0.03)); }
+    function motorActivo() { return !!MS.on && mMetricas().listo; }
+    function mObjPct() {      /* % que debe subir el precio para ganar +0.13 USDT netos con el capital actual (incluye comisiones) */
+        var w = (typeof fabData !== "undefined" && fabData && fabData.wallet > 0) ? fabData.wallet : 12, m, mm = modoMulti(w), pfl;
+        if (mm) m = mm.presup * cfg.multi.ent / 100; else { pfl = elegirPerfil(w) || { ent: 99 }; m = w * pfl.ent / 100; }
+        m = Math.max(5, m); return TP_FIJO / m * 100 + cfg.feeIn + cfg.feeOut;
+    }
+    function motorTick() {
+        try {
+            var ahora = Date.now(), C = (typeof cachedData !== "undefined") ? cachedData : {}, cambio = false;
+            MS.pend = MS.pend.filter(function (it) {         /* seguimiento de lo que pasó después de cada señal */
+                if (ahora - it.last > 900000) { cambio = true; return false; }   /* la página estuvo cerrada: esa muestra no sirve */
+                var c = C[it.s], px = c ? +c.price : 0; if (!(px > 0)) return true;
+                it.last = ahora;
+                var fin = null; if (px >= it.tg) fin = 1; else if (px <= it.ad) fin = 0; else if (ahora - it.t0 >= WIN_MS) fin = 0;
+                if (fin === null) return true;
+                cambio = true; MS.n++; MS.wins += fin; if (fin) MS.twSum += ahora - it.t0;
+                MS.hist.push({ x: it.x, y: fin, p: Math.round(it.p * 1000) / 1000, s: it.s, t: ahora }); if (MS.hist.length > HMAX) MS.hist.shift();
+                mEntrenar(); return false;
+            });
+            var obj = mObjPct();
+            listaRebote().slice(0, 20).forEach(function (r) {   /* nuevas señales para aprender */
+                if (MS.pend.length >= MAXP || !(r.px > 0)) return;
+                if (MS.pend.some(function (q) { return q.s === r.s; }) || ahora - (MS.cool[r.s] || 0) < COOL_MS) return;
+                var v = mVec(r); MS.cool[r.s] = ahora;
+                MS.pend.push({ s: r.s, t0: ahora, last: ahora, p0: r.px, tg: r.px * (1 + obj / 100), ad: r.px * 0.75, x: v, p: mPred(v) }); cambio = true;
+            });
+            if (cambio || ahora - mGuard > 60000) { mGuard = ahora; motorGuardar(); }
+        } catch (e) {}
+    }
+    setInterval(motorTick, 10000);
+    function motorBloquea(sym) {
+        try {
+            if (!motorActivo()) return false;
+            var r = listaRebote().filter(function (x) { return x.s === sym; })[0], um = motorUmbral(); if (!r || r.pm == null || r.pm >= um) return false;
+            var a = Date.now(); if (a - (mLogBloq[sym] || 0) > 300000) { mLogBloq[sym] = a; log("🧠 Motor: no compra " + sym + " (probabilidad " + Math.round(r.pm * 100) + " % < " + Math.round(um * 100) + " %)"); }
+            return true;
+        } catch (e) { return false; }
+    }
+    function htmlMotor() {
+        var m = mMetricas(), est, col;
+        if (motorActivo()) { est = "FILTRO ACTIVO"; col = "#0ecb81"; } else if (m.listo) { est = "LISTO · filtro apagado"; col = "#f3ba2f"; } else { est = "OBSERVANDO " + Math.min(MS.n, MIN_N) + "/" + MIN_N; col = "#7dd3fc"; }
+        var win = MS.n ? Math.round(MS.wins / MS.n * 100) + " %" : "—", tm = MS.wins ? Math.round(MS.twSum / MS.wins / 60000) + " min" : "—";
+        var bt = 'style="cursor:pointer;border:1px solid rgba(255,255,255,.2);background:#0b1220;color:#e2e8f0;border-radius:6px;padding:3px 8px;font-size:10px;margin:3px 4px 0 0"';
+        return '<div style="border:1px solid ' + col + '66;background:rgba(125,211,252,.05);border-radius:8px;padding:7px 9px;margin-bottom:8px;font-size:10.5px;color:#cbd5e1">' +
+            '<div style="display:flex;justify-content:space-between;align-items:center"><b style="color:#7dd3fc">🧠 MOTOR DE APRENDIZAJE</b><b style="color:' + col + '">' + est + '</b></div>' +
+            '<div style="margin-top:3px">Muestras <b>' + MS.n + '</b> · en seguimiento <b>' + MS.pend.length + '</b> · ganan +0.13 sin recompra (≤2 h): <b>' + win + '</b> · tiempo medio <b>' + tm + '</b></div>' +
+            '<div style="color:#94a3b8">' + (m.brier == null ? "Aún sin resultados: aprende de cada señal que se resuelve." : "Error del modelo " + m.brier.toFixed(3) + " vs azar " + m.ref.toFixed(3) + (m.listo ? " ✓ le gana al azar" : " · todavía no le gana al azar")) + '</div>' +
+            '<div><span data-motor="filtro" ' + bt + '>' + (MS.on ? "⏸ Apagar filtro del bot" : "▶ Activar filtro del bot") + '</span><span data-motor="exp" ' + bt + '>💾 Exportar memoria</span><span data-motor="imp" ' + bt + '>📥 Importar</span><span data-motor="reset" ' + bt + '>🗑 Reiniciar</span></div></div>';
+    }
+    function motorRefrescarUI() { try { var els = document.querySelectorAll(".bdReb"); if (!els.length) return; var h = htmlRebote(12); for (var i = 0; i < els.length; i++) { els[i].__sig = h; els[i].innerHTML = h; } } catch (e) {} }
+    document.addEventListener("click", function (e) {
+        var t = e.target && e.target.closest ? e.target.closest("[data-motor]") : null; if (!t) return; var a = t.getAttribute("data-motor");
+        if (a === "filtro") {
+            MS.on = !MS.on; motorGuardar();
+            if (MS.on && !mMetricas().listo) alert("Filtro activado, pero el motor todavía está aprendiendo. Empezará a filtrar solo cuando tenga " + MIN_N + " muestras y le gane al azar; mientras tanto el bot compra como siempre.");
+        } else if (a === "exp") {
+            try { var bl = new Blob([JSON.stringify(MS)], { type: "application/json" }), u = URL.createObjectURL(bl), l = document.createElement("a"); l.href = u; l.download = "memoria-motor-cdc-" + new Date().toISOString().slice(0, 10) + ".json"; document.body.appendChild(l); l.click(); l.remove(); setTimeout(function () { URL.revokeObjectURL(u); }, 3000); } catch (x) { alert("No se pudo exportar: " + x.message); }
+        } else if (a === "imp") {
+            var inp = document.createElement("input"); inp.type = "file"; inp.accept = ".json,application/json";
+            inp.onchange = function () { var f = inp.files && inp.files[0]; if (!f) return; var rd = new FileReader(); rd.onload = function () {
+                try { var d = JSON.parse(rd.result); if (!d || !Array.isArray(d.w) || d.w.length !== NF || !Array.isArray(d.hist)) throw new Error("archivo no válido");
+                    if (!confirm("¿Reemplazar la memoria actual (" + MS.n + " muestras) por la del archivo (" + (+d.n || 0) + " muestras)?")) return;
+                    MS.w = d.w.map(Number); MS.b = +d.b || 0; MS.n = +d.n || 0; MS.wins = +d.wins || 0; MS.twSum = +d.twSum || 0; MS.hist = d.hist.slice(-HMAX); MS.pend = []; motorGuardar(); motorRefrescarUI();
+                } catch (x) { alert("No se pudo importar: " + x.message); } }; rd.readAsText(f); };
+            inp.click(); return;
+        } else if (a === "reset") {
+            if (!confirm("¿Borrar TODO lo que aprendió el motor? (no toca tu cuenta de Binance)")) return;
+            MS.w = []; for (var i = 0; i < NF; i++) MS.w.push(0); MS.b = 0; MS.n = 0; MS.wins = 0; MS.twSum = 0; MS.hist = []; MS.pend = []; MS.cool = {}; motorGuardar();
+        }
+        motorRefrescarUI();
+    });
+    window.CDC_MOTOR = { estado: function () { var m = mMetricas(); return { muestras: MS.n, ganan: MS.wins, seguimiento: MS.pend.length, brier: m.brier, azar: m.ref, listo: m.listo, filtro: motorActivo(), umbral: motorUmbral() }; }, prob: function (s) { var r = listaRebote().filter(function (x) { return x.s === s; })[0]; return r ? r.pm : null; } };
+
+    /* ═══ 📡 RED Y LATENCIA (panel) — lee CDC_NET (cabecera del archivo) ═══ */
+    function htmlRed() {
+        var N = window.CDC_NET; if (!N) return '<div style="color:#64748b">Motor de red no disponible.</div>';
+        var st = N.stats(), sl = N.salud(), nv = N.nivel(), au = N.auto();
+        var col = sl === 0 ? "#0ecb81" : sl === 1 ? "#f3ba2f" : "#ff6b7a", tx = sl === 0 ? "🟢 FLUIDO" : sl === 1 ? "🟡 CARGADO" : "🔴 LIMITADO";
+        var bt = 'style="cursor:pointer;border:1px solid rgba(255,255,255,.2);background:#0b1220;color:#e2e8f0;border-radius:6px;padding:3px 8px;font-size:10px;margin:3px 4px 0 0"';
+        var ph = N.peoresHoras().map(function (x) { return (x.h < 10 ? "0" : "") + x.h + ":00 (" + Math.round(x.ms) + " ms)"; }).join(" · ");
+        var ev = N.eventos().slice(-3).reverse().map(function (e) { return new Date(e.t).toLocaleTimeString() + " → nivel " + e.n + ": " + e.m; }).join("<br>");
+        return '<div style="border:1px solid ' + col + '66;background:rgba(255,255,255,.03);border-radius:8px;padding:7px 9px;font-size:10.5px;color:#cbd5e1">' +
+            '<div style="display:flex;justify-content:space-between;align-items:center"><b style="color:#7dd3fc">📡 RED Y LATENCIA</b><b style="color:' + col + '">' + tx + '</b></div>' +
+            '<div style="margin-top:3px">Latencia Binance: promedio <b>' + Math.round(st.avg) + ' ms</b> · p95 <b>' + Math.round(st.p95) + ' ms</b></div>' +
+            '<div>Llamadas por minuto: <b>' + st.calls + '</b> <span style="color:#94a3b8">(velas ' + st.K.velas + ' · precios ' + st.K.precios + ' · cuenta ' + st.K.cuenta + ' · otras ' + st.K.otros + ')</span></div>' +
+            '<div>Peso ' + (st.pesoReal ? "" : "estimado ") + '<b>' + Math.round(st.peso) + ' / 2400</b> (' + Math.round(st.pesoPct) + ' %) · en espera <b>' + st.pend + '</b> · colgadas (&gt;10 s) <b>' + st.colg + '</b> · errores <b>' + st.err + '</b></div>' +
+            (function(){var H=N.historial();if(H.length<3)return '';var mx=Math.max.apply(null,H.map(function(x){return x.p;}).concat([500])),b='';H.forEach(function(x){var c=x.s===0?"#0ecb81":x.s===1?"#f3ba2f":"#ff6b7a";b+='<i style="flex:1;min-height:2px;border-radius:2px 2px 0 0;background:'+c+';height:'+Math.max(2,Math.round(x.p/mx*100))+'%"></i>';});return '<div style="display:flex;align-items:flex-end;gap:2px;height:26px;margin:4px 0 2px" title="p95 de latencia, últimos 3 min">'+b+'</div>';})() +
+            '<div>Congelones de pantalla (60 s): <b>' + st.cong + '</b>' + (st.cong ? ' <span style="color:#94a3b8">(el peor ' + Math.round(st.congMax) + ' ms)</span>' : '') + '</div>' +
+            '<div style="color:#94a3b8;margin-top:3px">Ajuste automático ' + (au ? '<b style="color:#0ecb81">ACTIVO</b>' : '<b style="color:#f3ba2f">APAGADO</b>') + ' · nivel <b>' + nv + '</b>: ' + N.detalle() + '</div>' +
+            (ph ? '<div style="color:#94a3b8">Horas más lentas (memoria): ' + ph + '</div>' : '') + (ev ? '<div style="color:#64748b;margin-top:2px">' + ev + '</div>' : '') +
+            '<div><span data-net="copiar" ' + bt + '>📋 Copiar reporte</span><span data-net="auto" ' + bt + '>' + (au ? "⏸ Apagar ajuste automático" : "▶ Activar ajuste automático") + '</span></div></div>';
+    }
+    setInterval(function () { try { var els = document.querySelectorAll(".bdNet"); if (!els.length) return; var h = htmlRed(); for (var i = 0; i < els.length; i++) if (els[i].__sig !== h) { els[i].__sig = h; els[i].innerHTML = h; } } catch (e) {} }, 3000);
+    document.addEventListener("click", function (e) {
+        var t = e.target && e.target.closest ? e.target.closest("[data-net]") : null; if (!t || !window.CDC_NET) return;
+        if (t.getAttribute("data-net") === "copiar") { try { var rp = CDC_NET.reporte(); (navigator.clipboard ? navigator.clipboard.writeText(rp) : Promise.reject()).then(function () { t.textContent = "✅ Copiado"; }, function () { window.prompt("Copia el reporte:", rp); }); } catch (x) {} return; }
+        CDC_NET.auto(!CDC_NET.auto());
+        try { var els = document.querySelectorAll(".bdNet"), h = htmlRed(); for (var i = 0; i < els.length; i++) { els[i].__sig = h; els[i].innerHTML = h; } } catch (x) {}
+    });
 
     var fabOpen = false, fabTab = "mon", fabSel = null, fabBusy = false, fabFrameSym = null, fabData = null, fabN = 0, fabIni = false, avT = 0;
     var fabIP = "", ipBusy = false, fabFallos = 0;
@@ -22249,6 +22490,7 @@ window.CDC_TRACK=(function(){
                 '<div style="color:#94a3b8;font-size:10.5px;margin-top:3px">medio ' + pf(ent) + ' → actual ' + pf(mk) + ' · sale a ' + (tpPx ? pf(tpPx) + ' (falta +' + nf((tpPx / mk - 1) * 100, 2) + ' %)' : '<span style="color:#ff6b7a">SIN SALIDA</span>') + '</div>' +
                 '<div style="color:#64748b;font-size:10.5px">' + esc(rc) + '</div></div>';
         });
+        h += '<div class="bdf-sec">📡 Red y latencia</div><div class="bdNet">' + htmlRed() + '</div>';
         h += '<div class="bdf-sec">⚡ Mejores para rebote <span>(FLASH + DESMAYO)</span></div><div class="bdReb">' + htmlRebote(10) + '</div>';
         h += '<div class="bdf-sec">Monedas en alerta ahora en el CDC</div>';
         h += d.al.length ? d.al.slice(0, 20).map(function (a) { return '<span data-sym="' + esc(a.s) + '" class="bdf-chip">' + esc(a.s.replace("USDT", "")) + ' · ' + a.t + '</span>'; }).join("") : '<span style="color:#64748b">Ninguna en este momento.</span>';
@@ -22666,6 +22908,7 @@ window.CDC_TRACK=(function(){
         }).join("") : '<div style="color:#64748b;padding:6px 2px">Sin posiciones abiertas.</div>';
         var chips = d.al.length ? d.al.slice(0, 24).map(function (a) { return '<span data-sym="' + esc(a.s) + '" class="bdf-chip">' + esc(a.s.replace("USDT", "")) + ' · ' + a.t + '</span>'; }).join("") : '<span style="color:#64748b">Ninguna en este momento.</span>';
         var c4 = mxSec("reb", "⚡ Mejores para rebote · FLASH + DESMAYO", listaRebote().length + "", '<div class="bdReb">' + htmlRebote(12) + '</div>');
+        var c5 = mxSec("net", "📡 Red y latencia", (window.CDC_NET ? ["🟢", "🟡", "🔴"][CDC_NET.salud()] : ""), '<div class="bdNet">' + htmlRed() + '</div>');
         var c2 = mxSec("pos", "📌 Posiciones abiertas", d.pos.length + " abierta(s)", '<div style="color:#94a3b8;font-size:10.5px;margin-bottom:6px">Toca una para ver su gráfico</div>' + pos) + mxSec("alr", "🔔 Monedas en alerta en el CDC", d.al.length + "", chips);
         var mi = cfg.testnet ? "t" : "r", L = (typeof ops !== "undefined" ? ops : []).filter(function (o) { return o.m === mi; });
         var c3 = mxSec("evo", "📈 Evolución de tu cuenta", "capital + PnL", spark()) + mxSec("ops", "🧾 Últimas operaciones", L.length + "", L.length ? L.slice(0, 10).map(mxOp).join("") : '<div style="color:#64748b">Todavía no hay operaciones. Aquí aparecerá cada compra, recompra, salida y cierre.</div>');
@@ -22676,9 +22919,9 @@ window.CDC_TRACK=(function(){
         var ov = '<div class="mx-ov" data-k="dis"><div class="mx-ovc big"><div class="mx-ovt">💰 BALANCE TOTAL</div>' + hero + spark() + '</div><div class="mx-ovc"><div class="mx-ovt">🍩 DISTRIBUCIÓN</div>' + donut + '</div><div class="mx-ovc"><div class="mx-ovt">📊 RENDIMIENTO</div>' + perf + '</div></div>';
         function ni(k, t, n) { return '<button type="button" class="mx-nav-i" data-go="' + k + '"><span>' + t + '</span>' + (n !== "" && n != null ? '<b>' + n + '</b>' : '') + '</button>'; }
         var on = !!cfg.activo, pill = '<span class="mx-pill ' + (on ? "on" : "off") + '">' + (on ? "ACTIVO" : "APAGADO") + '</span>';
-        var nav = '<div class="mx-navbox"><div class="mx-navt">🤖 PANEL BOT CDC ' + pill + '</div>' + ni("pos", "⚡ Operación en vivo", d.pos.length) + ni("chart", "📈 Gráfico en vivo", "") + ni("ops", "🧾 Operaciones", L.length) + ni("evo", "📉 Evolución de cuenta", "") + ni("rsk", "🛡️ Riesgo", nf(_pm, 0) + "%") + ni("dis", "🍩 Distribución", "") + ni("sts", "📊 Estadísticas", _cl.length) + ni("reb", "⚡ Mejores para rebote", listaRebote().length) + ni("alr", "🔔 Alertas CDC", d.al.length) + '<div class="mx-rules"><div class="mx-rt">MODO DE OPERACIÓN</div>' + modo + '</div></div>';
+        var nav = '<div class="mx-navbox"><div class="mx-navt">🤖 PANEL BOT CDC ' + pill + '</div>' + ni("pos", "⚡ Operación en vivo", d.pos.length) + ni("chart", "📈 Gráfico en vivo", "") + ni("ops", "🧾 Operaciones", L.length) + ni("evo", "📉 Evolución de cuenta", "") + ni("rsk", "🛡️ Riesgo", nf(_pm, 0) + "%") + ni("dis", "🍩 Distribución", "") + ni("sts", "📊 Estadísticas", _cl.length) + ni("reb", "⚡ Mejores para rebote", listaRebote().length) + ni("net", "📡 Red y latencia", "") + ni("alr", "🔔 Alertas CDC", d.al.length) + '<div class="mx-rules"><div class="mx-rt">MODO DE OPERACIÓN</div>' + modo + '</div></div>';
         var feedh = '<div class="mx-feedh"><div><b>CENTRO DE COMANDO DEL BOT</b><small>Ejecución conectada al radar CDC · ' + (cfg.testnet ? "TESTNET" : "CUENTA REAL") + '</small></div>' + pill + '</div>';
-        return '<div class="mx-grid"><div class="mx-top">' + top + '</div><div class="mx-c mx-nav">' + nav + '</div><div class="mx-c mx-der">' + (_p1[0] || "") + (_p3[1] || "") + (_p1[1] || "") + (_p1[2] || "") + (_p1[3] || "") + (_p2[1] || "") + '</div><div class="mx-c mx-cenA">' + feedh + ov + c4 + (_p2[0] || "") + '</div><div class="mx-c mx-cenB">' + (_p3[0] || "") + '</div></div>';
+        return '<div class="mx-grid"><div class="mx-top">' + top + '</div><div class="mx-c mx-nav">' + nav + '</div><div class="mx-c mx-der">' + (_p1[0] || "") + (_p3[1] || "") + (_p1[1] || "") + (_p1[2] || "") + (_p1[3] || "") + (_p2[1] || "") + '</div><div class="mx-c mx-cenA">' + feedh + ov + c4 + c5 + (_p2[0] || "") + '</div><div class="mx-c mx-cenB">' + (_p3[0] || "") + '</div></div>';
     }
     setInterval(function () {
         var e = $("mxStaleT"); if (!e) return;
