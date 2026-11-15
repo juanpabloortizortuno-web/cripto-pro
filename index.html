@@ -2467,6 +2467,7 @@ td,.cdcbn-v,.cdcbn-pct,.gauge-display-val,#cryptoList span,.mx-kpi b,.mx-g b,.bc
 #bdCon .bc-h{position:sticky;top:0;margin:0 0 12px;border-radius:0;border:0;border-bottom:1px solid rgba(243,186,47,.45);z-index:50;padding-top:calc(8px + env(safe-area-inset-top,0px));background:#0b1120 !important}
 #bdCon.mx-wide .bc-in,#bdCon .bc-in{max-width:none !important;width:100%;padding:0 14px 30px !important;box-sizing:border-box}
 #bdCon .mx-slot:empty{display:none}
+@media (min-width:1100px){#bdCon.mx-wide #bcVmon{grid-template-columns:240px minmax(0,1.4fr) minmax(0,1fr) 330px}}
 #bdCon .mx-slot{margin-top:0}
 #bdCon #bcManCard,#bdCon #mxSlotPM>.bdf-card{flex:1 1 100%}
 #bdCon .mx-der .mx-feedh,#bdCon .mx-nav .mx-navbox{position:static}
@@ -2480,17 +2481,17 @@ td,.cdcbn-v,.cdcbn-pct,.gauge-display-val,#cryptoList span,.mx-kpi b,.mx-g b,.bc
 @media (min-width:1100px){
 #bdCon.mx-wide #bcVmon{grid-template-columns:250px minmax(0,1.35fr) minmax(0,1fr) 340px}
 #bdCon.mx-wide .mx-nav{grid-column:1;grid-row:2/span 5}
-#bdCon.mx-wide #bcChart{grid-column:2;grid-row:2;align-self:start}
-#bdCon.mx-wide .mx-cenD{grid-column:3;grid-row:2;align-self:start}
-#bdCon.mx-wide .mx-cenO{grid-column:2/4;grid-row:3}
+#bdCon.mx-wide .mx-cenO{grid-column:2/4;grid-row:2}
+#bdCon.mx-wide #bcChart{grid-column:2;grid-row:3;align-self:start}
+#bdCon.mx-wide .mx-cenD{grid-column:3;grid-row:3;align-self:start}
 #bdCon.mx-wide .mx-cenC{grid-column:2/4;grid-row:4}
 #bdCon.mx-wide .mx-cenB{grid-column:2/4;grid-row:5}
 #bdCon.mx-wide .mx-der{grid-column:4;grid-row:2/span 4}
 }
 @media (min-width:720px) and (max-width:1099px){
-#bdCon.mx-wide #bcChart{grid-column:1;grid-row:2}
-#bdCon.mx-wide .mx-cenD{grid-column:1;grid-row:3}
-#bdCon.mx-wide .mx-cenO{grid-column:1;grid-row:4}
+#bdCon.mx-wide .mx-cenO{grid-column:1;grid-row:2}
+#bdCon.mx-wide #bcChart{grid-column:1;grid-row:3}
+#bdCon.mx-wide .mx-cenD{grid-column:1;grid-row:4}
 #bdCon.mx-wide .mx-cenC{grid-column:1;grid-row:5}
 #bdCon.mx-wide .mx-cenB{grid-column:1;grid-row:6}
 #bdCon.mx-wide .mx-der{grid-column:2;grid-row:2/span 5}
@@ -19112,7 +19113,7 @@ window.CDC_FLASH=(function(){
     // archivo completo sin caer en la paradoja de "el hash contiene su
     // propio hash". No cambiar este texto.
     var _PLACEHOLDER = "%%CDC_INTEGRITY_HASH%%";
-    var _HASH_ESPERADO = "bfc61c34f489777ee0c20c649ebd3b5672d374f7a21a1c2907ada039affecdd0"; // ← se reemplaza por el hash real en el paso final
+    var _HASH_ESPERADO = "8ef4e4bcda56b8506eefc1f43e4f987ccf2904d07f7da69db73dd2af3c4d5353"; // ← se reemplaza por el hash real en el paso final
 
     function _bloquear(motivo) {
         try {
@@ -23162,7 +23163,7 @@ window.CDC_TRACK=(function(){
                 '<button type="button" class="mx-vc" data-go="net"><small>📡 RED Y LATENCIA</small><b style="color:' + _nc + '">● ' + _nt + '</b><span>' + (_st ? Math.round(_st.avg) + ' ms · p95 ' + Math.round(_st.p95) + ' ms · peso ' + Math.round(_st.pesoPct) + ' %' : 'sin datos') + '</span></button>' +
                 '<button type="button" class="mx-vc" data-go="bot"><small>🤖 BOT</small><b style="color:' + (cfg.activo ? "#0ecb81" : "#94a3b8") + '">' + (cfg.activo ? "● ACTIVO" : "○ APAGADO") + '</b><span>' + (d.pos ? d.pos.length : 0) + ' posición(es)</span></button></div>';
         } catch (e) { vig = ""; }
-        return '<div class="mx-grid"><div class="mx-top">' + top + '</div><div class="mx-c mx-nav">' + nav + '<div id="mxSlotMan" class="mx-slot mx-slotrow"></div></div><div class="mx-c mx-der">' + feedh + vig + '<div id="mxSlotPM" class="mx-slot mx-slotrow"></div>' + (_p1[0] || "") + '<div id="mxSlotManB" class="mx-slot mx-slotrow"></div>' + (_p3[1] || "") + (_p1[1] || "") + (_p1[2] || "") + (_p1[3] || "") + '</div><div class="mx-c mx-cenO">' + ov + '</div><div class="mx-c mx-cenD">' + (_p2[0] || "") + (_p2[1] || "") + '</div><div class="mx-c mx-cenC">' + c4 + c5 + '</div><div class="mx-c mx-cenB">' + (_p3[0] || "") + '</div></div>';
+        return '<div class="mx-grid"><div class="mx-top">' + top + '</div><div class="mx-c mx-nav"><div id="mxSlotMan" class="mx-slot mx-slotrow"></div>' + nav + '</div><div class="mx-c mx-der">' + feedh + vig + '<div id="mxSlotPM" class="mx-slot mx-slotrow"></div>' + (_p1[0] || "") + '<div id="mxSlotManB" class="mx-slot mx-slotrow"></div>' + (_p3[1] || "") + (_p1[1] || "") + (_p1[2] || "") + (_p1[3] || "") + '</div><div class="mx-c mx-cenO">' + ov + '</div><div class="mx-c mx-cenD">' + (_p2[0] || "") + (_p2[1] || "") + '</div><div class="mx-c mx-cenC">' + c4 + c5 + '</div><div class="mx-c mx-cenB">' + (_p3[0] || "") + '</div></div>';
     }
     setInterval(function () {
         var e = $("mxStaleT"); if (!e) return;
