@@ -2459,13 +2459,13 @@ td,.cdcbn-v,.cdcbn-pct,.gauge-display-val,#cryptoList span,.mx-kpi b,.mx-g b,.bc
 <style id="tmLayout2">
 /* Juan Pablo: izquierda = menú + Ajuste manual · centro = Gráfico+Posiciones, luego Balance/Distribución/Rendimiento · derecha = Centro de comando + Marcapasos + Mi billetera */
 /* Barra "CONEXIÓN BINANCE" más abajo y como tarjeta, para que no quede tapada por la barra del navegador */
-#bdCon{padding-top:calc(46px + env(safe-area-inset-top,0px)) !important}
-#bdCon::before{content:"";position:fixed;top:0;left:0;right:0;height:calc(46px + env(safe-area-inset-top,0px));background:#0d1526;z-index:5;pointer-events:none}
+#bdCon{padding-top:0 !important}
 #bdCon .bc-fus{display:flex;align-items:center;gap:10px;flex-wrap:nowrap}
 #bdCon .bc-fus>b{white-space:nowrap}
 #bdCon .bc-fus .bdf-tabs{flex:1;min-width:0;margin:0 !important;max-width:none !important;grid-template-columns:repeat(4,1fr) !important}
 @media (max-width:719px){#bdCon .bc-fus{flex-wrap:wrap}#bdCon .bc-fus .bdf-tabs{order:3;flex:1 1 100%;grid-template-columns:repeat(2,1fr) !important}}
-#bdCon .bc-h{margin:0 12px 10px;top:calc(46px + env(safe-area-inset-top,0px));z-index:6;border:1px solid rgba(243,186,47,.35);border-radius:12px}
+#bdCon .bc-h{position:sticky;top:0;margin:0 0 12px;border-radius:0;border:0;border-bottom:1px solid rgba(243,186,47,.45);z-index:50;padding-top:calc(8px + env(safe-area-inset-top,0px));background:#0b1120 !important}
+#bdCon.mx-wide .bc-in,#bdCon .bc-in{max-width:none !important;width:100%;padding:0 14px 30px !important;box-sizing:border-box}
 #bdCon .mx-slot:empty{display:none}
 #bdCon .mx-slot{margin-top:0}
 #bdCon #bcManCard,#bdCon #mxSlotPM>.bdf-card{flex:1 1 100%}
@@ -19112,7 +19112,7 @@ window.CDC_FLASH=(function(){
     // archivo completo sin caer en la paradoja de "el hash contiene su
     // propio hash". No cambiar este texto.
     var _PLACEHOLDER = "%%CDC_INTEGRITY_HASH%%";
-    var _HASH_ESPERADO = "7fed2f3e4dbe360a5eb3234b1f99f3fe5293828fc716954a4d6fdb622a8ab0e0"; // ← se reemplaza por el hash real en el paso final
+    var _HASH_ESPERADO = "bfc61c34f489777ee0c20c649ebd3b5672d374f7a21a1c2907ada039affecdd0"; // ← se reemplaza por el hash real en el paso final
 
     function _bloquear(motivo) {
         try {
