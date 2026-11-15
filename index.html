@@ -19050,7 +19050,7 @@ window.CDC_FLASH=(function(){
     // archivo completo sin caer en la paradoja de "el hash contiene su
     // propio hash". No cambiar este texto.
     var _PLACEHOLDER = "%%CDC_INTEGRITY_HASH%%";
-    var _HASH_ESPERADO = "3442b24bbd4fcc62b73622900cea436bc8b43e8dc21eb9a76202456743c483f3"; // ← se reemplaza por el hash real en el paso final
+    var _HASH_ESPERADO = "3267211926583a2a296c451abac0a75e12d1cfaf7c1cae7871697e04d6eaf6a6"; // ← se reemplaza por el hash real en el paso final
 
     function _bloquear(motivo) {
         try {
@@ -20690,14 +20690,15 @@ setTimeout(function(){setInterval(tick,CFG.TICK_MS);},CFG.ARRANQUE_MS);
     setInterval(function () { try { muestrearDes(); cuadroDes(); } catch (e) {} }, 300);
     /* ═══ CUADRO "MONEDAS CON DESMAYO" — FIN ═══ */
     /* ═══ 🧮 PLAN DESMAYO v1 — CDC FUTURO-PRO (Juan Pablo Ortiz Ortuño) — INICIO ═══
-       • TP NETO por capital:  capital < 50 USDT → 0.10 USDT · capital 100 USDT (o más) → 0.50 USDT · entre 50 y 100 sube en línea recta (0.10 → 0.50).
+       • TP NETO ESTÁNDAR: 0.05 USDT para cualquier capital (v10).
        • MARCA DE SIGUIENTE INVERSIÓN: si la moneda sigue cayendo, el cuadro marca el precio de la próxima recompra. El % de caída AUMENTA en cada nivel (×1.5)
          y el paso base se adapta a la volatilidad real de la moneda (velas 1m) y a la fase del desmayo (ACELERANDO más ancho · AGOTADO más corto).
        • Con cada recompra se recalcula el precio promedio y el precio del TP (neto de comisiones) → salida más cerca = más rápido. */
     var PL_KEY = "cdc_des_plan_v1", PL = { cap: 100, lev: 1, mult: 1, dir: 1, fee: 0.05, niv: 3, tp: 0.05, coins: {} };
-    try { var _pls = JSON.parse(localStorage.getItem(PL_KEY) || "null"); if (_pls && typeof _pls === "object") { ["cap", "lev", "mult", "dir", "fee", "niv", "tp"].forEach(function (q) { if (isFinite(+_pls[q]) && +_pls[q] > 0) PL[q] = +_pls[q]; }); if (_pls.coins) PL.coins = _pls.coins; } } catch (e) {}
+    try { var _pls = JSON.parse(localStorage.getItem(PL_KEY) || "null"); if (_pls && typeof _pls === "object") { ["cap", "lev", "mult", "dir", "fee", "niv", "tp"].forEach(function (q) { if (isFinite(+_pls[q]) && +_pls[q] > 0) PL[q] = +_pls[q]; }); if (_pls.coins) PL.coins = _pls.coins; if (!_pls.tpv5) PL.tp = 0.05; } } catch (e) {}
+    PL.tpv5 = 1;   /* v10: marca de ganancia estándar 0.05 USDT (una sola vez; luego editable) */
     function plGuardar() { try { localStorage.setItem(PL_KEY, JSON.stringify(PL)); } catch (e) {} }
-    function tpUsdt(cap) { cap = +cap || 0; if (cap < 50) return 0.10; if (cap >= 100) return 0.50; return Math.round((0.10 + (cap - 50) * 0.008) * 100) / 100; }
+    function tpUsdt(cap) { return 0.05; }   /* v10: ESTÁNDAR 0.05 USDT para cualquier capital */
     function plFmt(v) { return !isFinite(v) ? "—" : v < 0.01 ? v.toFixed(6) : v < 1 ? v.toFixed(4) : v < 100 ? v.toFixed(3) : v.toFixed(2); }
     function volPct(sym) { var h = CK[sym], k = h && h.k; if (!k || k.length < 35) return null; var s = 0, m = 0, i, H, L;
         for (i = k.length - 30; i < k.length; i++) { H = +k[i][2]; L = +k[i][3]; if (L > 0) { s += (H - L) / L * 100; m++; } } return m ? s / m : null; }
