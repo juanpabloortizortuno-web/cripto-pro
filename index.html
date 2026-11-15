@@ -2434,6 +2434,7 @@ td,.cdcbn-v,.cdcbn-pct,.gauge-display-val,#cryptoList span,.mx-kpi b,.mx-g b,.bc
 }
 </style>
 
+<style id="mxSlotCss">.mx-slot{margin-top:8px}.mx-slot .bdf-card{margin:0;padding:8px 9px;border-radius:10px}.mx-slot .bdf-card h4{font-size:11.5px;margin:0 0 4px}.mx-slot .bc-lab{font-size:10.5px;margin:5px 0 2px}.mx-slot .bc-inp{padding:5px 7px;font-size:12px}.mx-slot .bdf-btn{padding:6px 4px;font-size:11px}.mx-slot .bdf-card>div[style*="94a3b8"]{font-size:10px!important}</style>
 </head>
 <body>
 <style id="cdcIntroPro">
@@ -19050,7 +19051,7 @@ window.CDC_FLASH=(function(){
     // archivo completo sin caer en la paradoja de "el hash contiene su
     // propio hash". No cambiar este texto.
     var _PLACEHOLDER = "%%CDC_INTEGRITY_HASH%%";
-    var _HASH_ESPERADO = "1e711e971745fd349ad3c15bc53c343b31b9b10d690efcc749bef92310504239"; // ← se reemplaza por el hash real en el paso final
+    var _HASH_ESPERADO = "3c19dfb0b4440600763250c01784c8342aa585bc6719118460efa920f1bc1b7a"; // ← se reemplaza por el hash real en el paso final
 
     function _bloquear(motivo) {
         try {
@@ -21982,9 +21983,10 @@ window.CDC_TRACK=(function(){
         var lev = (MAN.on && MAN.lev) || LEV, emerg = !mm && s.wallet < 6;
         if (emerg) { if (!(MAN.on && MAN.lev)) lev = 2; perf = { desde: 0, ent: perf.ent, tp: TP_FIJO, adds: [], emergencia: true }; }
         if (MAN.on) { perf = JSON.parse(JSON.stringify(perf)); if (!perf.adds || !perf.adds.length) perf.adds = [{ caida: 25, pct: 99, tp: TP_FIJO }]; }   /* ajuste manual: siempre hay recompra con el saldo restante */
-        var baseM = (MAN.on && MAN.inv > 0) ? MAN.inv : (mm ? mm.presup * cfg.multi.ent / 100 : s.disp * perf.ent / 100);
+        var entPct = (MAN.on && MAN.inv > 0) ? MAN.inv : (mm ? cfg.multi.ent : perf.ent);   /* ajuste manual: % del saldo */
+        var baseM = mm ? mm.presup * entPct / 100 : s.disp * entPct / 100;
         var margen = Math.min(baseM, margenSeguro(s.disp, lev));
-        if (MAN.on && MAN.inv > 0 && margen < MAN.inv - 0.005) log("⚠️ " + sym + ": pediste invertir " + MAN.inv + " USDT pero el saldo disponible solo alcanza para " + margen.toFixed(2) + " USDT; se usa esa cantidad.", true);
+        if (MAN.on && MAN.inv > 0 && margen < baseM - 0.005) log("⚠️ " + sym + ": pediste invertir " + MAN.inv + " % (" + baseM.toFixed(2) + " USDT) pero el saldo disponible solo alcanza para " + margen.toFixed(2) + " USDT; se usa esa cantidad.", true);
         var px = parseFloat((await api("GET", "/fapi/v1/ticker/price", { symbol: sym }, false)).price);
         var qty = parseFloat(floorStep(margen * lev / px, inf.step, inf.qp));
         if (qty < inf.minQty || qty * px < inf.minNot * 1.02) { log("⏭ " + sym + ": " + (qty * px).toFixed(2) + " USDT no alcanza el mínimo de Binance (" + inf.minNot + ") · saldo disponible " + s.disp.toFixed(2), true); return false; }
@@ -22080,7 +22082,7 @@ window.CDC_TRACK=(function(){
             if (!porTiempo && !(mk <= ent * (1 - nx.caida / 100))) continue;
             if (Date.now() < (intentosAdd[sym] || 0)) continue;
             intentosAdd[sym] = Date.now() + 60000;
-            if (porTiempo && !(mk <= ent * (1 - nx.caida / 100))) log("⏱ " + sym + ": 1 minuto sin llegar a la meta → recompra para acelerar (la salida pasará a +" + TP_FIJO + " USDT)");
+            if (porTiempo && !(mk <= ent * (1 - nx.caida / 100))) log("⏱ " + sym + ": " + (ESPERA_RECOMPRA_MS / 60000) + " min sin llegar a la meta → recompra para acelerar (la salida pasará a +" + TP_FIJO + " USDT)");
             try { if (!(await recomprar(sym, p, nx, rec.adds + 1, adds.length))) intentosAdd[sym] = Date.now() + 300000; }
             catch (e) { log("❌ Recompra " + sym + ": " + e.message, true); }
         }
@@ -22202,16 +22204,18 @@ window.CDC_TRACK=(function(){
                 else if (ahora - espera[sym].ausente >= REARMAR_MS) { delete espera[sym]; cambio = true; log("🔄 " + sym + ": su alerta terminó. Queda lista para una NUEVA alerta"); }
             });
             if (cambio) escLS(ELS, espera);
+            var SB = { n: lista.length, cand: cand.length, esp: 0, mot: 0, lleno: 0, filtro: 0, cool: 0, compra: 0 };   /* v16: diagnóstico de la búsqueda */
             for (var i = 0; i < cand.length; i++) {
                 var sym = cand[i].s;
-                if (espera[sym] || misPos[sym]) continue;
-                if (motorBloquea(sym)) continue;                                   /* 🧠 filtro del motor (solo si está ACTIVO y listo) */                           /* ya ganada (espera alerta nueva) o ya abierta */
+                if (espera[sym] || misPos[sym]) { SB.esp++; continue; }
+                if (motorBloquea(sym)) { SB.mot++; continue; }                                   /* 🧠 filtro del motor (solo si está ACTIVO y listo) */                           /* ya ganada (espera alerta nueva) o ya abierta */
                 if (F0 && F0.on) {                                                 /* 🎯 FILTRO DE ENTRADA: líneas + caída + quiebre */
                     try { var w0 = (typeof fabData !== "undefined" && fabData && fabData.wallet > 0) ? fabData.wallet : 0, mm0 = w0 ? modoMulti(w0) : null;
-                        if (w0 && Object.keys(misPos).length >= (mm0 ? mm0.n : 1)) continue; } catch (e) {}   /* ya está lleno: ni se gastan llamadas */
+                        if (w0 && Object.keys(misPos).length >= (mm0 ? mm0.n : 1)) { SB.lleno++; continue; } } catch (e) {}   /* ya está lleno: ni se gastan llamadas */
                     var fe = await filtroEntrada(sym);
                     if (!cfg.activo) break;
                     if (!fe.ok) {
+                        SB.filtro++;
                         if (!fe.espera) {
                             if (!vig[sym]) { vig[sym] = { t: ahora, tipo: String(cand[i].tipo).replace(/^VIGILADA · /, "").slice(0, 60) };
                                 var vk = Object.keys(vig); if (vk.length > 12) { vk.sort(function (a, b) { return vig[a].t - vig[b].t; }); delete vig[vk[0]]; } }
@@ -22221,11 +22225,15 @@ window.CDC_TRACK=(function(){
                     }
                     delete vig[sym]; cand[i].tipo += " · 🎯 " + fe.motivo;
                 }
-                var t0 = intentos[sym]; if (t0 && ahora - t0 < 60000) continue;
-                intentos[sym] = ahora;
+                var t0 = intentos[sym]; if (t0 && ahora - t0 < 60000) { SB.cool++; continue; }
+                intentos[sym] = ahora; SB.compra++;
                 try { await comprar(sym, cand[i].tipo); }
                 catch (e) { log("❌ " + sym + ": " + e.message, true); }
                 if (!cfg.activo) break;
+            }
+            if (cfg.activo && SB.compra === 0 && Date.now() - (PM.busqLog || 0) > 60000) {      /* v16: cada minuto sin comprar, di POR QUÉ */
+                PM.busqLog = Date.now();
+                log("🔎 Búsqueda: el radar trae " + SB.n + " moneda(s), " + SB.cand + " en caída/rebote · " + SB.esp + " en espera de alerta nueva o ya abiertas · " + SB.filtro + " NO pasan el filtro de entrada · " + SB.mot + " frenadas por el motor · " + SB.lleno + " sin cupo (bot lleno) · " + SB.cool + " en pausa de 60 s" + (SB.cand === 0 ? " → el radar no tiene monedas que cumplan ahora" : ""));
             }
         } catch (e) { log("❌ " + e.message, true); }
         busy = false;
@@ -23070,7 +23078,7 @@ window.CDC_TRACK=(function(){
         var _p2 = sp(c2), _p1 = sp(c1), _p3 = sp(c3);
         var _cn = L.filter(function (o) { return o.tipo !== "COMPRA" && o.tipo !== "RECOMPRA" && o.tipo !== "SALIDA" && o.neto != null; }).slice(0, 8).reverse(), _mxn = _cn.reduce(function (a, o) { return Math.max(a, Math.abs(o.neto)); }, 0) || 1;
         var perf = _cn.length ? '<div class="mx-bars">' + _cn.map(function (o) { return '<i title="' + nf(o.neto, 3) + ' USDT" style="height:' + Math.max(6, Math.abs(o.neto) / _mxn * 100).toFixed(0) + '%;background:' + (o.neto >= 0 ? "#0ecb81" : "#ff4d6d") + '"></i>'; }).join("") + '</div><div class="mx-cap">Últimos ' + _cn.length + ' cierres (neto USDT)</div>' : '<div style="color:#64748b;font-size:11.5px">Sin cierres todavía.</div>';
-        var ov = '<div class="mx-ov" data-k="dis"><div class="mx-ovc big"><div class="mx-ovt">💰 BALANCE TOTAL</div>' + hero + spark() + '</div><div class="mx-ovc"><div class="mx-ovt">🍩 DISTRIBUCIÓN</div>' + donut + '</div><div class="mx-ovc"><div class="mx-ovt">📊 RENDIMIENTO</div>' + perf + '</div></div>';
+        var ov = '<div class="mx-ov" data-k="dis"><div class="mx-ovc big"><div class="mx-ovt">💰 BALANCE TOTAL</div>' + hero + spark() + '</div><div class="mx-ovc"><div class="mx-ovt">🍩 DISTRIBUCIÓN</div>' + donut + '<div id="mxSlotMan" class="mx-slot"></div></div><div class="mx-ovc"><div class="mx-ovt">📊 RENDIMIENTO</div>' + perf + '<div id="mxSlotPM" class="mx-slot"></div></div></div>';
         function ni(k, t, n) { return '<button type="button" class="mx-nav-i" data-go="' + k + '"><span>' + t + '</span>' + (n !== "" && n != null ? '<b>' + n + '</b>' : '') + '</button>'; }
         var on = !!cfg.activo, pill = '<span class="mx-pill ' + (on ? "on" : "off") + '">' + (on ? "ACTIVO" : "APAGADO") + '</span>';
         var nav = '<div class="mx-navbox"><div class="mx-navt">🤖 PANEL BOT CDC ' + pill + '</div>' + ni("pos", "⚡ Operación en vivo", d.pos.length) + ni("chart", "📈 Gráfico en vivo", "") + ni("ops", "🧾 Operaciones", L.length) + ni("evo", "📉 Evolución de cuenta", "") + ni("rsk", "🛡️ Riesgo", nf(_pm, 0) + "%") + ni("dis", "🍩 Distribución", "") + ni("sts", "📊 Estadísticas", _cl.length) + ni("reb", "⚡ Mejores para rebote", listaRebote().length) + ni("net", "📡 Red y latencia", "") + ni("alr", "🔔 Alertas CDC", d.al.length) + '<div class="mx-rules"><div class="mx-rt">MODO DE OPERACIÓN</div>' + modo + '</div></div>';
@@ -23096,7 +23104,13 @@ window.CDC_TRACK=(function(){
         $("bcEstado").innerHTML = 'Estado: <b class="' + (kk ? "bdf-okc" : "bdf-badc") + '">' + (kk ? "✔ Key guardada" : "✖ falta Key") + '</b> · <b class="' + (ss ? "bdf-okc" : "bdf-badc") + '">' + (ss ? "✔ Secret guardado" : "✖ falta Secret") + '</b>' +
             (conectado ? '<div class="bdf-row"><button class="bdf-btn bdf-blue" data-ca="tab-mon" style="flex:1">✅ Conectado · ' + nf(d.wallet, 2) + ' USDT · ver mi monitor →</button></div>' : "");
         ["con", "opc", "mon"].forEach(function (t) { $("bcV" + t).style.display = conTab === t ? (t === "mon" ? "" : "block") : "none"; $("bcT" + t).className = conTab === t ? "on" : ""; });
-        if (conTab === "mon") $("bcMon").innerHTML = conMonHtml();
+        if (conTab === "mon") { var _mc = $("bcManCard"), _pc = $("bcPM") ? $("bcPM").parentNode : null, _hb = $("bcManBox"), _fa = document.activeElement, _fid = _fa && _fa.id && _mc && _mc.contains(_fa) ? _fa.id : "";
+            if (_hb && _mc && _pc) { _hb.appendChild(_mc); _hb.appendChild(_pc); }
+            $("bcMon").innerHTML = conMonHtml();
+            var _sm = $("mxSlotMan"), _sp = $("mxSlotPM"), _dt = $("bcManDet");
+            if (_sm && _sp && _mc && _pc) { _sm.appendChild(_mc); _sp.appendChild(_pc); _mc.style.flex = "none"; _pc.style.flex = "none"; if (_dt) _dt.style.display = "none"; }
+            else if (_dt) _dt.style.display = "";
+            if (_fid && $(_fid)) { try { $(_fid).focus(); } catch (e) {} } }
         var wrap = $("bcChart"), f = $("bcFrame"), showF = conTab === "mon" && fabSel && d && !d.err;
         wrap.style.display = showF ? "block" : "none"; wrap.classList.toggle("closed", mxIsClosed("chart"));
         if (showF) { $("bcSym").textContent = fabSel + " (perpetuo)"; if (conFrameSym !== fabSel) { conFrameSym = fabSel; f.src = "https://s.tradingview.com/widgetembed/?symbol=" + encodeURIComponent("BINANCE:" + fabSel + ".P") + "&interval=5&theme=dark&style=1&locale=es&hide_side_toolbar=1&allow_symbol_change=0"; } }
@@ -23250,8 +23264,8 @@ window.CDC_TRACK=(function(){
               '<div class="bdf-card" id="bcManCard"><h4>🎛️ 4 · Ajuste manual <span style="font-size:10.5px;color:#94a3b8;font-weight:400">(solo esta sesión)</span></h4>' +
               '<div style="font-size:11px;color:#94a3b8;margin-bottom:6px">Detén el bot, llena las casillas que quieras y pulsa Aplicar. Las casillas vacías usan lo predeterminado. Si actualizas la página, todo vuelve al estado predeterminado.</div>' +
               '<label class="bc-lab" for="bcManLev">Apalancamiento (x) — predeterminado 1</label><input id="bcManLev" class="bc-inp" type="number" inputmode="numeric" min="1" max="20" step="1" placeholder="vacío = 1x">' +
-              '<label class="bc-lab" for="bcManInv">Inversión inicial (USDT de tu capital por operación)</label><input id="bcManInv" class="bc-inp" type="number" inputmode="decimal" min="0" step="0.01" placeholder="vacío = automática según tu perfil">' +
-              '<label class="bc-lab" for="bcManEsp">Tiempo para usar el saldo restante (segundos)</label><input id="bcManEsp" class="bc-inp" type="number" inputmode="numeric" min="5" max="3600" step="1" placeholder="vacío = 60 s">' +
+              '<label class="bc-lab" for="bcManInv">Inversión inicial (% de tu saldo por operación)</label><input id="bcManInv" class="bc-inp" type="number" inputmode="decimal" min="1" max="100" step="1" placeholder="vacío = automática según tu perfil">' +
+              '<label class="bc-lab" for="bcManEsp">Tiempo para usar el saldo restante (minutos)</label><input id="bcManEsp" class="bc-inp" type="number" inputmode="decimal" min="0.5" max="60" step="0.5" placeholder="vacío = 1 minuto">' +
               '<div id="bcManPrev" style="font-size:11px;color:#94a3b8;margin:6px 0"></div>' +
               '<div class="bdf-row"><button type="button" id="bcManOk" class="bdf-btn bdf-green" style="flex:1">✅ Aplicar</button><button type="button" id="bcManNo" class="bdf-btn bdf-gold" style="flex:1">↩ Quitar ajuste</button></div>' +
               '<div id="bcManSt" style="margin-top:6px;font-size:11.5px"></div></div>' +
@@ -23609,8 +23623,8 @@ window.CDC_TRACK=(function(){
         var stl = document.createElement("style");
         stl.textContent = "@keyframes pmLate{0%,100%{transform:scale(1)}15%{transform:scale(1.25)}30%{transform:scale(1)}45%{transform:scale(1.13)}60%{transform:scale(1)}}@keyframes pmEcg{to{stroke-dashoffset:-120}}.pmHeart{transform-box:fill-box;transform-origin:center;animation:pmLate 1s ease-in-out infinite}.pmEcg{stroke-dasharray:60 60;animation:pmEcg 1s linear infinite}.pmOff .pmHeart,.pmOff .pmEcg{animation:none}";
         document.head.appendChild(stl);
-        function pmSvg(c, off) {
-            return '<svg class="' + (off ? "pmOff" : "") + '" width="120" height="40" viewBox="0 0 120 36" style="flex:none"><g transform="translate(2,3) scale(1.25)"><path class="pmHeart" d="M12 21C5 16 2 12.5 2 9a5 5 0 0 1 10-1.5A5 5 0 0 1 22 9c0 3.5-3 7-10 12z" fill="' + c + '"/></g>' +
+        function pmSvg(c, off, sm) {
+            return '<svg class="' + (off ? "pmOff" : "") + '" width="' + (sm ? 84 : 120) + '" height="' + (sm ? 26 : 40) + '" viewBox="0 0 120 36" style="flex:none"><g transform="translate(2,3) scale(1.25)"><path class="pmHeart" d="M12 21C5 16 2 12.5 2 9a5 5 0 0 1 10-1.5A5 5 0 0 1 22 9c0 3.5-3 7-10 12z" fill="' + c + '"/></g>' +
                 '<polyline class="pmEcg" points="36,20 50,20 55,8 61,31 67,14 71,20 118,20" fill="none" stroke="' + c + '" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>';
         }
         function audioIniciar() {
@@ -23630,6 +23644,11 @@ window.CDC_TRACK=(function(){
             var sg = act + col; if (sg !== svgSig) { svgSig = sg; $("pmI").innerHTML = pmSvg(col, !act); }
             $("pmT").textContent = txt; $("pmT").style.color = col;
             $("pmD").textContent = "Retraso " + Math.round(PM.lag) + " ms · peor " + Math.round(PM.worst) + " ms · rescates " + PM.rescates + " · sonido " + (aud ? (aud.ctx.state === "running" ? "activo" : "esperando un toque en pantalla") : "apagado") + " · latido " + (worker && !fb ? "en hilo aparte" : "normal");
+            var mi = $("bcPMmini"); if (mi) {
+                if (!mi.__i) { mi.__i = 1; mi.innerHTML = '<span id="pmMi"></span><span id="pmMt" style="font-size:11.5px;font-weight:700"></span>'; }
+                if (mi.__sg !== sg) { mi.__sg = sg; $("pmMi").innerHTML = pmSvg(col, !act, 1); }
+                $("pmMt").textContent = !act ? "❤ Marcapasos en reposo (se activa con RUN)" : ok ? "❤ Marcapasos LATIENDO · retraso " + Math.round(PM.lag) + " ms · rescates " + PM.rescates : "❤ RETRASO detectado — recuperando…"; $("pmMt").style.color = col;
+            }
             var cb = $("bcPMAud"); if (cb && !cb.__b) { cb.__b = 1; cb.checked = audioOn; cb.onchange = function () { audioOn = this.checked; escLS(PREF, { audio: audioOn }); if (!audioOn) audioParar(); }; }
         }
         function pulso() {
@@ -23654,22 +23673,25 @@ window.CDC_TRACK=(function(){
         function manLeer() {
             var a = num("bcManLev"), b = num("bcManInv"), c = num("bcManEsp"), r = { lev: 0, inv: 0, esp: 0, err: "" };
             if (a !== "") { r.lev = Math.round(Number(a)); if (!(r.lev >= 1 && r.lev <= 20)) r.err = "El apalancamiento debe estar entre 1 y 20."; }
-            if (b !== "") { r.inv = Number(b); if (!(r.inv > 0)) r.err = "La inversión inicial debe ser mayor que 0."; }
-            if (c !== "") { r.esp = Math.round(Number(c)); if (!(r.esp >= 5 && r.esp <= 3600)) r.err = "El tiempo debe estar entre 5 y 3600 segundos."; }
+            if (b !== "") { r.inv = Number(b); if (!(r.inv >= 1 && r.inv <= 100)) r.err = "La inversión inicial debe estar entre 1 % y 100 %."; }
+            if (c !== "") { r.esp = Number(c); if (!(r.esp >= 0.5 && r.esp <= 60)) r.err = "El tiempo debe estar entre 0.5 y 60 minutos."; }
             if (!r.err && a === "" && b === "" && c === "") r.err = "Llena al menos una casilla.";
             return r;
         }
-        function manResumen(lev, inv, esp) { return "apalancamiento x" + (lev || LEV) + " · inversión inicial " + (inv ? inv + " USDT" + (lev > 1 ? " (posición ≈ " + (inv * lev).toFixed(2) + " USDT)" : "") : "automática") + " · recompra con el saldo a los " + (esp || 60) + " s"; }
+        function manWallet() { return (typeof fabData !== "undefined" && fabData && fabData.wallet > 0) ? fabData.wallet : 0; }
+        function manResumen(lev, inv, esp) { var m = inv && manWallet() ? manWallet() * inv / 100 : 0;
+            return "apalancamiento x" + (lev || LEV) + " · inversión inicial " + (inv ? inv + " % del saldo" + (m ? " (≈ " + m.toFixed(2) + " USDT" + (lev > 1 ? ", posición ≈ " + (m * lev).toFixed(2) + " USDT" : "") + ")" : "") : "automática") + " · recompra con el saldo a los " + (esp || 1) + " min"; }
         function manPrev() {
-            var e = $("bcManPrev"); if (!e) return; var r = manLeer(), L = r.lev || 0, h = "";
-            if (L > 1) h = "⚠️ Con x" + L + " una caída de ≈ " + (100 / L).toFixed(0) + " % desde la entrada liquida la posición (margen aislado). La recompra por tiempo agranda ese riesgo.";
+            var e = $("bcManPrev"); if (!e) return; var r = manLeer(), L = r.lev || 0, h = "", w = manWallet();
+            if (r.inv >= 1 && r.inv <= 100 && w) h = "Invertirás ≈ " + (w * r.inv / 100).toFixed(2) + " USDT de " + w.toFixed(2) + (L > 1 ? " (posición ≈ " + (w * r.inv / 100 * L).toFixed(2) + " USDT)" : "") + ". ";
+            if (L > 1) h += "⚠️ Con x" + L + " una caída de ≈ " + (100 / L).toFixed(0) + " % desde la entrada liquida la posición (margen aislado). La recompra por tiempo agranda ese riesgo.";
             if (e.__h !== h) { e.__h = h; e.textContent = h; e.style.color = "#ffc27a"; }
         }
         function manAviso(m, mal) { var s = $("bcManSt"); if (!s) return; s.__m = 1; s.innerHTML = '<span style="color:' + (mal ? "#ff6b78" : "#0ecb81") + '">' + m + '</span>'; }
         function manAplicar() {
             if (cfg.activo) { manAviso("⏹ Detén el bot (PARAR BOT) antes de cambiar el ajuste.", true); return; }
             var r = manLeer(); if (r.err) { manAviso("✖ " + r.err, true); return; }
-            MAN.on = true; MAN.lev = r.lev; MAN.inv = r.inv; MAN.esp = r.esp; ESPERA_RECOMPRA_MS = (r.esp || 60) * 1000;
+            MAN.on = true; MAN.lev = r.lev; MAN.inv = r.inv; MAN.esp = r.esp; ESPERA_RECOMPRA_MS = (r.esp || 1) * 60000;
             log("🎛 AJUSTE MANUAL aplicado (solo esta sesión) · " + manResumen(r.lev, r.inv, r.esp));
             manAviso("✔ Aplicado. Ahora enciende el bot con RUN.", false); manSig = "";
         }
@@ -23682,6 +23704,13 @@ window.CDC_TRACK=(function(){
         var manSig = "";
         function manPaint() {
             var card = $("bcManCard"); if (!card) return;
+            if (!card.__mv) { var mon = $("bcVmon"), pmc = $("bcPM") ? $("bcPM").parentNode : null;
+                if (mon && pmc) { card.__mv = 1; var det = document.createElement("details"); det.id = "bcManDet"; det.open = true; det.style.cssText = "margin:0 0 8px";
+                    det.innerHTML = '<summary style="cursor:pointer;font-weight:700;color:#f3ba2f;padding:6px 2px">🎛️ Ajuste manual · ❤ Marcapasos <span id="bcManBadge" style="font-weight:400;font-size:11px;color:#94a3b8"></span></summary><div id="bcManBox" style="display:flex;flex-wrap:wrap;gap:8px;align-items:flex-start"></div>';
+                    var bx = det.lastChild; card.style.flex = "1 1 300px"; pmc.style.flex = "1 1 300px"; bx.appendChild(card); bx.appendChild(pmc); mon.insertBefore(det, mon.firstChild);
+                    var mini = document.createElement("div"); mini.id = "bcPMmini"; mini.style.cssText = "display:flex;align-items:center;gap:8px;padding:3px 10px;margin:0 0 6px;border:1px solid rgba(255,255,255,.12);border-radius:10px;background:#090f1c";
+                    mon.insertBefore(mini, mon.firstChild); } }
+            var bd = $("bcManBadge"); if (bd) bd.textContent = MAN.on ? "· EN USO" : "· predeterminado";
             if (!card.__b) { card.__b = 1; $("bcManOk").onclick = manAplicar; $("bcManNo").onclick = manQuitar; ["bcManLev", "bcManInv", "bcManEsp"].forEach(function (i) { $(i).oninput = manPrev; }); }
             var act = !!cfg.activo;
             ["bcManLev", "bcManInv", "bcManEsp", "bcManOk", "bcManNo"].forEach(function (i) { var e = $(i); if (e && e.disabled !== act) e.disabled = act; });
