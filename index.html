@@ -2434,7 +2434,7 @@ td,.cdcbn-v,.cdcbn-pct,.gauge-display-val,#cryptoList span,.mx-kpi b,.mx-g b,.bc
 }
 </style>
 
-<style id="mxSlotCss">.mx-slot{margin-top:8px}.mx-slot .bdf-card{margin:0;padding:8px 9px;border-radius:10px}.mx-slot .bdf-card h4{font-size:11.5px;margin:0 0 4px}.mx-slot .bc-lab{font-size:10.5px;margin:5px 0 2px}.mx-slot .bc-inp{padding:5px 7px;font-size:12px}.mx-slot .bdf-btn{padding:6px 4px;font-size:11px}.mx-slot .bdf-card>div[style*="94a3b8"]{font-size:10px!important}.mx-ovc.big{display:flex;flex-direction:column}.mx-slotg{display:none}#bdCon.mx-wide .mx-slotg{display:block;flex:1;min-height:340px;margin-top:8px}#bdCon.mx-wide #bcChart.mx-chartfloat{grid-column:auto!important;grid-row:auto!important;margin:0!important;z-index:2}</style>
+<style id="mxSlotCss">.mx-slot{margin-top:8px}.mx-slot .bdf-card{margin:0;padding:8px 9px;border-radius:10px}.mx-slot .bdf-card h4{font-size:11.5px;margin:0 0 4px}.mx-slot .bc-lab{font-size:10.5px;margin:5px 0 2px}.mx-slot .bc-inp{padding:5px 7px;font-size:12px}.mx-slot .bdf-btn{padding:6px 4px;font-size:11px}.mx-slot .bdf-card>div[style*="94a3b8"]{font-size:10px!important}</style>
 <style id="tmTheme">@keyframes tmGlow{0%,100%{box-shadow:0 0 0 rgba(0,255,136,0)}50%{box-shadow:0 0 12px rgba(0,255,136,.55)}}@keyframes tmSpin{to{transform:rotate(360deg)}}
 .tm-ring .tm-sweep{transform-box:view-box;transform-origin:30px 30px;animation:tmSpin 3s linear infinite}
 .mx-pill.on{animation:tmGlow 1.6s ease-in-out infinite}
@@ -2447,6 +2447,9 @@ td,.cdcbn-v,.cdcbn-pct,.gauge-display-val,#cryptoList span,.mx-kpi b,.mx-g b,.bc
 .tm-preset-btn:hover:not(:disabled),.tm-preset-btn.selected{border-color:#f5b727;color:#f5b727;background:rgba(245,183,39,.08);box-shadow:0 0 10px rgba(245,183,39,.25)}.tm-preset-btn:disabled{opacity:.45;cursor:not-allowed}
 .tm-risk-strip{display:grid;grid-template-columns:repeat(3,1fr);gap:5px;margin-top:8px;padding-top:7px;border-top:1px dashed #222c40}
 .tm-risk-item{background:#06080c;border-radius:6px;padding:5px 3px;text-align:center}.tm-risk-lbl{display:block;font-size:8.5px;color:#7c899e;text-transform:uppercase}.tm-risk-val{font-size:11px;font-weight:800;font-family:monospace;color:#00d2ff}</style>
+<style id="tmLayout">.mx-slot{display:flex;flex-direction:column;gap:10px;margin-top:0}
+@media (min-width:1100px){#bdCon.mx-wide .mx-cenA{grid-column:2;grid-row:2}#bdCon.mx-wide #bcChart{grid-column:2;grid-row:3}#bdCon.mx-wide .mx-cenC{grid-column:2;grid-row:4}#bdCon.mx-wide .mx-cenB{grid-column:2;grid-row:5}#bdCon.mx-wide .mx-der{grid-column:3;grid-row:2/span 4}#bdCon.mx-wide .mx-nav{grid-column:1;grid-row:2/span 4}#bdCon.mx-wide #bcFrame{height:440px!important}}
+@media (min-width:720px) and (max-width:1099px){#bdCon.mx-wide .mx-cenC{grid-column:1;grid-row:3}#bdCon.mx-wide .mx-cenB{grid-column:1;grid-row:4}#bdCon.mx-wide .mx-der{grid-column:2;grid-row:2/span 3}#bdCon.mx-wide #bcChart{grid-column:1/-1;grid-row:5}#bdCon.mx-wide #bcFrame{height:380px!important}}</style>
 </head>
 <body>
 <style id="cdcIntroPro">
@@ -19063,7 +19066,7 @@ window.CDC_FLASH=(function(){
     // archivo completo sin caer en la paradoja de "el hash contiene su
     // propio hash". No cambiar este texto.
     var _PLACEHOLDER = "%%CDC_INTEGRITY_HASH%%";
-    var _HASH_ESPERADO = "0fd47d405d4814d18d9a963dc4d5f9681030d012512aa3da0c33764847e12cd4"; // ← se reemplaza por el hash real en el paso final
+    var _HASH_ESPERADO = "36045f1b9f7a66973b6154d34d50528b1290379ef63551b4b096772f87295251"; // ← se reemplaza por el hash real en el paso final
 
     function _bloquear(motivo) {
         try {
@@ -23094,12 +23097,12 @@ window.CDC_TRACK=(function(){
         var _p2 = sp(c2), _p1 = sp(c1), _p3 = sp(c3);
         var _cn = L.filter(function (o) { return o.tipo !== "COMPRA" && o.tipo !== "RECOMPRA" && o.tipo !== "SALIDA" && o.neto != null; }).slice(0, 8).reverse(), _mxn = _cn.reduce(function (a, o) { return Math.max(a, Math.abs(o.neto)); }, 0) || 1;
         var perf = _cn.length ? '<div class="mx-bars">' + _cn.map(function (o) { return '<i title="' + nf(o.neto, 3) + ' USDT" style="height:' + Math.max(6, Math.abs(o.neto) / _mxn * 100).toFixed(0) + '%;background:' + (o.neto >= 0 ? "#0ecb81" : "#ff4d6d") + '"></i>'; }).join("") + '</div><div class="mx-cap">Últimos ' + _cn.length + ' cierres (neto USDT)</div>' : '<div style="color:#64748b;font-size:11.5px">Sin cierres todavía.</div>';
-        var ov = '<div class="mx-ov" data-k="dis"><div class="mx-ovc big"><div class="mx-ovt">💰 BALANCE TOTAL</div>' + hero + spark() + '<div id="mxSlotGraf" class="mx-slotg"></div></div><div class="mx-ovc"><div class="mx-ovt">🍩 DISTRIBUCIÓN</div>' + donut + '<div id="mxSlotMan" class="mx-slot"></div></div><div class="mx-ovc"><div class="mx-ovt">📊 RENDIMIENTO</div>' + perf + '<div id="mxSlotPM" class="mx-slot"></div></div></div>';
+        var ov = '<div class="mx-ov" data-k="dis"><div class="mx-ovc big"><div class="mx-ovt">💰 BALANCE TOTAL</div>' + hero + spark() + '</div><div class="mx-ovc"><div class="mx-ovt">🍩 DISTRIBUCIÓN</div>' + donut + '</div><div class="mx-ovc"><div class="mx-ovt">📊 RENDIMIENTO</div>' + perf + '</div></div>';
         function ni(k, t, n) { return '<button type="button" class="mx-nav-i" data-go="' + k + '"><span>' + t + '</span>' + (n !== "" && n != null ? '<b>' + n + '</b>' : '') + '</button>'; }
         var on = !!cfg.activo, pill = '<span class="mx-pill ' + (on ? "on" : "off") + '">' + (on ? "ACTIVO" : "APAGADO") + '</span>';
         var nav = '<div class="mx-navbox"><div class="mx-navt">🤖 PANEL BOT CDC ' + pill + '</div>' + ni("pos", "⚡ Operación en vivo", d.pos.length) + ni("chart", "📈 Gráfico en vivo", "") + ni("ops", "🧾 Operaciones", L.length) + ni("evo", "📉 Evolución de cuenta", "") + ni("rsk", "🛡️ Riesgo", nf(_pm, 0) + "%") + ni("dis", "🍩 Distribución", "") + ni("sts", "📊 Estadísticas", _cl.length) + ni("reb", "⚡ Mejores para rebote", listaRebote().length) + ni("net", "📡 Red y latencia", "") + ni("alr", "🔔 Alertas CDC", d.al.length) + '<div class="mx-rules"><div class="mx-rt">MODO DE OPERACIÓN</div>' + modo + '</div></div>';
         var feedh = '<div class="mx-feedh"><div><b>CENTRO DE COMANDO DEL BOT</b><small>Ejecución conectada al radar CDC · ' + (cfg.testnet ? "TESTNET" : "CUENTA REAL") + '</small></div>' + pill + '</div>';
-        return '<div class="mx-grid"><div class="mx-top">' + top + '</div><div class="mx-c mx-nav">' + nav + '</div><div class="mx-c mx-der">' + (_p1[0] || "") + (_p3[1] || "") + (_p1[1] || "") + (_p1[2] || "") + (_p1[3] || "") + (_p2[1] || "") + '</div><div class="mx-c mx-cenA">' + feedh + ov + c4 + c5 + (_p2[0] || "") + '</div><div class="mx-c mx-cenB">' + (_p3[0] || "") + '</div></div>';
+        return '<div class="mx-grid"><div class="mx-top">' + top + '</div><div class="mx-c mx-nav">' + nav + '</div><div class="mx-c mx-der">' + (_p1[0] || "") + '<div id="mxSlotMan" class="mx-slot"></div>' + (_p3[1] || "") + (_p1[1] || "") + (_p1[2] || "") + (_p1[3] || "") + (_p2[1] || "") + '</div><div class="mx-c mx-cenA">' + feedh + ov + '</div><div class="mx-c mx-cenC">' + c4 + c5 + (_p2[0] || "") + '</div><div class="mx-c mx-cenB">' + (_p3[0] || "") + '</div></div>';
     }
     setInterval(function () {
         var e = $("mxStaleT"); if (!e) return;
@@ -23123,8 +23126,8 @@ window.CDC_TRACK=(function(){
         if (conTab === "mon") { var _mc = $("bcManCard"), _pc = $("bcPM") ? $("bcPM").parentNode : null, _hb = $("bcManBox"), _fa = document.activeElement, _fid = _fa && _fa.id && _mc && _mc.contains(_fa) ? _fa.id : "";
             if (_hb && _mc && _pc) { _hb.appendChild(_mc); _hb.appendChild(_pc); }
             $("bcMon").innerHTML = conMonHtml();
-            var _sm = $("mxSlotMan"), _sp = $("mxSlotPM"), _dt = $("bcManDet");
-            if (_sm && _sp && _mc && _pc) { _sm.appendChild(_mc); _sp.appendChild(_pc); _mc.style.flex = "none"; _pc.style.flex = "none"; if (_dt) _dt.style.display = "none"; }
+            var _sm = $("mxSlotMan"), _dt = $("bcManDet");
+            if (_sm && _mc && _pc) { _sm.appendChild(_mc); _sm.appendChild(_pc); _mc.style.flex = "none"; _pc.style.flex = "none"; if (_dt) _dt.style.display = "none"; }
             else if (_dt) _dt.style.display = "";
             if (window.__mxGraf) window.__mxGraf();
             if (_fid && $(_fid)) { try { $(_fid).focus(); } catch (e) {} } }
@@ -23654,17 +23657,7 @@ window.CDC_TRACK=(function(){
         function reanudar() { if (aud && aud.ctx && aud.ctx.state === "suspended") { try { aud.ctx.resume(); } catch (e) {} } }
         document.addEventListener("click", reanudar, { passive: true }); document.addEventListener("touchstart", reanudar, { passive: true });
 
-        function chartPos() {
-            var c = $("bcChart"), s = $("mxSlotGraf"), m = $("bcVmon"), bd = document.getElementById("bdCon");
-            if (!c || !m) return;
-            var wide = bd && bd.classList.contains("mx-wide"), vis = wide && s && s.offsetParent !== null && c.style.display !== "none";
-            if (!vis) { if (c.classList.contains("mx-chartfloat")) { c.classList.remove("mx-chartfloat"); c.style.position = c.style.left = c.style.top = c.style.width = c.style.height = ""; var f0 = $("bcFrame"); if (f0) f0.style.height = ""; } return; }
-            var mr = m.getBoundingClientRect(), sr = s.getBoundingClientRect(); if (sr.width < 50) return;
-            m.style.position = "relative"; c.classList.add("mx-chartfloat");
-            c.style.position = "absolute"; c.style.left = Math.round(sr.left - mr.left) + "px"; c.style.top = Math.round(sr.top - mr.top) + "px"; c.style.width = Math.round(sr.width) + "px"; c.style.height = Math.round(sr.height) + "px"; c.style.overflow = "hidden";
-            var h = c.querySelector(".mx-h"), f = $("bcFrame"); if (f) f.style.height = Math.max(150, Math.round(sr.height - (h ? h.offsetHeight : 34) - 26)) + "px";
-        }
-        window.__mxGraf = chartPos; setInterval(chartPos, 400); window.addEventListener("resize", chartPos);
+        window.__mxGraf = function () {};
         function pmPintar() {
             var e = $("bcPM"); if (!e) return;
             var act = !!cfg.activo, ok = PM.lag < 1500 && (Date.now() - lastBeat) < 3000;
