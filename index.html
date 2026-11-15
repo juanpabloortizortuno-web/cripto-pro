@@ -2458,6 +2458,8 @@ td,.cdcbn-v,.cdcbn-pct,.gauge-display-val,#cryptoList span,.mx-kpi b,.mx-g b,.bc
 @media (min-width:720px) and (max-width:1099px){#bdCon.mx-wide .mx-cenD{grid-column:1;grid-row:3}#bdCon.mx-wide .mx-cenC{grid-column:1;grid-row:4}#bdCon.mx-wide .mx-cenB{grid-column:1;grid-row:5}#bdCon.mx-wide .mx-der{grid-column:2;grid-row:2/span 4}#bdCon.mx-wide #bcChart{grid-column:1/-1;grid-row:6}#bdCon.mx-wide #bcFrame{height:360px!important}}</style>
 <style id="tmLayout2">
 /* Juan Pablo: izquierda = menú + Ajuste manual · centro = Gráfico+Posiciones, luego Balance/Distribución/Rendimiento · derecha = Centro de comando + Marcapasos + Mi billetera */
+/* Barra "CONEXIÓN BINANCE" más abajo y como tarjeta, para que no quede tapada por la barra del navegador */
+#bdCon .bc-h{margin:18px 12px 8px;top:10px;border:1px solid rgba(243,186,47,.35);border-radius:12px;padding-top:calc(10px + env(safe-area-inset-top,0px))}
 #bdCon .mx-slot:empty{display:none}
 #bdCon .mx-slot{margin-top:0}
 #bdCon #bcManCard,#bdCon #mxSlotPM>.bdf-card{flex:1 1 100%}
@@ -19104,7 +19106,7 @@ window.CDC_FLASH=(function(){
     // archivo completo sin caer en la paradoja de "el hash contiene su
     // propio hash". No cambiar este texto.
     var _PLACEHOLDER = "%%CDC_INTEGRITY_HASH%%";
-    var _HASH_ESPERADO = "36c707f12844f943e954fde4715f0f9cf587016b01cc628e6b93c8b6ff67464a"; // ← se reemplaza por el hash real en el paso final
+    var _HASH_ESPERADO = "4ffe52743bed1751d3b71f02417d54135d03e16e189dfce7da222984d4f77f02"; // ← se reemplaza por el hash real en el paso final
 
     function _bloquear(motivo) {
         try {
