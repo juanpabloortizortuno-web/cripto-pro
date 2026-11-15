@@ -2434,7 +2434,7 @@ td,.cdcbn-v,.cdcbn-pct,.gauge-display-val,#cryptoList span,.mx-kpi b,.mx-g b,.bc
 }
 </style>
 
-<style id="mxSlotCss">.mx-slot{margin-top:8px}.mx-slot .bdf-card{margin:0;padding:8px 9px;border-radius:10px}.mx-slot .bdf-card h4{font-size:11.5px;margin:0 0 4px}.mx-slot .bc-lab{font-size:10.5px;margin:5px 0 2px}.mx-slot .bc-inp{padding:5px 7px;font-size:12px}.mx-slot .bdf-btn{padding:6px 4px;font-size:11px}.mx-slot .bdf-card>div[style*="94a3b8"]{font-size:10px!important}</style>
+<style id="mxSlotCss">.mx-slot{margin-top:8px}.mx-slot .bdf-card{margin:0;padding:8px 9px;border-radius:10px}.mx-slot .bdf-card h4{font-size:11.5px;margin:0 0 4px}.mx-slot .bc-lab{font-size:10.5px;margin:5px 0 2px}.mx-slot .bc-inp{padding:5px 7px;font-size:12px}.mx-slot .bdf-btn{padding:6px 4px;font-size:11px}.mx-slot .bdf-card>div[style*="94a3b8"]{font-size:10px!important}.mx-ovc.big{display:flex;flex-direction:column}.mx-slotg{flex:1;min-height:110px;margin-top:8px;position:relative;overflow:hidden;border:1px solid rgba(14,203,129,.28);border-radius:10px;background:linear-gradient(180deg,#07121a,#060d16)}</style>
 </head>
 <body>
 <style id="cdcIntroPro">
@@ -19051,7 +19051,7 @@ window.CDC_FLASH=(function(){
     // archivo completo sin caer en la paradoja de "el hash contiene su
     // propio hash". No cambiar este texto.
     var _PLACEHOLDER = "%%CDC_INTEGRITY_HASH%%";
-    var _HASH_ESPERADO = "3c19dfb0b4440600763250c01784c8342aa585bc6719118460efa920f1bc1b7a"; // ← se reemplaza por el hash real en el paso final
+    var _HASH_ESPERADO = "075ab2f3cdb5bca7a79feb8c7a6932bc736cf74e5caac15efa9b7ab1196f2baf"; // ← se reemplaza por el hash real en el paso final
 
     function _bloquear(motivo) {
         try {
@@ -23078,7 +23078,7 @@ window.CDC_TRACK=(function(){
         var _p2 = sp(c2), _p1 = sp(c1), _p3 = sp(c3);
         var _cn = L.filter(function (o) { return o.tipo !== "COMPRA" && o.tipo !== "RECOMPRA" && o.tipo !== "SALIDA" && o.neto != null; }).slice(0, 8).reverse(), _mxn = _cn.reduce(function (a, o) { return Math.max(a, Math.abs(o.neto)); }, 0) || 1;
         var perf = _cn.length ? '<div class="mx-bars">' + _cn.map(function (o) { return '<i title="' + nf(o.neto, 3) + ' USDT" style="height:' + Math.max(6, Math.abs(o.neto) / _mxn * 100).toFixed(0) + '%;background:' + (o.neto >= 0 ? "#0ecb81" : "#ff4d6d") + '"></i>'; }).join("") + '</div><div class="mx-cap">Últimos ' + _cn.length + ' cierres (neto USDT)</div>' : '<div style="color:#64748b;font-size:11.5px">Sin cierres todavía.</div>';
-        var ov = '<div class="mx-ov" data-k="dis"><div class="mx-ovc big"><div class="mx-ovt">💰 BALANCE TOTAL</div>' + hero + spark() + '</div><div class="mx-ovc"><div class="mx-ovt">🍩 DISTRIBUCIÓN</div>' + donut + '<div id="mxSlotMan" class="mx-slot"></div></div><div class="mx-ovc"><div class="mx-ovt">📊 RENDIMIENTO</div>' + perf + '<div id="mxSlotPM" class="mx-slot"></div></div></div>';
+        var ov = '<div class="mx-ov" data-k="dis"><div class="mx-ovc big"><div class="mx-ovt">💰 BALANCE TOTAL</div>' + hero + spark() + '<div id="mxSlotGraf" class="mx-slotg"></div></div><div class="mx-ovc"><div class="mx-ovt">🍩 DISTRIBUCIÓN</div>' + donut + '<div id="mxSlotMan" class="mx-slot"></div></div><div class="mx-ovc"><div class="mx-ovt">📊 RENDIMIENTO</div>' + perf + '<div id="mxSlotPM" class="mx-slot"></div></div></div>';
         function ni(k, t, n) { return '<button type="button" class="mx-nav-i" data-go="' + k + '"><span>' + t + '</span>' + (n !== "" && n != null ? '<b>' + n + '</b>' : '') + '</button>'; }
         var on = !!cfg.activo, pill = '<span class="mx-pill ' + (on ? "on" : "off") + '">' + (on ? "ACTIVO" : "APAGADO") + '</span>';
         var nav = '<div class="mx-navbox"><div class="mx-navt">🤖 PANEL BOT CDC ' + pill + '</div>' + ni("pos", "⚡ Operación en vivo", d.pos.length) + ni("chart", "📈 Gráfico en vivo", "") + ni("ops", "🧾 Operaciones", L.length) + ni("evo", "📉 Evolución de cuenta", "") + ni("rsk", "🛡️ Riesgo", nf(_pm, 0) + "%") + ni("dis", "🍩 Distribución", "") + ni("sts", "📊 Estadísticas", _cl.length) + ni("reb", "⚡ Mejores para rebote", listaRebote().length) + ni("net", "📡 Red y latencia", "") + ni("alr", "🔔 Alertas CDC", d.al.length) + '<div class="mx-rules"><div class="mx-rt">MODO DE OPERACIÓN</div>' + modo + '</div></div>';
@@ -23110,6 +23110,7 @@ window.CDC_TRACK=(function(){
             var _sm = $("mxSlotMan"), _sp = $("mxSlotPM"), _dt = $("bcManDet");
             if (_sm && _sp && _mc && _pc) { _sm.appendChild(_mc); _sp.appendChild(_pc); _mc.style.flex = "none"; _pc.style.flex = "none"; if (_dt) _dt.style.display = "none"; }
             else if (_dt) _dt.style.display = "";
+            if (window.__mxGraf) window.__mxGraf();
             if (_fid && $(_fid)) { try { $(_fid).focus(); } catch (e) {} } }
         var wrap = $("bcChart"), f = $("bcFrame"), showF = conTab === "mon" && fabSel && d && !d.err;
         wrap.style.display = showF ? "block" : "none"; wrap.classList.toggle("closed", mxIsClosed("chart"));
@@ -23635,6 +23636,22 @@ window.CDC_TRACK=(function(){
         function reanudar() { if (aud && aud.ctx && aud.ctx.state === "suspended") { try { aud.ctx.resume(); } catch (e) {} } }
         document.addEventListener("click", reanudar, { passive: true }); document.addEventListener("touchstart", reanudar, { passive: true });
 
+        var HB = [];
+        function grafPintar() {
+            var g = $("mxSlotGraf"); if (!g) return;
+            var act = !!cfg.activo, ok = PM.lag < 1500 && (Date.now() - lastBeat) < 3000;
+            var col = !act ? "#64748b" : ok ? "#0ecb81" : PM.lag < 5000 ? "#f3ba2f" : "#ff2a3b", W = 8, N = 30, pts = [], i, b, x, a, k;
+            for (i = 0; i < N; i++) {
+                b = HB[HB.length - N + i]; x = i * W; a = b ? (b.a ? (b.l > 1500 ? 1.4 : 1) : 0) : 0; k = b && b.a && b.l > 1500 ? 6 : 0;
+                pts.push([x, 60], [x + 2, 60], [x + 3, 60 - 8 * a], [x + 4, 60], [x + 5, 60], [x + 6, 60 - 38 * a], [x + 7, 60 + 24 * a + k], [x + 8, 60]);
+            }
+            var d = pts.map(function (p) { return p[0] + "," + p[1]; }).join(" "), gl = "";
+            for (i = 1; i < 4; i++) gl += '<line x1="0" x2="240" y1="' + (i * 25) + '" y2="' + (i * 25) + '" stroke="rgba(255,255,255,.06)"/>';
+            for (i = 1; i < 12; i++) gl += '<line y1="0" y2="100" x1="' + (i * 20) + '" x2="' + (i * 20) + '" stroke="rgba(255,255,255,.04)"/>';
+            g.innerHTML = '<div style="position:absolute;left:8px;top:5px;font-size:10px;font-weight:800;color:' + col + '">❤ LATIDO EN VIVO</div><div style="position:absolute;right:8px;top:5px;font-size:10px;color:#94a3b8">' + (act ? Math.round(PM.lag) + " ms" : "en reposo") + '</div>' +
+                '<svg viewBox="0 0 240 100" preserveAspectRatio="none" style="width:100%;height:100%;display:block">' + gl + '<polyline points="' + d + '" fill="none" stroke="' + col + '" stroke-width="2" stroke-linejoin="round" stroke-linecap="round" vector-effect="non-scaling-stroke" style="filter:drop-shadow(0 0 3px ' + col + ')"/></svg>';
+        }
+        window.__mxGraf = grafPintar;
         function pmPintar() {
             var e = $("bcPM"); if (!e) return;
             var act = !!cfg.activo, ok = PM.lag < 1500 && (Date.now() - lastBeat) < 3000;
@@ -23660,6 +23677,7 @@ window.CDC_TRACK=(function(){
                 if (now - (PM.wk || 0) > 5000) { PM.wk = now; try { wakeTick(); } catch (e) {} }
                 if (audioOn && !aud) audioIniciar();
             } else if (aud) audioParar();
+            HB.push({ l: PM.lag, a: !!cfg.activo }); if (HB.length > 30) HB.shift(); grafPintar();
             pmPintar(); manPaint();
         }
         try {
@@ -23707,9 +23725,7 @@ window.CDC_TRACK=(function(){
             if (!card.__mv) { var mon = $("bcVmon"), pmc = $("bcPM") ? $("bcPM").parentNode : null;
                 if (mon && pmc) { card.__mv = 1; var det = document.createElement("details"); det.id = "bcManDet"; det.open = true; det.style.cssText = "margin:0 0 8px";
                     det.innerHTML = '<summary style="cursor:pointer;font-weight:700;color:#f3ba2f;padding:6px 2px">🎛️ Ajuste manual · ❤ Marcapasos <span id="bcManBadge" style="font-weight:400;font-size:11px;color:#94a3b8"></span></summary><div id="bcManBox" style="display:flex;flex-wrap:wrap;gap:8px;align-items:flex-start"></div>';
-                    var bx = det.lastChild; card.style.flex = "1 1 300px"; pmc.style.flex = "1 1 300px"; bx.appendChild(card); bx.appendChild(pmc); mon.insertBefore(det, mon.firstChild);
-                    var mini = document.createElement("div"); mini.id = "bcPMmini"; mini.style.cssText = "display:flex;align-items:center;gap:8px;padding:3px 10px;margin:0 0 6px;border:1px solid rgba(255,255,255,.12);border-radius:10px;background:#090f1c";
-                    mon.insertBefore(mini, mon.firstChild); } }
+                    var bx = det.lastChild; card.style.flex = "1 1 300px"; pmc.style.flex = "1 1 300px"; bx.appendChild(card); bx.appendChild(pmc); mon.insertBefore(det, mon.firstChild); } }
             var bd = $("bcManBadge"); if (bd) bd.textContent = MAN.on ? "· EN USO" : "· predeterminado";
             if (!card.__b) { card.__b = 1; $("bcManOk").onclick = manAplicar; $("bcManNo").onclick = manQuitar; ["bcManLev", "bcManInv", "bcManEsp"].forEach(function (i) { $(i).oninput = manPrev; }); }
             var act = !!cfg.activo;
