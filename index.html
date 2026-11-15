@@ -2447,9 +2447,15 @@ td,.cdcbn-v,.cdcbn-pct,.gauge-display-val,#cryptoList span,.mx-kpi b,.mx-g b,.bc
 .tm-preset-btn:hover:not(:disabled),.tm-preset-btn.selected{border-color:#f5b727;color:#f5b727;background:rgba(245,183,39,.08);box-shadow:0 0 10px rgba(245,183,39,.25)}.tm-preset-btn:disabled{opacity:.45;cursor:not-allowed}
 .tm-risk-strip{display:grid;grid-template-columns:repeat(3,1fr);gap:5px;margin-top:8px;padding-top:7px;border-top:1px dashed #222c40}
 .tm-risk-item{background:#06080c;border-radius:6px;padding:5px 3px;text-align:center}.tm-risk-lbl{display:block;font-size:8.5px;color:#7c899e;text-transform:uppercase}.tm-risk-val{font-size:11px;font-weight:800;font-family:monospace;color:#00d2ff}</style>
-<style id="tmLayout">.mx-slot{display:flex;flex-direction:column;gap:10px;margin-top:0}
-@media (min-width:1100px){#bdCon.mx-wide .mx-cenA{grid-column:2;grid-row:2}#bdCon.mx-wide #bcChart{grid-column:2;grid-row:3}#bdCon.mx-wide .mx-cenC{grid-column:2;grid-row:4}#bdCon.mx-wide .mx-cenB{grid-column:2;grid-row:5}#bdCon.mx-wide .mx-der{grid-column:3;grid-row:2/span 4}#bdCon.mx-wide .mx-nav{grid-column:1;grid-row:2/span 4}#bdCon.mx-wide #bcFrame{height:440px!important}}
-@media (min-width:720px) and (max-width:1099px){#bdCon.mx-wide .mx-cenC{grid-column:1;grid-row:3}#bdCon.mx-wide .mx-cenB{grid-column:1;grid-row:4}#bdCon.mx-wide .mx-der{grid-column:2;grid-row:2/span 3}#bdCon.mx-wide #bcChart{grid-column:1/-1;grid-row:5}#bdCon.mx-wide #bcFrame{height:380px!important}}</style>
+<style id="tmLayout">.mx-slot{display:flex;flex-direction:column;gap:10px}.mx-slotrow{flex-direction:row;flex-wrap:wrap;align-items:stretch}.mx-slotrow>#bcManCard{flex:1 1 300px}.mx-slotrow>.bdf-card:not(#bcManCard){flex:0 1 215px}
+.mx-slotrow .bdf-card>div[style*="margin-top:4px"]{display:none}
+.tm-fields{display:grid;grid-template-columns:repeat(3,1fr);gap:6px}.tm-f .bc-lab{margin:0 0 2px;font-size:10px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.tm-badge{font-size:9.5px;font-weight:800;padding:1px 7px;border-radius:9px;background:#1a2232;color:#94a3b8;margin-left:6px;vertical-align:middle}.tm-badge.on{background:rgba(14,203,129,.18);color:#0ecb81}
+.mx-vig{display:grid;grid-template-columns:1.3fr 1.3fr .8fr;gap:8px}
+.mx-vc{background:linear-gradient(180deg,#0d1118,#090c12);border:1px solid #1e2636;border-radius:10px;padding:7px 10px;text-align:left;color:#e2e8f0;cursor:pointer;display:flex;flex-direction:column;gap:2px;font:inherit;min-width:0}.mx-vc:hover{border-color:#f5b727}
+.mx-vc small{font-size:9.5px;font-weight:800;letter-spacing:.06em;color:#f5b727}.mx-vc b{font-size:15px}.mx-vc b em{font-size:10px;font-style:normal;color:#94a3b8;font-weight:700}.mx-vc span{font-size:10.5px;color:#94a3b8}
+@media (min-width:1100px){#bdCon.mx-wide #bcVmon{grid-template-columns:200px minmax(0,1.35fr) minmax(0,1fr) 330px}#bdCon.mx-wide .mx-top{grid-column:1/-1;grid-row:1}#bdCon.mx-wide .mx-nav{grid-column:1;grid-row:2/span 5}#bdCon.mx-wide .mx-cenA{grid-column:2/4;grid-row:2}#bdCon.mx-wide #bcChart{grid-column:2;grid-row:3;align-self:start}#bdCon.mx-wide .mx-cenD{grid-column:3;grid-row:3;align-self:start}#bdCon.mx-wide .mx-cenC{grid-column:2/4;grid-row:4}#bdCon.mx-wide .mx-cenB{grid-column:2/4;grid-row:5}#bdCon.mx-wide .mx-der{grid-column:4;grid-row:2/span 5}#bdCon.mx-wide #bcFrame{height:auto!important;aspect-ratio:1/1;max-height:460px;width:100%}#bdCon.mx-wide .mx-cenD .mx-g{grid-template-columns:1fr 1fr}}
+@media (min-width:720px) and (max-width:1099px){#bdCon.mx-wide .mx-cenD{grid-column:1;grid-row:3}#bdCon.mx-wide .mx-cenC{grid-column:1;grid-row:4}#bdCon.mx-wide .mx-cenB{grid-column:1;grid-row:5}#bdCon.mx-wide .mx-der{grid-column:2;grid-row:2/span 4}#bdCon.mx-wide #bcChart{grid-column:1/-1;grid-row:6}#bdCon.mx-wide #bcFrame{height:360px!important}}</style>
 </head>
 <body>
 <style id="cdcIntroPro">
@@ -19066,7 +19072,7 @@ window.CDC_FLASH=(function(){
     // archivo completo sin caer en la paradoja de "el hash contiene su
     // propio hash". No cambiar este texto.
     var _PLACEHOLDER = "%%CDC_INTEGRITY_HASH%%";
-    var _HASH_ESPERADO = "36045f1b9f7a66973b6154d34d50528b1290379ef63551b4b096772f87295251"; // ← se reemplaza por el hash real en el paso final
+    var _HASH_ESPERADO = "e50a02dd45cbd7a6fedc100d52ca82cf22ce984e04aada0a5fd80e3249585f8f"; // ← se reemplaza por el hash real en el paso final
 
     function _bloquear(motivo) {
         try {
@@ -23102,7 +23108,21 @@ window.CDC_TRACK=(function(){
         var on = !!cfg.activo, pill = '<span class="mx-pill ' + (on ? "on" : "off") + '">' + (on ? "ACTIVO" : "APAGADO") + '</span>';
         var nav = '<div class="mx-navbox"><div class="mx-navt">🤖 PANEL BOT CDC ' + pill + '</div>' + ni("pos", "⚡ Operación en vivo", d.pos.length) + ni("chart", "📈 Gráfico en vivo", "") + ni("ops", "🧾 Operaciones", L.length) + ni("evo", "📉 Evolución de cuenta", "") + ni("rsk", "🛡️ Riesgo", nf(_pm, 0) + "%") + ni("dis", "🍩 Distribución", "") + ni("sts", "📊 Estadísticas", _cl.length) + ni("reb", "⚡ Mejores para rebote", listaRebote().length) + ni("net", "📡 Red y latencia", "") + ni("alr", "🔔 Alertas CDC", d.al.length) + '<div class="mx-rules"><div class="mx-rt">MODO DE OPERACIÓN</div>' + modo + '</div></div>';
         var feedh = '<div class="mx-feedh"><div><b>CENTRO DE COMANDO DEL BOT</b><small>Ejecución conectada al radar CDC · ' + (cfg.testnet ? "TESTNET" : "CUENTA REAL") + '</small></div>' + pill + '</div>';
-        return '<div class="mx-grid"><div class="mx-top">' + top + '</div><div class="mx-c mx-nav">' + nav + '</div><div class="mx-c mx-der">' + (_p1[0] || "") + '<div id="mxSlotMan" class="mx-slot"></div>' + (_p3[1] || "") + (_p1[1] || "") + (_p1[2] || "") + (_p1[3] || "") + (_p2[1] || "") + '</div><div class="mx-c mx-cenA">' + feedh + ov + '</div><div class="mx-c mx-cenC">' + c4 + c5 + (_p2[0] || "") + '</div><div class="mx-c mx-cenB">' + (_p3[0] || "") + '</div></div>';
+        var vig = ""; try {
+            var _N = window.CDC_NET, _st = null, _sl = 0; if (_N) { _st = _N.stats(); _sl = _N.salud(); }
+            var _nc = _sl === 0 ? "#0ecb81" : _sl === 1 ? "#f3ba2f" : "#ff6b7a", _nt = _sl === 0 ? "FLUIDO" : _sl === 1 ? "CARGADO" : "LIMITADO";
+            var _p0 = d.pos && d.pos[0], _fs = (typeof fabSel !== "undefined" && fabSel) ? fabSel : "", vhtml;
+            if (_p0) {
+                var _mk = parseFloat(_p0.markPrice), _en = parseFloat(_p0.entryPrice), _pn = parseFloat(_p0.unRealizedProfit) || 0, _pc = _en > 0 ? (_mk / _en - 1) * 100 : null, _cl = _pn >= 0 ? "#0ecb81" : "#ff6b7a";
+                vhtml = '<b>' + esc(String(_p0.symbol).replace("USDT", "")) + ' <em>LONG ' + esc(String(_p0.leverage || "")) + 'x</em>' + (d.pos.length > 1 ? ' <em>+' + (d.pos.length - 1) + ' más</em>' : '') + '</b><span style="color:' + _cl + '">' + (_pn >= 0 ? "+" : "") + _pn.toFixed(3) + ' USDT' + (_pc == null ? "" : ' · ' + (_pc >= 0 ? "+" : "") + _pc.toFixed(2) + ' % precio') + '</span>';
+            } else {
+                vhtml = '<b>' + (_fs ? esc(String(_fs).replace("USDT", "")) : "Esperando alerta") + '</b><span>' + (cfg.activo ? "sin operación abierta · buscando entrada" : "bot apagado") + '</span>';
+            }
+            vig = '<div class="mx-vig"><button type="button" class="mx-vc" data-go="pos"><small>👁 MONEDA VIGILADA</small>' + vhtml + '</button>' +
+                '<button type="button" class="mx-vc" data-go="net"><small>📡 RED Y LATENCIA</small><b style="color:' + _nc + '">● ' + _nt + '</b><span>' + (_st ? Math.round(_st.avg) + ' ms · p95 ' + Math.round(_st.p95) + ' ms · peso ' + Math.round(_st.pesoPct) + ' %' : 'sin datos') + '</span></button>' +
+                '<button type="button" class="mx-vc" data-go="bot"><small>🤖 BOT</small><b style="color:' + (cfg.activo ? "#0ecb81" : "#94a3b8") + '">' + (cfg.activo ? "● ACTIVO" : "○ APAGADO") + '</b><span>' + (d.pos ? d.pos.length : 0) + ' posición(es)</span></button></div>';
+        } catch (e) { vig = ""; }
+        return '<div class="mx-grid"><div class="mx-top">' + top + '</div><div class="mx-c mx-nav">' + nav + '</div><div class="mx-c mx-der">' + (_p1[0] || "") + (_p3[1] || "") + (_p1[1] || "") + (_p1[2] || "") + (_p1[3] || "") + '</div><div class="mx-c mx-cenA">' + feedh + vig + '<div id="mxSlotMan" class="mx-slot mx-slotrow"></div>' + ov + '</div><div class="mx-c mx-cenD">' + (_p2[0] || "") + (_p2[1] || "") + '</div><div class="mx-c mx-cenC">' + c4 + c5 + '</div><div class="mx-c mx-cenB">' + (_p3[0] || "") + '</div></div>';
     }
     setInterval(function () {
         var e = $("mxStaleT"); if (!e) return;
@@ -23127,7 +23147,7 @@ window.CDC_TRACK=(function(){
             if (_hb && _mc && _pc) { _hb.appendChild(_mc); _hb.appendChild(_pc); }
             $("bcMon").innerHTML = conMonHtml();
             var _sm = $("mxSlotMan"), _dt = $("bcManDet");
-            if (_sm && _mc && _pc) { _sm.appendChild(_mc); _sm.appendChild(_pc); _mc.style.flex = "none"; _pc.style.flex = "none"; if (_dt) _dt.style.display = "none"; }
+            if (_sm && _mc && _pc) { _sm.appendChild(_mc); _sm.appendChild(_pc); _mc.style.flex = ""; _pc.style.flex = ""; if (_dt) _dt.style.display = "none"; }
             else if (_dt) _dt.style.display = "";
             if (window.__mxGraf) window.__mxGraf();
             if (_fid && $(_fid)) { try { $(_fid).focus(); } catch (e) {} } }
@@ -23281,12 +23301,12 @@ window.CDC_TRACK=(function(){
               '<div class="bdf-row"><button class="bdf-btn bdf-green bc-big" data-ca="gp">💾 Guardar y probar conexión</button></div></div><div id="bcRes"></div><div id="bcEstado" style="margin-top:8px"></div>' +
               '<div style="text-align:right;margin-top:6px"><a data-ca="borrar" style="color:#94a3b8;font-size:11px;cursor:pointer;text-decoration:underline">borrar claves de este dispositivo</a></div></div>' +
               '<div class="bdf-card"><h4>🤖 3 · Bot Desmayo</h4><div style="margin-bottom:6px"><b id="bcEst"></b></div><button id="bcRun" data-ca="run" class="bdf-btn bc-big"></button><div id="bcResume"></div><label style="display:block;margin:8px 0 2px"><input type="checkbox" id="bcWake"> 🔆 Mantener la pantalla encendida mientras el bot esté activo</label><div id="bcWakeSt" style="font-size:11px"></div><div style="margin-top:6px;color:#94a3b8;font-size:11px">El bot trabaja solo mientras la app esté abierta y visible: no la cierres ni cambies a otra app. Si se cierra, el bot se apaga (tus salidas puestas en Binance siguen ahí). Sin stop loss: usa solo dinero que puedas perder.</div></div>' +
-              '<div class="bdf-card" id="bcManCard"><h4>🎛️ 4 · Ajuste manual <span style="font-size:10.5px;color:#94a3b8;font-weight:400">(solo esta sesión)</span></h4>' +
-              '<div style="font-size:11px;color:#94a3b8;margin-bottom:6px">Detén el bot, llena las casillas que quieras y pulsa Aplicar. Las casillas vacías usan lo predeterminado. Si actualizas la página, todo vuelve al estado predeterminado.</div>' +
+              '<div class="bdf-card" id="bcManCard"><h4>🎛️ Ajuste manual <span id="bcManBadge2" class="tm-badge">predeterminado</span></h4>' +
+              '<div style="font-size:11px;color:#94a3b8;margin-bottom:6px">Elige cuánto invertir, con qué apalancamiento y cuánto esperar para recomprar. Bot parado → llena → ✅ Aplicar → RUN. Vacío = predeterminado; al recargar la página se borra.</div>' +
               '<div class="tm-presets"><button type="button" class="tm-preset-btn" data-p="cons">🛡️ CONSERVADOR</button><button type="button" class="tm-preset-btn" data-p="desm">🎯 DESMAYO PRO</button><button type="button" class="tm-preset-btn" data-p="turbo">🔥 TURBO LONG</button></div>' +
-              '<label class="bc-lab" for="bcManLev">Apalancamiento (x) — predeterminado 1</label><input id="bcManLev" class="bc-inp" type="number" inputmode="numeric" min="1" max="20" step="1" placeholder="vacío = 1x">' +
-              '<label class="bc-lab" for="bcManInv">Inversión inicial (% de tu saldo por operación)</label><input id="bcManInv" class="bc-inp" type="number" inputmode="decimal" min="1" max="100" step="1" placeholder="vacío = 50 % (capital < 20 USDT) o según tu perfil">' +
-              '<label class="bc-lab" for="bcManEsp">Tiempo para usar el saldo restante (minutos)</label><input id="bcManEsp" class="bc-inp" type="number" inputmode="decimal" min="0.5" max="60" step="0.5" placeholder="vacío = 1 minuto">' +
+              '<div class="tm-fields"><div class="tm-f"><label class="bc-lab" for="bcManLev" title="Apalancamiento (x) — predeterminado 1">Apalancamiento (x)</label><input id="bcManLev" class="bc-inp" type="number" inputmode="numeric" min="1" max="20" step="1" placeholder="vacío = 1x"></div>' +
+              '<div class="tm-f"><label class="bc-lab" for="bcManInv" title="Inversión inicial (% de tu saldo por operación)">Inversión (% del saldo)</label><input id="bcManInv" class="bc-inp" type="number" inputmode="decimal" min="1" max="100" step="1" placeholder="vacío = 50 %"></div>' +
+              '<div class="tm-f"><label class="bc-lab" for="bcManEsp" title="Tiempo para usar el saldo restante (minutos)">Recompra (minutos)</label><input id="bcManEsp" class="bc-inp" type="number" inputmode="decimal" min="0.5" max="60" step="0.5" placeholder="vacío = 1 min"></div></div>' +
               '<div class="tm-risk-strip"><div class="tm-risk-item"><span class="tm-risk-lbl">Exposición</span><span id="tmRkExp" class="tm-risk-val">—</span></div><div class="tm-risk-item"><span class="tm-risk-lbl">Liquida si cae</span><span id="tmRkLiq" class="tm-risk-val">—</span></div><div class="tm-risk-item"><span class="tm-risk-lbl">Riesgo</span><span id="tmRkLvl" class="tm-risk-val">—</span></div></div>' +
               '<div id="bcManPrev" style="font-size:11px;color:#94a3b8;margin:6px 0"></div>' +
               '<div class="bdf-row"><button type="button" id="bcManOk" class="bdf-btn bdf-green" style="flex:1">✅ Aplicar</button><button type="button" id="bcManNo" class="bdf-btn bdf-gold" style="flex:1">↩ Quitar ajuste</button></div>' +
@@ -23737,6 +23757,7 @@ window.CDC_TRACK=(function(){
                     det.innerHTML = '<summary style="cursor:pointer;font-weight:700;color:#f3ba2f;padding:6px 2px">🎛️ Ajuste manual · ❤ Marcapasos <span id="bcManBadge" style="font-weight:400;font-size:11px;color:#94a3b8"></span></summary><div id="bcManBox" style="display:flex;flex-wrap:wrap;gap:8px;align-items:flex-start"></div>';
                     var bx = det.lastChild; card.style.flex = "1 1 300px"; pmc.style.flex = "1 1 300px"; bx.appendChild(card); bx.appendChild(pmc); mon.insertBefore(det, mon.firstChild); } }
             var bd = $("bcManBadge"); if (bd) bd.textContent = MAN.on ? "· EN USO" : "· predeterminado";
+            var b2 = $("bcManBadge2"); if (b2) { b2.textContent = MAN.on ? "EN USO" : "predeterminado"; b2.className = "tm-badge" + (MAN.on ? " on" : ""); }
             if (!card.__b) { card.__b = 1;
                 var PRE = { cons: [1, 25, 2], desm: [2, 50, 1], turbo: [5, 75, 1] };
                 card.querySelectorAll(".tm-preset-btn").forEach(function (b) { b.onclick = function () { if (cfg.activo) return; var p = PRE[b.getAttribute("data-p")]; if (!p) return; $("bcManLev").value = p[0]; $("bcManInv").value = p[1]; $("bcManEsp").value = p[2]; card.querySelectorAll(".tm-preset-btn").forEach(function (x) { x.classList.toggle("selected", x === b); }); manPrev(); manAviso("Valores cargados. Pulsa ✅ Aplicar para usarlos.", false); }; });
