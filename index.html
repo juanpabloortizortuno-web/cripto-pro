@@ -2466,6 +2466,20 @@ td,.cdcbn-v,.cdcbn-pct,.gauge-display-val,#cryptoList span,.mx-kpi b,.mx-g b,.bc
 @media (max-width:719px){#bdCon .bc-fus{flex-wrap:wrap}#bdCon .bc-fus .bdf-tabs{order:3;flex:1 1 100%;grid-template-columns:repeat(2,1fr) !important}}
 #bdCon .bc-h{position:sticky;top:0;margin:0 0 12px;border-radius:0;border:0;border-bottom:1px solid rgba(243,186,47,.45);z-index:50;padding-top:calc(8px + env(safe-area-inset-top,0px));background:#0b1120 !important}
 #bdCon.mx-wide .bc-in,#bdCon .bc-in{max-width:none !important;width:100%;padding:0 14px 30px !important;box-sizing:border-box}
+#bdCon .bd-srch{display:flex;align-items:center;gap:10px;padding:9px 12px;border-radius:12px;border:1px solid rgba(243,186,47,.5);background:linear-gradient(135deg,#1b1503,#0b1220)}
+#bdCon .bd-srch b{display:block;font:900 11.5px Inter,Arial,sans-serif;letter-spacing:.4px;color:#f3ba2f}
+#bdCon .bd-srch small{display:block;margin-top:2px;font:600 9.5px Inter,Arial,sans-serif;color:#94a3b8}
+#bdCon .bd-q{position:relative;flex:none;width:26px;height:26px;display:inline-block}
+#bdCon .bd-q i{position:absolute;inset:0;border-radius:50%;border:3px solid rgba(243,186,47,.25);border-top-color:#f3ba2f}
+#bdCon .bd-q em{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;font:900 13px Arial;font-style:normal;color:#f3ba2f}
+#bdCon .bd-on .bd-q i{animation:bdSpin 1s linear infinite}
+#bdCon .bd-blink{animation:bdBlink 1.4s ease-in-out infinite}
+#bdCon .bd-off{border-color:rgba(148,163,184,.35);background:#0b1220}
+#bdCon .bd-off b,#bdCon .bd-off .bd-q em{color:#94a3b8}#bdCon .bd-off .bd-q i{border-color:rgba(148,163,184,.3)}
+#bdCon .bd-full{border-color:rgba(14,203,129,.45)}
+#bdCon .bd-full b,#bdCon .bd-full .bd-q em{color:#0ecb81}#bdCon .bd-full .bd-q i{border-color:#0ecb81}
+@keyframes bdSpin{to{transform:rotate(360deg)}}
+@keyframes bdBlink{0%,100%{opacity:1}50%{opacity:.25}}
 #bdCon .mx-slot:empty{display:none}
 @media (min-width:1100px){#bdCon.mx-wide #bcVmon{grid-template-columns:240px minmax(0,1.4fr) minmax(0,1fr) 330px}}
 #bdCon .mx-slot{margin-top:0}
@@ -19113,7 +19127,7 @@ window.CDC_FLASH=(function(){
     // archivo completo sin caer en la paradoja de "el hash contiene su
     // propio hash". No cambiar este texto.
     var _PLACEHOLDER = "%%CDC_INTEGRITY_HASH%%";
-    var _HASH_ESPERADO = "8ef4e4bcda56b8506eefc1f43e4f987ccf2904d07f7da69db73dd2af3c4d5353"; // ← se reemplaza por el hash real en el paso final
+    var _HASH_ESPERADO = "9456b73cbbea68f242053cf8eab54e5240a93f8c88d43560fb9bd2c3485aa7d7"; // ← se reemplaza por el hash real en el paso final
 
     function _bloquear(motivo) {
         try {
@@ -21900,7 +21914,8 @@ window.CDC_TRACK=(function(){
     /* v15: AJUSTE MANUAL — solo en memoria (no se guarda): al actualizar la página vuelve a lo predeterminado */
     var MAN = { on: false, lev: 0, inv: 0, esp: 0 };
     var PM = { lastTick: Date.now(), busyAt: 0, lag: 0, worst: 0, rescates: 0 };
-    var ESPERA_RECOMPRA_MS = 60000;   /* v14: si en 1 minuto la posición no llegó a su meta, recompra con el saldo libre y la salida pasa a +0.05 */
+    var ESPERA_RECOMPRA_DEF = 16 * 60000;   /* Juan Pablo: recompra predeterminada a los 16 min, SOLO cuando la caída frena */
+    var ESPERA_RECOMPRA_MS = ESPERA_RECOMPRA_DEF;   /* v14: si en 1 minuto la posición no llegó a su meta, recompra con el saldo libre y la salida pasa a +0.05 */
     async function tpActual() {
         if (Date.now() - tpCache.t < 20000) return tpCache.v;
         try { var sw = await saldo(); tpCache = { t: Date.now(), v: tpPorCapital(sw.wallet) }; } catch (e) {}
@@ -22123,6 +22138,19 @@ window.CDC_TRACK=(function(){
         await ponerSalida(sym, inf, parseFloat(np.positionAmt), parseFloat(np.entryPrice), add.tp, true);
         return true;
     }
+    /* ¿Frenó la caída? Con velas de 1 min: los últimos 3 min no hacen mínimo nuevo (vs. los 10 anteriores) y la última vela cerrada no es una roja fuerte */
+    async function caidaFrenada(sym) {
+        if (window.__cdcApiLim && Date.now() < window.__cdcApiLim.until) return { ok: false, motivo: "Binance limita las llamadas" };
+        var k = null; try { k = await obtenerKlines(sym, "1m", 30); } catch (e) {}
+        if (!k || k.length < 15) return { ok: false, motivo: "sin velas de 1 min" };
+        var c = k.slice(0, -1), n = c.length;
+        var lowRec = Math.min.apply(null, c.slice(n - 3).map(function (x) { return +x[3]; }));
+        var lowPrev = Math.min.apply(null, c.slice(n - 13, n - 3).map(function (x) { return +x[3]; }));
+        var u = c[n - 1], uo = +u[1], uc = +u[4];
+        var sinMin = lowRec >= lowPrev * 0.9995, noRoja = uc >= uo * 0.998;
+        if (sinMin && noRoja) return { ok: true, motivo: "sin mínimo nuevo en 3 min" };
+        return { ok: false, motivo: !sinMin ? "sigue haciendo mínimos nuevos" : "última vela roja fuerte" };
+    }
     async function gestionar() {
         var syms = Object.keys(misPos); if (!syms.length) return;
         await modo();
@@ -22143,6 +22171,17 @@ window.CDC_TRACK=(function(){
             var porTiempo = rec.t > 0 && Date.now() - rec.t >= ESPERA_RECOMPRA_MS;   /* v14: 1 minuto sin llegar a la meta */
             if (!porTiempo && !(mk <= ent * (1 - nx.caida / 100))) continue;
             if (Date.now() < (intentosAdd[sym] || 0)) continue;
+            if (porTiempo && !(mk <= ent * (1 - nx.caida / 100))) {   /* recompra por tiempo: solo si el precio está bajo su medio Y la caída ya frenó */
+                if (!(mk < ent)) { intentosAdd[sym] = Date.now() + 20000; continue; }
+                var fr = await caidaFrenada(sym);
+                window.__avFr = window.__avFr || {};
+                if (!fr.ok) {
+                    intentosAdd[sym] = Date.now() + 20000;
+                    if (!window.__avFr[sym] || Date.now() - window.__avFr[sym] > 120000) { window.__avFr[sym] = Date.now(); log("⏳ " + sym + ": ya pasaron " + (ESPERA_RECOMPRA_MS / 60000) + " min · espero a que FRENE la caída para recomprar (" + fr.motivo + ")"); }
+                    continue;
+                }
+                log("✅ " + sym + ": la caída frenó (" + fr.motivo + ") → recompra");
+            }
             intentosAdd[sym] = Date.now() + 60000;
             if (porTiempo && !(mk <= ent * (1 - nx.caida / 100))) log("⏱ " + sym + ": " + (ESPERA_RECOMPRA_MS / 60000) + " min sin llegar a la meta → recompra para acelerar (la salida pasará a +" + TP_FIJO + " USDT)");
             try { if (!(await recomprar(sym, p, nx, rec.adds + 1, adds.length))) intentosAdd[sym] = Date.now() + 300000; }
@@ -23149,6 +23188,17 @@ window.CDC_TRACK=(function(){
         var on = !!cfg.activo, pill = '<span class="mx-pill ' + (on ? "on" : "off") + '">' + (on ? "ACTIVO" : "APAGADO") + '</span>';
         var nav = '<div class="mx-navbox"><div class="mx-navt">🤖 PANEL BOT CDC ' + pill + '</div>' + ni("pos", "⚡ Operación en vivo", d.pos.length) + ni("chart", "📈 Gráfico en vivo", "") + ni("ops", "🧾 Operaciones", L.length) + ni("evo", "📉 Evolución de cuenta", "") + ni("rsk", "🛡️ Riesgo", nf(_pm, 0) + "%") + ni("dis", "🍩 Distribución", "") + ni("sts", "📊 Estadísticas", _cl.length) + ni("reb", "⚡ Mejores para rebote", listaRebote().length) + ni("net", "📡 Red y latencia", "") + ni("alr", "🔔 Alertas CDC", d.al.length) + '<div class="mx-rules"><div class="mx-rt">MODO DE OPERACIÓN</div>' + modo + '</div></div>';
         var feedh = '<div class="mx-feedh"><div><b>CENTRO DE COMANDO DEL BOT</b><small>Ejecución conectada al radar CDC · ' + (cfg.testnet ? "TESTNET" : "CUENTA REAL") + '</small></div>' + pill + '</div>';
+        var srch = ""; try {   /* 🔎 Indicador: BUSCANDO MONEDA PARA COMPRAR (icono "?" girando + texto parpadeando) */
+            var _ms = Date.now(), _dS = "animation-delay:-" + ((_ms % 1000) / 1000).toFixed(3) + "s", _dB = "animation-delay:-" + ((_ms % 1400) / 1000).toFixed(3) + "s";
+            if (!cfg.activo) { srch = '<div class="bd-srch bd-off"><span class="bd-q"><i></i><em>?</em></span><div><b>BOT APAGADO · no está buscando</b><small>Pulsa RUN para que busque monedas LONG</small></div></div>'; }
+            else {
+                var _w = (typeof fabData !== "undefined" && fabData && fabData.wallet > 0) ? fabData.wallet : 0, _mm = null, _cap = 1, _np = (d.pos ? d.pos.length : 0);
+                try { _mm = _w ? modoMulti(_w) : null; if (_mm && _mm.n > 0) _cap = _mm.n; } catch (e1) {}
+                try { _np = Math.max(_np, Object.keys(misPos).length); } catch (e2) {}
+                if (_np < _cap) srch = '<div class="bd-srch bd-on"><span class="bd-q"><i style="' + _dS + '"></i><em>?</em></span><div><b class="bd-blink" style="' + _dB + '">BUSCANDO MONEDA PARA COMPRAR…</b><small>LONG · FLASH + DESMAYO + CAÍDA BRUTAL · ' + _np + '/' + _cap + ' abiertas</small></div></div>';
+                else srch = '<div class="bd-srch bd-full"><span class="bd-q"><i></i><em>✓</em></span><div><b>CUPO LLENO · ' + _np + '/' + _cap + ' abiertas</b><small>Esperando la salida para volver a buscar</small></div></div>';
+            }
+        } catch (e) { srch = ""; }
         var vig = ""; try {
             var _N = window.CDC_NET, _st = null, _sl = 0; if (_N) { _st = _N.stats(); _sl = _N.salud(); }
             var _nc = _sl === 0 ? "#0ecb81" : _sl === 1 ? "#f3ba2f" : "#ff6b7a", _nt = _sl === 0 ? "FLUIDO" : _sl === 1 ? "CARGADO" : "LIMITADO";
@@ -23163,7 +23213,7 @@ window.CDC_TRACK=(function(){
                 '<button type="button" class="mx-vc" data-go="net"><small>📡 RED Y LATENCIA</small><b style="color:' + _nc + '">● ' + _nt + '</b><span>' + (_st ? Math.round(_st.avg) + ' ms · p95 ' + Math.round(_st.p95) + ' ms · peso ' + Math.round(_st.pesoPct) + ' %' : 'sin datos') + '</span></button>' +
                 '<button type="button" class="mx-vc" data-go="bot"><small>🤖 BOT</small><b style="color:' + (cfg.activo ? "#0ecb81" : "#94a3b8") + '">' + (cfg.activo ? "● ACTIVO" : "○ APAGADO") + '</b><span>' + (d.pos ? d.pos.length : 0) + ' posición(es)</span></button></div>';
         } catch (e) { vig = ""; }
-        return '<div class="mx-grid"><div class="mx-top">' + top + '</div><div class="mx-c mx-nav"><div id="mxSlotMan" class="mx-slot mx-slotrow"></div>' + nav + '</div><div class="mx-c mx-der">' + feedh + vig + '<div id="mxSlotPM" class="mx-slot mx-slotrow"></div>' + (_p1[0] || "") + '<div id="mxSlotManB" class="mx-slot mx-slotrow"></div>' + (_p3[1] || "") + (_p1[1] || "") + (_p1[2] || "") + (_p1[3] || "") + '</div><div class="mx-c mx-cenO">' + ov + '</div><div class="mx-c mx-cenD">' + (_p2[0] || "") + (_p2[1] || "") + '</div><div class="mx-c mx-cenC">' + c4 + c5 + '</div><div class="mx-c mx-cenB">' + (_p3[0] || "") + '</div></div>';
+        return '<div class="mx-grid"><div class="mx-top">' + top + '</div><div class="mx-c mx-nav"><div id="mxSlotMan" class="mx-slot mx-slotrow"></div>' + nav + '</div><div class="mx-c mx-der">' + feedh + srch + vig + '<div id="mxSlotPM" class="mx-slot mx-slotrow"></div>' + (_p1[0] || "") + '<div id="mxSlotManB" class="mx-slot mx-slotrow"></div>' + (_p3[1] || "") + (_p1[1] || "") + (_p1[2] || "") + (_p1[3] || "") + '</div><div class="mx-c mx-cenO">' + ov + '</div><div class="mx-c mx-cenD">' + (_p2[0] || "") + (_p2[1] || "") + '</div><div class="mx-c mx-cenC">' + c4 + c5 + '</div><div class="mx-c mx-cenB">' + (_p3[0] || "") + '</div></div>';
     }
     setInterval(function () {
         var e = $("mxStaleT"); if (!e) return;
@@ -23347,7 +23397,7 @@ window.CDC_TRACK=(function(){
               '<div class="tm-presets"><button type="button" class="tm-preset-btn" data-p="cons">🛡️ CONSERVADOR</button><button type="button" class="tm-preset-btn" data-p="desm">🎯 DESMAYO PRO</button><button type="button" class="tm-preset-btn" data-p="turbo">🔥 TURBO LONG</button></div>' +
               '<div class="tm-fields"><div class="tm-f"><label class="bc-lab" for="bcManLev" title="Apalancamiento (x) — predeterminado 1">Apalancamiento (x)</label><input id="bcManLev" class="bc-inp" type="number" inputmode="numeric" min="1" max="20" step="1" placeholder="vacío = 1x"></div>' +
               '<div class="tm-f"><label class="bc-lab" for="bcManInv" title="Inversión inicial (% de tu saldo por operación)">Inversión (% del saldo)</label><input id="bcManInv" class="bc-inp" type="number" inputmode="decimal" min="1" max="100" step="1" placeholder="vacío = 50 %"></div>' +
-              '<div class="tm-f"><label class="bc-lab" for="bcManEsp" title="Tiempo para usar el saldo restante (minutos)">Recompra (minutos)</label><input id="bcManEsp" class="bc-inp" type="number" inputmode="decimal" min="0.5" max="60" step="0.5" placeholder="vacío = 1 min"></div></div>' +
+              '<div class="tm-f"><label class="bc-lab" for="bcManEsp" title="Tiempo para usar el saldo restante (minutos)">Recompra (minutos)</label><input id="bcManEsp" class="bc-inp" type="number" inputmode="decimal" min="0.5" max="60" step="0.5" placeholder="vacío = 16 min"></div></div>' +
               '<div class="tm-risk-strip"><div class="tm-risk-item"><span class="tm-risk-lbl">Exposición</span><span id="tmRkExp" class="tm-risk-val">—</span></div><div class="tm-risk-item"><span class="tm-risk-lbl">Liquida si cae</span><span id="tmRkLiq" class="tm-risk-val">—</span></div><div class="tm-risk-item"><span class="tm-risk-lbl">Riesgo</span><span id="tmRkLvl" class="tm-risk-val">—</span></div></div>' +
               '<div id="bcManPrev" style="font-size:11px;color:#94a3b8;margin:6px 0"></div>' +
               '<div class="bdf-row"><button type="button" id="bcManOk" class="bdf-btn bdf-green" style="flex:1">✅ Aplicar</button><button type="button" id="bcManNo" class="bdf-btn bdf-gold" style="flex:1">↩ Quitar ajuste</button></div>' +
@@ -23772,7 +23822,7 @@ window.CDC_TRACK=(function(){
         }
         function manWallet() { return (typeof fabData !== "undefined" && fabData && fabData.wallet > 0) ? fabData.wallet : 0; }
         function manResumen(lev, inv, esp) { var m = inv && manWallet() ? manWallet() * inv / 100 : 0;
-            return "apalancamiento x" + (lev || LEV) + " · inversión inicial " + (inv ? inv + " % del saldo" + (m ? " (≈ " + m.toFixed(2) + " USDT" + (lev > 1 ? ", posición ≈ " + (m * lev).toFixed(2) + " USDT" : "") + ")" : "") : "automática (50 % si tu capital es menor a 20 USDT; desde 20 USDT, según tu perfil)") + " · recompra con el saldo a los " + (esp || 1) + " min"; }
+            return "apalancamiento x" + (lev || LEV) + " · inversión inicial " + (inv ? inv + " % del saldo" + (m ? " (≈ " + m.toFixed(2) + " USDT" + (lev > 1 ? ", posición ≈ " + (m * lev).toFixed(2) + " USDT" : "") + ")" : "") : "automática (50 % si tu capital es menor a 20 USDT; desde 20 USDT, según tu perfil)") + " · recompra con el saldo a los " + (esp || 16) + " min, cuando frene la caída"; }
         function manPrev() {
             var e = $("bcManPrev"); if (!e) return; var r = manLeer(), L = r.lev || 0, h = "", w = manWallet();
             if (r.inv >= 1 && r.inv <= 100 && w) h = "Invertirás ≈ " + (w * r.inv / 100).toFixed(2) + " USDT de " + w.toFixed(2) + (L > 1 ? " (posición ≈ " + (w * r.inv / 100 * L).toFixed(2) + " USDT)" : "") + ". ";
@@ -23788,13 +23838,13 @@ window.CDC_TRACK=(function(){
         function manAplicar() {
             if (cfg.activo) { manAviso("⏹ Detén el bot (PARAR BOT) antes de cambiar el ajuste.", true); return; }
             var r = manLeer(); if (r.err) { manAviso("✖ " + r.err, true); return; }
-            MAN.on = true; MAN.lev = r.lev; MAN.inv = r.inv; MAN.esp = r.esp; ESPERA_RECOMPRA_MS = (r.esp || 1) * 60000;
+            MAN.on = true; MAN.lev = r.lev; MAN.inv = r.inv; MAN.esp = r.esp; ESPERA_RECOMPRA_MS = (r.esp || 16) * 60000;
             log("🎛 AJUSTE MANUAL aplicado (solo esta sesión) · " + manResumen(r.lev, r.inv, r.esp));
             manAviso("✔ Aplicado. Ahora enciende el bot con RUN.", false); manSig = "";
         }
         function manQuitar() {
             if (cfg.activo) { manAviso("⏹ Detén el bot (PARAR BOT) antes de cambiar el ajuste.", true); return; }
-            MAN.on = false; MAN.lev = 0; MAN.inv = 0; MAN.esp = 0; ESPERA_RECOMPRA_MS = 60000;
+            MAN.on = false; MAN.lev = 0; MAN.inv = 0; MAN.esp = 0; ESPERA_RECOMPRA_MS = ESPERA_RECOMPRA_DEF;
             ["bcManLev", "bcManInv", "bcManEsp"].forEach(function (i) { var e = $(i); if (e) e.value = ""; });
             log("🎛 Ajuste manual quitado: el bot vuelve a lo predeterminado."); manAviso("↩ Ajuste quitado. El bot usa lo predeterminado.", false); manSig = "";
         }
