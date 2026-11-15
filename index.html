@@ -19127,7 +19127,7 @@ window.CDC_FLASH=(function(){
     // archivo completo sin caer en la paradoja de "el hash contiene su
     // propio hash". No cambiar este texto.
     var _PLACEHOLDER = "%%CDC_INTEGRITY_HASH%%";
-    var _HASH_ESPERADO = "9456b73cbbea68f242053cf8eab54e5240a93f8c88d43560fb9bd2c3485aa7d7"; // ← se reemplaza por el hash real en el paso final
+    var _HASH_ESPERADO = "7ff17f1566081890ba8f56946912fb476ddc3f12868ffbcff616be18b491868a"; // ← se reemplaza por el hash real en el paso final
 
     function _bloquear(motivo) {
         try {
@@ -22143,7 +22143,11 @@ window.CDC_TRACK=(function(){
         if (window.__cdcApiLim && Date.now() < window.__cdcApiLim.until) return { ok: false, motivo: "Binance limita las llamadas" };
         var k = null; try { k = await obtenerKlines(sym, "1m", 30); } catch (e) {}
         if (!k || k.length < 15) return { ok: false, motivo: "sin velas de 1 min" };
-        var c = k.slice(0, -1), n = c.length;
+        return frenoVelas(k.slice(0, -1));
+    }
+    /* Freno de caída (velas de 1 min CERRADAS): los últimos 3 min no hacen mínimo nuevo vs. los 10 anteriores y la última vela no es roja fuerte */
+    function frenoVelas(c) {
+        var n = c.length; if (n < 14) return { ok: false, motivo: "pocas velas" };
         var lowRec = Math.min.apply(null, c.slice(n - 3).map(function (x) { return +x[3]; }));
         var lowPrev = Math.min.apply(null, c.slice(n - 13, n - 3).map(function (x) { return +x[3]; }));
         var u = c[n - 1], uo = +u[1], uc = +u[4];
@@ -22262,6 +22266,11 @@ window.CDC_TRACK=(function(){
         var r;
         if (!k || k.length < 3) r = { ok: false, espera: true, motivo: "sin velas de 1 min (red o límite de Binance)" };
         else r = evaluarVelas(k.slice(0, -1), parseFloat(k[k.length - 1][4]), F);     /* la última vela aún se está formando */
+        if (r && r.ok && !r.quiebre && F.freno !== false) {      /* Juan Pablo: solo se compra si la caída YA frenó; si sigue cayendo no se compra */
+            var fz = frenoVelas(k.slice(0, -1));
+            if (!fz.ok) r = { ok: false, motivo: "SIGUE CAYENDO (" + fz.motivo + ") · no se compra hasta que frene · " + r.motivo, caida: r.caida };
+            else r.motivo = "FRENÓ la caída (" + fz.motivo + ") · " + r.motivo;
+        }
         fCache[sym] = { t: Date.now(), r: r }; return r;
     }
     window.CDC_FILTRO_ENTRADA = { evaluar: evaluarVelas, probar: function (s) { return filtroEntrada(String(s).toUpperCase()); }, cfg: function () { return cfg.filtro; }, vigiladas: function () { return Object.keys(vig); } };
