@@ -19050,7 +19050,7 @@ window.CDC_FLASH=(function(){
     // archivo completo sin caer en la paradoja de "el hash contiene su
     // propio hash". No cambiar este texto.
     var _PLACEHOLDER = "%%CDC_INTEGRITY_HASH%%";
-    var _HASH_ESPERADO = "48ef4dc53b4da745044e94532169523c8d2f73215f72b17867da9f02b1ca1a3b"; // ← se reemplaza por el hash real en el paso final
+    var _HASH_ESPERADO = "7501513c0f4e6b087f006bd0728558479617544dda73acb2662e4908f80cadb1"; // ← se reemplaza por el hash real en el paso final
 
     function _bloquear(motivo) {
         try {
@@ -21830,6 +21830,17 @@ window.CDC_TRACK=(function(){
     var espera = leerLS(ELS), misPos = leerLS(PLS);
     try { Object.keys(misPos).forEach(function (k) { var pf = misPos[k] && misPos[k].perf; if (pf && !pf.multi) { pf.tp = TP_FIJO; (pf.adds || []).forEach(function (a) { a.tp = TP_FIJO; }); } }); escLS(PLS, misPos); } catch (e) {}   /* v9: posiciones abiertas con perfil viejo → también 0.13 en su próxima salida */          /* espera: cerradas · misPos: abiertas por este bot (con su perfil) */
 
+    /* 💰 META DE GANANCIA POR CAPITAL (v13): +0.05 hasta 20 USDT · +0.10 desde 20 · +0.15 desde 30 · +0.20 desde 40 (NETOS, ya con comisiones).
+       El capital es el saldo de la billetera de Futuros. Si no se puede leer el saldo, se conserva el último valor (al inicio 0.05). */
+    function tpPorCapital(w) { return w >= 40 ? 0.20 : w >= 30 ? 0.15 : w >= 20 ? 0.10 : TP_FIJO; }
+    var tpCache = { t: 0, v: TP_FIJO };
+    var ESPERA_RECOMPRA_MS = 60000;   /* v14: si en 1 minuto la posición no llegó a su meta, recompra con el saldo libre y la salida pasa a +0.05 */
+    async function tpActual() {
+        if (Date.now() - tpCache.t < 20000) return tpCache.v;
+        try { var sw = await saldo(); tpCache = { t: Date.now(), v: tpPorCapital(sw.wallet) }; } catch (e) {}
+        return tpCache.v;
+    }
+    function tpTxt() { return tpCache.t ? String(tpCache.v) : "0.05–0.20 según capital"; }
     function leerLS(k) { try { return JSON.parse(localStorage.getItem(k) || "{}"); } catch (e) { return {}; } }
     function escLS(k, v) { try { localStorage.setItem(k, JSON.stringify(v)); } catch (e) {} }
     function cargar() {
@@ -21874,8 +21885,8 @@ window.CDC_TRACK=(function(){
             adds: m.adds.map(function (a) { return { caida: a.caida, pct: a.pct, tp: TP_FIJO }; }) };
     }
     function textoPerfil(p) {
-        var t = "entra " + p.ent + "% del capital, sale +" + p.tp + " USDT";
-        p.adds.forEach(function (a, i) { t += " · recompra " + (i + 1) + ": si cae " + a.caida + "% usa " + a.pct + "% del libre → sale +" + a.tp + " USDT"; });
+        var t = "entra " + p.ent + "% del capital, sale +" + tpTxt() + " USDT";
+        p.adds.forEach(function (a, i) { t += " · recompra " + (i + 1) + ": si cae " + a.caida + "% usa " + a.pct + "% del libre → sale +" + tpTxt() + " USDT"; });
         return t + (p.adds.length ? "" : " · sin recompras");
     }
 
@@ -21951,7 +21962,7 @@ window.CDC_TRACK=(function(){
         var pr0 = await api("GET", "/fapi/v2/positionRisk", {}, true);
         var pos = pr0.filter(function (p) { return parseFloat(p.positionAmt) > 0; }), otras = pr0.filter(function (p) { return parseFloat(p.positionAmt) < 0; });
         if (pos.some(function (p) { return p.symbol === sym; })) { log("⏭ " + sym + ": ya hay posición abierta, no se compra de nuevo"); return false; }
-        var s = await saldo(), mm = modoMulti(s.wallet), maxEf = mm ? mm.n : Math.min(1, cfg.maxPos);
+        var s = await saldo(), mm = modoMulti(s.wallet), maxEf = mm ? mm.n : Math.min(1, cfg.maxPos); tpCache = { t: Date.now(), v: tpPorCapital(s.wallet) };
         if (!mm) {      /* capital chico: UNA operación a la vez, también si la abriste tú a mano → esperar a que termine */
             var enCurso = pos.concat(otras).map(function (p) { return p.symbol; });
             if (!enCurso.length) { try { (await api("GET", "/fapi/v1/openOrders", {}, true)).forEach(function (o) { if (!o.reduceOnly && !o.closePosition && enCurso.indexOf(o.symbol) < 0) enCurso.push(o.symbol); }); } catch (e) {} }
@@ -21990,9 +22001,9 @@ window.CDC_TRACK=(function(){
     }
 
     /* Salida: venta límite reduce-only para ganar `objetivo` USDT sobre TODA la posición (precio medio) */
-    async function ponerSalida(sym, inf, cant, entrada, objetivo) {
-        /* v10: ESTÁNDAR DE GANANCIA — TODA salida (cualquier moneda, capital, recompra, emergencia o multi-moneda) gana +TP_FIJO = 0.05 USDT netos. */
-        objetivo = TP_FIJO;
+    async function ponerSalida(sym, inf, cant, entrada, objetivo, fijo) {
+        /* v13: META ESCALONADA — TODA salida gana el TP que corresponde al capital: 0.05 (<20) · 0.10 (20+) · 0.15 (30+) · 0.20 (40+) USDT netos. */
+        objetivo = fijo ? TP_FIJO : await tpActual();   /* v14: tras una recompra la meta baja a +0.05 (posición más grande = sale más rápido) */
         var T = cfg.tpNeto
             ? (objetivo + cant * entrada * (1 + cfg.feeIn / 100)) / (cant * (1 - cfg.feeOut / 100))
             : entrada + objetivo / cant;
@@ -22037,7 +22048,7 @@ window.CDC_TRACK=(function(){
         await cancelarSalidas(sym);
         np = (await api("GET", "/fapi/v2/positionRisk", { symbol: sym }, true)).filter(function (x) { return parseFloat(x.positionAmt) > 0; })[0];
         if (!np) { log("ℹ️ " + sym + " se cerró antes de recolocar la salida (salida anterior ejecutada)"); return true; }
-        await ponerSalida(sym, inf, parseFloat(np.positionAmt), parseFloat(np.entryPrice), add.tp);
+        await ponerSalida(sym, inf, parseFloat(np.positionAmt), parseFloat(np.entryPrice), add.tp, true);
         return true;
     }
     async function gestionar() {
@@ -22057,9 +22068,11 @@ window.CDC_TRACK=(function(){
             var rec = misPos[sym], adds = (rec.perf && rec.perf.adds) || [], nx = adds[rec.adds];
             if (!nx) continue;                                                 /* sin más recompras en su perfil */
             var ent = parseFloat(p.entryPrice), mk = parseFloat(p.markPrice);   /* entryPrice = precio medio actual */
-            if (!(mk <= ent * (1 - nx.caida / 100))) continue;
+            var porTiempo = rec.t > 0 && Date.now() - rec.t >= ESPERA_RECOMPRA_MS;   /* v14: 1 minuto sin llegar a la meta */
+            if (!porTiempo && !(mk <= ent * (1 - nx.caida / 100))) continue;
             if (Date.now() < (intentosAdd[sym] || 0)) continue;
             intentosAdd[sym] = Date.now() + 60000;
+            if (porTiempo && !(mk <= ent * (1 - nx.caida / 100))) log("⏱ " + sym + ": 1 minuto sin llegar a la meta → recompra para acelerar (la salida pasará a +" + TP_FIJO + " USDT)");
             try { if (!(await recomprar(sym, p, nx, rec.adds + 1, adds.length))) intentosAdd[sym] = Date.now() + 300000; }
             catch (e) { log("❌ Recompra " + sym + ": " + e.message, true); }
         }
@@ -22405,7 +22418,7 @@ window.CDC_TRACK=(function(){
     function mObjPct() {      /* % que debe subir el precio para ganar +0.05 USDT netos con el capital actual (incluye comisiones) */
         var w = (typeof fabData !== "undefined" && fabData && fabData.wallet > 0) ? fabData.wallet : 12, m, mm = modoMulti(w), pfl;
         if (mm) m = mm.presup * cfg.multi.ent / 100; else { pfl = elegirPerfil(w) || { ent: 99 }; m = w * pfl.ent / 100; }
-        m = Math.max(5, m); return TP_FIJO / m * 100 + cfg.feeIn + cfg.feeOut;
+        m = Math.max(5, m); return tpPorCapital(w) / m * 100 + cfg.feeIn + cfg.feeOut;
     }
     function motorTick() {
         try {
@@ -22446,7 +22459,7 @@ window.CDC_TRACK=(function(){
         var bt = 'style="cursor:pointer;border:1px solid rgba(255,255,255,.2);background:#0b1220;color:#e2e8f0;border-radius:6px;padding:3px 8px;font-size:10px;margin:3px 4px 0 0"';
         return '<div style="border:1px solid ' + col + '66;background:rgba(125,211,252,.05);border-radius:8px;padding:7px 9px;margin-bottom:8px;font-size:10.5px;color:#cbd5e1">' +
             '<div style="display:flex;justify-content:space-between;align-items:center"><b style="color:#7dd3fc">🧠 MOTOR DE APRENDIZAJE</b><b style="color:' + col + '">' + est + '</b></div>' +
-            '<div style="margin-top:3px">Muestras <b>' + MS.n + '</b> · en seguimiento <b>' + MS.pend.length + '</b> · ganan +0.05 sin recompra (≤2 h): <b>' + win + '</b> · tiempo medio <b>' + tm + '</b></div>' +
+            '<div style="margin-top:3px">Muestras <b>' + MS.n + '</b> · en seguimiento <b>' + MS.pend.length + '</b> · ganan su meta sin recompra (≤2 h): <b>' + win + '</b> · tiempo medio <b>' + tm + '</b></div>' +
             '<div style="color:#94a3b8">' + (m.brier == null ? "Aún sin resultados: aprende de cada señal que se resuelve." : "Error del modelo " + m.brier.toFixed(3) + " vs azar " + m.ref.toFixed(3) + (m.listo ? " ✓ le gana al azar" : " · todavía no le gana al azar")) + '</div>' +
             '<div><span data-motor="filtro" ' + bt + '>' + (MS.on ? "⏸ Apagar filtro del bot" : "▶ Activar filtro del bot") + '</span><span data-motor="exp" ' + bt + '>💾 Exportar memoria</span><span data-motor="imp" ' + bt + '>📥 Importar</span><span data-motor="reset" ' + bt + '>🗑 Reiniciar</span></div></div>';
     }
@@ -23376,7 +23389,7 @@ window.CDC_TRACK=(function(){
     function filtroHtml(inp) {
         function f(id, lab) { return '<div>' + lab + '<input id="bdFl' + id + '" type="number" step="any" style="' + inp + '"></div>'; }
         return '<div id="bdFiltroBox" style="border:1px solid rgba(14,203,129,.45);border-radius:8px;padding:6px;margin:6px 0"><b style="color:#0ecb81;font-size:11px">🎯 Filtro de entrada LONG</b>' +
-            '<div style="font-size:10px;color:#94a3b8;margin:2px 0 4px">Ganancia fija <b style="color:#f3ba2f">+0.05 USDT</b> en todas las monedas. Compra solo si la roja (MA25) está arriba de la amarilla lenta (MA7). Si la caída es ≥ «caída mín.» (cascada) espera un quiebre grande que la frene; mientras tanto la moneda queda vigilada.</div>' +
+            '<div style="font-size:10px;color:#94a3b8;margin:2px 0 4px">Ganancia por capital: <b style="color:#f3ba2f">+0.05</b> (menos de 20) · <b style="color:#f3ba2f">+0.10</b> (20+) · <b style="color:#f3ba2f">+0.15</b> (30+) · <b style="color:#f3ba2f">+0.20 USDT</b> (40+) netos, en todas las monedas. Compra solo si la roja (MA25) está arriba de la amarilla lenta (MA7). Si la caída es ≥ «caída mín.» (cascada) espera un quiebre grande que la frene; mientras tanto la moneda queda vigilada.</div>' +
             '<label style="display:block;margin:2px 0"><input type="checkbox" id="bdFlOn"> Filtro activado</label>' +
             '<div style="font-size:10px;margin:2px 0">Tipo de línea <select id="bdFlTipo" style="background:#050914;color:#fff;border:1px solid rgba(255,255,255,.15);border-radius:6px;padding:3px 4px"><option value="sma">MA simple (como tu gráfico de Binance)</option><option value="ema">EMA</option></select></div>' +
             '<div style="display:grid;grid-template-columns:1fr 1fr;gap:4px;font-size:10px">' + f("Caida", "Caída mín. % (cascada)") + f("Quiebre", "Quiebre: cuerpo ×") + f("Vol", "Quiebre: volumen ×") + f("Vig", "Vigilar (min)") + '</div>' +
