@@ -19050,7 +19050,7 @@ window.CDC_FLASH=(function(){
     // archivo completo sin caer en la paradoja de "el hash contiene su
     // propio hash". No cambiar este texto.
     var _PLACEHOLDER = "%%CDC_INTEGRITY_HASH%%";
-    var _HASH_ESPERADO = "4d59b7527e7bdeca1ad7ccf6859274ef3cd5067cd57c7898f43d61792744ccb8"; // ← se reemplaza por el hash real en el paso final
+    var _HASH_ESPERADO = "88e2f8902760428c884b23107701a630e1a86d9763667dfbf32dcfae3ba9ff80"; // ← se reemplaza por el hash real en el paso final
 
     function _bloquear(motivo) {
         try {
@@ -20694,7 +20694,7 @@ setTimeout(function(){setInterval(tick,CFG.TICK_MS);},CFG.ARRANQUE_MS);
        • MARCA DE SIGUIENTE INVERSIÓN: si la moneda sigue cayendo, el cuadro marca el precio de la próxima recompra. El % de caída AUMENTA en cada nivel (×1.5)
          y el paso base se adapta a la volatilidad real de la moneda (velas 1m) y a la fase del desmayo (ACELERANDO más ancho · AGOTADO más corto).
        • Con cada recompra se recalcula el precio promedio y el precio del TP (neto de comisiones) → salida más cerca = más rápido. */
-    var PL_KEY = "cdc_des_plan_v1", PL = { cap: 100, lev: 1, mult: 1, dir: 1, fee: 0.05, niv: 3, tp: 0.13, coins: {} };
+    var PL_KEY = "cdc_des_plan_v1", PL = { cap: 100, lev: 1, mult: 1, dir: 1, fee: 0.05, niv: 3, tp: 0.10, coins: {} };
     try { var _pls = JSON.parse(localStorage.getItem(PL_KEY) || "null"); if (_pls && typeof _pls === "object") { ["cap", "lev", "mult", "dir", "fee", "niv", "tp"].forEach(function (q) { if (isFinite(+_pls[q]) && +_pls[q] > 0) PL[q] = +_pls[q]; }); if (_pls.coins) PL.coins = _pls.coins; } } catch (e) {}
     function plGuardar() { try { localStorage.setItem(PL_KEY, JSON.stringify(PL)); } catch (e) {} }
     function tpUsdt(cap) { cap = +cap || 0; if (cap < 50) return 0.10; if (cap >= 100) return 0.50; return Math.round((0.10 + (cap - 50) * 0.008) * 100) / 100; }
@@ -21814,13 +21814,14 @@ window.CDC_TRACK=(function(){
    ══════════════════════════════════════════════════════════════════ */
 (function () {
     "use strict";
-    var LS = "cdcBotDesmayo_v2", TP_FIJO = 0.13, LEV = 1, FLASH_POS_MAX = 20, FLASH_SCORE_MIN = 55, logBuf = [], esperaLog = 0;
+    var LS = "cdcBotDesmayo_v2", TP_FIJO = 0.10, LEV = 1, FLASH_POS_MAX = 20, FLASH_SCORE_MIN = 55, logBuf = [], esperaLog = 0;
     var DEF = { key: "", secret: "", testnet: true, activo: false, tpNeto: true, feeIn: 0.05, feeOut: 0.02, maxPos: 5, incInminente: false,
+        filtro: { on: true, tipo: "sma", minCaida: 6, quiebre: 2.5, vol: 1.5, cuerpoMin: 0.5, rebMin: 1, cruzaMA7: false, vigMin: 45 },
         multi: { desde: 100, por: 50, ent: 33, tp: 1.67, adds: [{ caida: 25, pct: 99, tp: 3.33 }] },
         perfiles: [
-            { desde: 0,  ent: 99, tp: 0.13, adds: [] },
-            { desde: 12, ent: 50, tp: 0.13, adds: [{ caida: 25, pct: 99, tp: 0.13 }] },
-            { desde: 30, ent: 33, tp: 0.13, adds: [{ caida: 25, pct: 99, tp: 0.13 }] }
+            { desde: 0,  ent: 99, tp: 0.10, adds: [] },
+            { desde: 12, ent: 50, tp: 0.10, adds: [{ caida: 25, pct: 99, tp: 0.10 }] },
+            { desde: 30, ent: 33, tp: 0.10, adds: [{ caida: 25, pct: 99, tp: 0.10 }] }
         ] };
     var cfg = cargar(), offset = 0, info = null, dual = null, busy = false, intentos = {}, intentosAdd = {};
     var REARMAR_MS = 30000;                                   /* alerta ausente 30 s = alerta terminada */
@@ -21834,11 +21835,12 @@ window.CDC_TRACK=(function(){
         var c = leerLS(LS), o = Object.assign({}, DEF, c, { activo: false });
         if (!Array.isArray(o.perfiles) || !o.perfiles.length) o.perfiles = JSON.parse(JSON.stringify(DEF.perfiles));
         if (!o.multi || typeof o.multi !== "object" || !Array.isArray(o.multi.adds)) o.multi = JSON.parse(JSON.stringify(DEF.multi));
-        if (!c.tp13) { o.perfiles.forEach(function (p) { p.tp = 0.13; (p.adds || []).forEach(function (a) { a.tp = 0.13; }); }); o.tp13 = 1; escLS(LS, o); }   /* v9: cada operación sale con +0.13 USDT (una sola vez; luego editable) */
+        if (!c.tp10) { o.perfiles.forEach(function (p) { p.tp = 0.10; (p.adds || []).forEach(function (a) { a.tp = 0.10; }); }); o.tp13 = 1; o.tp10 = 1; escLS(LS, o); }   /* v9: cada operación sale con +0.13 USDT (una sola vez; luego editable) */
         if (!c.rec25) { o.perfiles.forEach(function (p) { (p.adds || []).forEach(function (a) { a.caida = 25; }); });
             (o.multi.adds || []).forEach(function (a) { a.caida = 25; }); o.rec25 = 1; escLS(LS, o); }   /* v10: recompra cuando la posición cae 25 % desde su precio medio */
-        if (!c.p30) { o.perfiles.forEach(function (p) { if (p.desde === 30) { p.ent = 33; p.tp = 0.13; p.adds = [{ caida: 25, pct: 99, tp: 0.13 }]; } }); o.p30 = 1; escLS(LS, o); }   /* v11: 30 USDT → entra con ~10 USDT; si cae 25 % mete todo el saldo restante en UNA recompra */
+        if (!c.p30) { o.perfiles.forEach(function (p) { if (p.desde === 30) { p.ent = 33; p.tp = 0.10; p.adds = [{ caida: 25, pct: 99, tp: 0.10 }]; } }); o.p30 = 1; escLS(LS, o); }   /* v11: 30 USDT → entra con ~10 USDT; si cae 25 % mete todo el saldo restante en UNA recompra */
         if (!c.pm33) { o.multi.ent = 33; o.multi.adds = [{ caida: 25, pct: 99, tp: 3.33 }]; o.pm33 = 1; escLS(LS, o); }   /* v12: modo multi-moneda con la misma regla en %: entra 33 % de la parte de cada moneda; si cae 25 % mete el 99 % de lo que le queda */
+        o.filtro = Object.assign({}, DEF.filtro, c.filtro || {});   /* 🎯 filtro de entrada v1 */
         return o;
     }
     function guardar() { escLS(LS, cfg); }
@@ -21867,8 +21869,8 @@ window.CDC_TRACK=(function(){
     }
     function perfMulti(presup) {                      /* convierte los % de la parte de la moneda en USDT para esa posición */
         var m = cfg.multi;
-        return { desde: m.desde, ent: m.ent, tp: presup * m.tp / 100, budget: presup, multi: true,
-            adds: m.adds.map(function (a) { return { caida: a.caida, pct: a.pct, tp: presup * a.tp / 100 }; }) };
+        return { desde: m.desde, ent: m.ent, tp: TP_FIJO, budget: presup, multi: true,
+            adds: m.adds.map(function (a) { return { caida: a.caida, pct: a.pct, tp: TP_FIJO }; }) };
     }
     function textoPerfil(p) {
         var t = "entra " + p.ent + "% del capital, sale +" + p.tp + " USDT";
@@ -21988,8 +21990,8 @@ window.CDC_TRACK=(function(){
 
     /* Salida: venta límite reduce-only para ganar `objetivo` USDT sobre TODA la posición (precio medio) */
     async function ponerSalida(sym, inf, cant, entrada, objetivo) {
-        /* v9: MARGEN FIJO — mientras el capital sea menor a «multi.desde» (100 USDT) TODA salida gana +TP_FIJO USDT netos, sin importar el perfil, la recompra o la emergencia. */
-        try { var _r = misPos[sym]; if (!(_r && _r.perf && _r.perf.multi)) objetivo = TP_FIJO; } catch (e) {}
+        /* v10: ESTÁNDAR DE GANANCIA — TODA salida (cualquier moneda, capital, recompra, emergencia o multi-moneda) gana +TP_FIJO = 0.10 USDT netos. */
+        objetivo = TP_FIJO;
         var T = cfg.tpNeto
             ? (objetivo + cant * entrada * (1 + cfg.feeIn / 100)) / (cant * (1 - cfg.feeOut / 100))
             : entrada + objetivo / cant;
@@ -22062,6 +22064,83 @@ window.CDC_TRACK=(function(){
         }
     }
 
+    /* ═══ 🎯 FILTRO DE ENTRADA LONG v1 — CDC FUTURO-PRO (Juan Pablo Ortiz Ortuño) ═══
+       Antes de comprar CUALQUIER moneda (desmayo, caída brutal, flash/rebote) mira sus velas de 1 minuto:
+         1) ORDEN DE LÍNEAS: la roja (MA25) tiene que estar ARRIBA de la amarilla lenta (MA7), y el precio todavía debajo de la roja (queda recorrido).
+         2) CAÍDA < «caída mín.» (6 %): se compra si el precio está debajo de la MA7 (amarilla rápida abajo de la lenta).
+         3) CAÍDA ≥ «caída mín.» (6 %, cascada): puede seguir cayendo → NO se compra hasta que haya un QUIEBRE GRANDE que la frene:
+              · vela verde con cuerpo ≥ «quiebre» veces el cuerpo medio, con volumen ≥ «vol» veces el medio y que rompe el máximo de las 2 velas anteriores
+              · el mínimo ya se hizo (no hay mínimos nuevos después) y el precio se mantiene arriba de la mitad de esa vela y ≥ 1 % sobre el mínimo
+         Si no cumple, la moneda queda VIGILADA (aunque su alerta termine) hasta «vigilar min» minutos y se compra en cuanto cumpla. */
+    /*FILTRO-INICIO*/
+    function mediaMovil(c, n, tipo) {
+        var r = new Array(c.length).fill(null), i, s = 0;
+        if (tipo === "ema") {
+            if (c.length < n) return r;
+            for (i = 0; i < n; i++) s += c[i];
+            var e = s / n, a = 2 / (n + 1); r[n - 1] = e;
+            for (i = n; i < c.length; i++) { e = c[i] * a + e * (1 - a); r[i] = e; }
+        } else {
+            for (i = 0; i < c.length; i++) { s += c[i]; if (i >= n) s -= c[i - n]; if (i >= n - 1) r[i] = s / n; }
+        }
+        return r;
+    }
+    /* k = velas CERRADAS de 1 min (formato Binance: [t, o, h, l, c, v, …]); px = precio actual; F = cfg.filtro */
+    function evaluarVelas(k, px, F) {
+        var n = k.length, LOOK = 90, o = [], h = [], l = [], c = [], v = [], i, j, z;
+        if (n < 40) return { ok: false, motivo: "pocas velas de 1 min (" + n + ")" };
+        k.forEach(function (x) { o.push(+x[1]); h.push(+x[2]); l.push(+x[3]); c.push(+x[4]); v.push(+x[5]); });
+        var m7 = mediaMovil(c, 7, F.tipo), m25 = mediaMovil(c, 25, F.tipo), nom = F.tipo === "ema" ? "EMA" : "MA";
+        i = n - 1; if (!(px > 0)) px = c[i];
+        var a7 = m7[i], a25 = m25[i], f4 = function (x) { return x >= 1 ? x.toFixed(4) : x.toPrecision(4); };
+        var base = nom + "7 " + f4(a7) + " · " + nom + "25 " + f4(a25) + " · precio " + f4(px);
+        if (!(a25 > a7)) return { ok: false, motivo: "la roja (" + nom + "25) NO está arriba de la amarilla lenta (" + nom + "7) · " + base };
+        if (!(px < a25)) return { ok: false, motivo: "el precio ya está sobre la roja (" + nom + "25): no queda recorrido · " + base };
+        /* caída: desde el techo de la ventana hasta el mínimo posterior */
+        var d0 = Math.max(0, n - LOOK), pk = d0, mn;
+        for (j = d0; j < n; j++) if (h[j] > h[pk]) pk = j;
+        mn = pk; for (j = pk; j < n; j++) if (l[j] < l[mn]) mn = j;
+        var caida = (h[pk] - l[mn]) / h[pk] * 100, minL = l[mn];
+        /* ¿hay un quiebre grande en la última o penúltima vela cerrada? */
+        function quiebreEn(q) {
+            if (q < 25 || !(c[q] > o[q])) return null;
+            if (mn > q || q - mn > 8) return null;                          /* el mínimo ya se hizo y fue hace poco */
+            var sb = 0, sv = 0; for (z = q - 20; z < q; z++) { sb += Math.abs(c[z] - o[z]); sv += v[z]; }
+            var mb = sb / 20, mv = sv / 20, cuerpo = c[q] - o[q];
+            if (!(cuerpo >= F.quiebre * mb) || cuerpo / o[q] * 100 < F.cuerpoMin) return null;
+            if (mv > 0 && v[q] < F.vol * mv) return null;
+            if (!(c[q] > Math.max(h[q - 1], h[q - 2]))) return null;   /* rompe el máximo de las 2 velas anteriores */
+            if (px < o[q] + cuerpo * 0.5) return null;                       /* el precio no devolvió más de la mitad del quiebre */
+            if (px < minL * (1 + F.rebMin / 100)) return null;               /* ya está ≥ rebMin % sobre el mínimo */
+            if (F.cruzaMA7 && !(px >= a7)) return null;
+            return { vela: n - 1 - q, cuerpoX: mb > 0 ? cuerpo / mb : 0, volX: mv > 0 ? v[q] / mv : 0, pct: cuerpo / o[q] * 100 };
+        }
+        var qb = quiebreEn(i) || quiebreEn(i - 1);
+        var det = "caída " + caida.toFixed(1) + " % · " + base;
+        if (caida >= F.minCaida) {
+            if (qb) return { ok: true, motivo: "QUIEBRE GRANDE tras caída de " + caida.toFixed(1) + " % (vela +" + qb.pct.toFixed(2) + " %, cuerpo ×" + qb.cuerpoX.toFixed(1) + ", volumen ×" + qb.volX.toFixed(1) + ") · " + base, caida: caida, quiebre: true };
+            return { ok: false, motivo: "cascada " + caida.toFixed(1) + " % ≥ " + F.minCaida + " %: puede seguir cayendo, espera un quiebre grande que la frene · " + base, caida: caida };
+        }
+        if (px < a7) return { ok: true, motivo: "caída " + caida.toFixed(1) + " % (< " + F.minCaida + " %) · amarilla rápida debajo de la lenta · " + base, caida: caida, quiebre: false };
+        if (qb) return { ok: true, motivo: "quiebre tras caída de " + caida.toFixed(1) + " % · " + base, caida: caida, quiebre: true };
+        return { ok: false, motivo: "el precio ya está sobre " + nom + "7 sin un quiebre que lo respalde · " + det, caida: caida };
+    }
+    /*FILTRO-FIN*/
+    var fCache = {}, fLog = {}, vig = {}, fPresup = 0;
+    async function filtroEntrada(sym) {
+        var F = cfg.filtro, ahora = Date.now(), hit = fCache[sym];
+        if (hit && ahora - hit.t < 15000) return hit.r;
+        if (window.__cdcApiLim && ahora < window.__cdcApiLim.until) return { ok: false, espera: true, motivo: "Binance está limitando las llamadas" };
+        if (fPresup <= 0) return { ok: false, espera: true, motivo: "turno" };        /* máx. 6 monedas nuevas por ciclo: cuida las llamadas a Binance */
+        fPresup--;
+        var k = null; try { k = await obtenerKlines(sym, "1m", 120); } catch (e) {}
+        var r;
+        if (!k || k.length < 3) r = { ok: false, espera: true, motivo: "sin velas de 1 min (red o límite de Binance)" };
+        else r = evaluarVelas(k.slice(0, -1), parseFloat(k[k.length - 1][4]), F);     /* la última vela aún se está formando */
+        fCache[sym] = { t: Date.now(), r: r }; return r;
+    }
+    window.CDC_FILTRO_ENTRADA = { evaluar: evaluarVelas, probar: function (s) { return filtroEntrada(String(s).toUpperCase()); }, cfg: function () { return cfg.filtro; }, vigiladas: function () { return Object.keys(vig); } };
+
     /* ── BUCLE PRINCIPAL ── */
     async function tick() {
         if (!cfg.activo || busy || !window.CDC_DESPERTAR) return;
@@ -22083,6 +22162,16 @@ window.CDC_TRACK=(function(){
                 if (!(f.pos <= FLASH_POS_MAX) || !(f.score >= FLASH_SCORE_MIN) || f.cae) return;
                 activos[f.sym] = 1; cand.push({ s: f.sym, tipo: "FLASH REBOTE LONG · puntaje " + f.score + " · posición " + Math.round(f.pos) + "%" });
             }); } catch (e) {}
+            fPresup = 6;
+            var F0 = cfg.filtro;
+            if (F0 && F0.on) {                                                       /* 🎯 monedas VIGILADAS: siguen en la lista aunque su alerta termine */
+                var limV = (F0.vigMin || 45) * 60000;
+                Object.keys(vig).forEach(function (s0) {
+                    if (misPos[s0] || espera[s0]) { delete vig[s0]; return; }
+                    if (ahora - vig[s0].t > limV) { delete vig[s0]; log("⌛ " + s0 + ": sale de vigilancia (" + (F0.vigMin || 45) + " min sin cumplir el filtro de entrada)"); return; }
+                    if (!activos[s0]) { activos[s0] = 1; cand.push({ s: s0, tipo: "VIGILADA · " + vig[s0].tipo }); }
+                });
+            }
             var cambio = false;                                                      /* monedas cerradas: liberar al terminar su alerta */
             Object.keys(espera).forEach(function (sym) {
                 if (activos[sym]) { if (espera[sym].ausente) { espera[sym].ausente = null; cambio = true; } return; }
@@ -22094,6 +22183,21 @@ window.CDC_TRACK=(function(){
                 var sym = cand[i].s;
                 if (espera[sym] || misPos[sym]) continue;
                 if (motorBloquea(sym)) continue;                                   /* 🧠 filtro del motor (solo si está ACTIVO y listo) */                           /* ya ganada (espera alerta nueva) o ya abierta */
+                if (F0 && F0.on) {                                                 /* 🎯 FILTRO DE ENTRADA: líneas + caída + quiebre */
+                    try { var w0 = (typeof fabData !== "undefined" && fabData && fabData.wallet > 0) ? fabData.wallet : 0, mm0 = w0 ? modoMulti(w0) : null;
+                        if (w0 && Object.keys(misPos).length >= (mm0 ? mm0.n : 1)) continue; } catch (e) {}   /* ya está lleno: ni se gastan llamadas */
+                    var fe = await filtroEntrada(sym);
+                    if (!cfg.activo) break;
+                    if (!fe.ok) {
+                        if (!fe.espera) {
+                            if (!vig[sym]) { vig[sym] = { t: ahora, tipo: String(cand[i].tipo).replace(/^VIGILADA · /, "").slice(0, 60) };
+                                var vk = Object.keys(vig); if (vk.length > 12) { vk.sort(function (a, b) { return vig[a].t - vig[b].t; }); delete vig[vk[0]]; } }
+                            if (ahora - (fLog[sym] || 0) > 300000) { fLog[sym] = ahora; log("🎯 Filtro: " + sym + " todavía NO · " + fe.motivo); }
+                        }
+                        continue;
+                    }
+                    delete vig[sym]; cand[i].tipo += " · 🎯 " + fe.motivo;
+                }
                 var t0 = intentos[sym]; if (t0 && ahora - t0 < 60000) continue;
                 intentos[sym] = ahora;
                 try { await comprar(sym, cand[i].tipo); }
@@ -22230,13 +22334,13 @@ window.CDC_TRACK=(function(){
 
     /* ═══ 🧠 MOTOR DE APRENDIZAJE v1 — CDC FUTURO-PRO (Juan Pablo Ortiz Ortuño) ═══
        Aprende de CADA señal (FLASH · DESMAYO · CAÍDA BRUTAL): guarda sus datos al momento de aparecer y mide qué pasó después con el precio real:
-         ✅ GANA  = el precio llega al nivel de salida (+0.13 USDT netos según tu capital) ANTES de caer 25 % y en menos de 2 horas
+         ✅ GANA  = el precio llega al nivel de salida (+0.10 USDT netos según tu capital) ANTES de caer 25 % y en menos de 2 horas
          ❌ PIERDE = cae 25 % primero (habría necesitado la recompra) o pasan 2 horas sin llegar
        Con eso entrena una regresión logística pequeña (corre en tu navegador) que da la probabilidad de GANAR de cada moneda.
        • La memoria se guarda en el navegador (localStorage, pidiendo almacenamiento persistente) y se puede exportar/importar.
        • FASE 1 (siempre): solo observa y muestra la probabilidad 🧠 en la lista de rebote.
        • FASE 2 (interruptor, apagado por defecto): el bot SOLO deja de comprar monedas con probabilidad baja. Se activa únicamente si hay ≥100 muestras
-         y el modelo le gana al azar (Brier). Nunca sube el monto ni cambia las reglas (+0.13, recompra al 25 %). */
+         y el modelo le gana al azar (Brier). Nunca sube el monto ni cambia las reglas (+0.10, recompra al 25 %). */
     var MK = "cdcMotor_v1", MIN_N = 100, WIN_MS = 7200000, COOL_MS = 1800000, MAXP = 60, HMAX = 400, NF = 12, mGuard = 0, mLogBloq = {};
     var MS = (function () {
         var d = {}; try { d = JSON.parse(localStorage.getItem(MK) || "{}") || {}; } catch (e) {}
@@ -22270,7 +22374,7 @@ window.CDC_TRACK=(function(){
     }
     function motorUmbral() { var m = mMetricas(); return m.base == null ? 0.5 : Math.min(0.7, Math.max(0.3, m.base + 0.03)); }
     function motorActivo() { return !!MS.on && mMetricas().listo; }
-    function mObjPct() {      /* % que debe subir el precio para ganar +0.13 USDT netos con el capital actual (incluye comisiones) */
+    function mObjPct() {      /* % que debe subir el precio para ganar +0.10 USDT netos con el capital actual (incluye comisiones) */
         var w = (typeof fabData !== "undefined" && fabData && fabData.wallet > 0) ? fabData.wallet : 12, m, mm = modoMulti(w), pfl;
         if (mm) m = mm.presup * cfg.multi.ent / 100; else { pfl = elegirPerfil(w) || { ent: 99 }; m = w * pfl.ent / 100; }
         m = Math.max(5, m); return TP_FIJO / m * 100 + cfg.feeIn + cfg.feeOut;
@@ -22314,7 +22418,7 @@ window.CDC_TRACK=(function(){
         var bt = 'style="cursor:pointer;border:1px solid rgba(255,255,255,.2);background:#0b1220;color:#e2e8f0;border-radius:6px;padding:3px 8px;font-size:10px;margin:3px 4px 0 0"';
         return '<div style="border:1px solid ' + col + '66;background:rgba(125,211,252,.05);border-radius:8px;padding:7px 9px;margin-bottom:8px;font-size:10.5px;color:#cbd5e1">' +
             '<div style="display:flex;justify-content:space-between;align-items:center"><b style="color:#7dd3fc">🧠 MOTOR DE APRENDIZAJE</b><b style="color:' + col + '">' + est + '</b></div>' +
-            '<div style="margin-top:3px">Muestras <b>' + MS.n + '</b> · en seguimiento <b>' + MS.pend.length + '</b> · ganan +0.13 sin recompra (≤2 h): <b>' + win + '</b> · tiempo medio <b>' + tm + '</b></div>' +
+            '<div style="margin-top:3px">Muestras <b>' + MS.n + '</b> · en seguimiento <b>' + MS.pend.length + '</b> · ganan +0.10 sin recompra (≤2 h): <b>' + win + '</b> · tiempo medio <b>' + tm + '</b></div>' +
             '<div style="color:#94a3b8">' + (m.brier == null ? "Aún sin resultados: aprende de cada señal que se resuelve." : "Error del modelo " + m.brier.toFixed(3) + " vs azar " + m.ref.toFixed(3) + (m.listo ? " ✓ le gana al azar" : " · todavía no le gana al azar")) + '</div>' +
             '<div><span data-motor="filtro" ' + bt + '>' + (MS.on ? "⏸ Apagar filtro del bot" : "▶ Activar filtro del bot") + '</span><span data-motor="exp" ' + bt + '>💾 Exportar memoria</span><span data-motor="imp" ' + bt + '>📥 Importar</span><span data-motor="reset" ' + bt + '>🗑 Reiniciar</span></div></div>';
     }
@@ -23231,7 +23335,7 @@ window.CDC_TRACK=(function(){
         var mu = { desde: isNaN(gm("d")) ? M0.desde : Math.max(1, gm("d")), por: isNaN(gm("u")) ? M0.por : Math.max(10, gm("u")),
             ent: isNaN(gm("e")) ? M0.ent : Math.min(99, Math.max(1, gm("e"))), tp: isNaN(gm("t")) ? M0.tp : Math.max(0.05, gm("t")), adds: [] };
         [1, 2].forEach(function (k) { var c = gm("c" + k), q = gm("p" + k), x = gm("t" + k); if (c > 0 && q > 0 && x > 0 && mu.adds.length === k - 1) mu.adds.push({ caida: c, pct: Math.min(99, q), tp: x }); });
-        cfg.multi = mu; guardar(); pintarPerfiles(); pintarMulti();
+        leerFiltro(); cfg.multi = mu; guardar(); pintarPerfiles(); pintarMulti(); pintarFiltro();
     }
     function pintar() {
         var a = cfg.activo;
@@ -23240,6 +23344,26 @@ window.CDC_TRACK=(function(){
         $("bdEstado").style.color = a ? (cfg.testnet ? "#f3ba2f" : "#ff2a3b") : "#94a3b8";
         $("bdOn").textContent = a ? "⏹ PARAR BOT" : "▶ RUN · EMPEZAR A OPERAR";
         $("bdBtn").style.borderColor = a ? (cfg.testnet ? "#f3ba2f" : "#ff2a3b") : "rgba(255,255,255,.2)";
+    }
+    function filtroHtml(inp) {
+        function f(id, lab) { return '<div>' + lab + '<input id="bdFl' + id + '" type="number" step="any" style="' + inp + '"></div>'; }
+        return '<div id="bdFiltroBox" style="border:1px solid rgba(14,203,129,.45);border-radius:8px;padding:6px;margin:6px 0"><b style="color:#0ecb81;font-size:11px">🎯 Filtro de entrada LONG</b>' +
+            '<div style="font-size:10px;color:#94a3b8;margin:2px 0 4px">Ganancia fija <b style="color:#f3ba2f">+0.10 USDT</b> en todas las monedas. Compra solo si la roja (MA25) está arriba de la amarilla lenta (MA7). Si la caída es ≥ «caída mín.» (cascada) espera un quiebre grande que la frene; mientras tanto la moneda queda vigilada.</div>' +
+            '<label style="display:block;margin:2px 0"><input type="checkbox" id="bdFlOn"> Filtro activado</label>' +
+            '<div style="font-size:10px;margin:2px 0">Tipo de línea <select id="bdFlTipo" style="background:#050914;color:#fff;border:1px solid rgba(255,255,255,.15);border-radius:6px;padding:3px 4px"><option value="sma">MA simple (como tu gráfico de Binance)</option><option value="ema">EMA</option></select></div>' +
+            '<div style="display:grid;grid-template-columns:1fr 1fr;gap:4px;font-size:10px">' + f("Caida", "Caída mín. % (cascada)") + f("Quiebre", "Quiebre: cuerpo ×") + f("Vol", "Quiebre: volumen ×") + f("Vig", "Vigilar (min)") + '</div>' +
+            '<label style="display:block;margin:4px 0 0;font-size:10px"><input type="checkbox" id="bdFlMa7"> Exigir además que el precio cruce sobre la MA7</label></div>';
+    }
+    function pintarFiltro() {
+        var F = cfg.filtro; if (!F) return;
+        try { $("bdFlOn").checked = !!F.on; $("bdFlTipo").value = F.tipo === "ema" ? "ema" : "sma"; $("bdFlCaida").value = F.minCaida; $("bdFlQuiebre").value = F.quiebre; $("bdFlVol").value = F.vol; $("bdFlVig").value = F.vigMin; $("bdFlMa7").checked = !!F.cruzaMA7; } catch (e) {}
+    }
+    function leerFiltro() {
+        var F = cfg.filtro; if (!F || !$("bdFlOn")) return;
+        var g = function (id, d, mn, mx) { var x = parseFloat($(id).value); return isNaN(x) ? d : Math.min(mx, Math.max(mn, x)); };
+        F.on = $("bdFlOn").checked; F.tipo = $("bdFlTipo").value === "ema" ? "ema" : "sma";
+        F.minCaida = g("bdFlCaida", 6, 0.5, 60); F.quiebre = g("bdFlQuiebre", 2.5, 1, 20); F.vol = g("bdFlVol", 1.5, 0, 20); F.vigMin = g("bdFlVig", 45, 5, 240); F.cruzaMA7 = $("bdFlMa7").checked;
+        fCache = {};
     }
     function multiHtml() {
         var inp = "background:#050914;color:#fff;border:1px solid rgba(255,255,255,.15);border-radius:6px;padding:4px 6px;width:100%;box-sizing:border-box;";
@@ -23281,7 +23405,7 @@ window.CDC_TRACK=(function(){
             '<label data-tip="test" style="display:block;margin:6px 0 2px;cursor:help"><input type="checkbox" id="bdTest"> Usar TESTNET (testnet.binancefuture.com) <span style="color:#f3ba2f">ⓘ</span></label>' +
             '<label style="display:block;margin:2px 0"><input type="checkbox" id="bdNeto"> Ganancias NETAS (descuentan comisiones)</label>' +
             '<label style="display:block;margin:2px 0 6px"><input type="checkbox" id="bdInm"> Incluir DESMAYO INMINENTE</label>' +
-            '<div><span data-tip="max" style="cursor:help">Máx. posiciones <span style="color:#f3ba2f">ⓘ</span></span> <span style="font-size:10px;color:#94a3b8">(monedas abiertas a la vez)</span><div style="width:50%"><input id="bdMax" data-tip="max" type="number" style="' + inp + '"></div></div>' + perf +
+            '<div><span data-tip="max" style="cursor:help">Máx. posiciones <span style="color:#f3ba2f">ⓘ</span></span> <span style="font-size:10px;color:#94a3b8">(monedas abiertas a la vez)</span><div style="width:50%"><input id="bdMax" data-tip="max" type="number" style="' + inp + '"></div></div>' + filtroHtml(inp) + perf +
             multiHtml() + '<div style="font-size:10px;color:#94a3b8">Recompra: deja vacío el "cae %" para no usarla. "% libre" = % del saldo disponible en ese momento.</div>' +
             '<div style="display:flex;gap:6px;margin-top:8px"><button id="bdGuardar" style="flex:1;padding:8px;border-radius:8px;border:1px solid #f3ba2f;background:#2a2108;color:#f3ba2f;cursor:pointer;font-weight:800">💾 GUARDAR</button>' +
             '<button id="bdProbar" style="flex:1;padding:8px;border-radius:8px;border:1px solid #2563eb;background:#0b1630;color:#9db8ff;cursor:pointer;font-weight:700">Probar conexión</button></div>' +
@@ -23290,7 +23414,7 @@ window.CDC_TRACK=(function(){
             '<div id="bdLog" style="margin-top:8px;max-height:170px;overflow:auto;font:11px/1.45 monospace"></div></div>';
         document.body.appendChild(w);
         $("bdKey").value = cfg.key; $("bdTest").checked = cfg.testnet; $("bdInm").checked = cfg.incInminente; $("bdNeto").checked = cfg.tpNeto;
-        $("bdMax").value = cfg.maxPos; pintarPerfiles(); pintarMulti();
+        $("bdMax").value = cfg.maxPos; pintarPerfiles(); pintarMulti(); pintarFiltro();
         $("bdP0d").readOnly = true;
         var m = document.createElement("div"); m.id = "bdMonWrap";
         m.style.cssText = "display:none;position:fixed;top:0;left:0;right:0;bottom:0;z-index:9600;background:rgba(3,7,18,.96);overflow:auto;font:12px/1.4 Inter,Arial,sans-serif;color:#cbd5e1;padding:14px";
