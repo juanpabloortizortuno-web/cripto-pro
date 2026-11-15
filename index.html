@@ -9362,7 +9362,7 @@ let colaSimbolosEMA = [];   // cola de símbolos pendientes de actualizar EMA (r
 let indiceEMAActual = 0;
 // 🎯 SOLO monedas de 0 a 2 USDT: las de más precio no se leen ni se piden a Binance (menos peticiones).
 // BTC/ETH/BNB/SOL se mantienen únicamente como referencia de mercado (correlación).
-let PRECIO_MAX_ESCANEO_USDT = (function(){ try{ var v=parseFloat(localStorage.getItem('cdc_precio_max')); return v>0?v:0.5; }catch(e){ return 0.5; } })(); /* 🎯 solo monedas ≤ 0.50 USDT: menos peticiones a Binance (no se cuelga la red ni salta el límite). Para cambiarlo: localStorage.setItem('cdc_precio_max','1') y recargar */
+let PRECIO_MAX_ESCANEO_USDT = (function(){ try{ var v=parseFloat(localStorage.getItem('cdc_precio_max')); return v>0?Math.max(v,1):1; }catch(e){ return 1; } })(); /* 🎯 SIEMPRE se buscan todas las monedas de menos de 1 USDT (mínimo fijo 1; se puede subir con localStorage.setItem('cdc_precio_max','3') y recargar, nunca bajar de 1) */
 const _SIEMPRE_ESCANEAR = ['BTCUSDT', 'ETHUSDT', 'BNBUSDT', 'SOLUSDT'];
 const EMA_LOTE_POR_CICLO = 10;      // cuántos símbolos actualizamos cada ciclo de refresco EMA (bajado de 35 a 15: 35 peticiones en paralelo cada 8s disparaba el rate limit de Binance -429/418-)
 const EMA_INTERVALO_MS = 13 * 1000; // cada 13s actualizamos un lote (antes 8s: era muy agresivo y sumado al resto de peticiones activaba el rate limit de Binance)
@@ -18954,7 +18954,7 @@ window.CDC_FLASH=(function(){
     // archivo completo sin caer en la paradoja de "el hash contiene su
     // propio hash". No cambiar este texto.
     var _PLACEHOLDER = "%%CDC_INTEGRITY_HASH%%";
-    var _HASH_ESPERADO = "a0430ed9759813c99faa033ec870565a69b9ef0d82050e2e08f4de3986e98284"; // ← se reemplaza por el hash real en el paso final
+    var _HASH_ESPERADO = "6a4b6d454402c7c07d2a1e8f40db4d0993e056f1b26cc72048dbeadca127a5ac"; // ← se reemplaza por el hash real en el paso final
 
     function _bloquear(motivo) {
         try {
@@ -21277,27 +21277,29 @@ window.CDC_WS24=(function(){
    Ajustable en vivo:  CDC_DESMAYO_RAPIDO.cfg.DROP_MIN = 2  */
 window.CDC_DESMAYO_RAPIDO=(function(){
   "use strict";
-  var CFG={ON:true,VENT_MS:180000,DROP_MIN:2.5,ALC_MIN:3,VOLX_MIN:2,TTL_MS:120000,MUESTREO_MS:1000,WAKE_MS:1500};
+  var CFG={ON:true,VENT_MS:180000,DROP_MIN:2.5,ALC_MIN:-100,VOLX_MIN:2,TTL_MS:120000,MUESTREO_MS:1000,WAKE_MS:1500,MAX_MARCADAS:30};
   var H={},FAST={},ultWake=0;
   window.__cdcFast=FAST;
   function despertar(){var n=Date.now();if(n-ultWake<CFG.WAKE_MS)return;ultWake=n;
     setTimeout(function(){try{if(window.__cdcDesTick)window.__cdcDesTick()}catch(e){}},0)}
   function proc(a){
     if(!CFG.ON||!a||!a.length)return;
-    var now=Date.now(),pmax=(typeof PRECIO_MAX_ESCANEO_USDT==="number")?PRECIO_MAX_ESCANEO_USDT:0.5,i,k;
+    var now=Date.now(),pmax=(typeof PRECIO_MAX_ESCANEO_USDT==="number")?PRECIO_MAX_ESCANEO_USDT:1,i,k;
     for(i=0;i<a.length;i++){
       var x=a[i],s=x&&x.s;if(!s||s.slice(-4)!=="USDT")continue;
       var p=+x.c,q=+x.q,ch=+x.P;if(!(p>0)||!(q>0))continue;
       var h=H[s]||(H[s]=[]),l=h[h.length-1];
       if(!l||now-l.t>=CFG.MUESTREO_MS)h.push({t:now,p:p,q:q});else{l.p=p;l.q=q}
       while(h.length&&now-h[0].t>CFG.VENT_MS+30000)h.shift();
-      if(h.length<5||!(ch>=CFG.ALC_MIN)||p>pmax)continue;           // solo alcistas y dentro del rango de precio del bot
+      if(h.length<5||!(ch>=CFG.ALC_MIN)||p>pmax)continue;           // cualquier moneda dentro del rango de precio del bot (<1 USDT); ALC_MIN solo filtra si lo subes
       var mx=0,r=null;
       for(k=0;k<h.length;k++){if(now-h[k].t<=CFG.VENT_MS){if(h[k].p>mx)mx=h[k].p;if(!r)r=h[k]}}
       if(!r||!(mx>0))continue;
       var drop=(mx-p)/mx*100;if(drop<CFG.DROP_MIN)continue;          // caída fuerte en la ventana
       var mins=Math.max((now-r.t)/60000,0.5),vx=(q-r.q)/((q/1440)*mins);if(vx<CFG.VOLX_MIN)continue;   // salida de capital: volumen vs lo normal
-      var nueva=!FAST[s];FAST[s]=now;if(nueva)despertar();
+      var nueva=!FAST[s];
+      if(nueva){var ks=Object.keys(FAST);if(ks.length>=CFG.MAX_MARCADAS){var viej=ks[0],kk;for(kk=1;kk<ks.length;kk++)if(FAST[ks[kk]]<FAST[viej])viej=ks[kk];delete FAST[viej]}}   // tope: no saturar a Binance si todo el mercado cae
+      FAST[s]=now;if(nueva)despertar();
     }
   }
   setInterval(function(){var n=Date.now(),s;for(s in FAST)if(n-FAST[s]>CFG.TTL_MS)delete FAST[s];
@@ -23161,6 +23163,10 @@ window.CDC_TRACK=(function(){
 @container cdcbn (min-width:601px){
   #detailView .cdcbn-hero .cdcbn-main{grid-template-columns:clamp(58px,10cqw,78px) minmax(150px,230px) minmax(130px,190px);justify-content:start;column-gap:clamp(14px,2.6cqw,26px);}
 }
+/* 🚀 barra de arranque dentro de la columna derecha: 2 x 2 para que quepa en ese ancho */
+#columnRight #cdcQuickBootBox{grid-template-columns:1fr 1fr;gap:8px 10px;padding:9px 10px;margin-bottom:10px;flex-shrink:0}
+#columnRight #cdcQuickBootBox .qb-big{font-size:13px}
+#columnRight #cdcQuickBootBox #qbRun{font-size:11.5px;padding:8px 6px}
 /* 🔻 «Señales en vivo»: el botón y la lista de MONEDAS CON DESMAYO suben justo debajo del título */
 .cdcbn-signals>div:first-child{order:-3}
 .cdcbn-signals>#cdcDesBtnHost{order:-2}
@@ -23203,6 +23209,19 @@ body.cdc-menu-oculto #cdcMenuToggle .p{opacity:0}
   window.addEventListener("resize", colocar);
   try { var ro = new ResizeObserver(colocar), c0 = document.querySelector(".container"); if (c0) ro.observe(c0); } catch (e) {}
   setInterval(colocar, 1500);
+
+  /* 🚀 la barra de arranque (BOT CDC · MI CUENTA · MÁX. POSICIONES · RUN) sube a la columna derecha, encima del Cerebro Neuronal.
+     Solo en escritorio; en celular vuelve a su lugar. Se mueve el mismo elemento, así que sus botones siguen funcionando igual. */
+  var MQ = window.matchMedia ? window.matchMedia("(min-width:951px)") : { matches: true }, qbCasa = null, qbSig = null;
+  function qb() {
+    var box = document.getElementById("cdcQuickBootBox"), col = document.getElementById("columnRight"); if (!box || !col) return;
+    if (!qbCasa) { qbCasa = box.parentNode; qbSig = box.nextSibling; }
+    if (MQ.matches) { if (box.parentNode !== col) col.insertBefore(box, col.firstElementChild || null); }
+    else if (box.parentNode !== qbCasa) { qbCasa.insertBefore(box, (qbSig && qbSig.parentNode === qbCasa) ? qbSig : qbCasa.firstChild); }
+  }
+  qb();
+  try { if (MQ.addEventListener) MQ.addEventListener("change", qb); else if (MQ.addListener) MQ.addListener(qb); } catch (e) {}
+  setInterval(qb, 2000);
 })();
 </script>
 </body></html>
