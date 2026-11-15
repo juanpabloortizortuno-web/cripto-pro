@@ -19050,7 +19050,7 @@ window.CDC_FLASH=(function(){
     // archivo completo sin caer en la paradoja de "el hash contiene su
     // propio hash". No cambiar este texto.
     var _PLACEHOLDER = "%%CDC_INTEGRITY_HASH%%";
-    var _HASH_ESPERADO = "7501513c0f4e6b087f006bd0728558479617544dda73acb2662e4908f80cadb1"; // ← se reemplaza por el hash real en el paso final
+    var _HASH_ESPERADO = "1e711e971745fd349ad3c15bc53c343b31b9b10d690efcc749bef92310504239"; // ← se reemplaza por el hash real en el paso final
 
     function _bloquear(motivo) {
         try {
@@ -21834,6 +21834,9 @@ window.CDC_TRACK=(function(){
        El capital es el saldo de la billetera de Futuros. Si no se puede leer el saldo, se conserva el último valor (al inicio 0.05). */
     function tpPorCapital(w) { return w >= 40 ? 0.20 : w >= 30 ? 0.15 : w >= 20 ? 0.10 : TP_FIJO; }
     var tpCache = { t: 0, v: TP_FIJO };
+    /* v15: AJUSTE MANUAL — solo en memoria (no se guarda): al actualizar la página vuelve a lo predeterminado */
+    var MAN = { on: false, lev: 0, inv: 0, esp: 0 };
+    var PM = { lastTick: Date.now(), busyAt: 0, lag: 0, worst: 0, rescates: 0 };
     var ESPERA_RECOMPRA_MS = 60000;   /* v14: si en 1 minuto la posición no llegó a su meta, recompra con el saldo libre y la salida pasa a +0.05 */
     async function tpActual() {
         if (Date.now() - tpCache.t < 20000) return tpCache.v;
@@ -21909,8 +21912,9 @@ window.CDC_TRACK=(function(){
         if (firmado) { q.append("timestamp", Date.now() + offset); q.append("recvWindow", 10000); qs = q.toString(); qs += "&signature=" + await hmac(qs); }
         else qs = q.toString();
         var r;
-        try { r = await fetch(base() + path + (qs ? "?" + qs : ""), { method: metodo, headers: (firmado && cfg.key) ? { "X-MBX-APIKEY": cfg.key } : {} }); }
-        catch (x) { throw new Error("No se pudo conectar con Binance (" + x.message + "). Revisa tu internet, bloqueos de red o antivirus."); }
+        var ctl = (metodo === "GET" && typeof AbortController !== "undefined") ? new AbortController() : null, toF = ctl ? setTimeout(function () { ctl.abort(); }, 25000) : 0;
+        try { r = await fetch(base() + path + (qs ? "?" + qs : ""), { method: metodo, headers: (firmado && cfg.key) ? { "X-MBX-APIKEY": cfg.key } : {}, signal: ctl ? ctl.signal : undefined }); clearTimeout(toF); }
+        catch (x) { clearTimeout(toF); throw new Error("No se pudo conectar con Binance (" + x.message + "). Revisa tu internet, bloqueos de red o antivirus."); }
         var j = await r.json().catch(function () { return {}; });
         if (!r.ok) { if (r.status === 429 || r.status === 418) { var ra = 0; try { ra = parseInt(r.headers.get("Retry-After")) || 0; } catch (x) {} window.__cdcApiLim = { s: r.status, until: Date.now() + (ra ? ra * 1000 : r.status === 418 ? 120000 : 20000) }; } var e = new Error(((j && j.msg) || ("HTTP " + r.status)) + pista(j && j.code)); e.code = j && j.code; throw e; }
         return j;
@@ -21975,15 +21979,19 @@ window.CDC_TRACK=(function(){
         var perf = mm ? perfMulti(mm.presup) : elegirPerfil(s.disp);
         if (!perf) { log("⏭ " + sym + ": ningún perfil aplica a un saldo disponible de " + s.disp.toFixed(2) + " USDT", true); return false; }
         /* 🆘 EMERGENCIA: capital < 6 USDT → 2x y salida +0.25 USDT, sin recompras, hasta llegar a 6 USDT */
-        var lev = LEV, emerg = !mm && s.wallet < 6;
-        if (emerg) { lev = 2; perf = { desde: 0, ent: perf.ent, tp: TP_FIJO, adds: [], emergencia: true }; }
-        var margen = Math.min((mm ? mm.presup * cfg.multi.ent / 100 : s.disp * perf.ent / 100), margenSeguro(s.disp, lev));
+        var lev = (MAN.on && MAN.lev) || LEV, emerg = !mm && s.wallet < 6;
+        if (emerg) { if (!(MAN.on && MAN.lev)) lev = 2; perf = { desde: 0, ent: perf.ent, tp: TP_FIJO, adds: [], emergencia: true }; }
+        if (MAN.on) { perf = JSON.parse(JSON.stringify(perf)); if (!perf.adds || !perf.adds.length) perf.adds = [{ caida: 25, pct: 99, tp: TP_FIJO }]; }   /* ajuste manual: siempre hay recompra con el saldo restante */
+        var baseM = (MAN.on && MAN.inv > 0) ? MAN.inv : (mm ? mm.presup * cfg.multi.ent / 100 : s.disp * perf.ent / 100);
+        var margen = Math.min(baseM, margenSeguro(s.disp, lev));
+        if (MAN.on && MAN.inv > 0 && margen < MAN.inv - 0.005) log("⚠️ " + sym + ": pediste invertir " + MAN.inv + " USDT pero el saldo disponible solo alcanza para " + margen.toFixed(2) + " USDT; se usa esa cantidad.", true);
         var px = parseFloat((await api("GET", "/fapi/v1/ticker/price", { symbol: sym }, false)).price);
         var qty = parseFloat(floorStep(margen * lev / px, inf.step, inf.qp));
         if (qty < inf.minQty || qty * px < inf.minNot * 1.02) { log("⏭ " + sym + ": " + (qty * px).toFixed(2) + " USDT no alcanza el mínimo de Binance (" + inf.minNot + ") · saldo disponible " + s.disp.toFixed(2), true); return false; }
         await modo();
         try { await api("POST", "/fapi/v1/marginType", { symbol: sym, marginType: "ISOLATED" }, true); } catch (e) { if (e.code !== -4046) throw e; }
-        await api("POST", "/fapi/v1/leverage", { symbol: sym, leverage: lev }, true);
+        try { await api("POST", "/fapi/v1/leverage", { symbol: sym, leverage: lev }, true); }
+        catch (e) { if (MAN.on && MAN.lev) { log("⛔ " + sym + ": Binance no acepta x" + lev + " en esta moneda (" + (e.message || e) + "). No se compra; baja el apalancamiento en el Ajuste manual.", true); return false; } throw e; }
 
         var p = { symbol: sym, side: "BUY", type: "MARKET", quantity: qty, newOrderRespType: "RESULT" };
         if (dual) p.positionSide = "LONG";
@@ -22157,8 +22165,9 @@ window.CDC_TRACK=(function(){
 
     /* ── BUCLE PRINCIPAL ── */
     async function tick() {
+        PM.lastTick = Date.now();
         if (!cfg.activo || busy || !window.CDC_DESPERTAR) return;
-        busy = true;
+        busy = true; PM.busyAt = Date.now();
         try {
             await cargarInfo();
             try { await gestionar(); } catch (e) { log("❌ Gestión de recompras: " + e.message, true); }
@@ -23238,6 +23247,17 @@ window.CDC_TRACK=(function(){
               '<div class="bdf-row"><button class="bdf-btn bdf-green bc-big" data-ca="gp">💾 Guardar y probar conexión</button></div></div><div id="bcRes"></div><div id="bcEstado" style="margin-top:8px"></div>' +
               '<div style="text-align:right;margin-top:6px"><a data-ca="borrar" style="color:#94a3b8;font-size:11px;cursor:pointer;text-decoration:underline">borrar claves de este dispositivo</a></div></div>' +
               '<div class="bdf-card"><h4>🤖 3 · Bot Desmayo</h4><div style="margin-bottom:6px"><b id="bcEst"></b></div><button id="bcRun" data-ca="run" class="bdf-btn bc-big"></button><div id="bcResume"></div><label style="display:block;margin:8px 0 2px"><input type="checkbox" id="bcWake"> 🔆 Mantener la pantalla encendida mientras el bot esté activo</label><div id="bcWakeSt" style="font-size:11px"></div><div style="margin-top:6px;color:#94a3b8;font-size:11px">El bot trabaja solo mientras la app esté abierta y visible: no la cierres ni cambies a otra app. Si se cierra, el bot se apaga (tus salidas puestas en Binance siguen ahí). Sin stop loss: usa solo dinero que puedas perder.</div></div>' +
+              '<div class="bdf-card" id="bcManCard"><h4>🎛️ 4 · Ajuste manual <span style="font-size:10.5px;color:#94a3b8;font-weight:400">(solo esta sesión)</span></h4>' +
+              '<div style="font-size:11px;color:#94a3b8;margin-bottom:6px">Detén el bot, llena las casillas que quieras y pulsa Aplicar. Las casillas vacías usan lo predeterminado. Si actualizas la página, todo vuelve al estado predeterminado.</div>' +
+              '<label class="bc-lab" for="bcManLev">Apalancamiento (x) — predeterminado 1</label><input id="bcManLev" class="bc-inp" type="number" inputmode="numeric" min="1" max="20" step="1" placeholder="vacío = 1x">' +
+              '<label class="bc-lab" for="bcManInv">Inversión inicial (USDT de tu capital por operación)</label><input id="bcManInv" class="bc-inp" type="number" inputmode="decimal" min="0" step="0.01" placeholder="vacío = automática según tu perfil">' +
+              '<label class="bc-lab" for="bcManEsp">Tiempo para usar el saldo restante (segundos)</label><input id="bcManEsp" class="bc-inp" type="number" inputmode="numeric" min="5" max="3600" step="1" placeholder="vacío = 60 s">' +
+              '<div id="bcManPrev" style="font-size:11px;color:#94a3b8;margin:6px 0"></div>' +
+              '<div class="bdf-row"><button type="button" id="bcManOk" class="bdf-btn bdf-green" style="flex:1">✅ Aplicar</button><button type="button" id="bcManNo" class="bdf-btn bdf-gold" style="flex:1">↩ Quitar ajuste</button></div>' +
+              '<div id="bcManSt" style="margin-top:6px;font-size:11.5px"></div></div>' +
+              '<div class="bdf-card"><h4>❤️ 5 · Marcapasos (anti-lag)</h4><div id="bcPM"></div>' +
+              '<label style="display:block;margin:8px 0 2px"><input type="checkbox" id="bcPMAud"> 🔊 Anti-suspensión con sonido inaudible (recomendado)</label>' +
+              '<div style="margin-top:4px;color:#94a3b8;font-size:11px">Un latido en un hilo aparte vigila al bot cada segundo: si la página se pone lenta o el navegador frena sus temporizadores, lo despierta; si una conexión se cuelga, lo destraba. Ayuda mucho, pero ningún navegador de celular permite trabajar con la pantalla apagada o la app cerrada.</div></div>' +
               '<div style="color:#64748b;font-size:11px;text-align:center;margin-top:8px">🔒 Las claves se guardan solo en este dispositivo y se envían directo a Binance. La página en GitHub es estática y no recibe ni guarda ninguna clave.</div>' +
             '</div>' +
             '<div id="bcVopc" style="display:none"></div><div id="bcVmon" style="display:none"><div id="bcMon"></div><div id="bcChart" class="mx-sec" style="display:none"><button type="button" class="mx-h" data-mx="chart"><span>📈 Gráfico en vivo <b id="bcSym" style="margin-left:6px;color:#fff"></b></span><span class="mx-x"><i>▾</i></span></button><div class="mx-b"><iframe id="bcFrame" style="width:100%;height:300px;border:0;border-radius:8px;background:#050914"></iframe></div></div></div></div>';
@@ -23583,6 +23603,93 @@ window.CDC_TRACK=(function(){
     }
 
     if (document.readyState === "loading") document.addEventListener("DOMContentLoaded", montar); else montar();
+    /* ===== v15 · AJUSTE MANUAL + ❤ MARCAPASOS ===== */
+    (function () {
+        var PREF = "cdcBotMarcapasos_v1", audioOn = leerLS(PREF).audio !== false, aud = null, worker = null, fb = 0, lastBeat = Date.now(), svgSig = "";
+        var stl = document.createElement("style");
+        stl.textContent = "@keyframes pmLate{0%,100%{transform:scale(1)}15%{transform:scale(1.25)}30%{transform:scale(1)}45%{transform:scale(1.13)}60%{transform:scale(1)}}@keyframes pmEcg{to{stroke-dashoffset:-120}}.pmHeart{transform-box:fill-box;transform-origin:center;animation:pmLate 1s ease-in-out infinite}.pmEcg{stroke-dasharray:60 60;animation:pmEcg 1s linear infinite}.pmOff .pmHeart,.pmOff .pmEcg{animation:none}";
+        document.head.appendChild(stl);
+        function pmSvg(c, off) {
+            return '<svg class="' + (off ? "pmOff" : "") + '" width="120" height="40" viewBox="0 0 120 36" style="flex:none"><g transform="translate(2,3) scale(1.25)"><path class="pmHeart" d="M12 21C5 16 2 12.5 2 9a5 5 0 0 1 10-1.5A5 5 0 0 1 22 9c0 3.5-3 7-10 12z" fill="' + c + '"/></g>' +
+                '<polyline class="pmEcg" points="36,20 50,20 55,8 61,31 67,14 71,20 118,20" fill="none" stroke="' + c + '" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>';
+        }
+        function audioIniciar() {
+            if (aud || !audioOn) return;
+            try { var AC = window.AudioContext || window.webkitAudioContext; if (!AC) return; var ctx = new AC(), o = ctx.createOscillator(), g = ctx.createGain(); o.frequency.value = 18; g.gain.value = 0.02; o.connect(g); g.connect(ctx.destination); o.start(); aud = { ctx: ctx, o: o }; } catch (e) { aud = null; }
+        }
+        function audioParar() { if (!aud) return; try { aud.o.stop(); aud.ctx.close(); } catch (e) {} aud = null; }
+        function reanudar() { if (aud && aud.ctx && aud.ctx.state === "suspended") { try { aud.ctx.resume(); } catch (e) {} } }
+        document.addEventListener("click", reanudar, { passive: true }); document.addEventListener("touchstart", reanudar, { passive: true });
+
+        function pmPintar() {
+            var e = $("bcPM"); if (!e) return;
+            var act = !!cfg.activo, ok = PM.lag < 1500 && (Date.now() - lastBeat) < 3000;
+            var col = !act ? "#64748b" : ok ? "#0ecb81" : PM.lag < 5000 ? "#f3ba2f" : "#ff2a3b";
+            var txt = !act ? "En reposo — se activa al encender el bot" : ok ? "LATIENDO · el bot está protegido" : "RETRASO detectado — recuperando…";
+            if (!e.__init) { e.__init = 1; e.innerHTML = '<div style="display:flex;align-items:center;gap:8px"><span id="pmI"></span><div style="font-size:11.5px"><b id="pmT"></b><br><span id="pmD" style="color:#94a3b8"></span></div></div>'; }
+            var sg = act + col; if (sg !== svgSig) { svgSig = sg; $("pmI").innerHTML = pmSvg(col, !act); }
+            $("pmT").textContent = txt; $("pmT").style.color = col;
+            $("pmD").textContent = "Retraso " + Math.round(PM.lag) + " ms · peor " + Math.round(PM.worst) + " ms · rescates " + PM.rescates + " · sonido " + (aud ? (aud.ctx.state === "running" ? "activo" : "esperando un toque en pantalla") : "apagado") + " · latido " + (worker && !fb ? "en hilo aparte" : "normal");
+            var cb = $("bcPMAud"); if (cb && !cb.__b) { cb.__b = 1; cb.checked = audioOn; cb.onchange = function () { audioOn = this.checked; escLS(PREF, { audio: audioOn }); if (!audioOn) audioParar(); }; }
+        }
+        function pulso() {
+            var now = Date.now(), gap = now - lastBeat; lastBeat = now;
+            PM.lag = Math.max(0, gap - 1000); if (PM.lag > PM.worst) PM.worst = PM.lag;
+            if (cfg.activo) {
+                if (now - PM.lastTick > 6000 && !busy) { PM.rescates++; try { tick(); } catch (e) {} }
+                if (busy && PM.busyAt && now - PM.busyAt > 180000) { busy = false; PM.busyAt = 0; PM.rescates++; log("🫀 Marcapasos: el ciclo del bot llevaba más de 3 minutos trabado (conexión colgada). Se destrabó y sigue trabajando.", true); }
+                if (now - (PM.wk || 0) > 5000) { PM.wk = now; try { wakeTick(); } catch (e) {} }
+                if (audioOn && !aud) audioIniciar();
+            } else if (aud) audioParar();
+            pmPintar(); manPaint();
+        }
+        try {
+            worker = new Worker(URL.createObjectURL(new Blob(["setInterval(function(){postMessage(1)},1000)"], { type: "text/javascript" })));
+            worker.onmessage = pulso;
+            worker.onerror = function () { if (!fb) fb = setInterval(pulso, 1000); };
+        } catch (e) { fb = setInterval(pulso, 1000); }
+
+        /* ---- Ajuste manual ---- */
+        function num(id) { var e = $(id); return e ? String(e.value).trim().replace(",", ".") : ""; }
+        function manLeer() {
+            var a = num("bcManLev"), b = num("bcManInv"), c = num("bcManEsp"), r = { lev: 0, inv: 0, esp: 0, err: "" };
+            if (a !== "") { r.lev = Math.round(Number(a)); if (!(r.lev >= 1 && r.lev <= 20)) r.err = "El apalancamiento debe estar entre 1 y 20."; }
+            if (b !== "") { r.inv = Number(b); if (!(r.inv > 0)) r.err = "La inversión inicial debe ser mayor que 0."; }
+            if (c !== "") { r.esp = Math.round(Number(c)); if (!(r.esp >= 5 && r.esp <= 3600)) r.err = "El tiempo debe estar entre 5 y 3600 segundos."; }
+            if (!r.err && a === "" && b === "" && c === "") r.err = "Llena al menos una casilla.";
+            return r;
+        }
+        function manResumen(lev, inv, esp) { return "apalancamiento x" + (lev || LEV) + " · inversión inicial " + (inv ? inv + " USDT" + (lev > 1 ? " (posición ≈ " + (inv * lev).toFixed(2) + " USDT)" : "") : "automática") + " · recompra con el saldo a los " + (esp || 60) + " s"; }
+        function manPrev() {
+            var e = $("bcManPrev"); if (!e) return; var r = manLeer(), L = r.lev || 0, h = "";
+            if (L > 1) h = "⚠️ Con x" + L + " una caída de ≈ " + (100 / L).toFixed(0) + " % desde la entrada liquida la posición (margen aislado). La recompra por tiempo agranda ese riesgo.";
+            if (e.__h !== h) { e.__h = h; e.textContent = h; e.style.color = "#ffc27a"; }
+        }
+        function manAviso(m, mal) { var s = $("bcManSt"); if (!s) return; s.__m = 1; s.innerHTML = '<span style="color:' + (mal ? "#ff6b78" : "#0ecb81") + '">' + m + '</span>'; }
+        function manAplicar() {
+            if (cfg.activo) { manAviso("⏹ Detén el bot (PARAR BOT) antes de cambiar el ajuste.", true); return; }
+            var r = manLeer(); if (r.err) { manAviso("✖ " + r.err, true); return; }
+            MAN.on = true; MAN.lev = r.lev; MAN.inv = r.inv; MAN.esp = r.esp; ESPERA_RECOMPRA_MS = (r.esp || 60) * 1000;
+            log("🎛 AJUSTE MANUAL aplicado (solo esta sesión) · " + manResumen(r.lev, r.inv, r.esp));
+            manAviso("✔ Aplicado. Ahora enciende el bot con RUN.", false); manSig = "";
+        }
+        function manQuitar() {
+            if (cfg.activo) { manAviso("⏹ Detén el bot (PARAR BOT) antes de cambiar el ajuste.", true); return; }
+            MAN.on = false; MAN.lev = 0; MAN.inv = 0; MAN.esp = 0; ESPERA_RECOMPRA_MS = 60000;
+            ["bcManLev", "bcManInv", "bcManEsp"].forEach(function (i) { var e = $(i); if (e) e.value = ""; });
+            log("🎛 Ajuste manual quitado: el bot vuelve a lo predeterminado."); manAviso("↩ Ajuste quitado. El bot usa lo predeterminado.", false); manSig = "";
+        }
+        var manSig = "";
+        function manPaint() {
+            var card = $("bcManCard"); if (!card) return;
+            if (!card.__b) { card.__b = 1; $("bcManOk").onclick = manAplicar; $("bcManNo").onclick = manQuitar; ["bcManLev", "bcManInv", "bcManEsp"].forEach(function (i) { $(i).oninput = manPrev; }); }
+            var act = !!cfg.activo;
+            ["bcManLev", "bcManInv", "bcManEsp", "bcManOk", "bcManNo"].forEach(function (i) { var e = $(i); if (e && e.disabled !== act) e.disabled = act; });
+            var sg = act + "|" + MAN.on + MAN.lev + "|" + MAN.inv + "|" + MAN.esp; if (sg === manSig) return; manSig = sg;
+            var s = $("bcManSt"); s.innerHTML = (act ? '<div style="color:#ffc27a">⏹ El bot está encendido: detenlo para cambiar estos datos.</div>' : "") +
+                (MAN.on ? '<div style="color:#0ecb81">✔ AJUSTE MANUAL EN USO: ' + manResumen(MAN.lev, MAN.inv, MAN.esp) + '</div>' : '<div style="color:#94a3b8">Sin ajuste manual: el bot usa su configuración predeterminada.</div>');
+        }
+    })();
     setInterval(tick, 4000);
 })();
 </script>
