@@ -19050,7 +19050,7 @@ window.CDC_FLASH=(function(){
     // archivo completo sin caer en la paradoja de "el hash contiene su
     // propio hash". No cambiar este texto.
     var _PLACEHOLDER = "%%CDC_INTEGRITY_HASH%%";
-    var _HASH_ESPERADO = "3267211926583a2a296c451abac0a75e12d1cfaf7c1cae7871697e04d6eaf6a6"; // ← se reemplaza por el hash real en el paso final
+    var _HASH_ESPERADO = "48ef4dc53b4da745044e94532169523c8d2f73215f72b17867da9f02b1ca1a3b"; // ← se reemplaza por el hash real en el paso final
 
     function _bloquear(motivo) {
         try {
@@ -22344,15 +22344,42 @@ window.CDC_TRACK=(function(){
          y el modelo le gana al azar (Brier). Nunca sube el monto ni cambia las reglas (+0.05, recompra al 25 %). */
     var MK = "cdcMotor_v1", MIN_N = 100, WIN_MS = 7200000, COOL_MS = 1800000, MAXP = 60, HMAX = 400, NF = 12, mGuard = 0, mLogBloq = {};
     var MS = (function () {
-        var d = {}; try { d = JSON.parse(localStorage.getItem(MK) || "{}") || {}; } catch (e) {}
+        var d = {}; try { d = JSON.parse(localStorage.getItem(MK) || localStorage.getItem(MK + "_bak") || "{}") || {}; } catch (e) {}
         var w = (Array.isArray(d.w) && d.w.length === NF) ? d.w.map(Number) : []; if (!w.length) for (var i = 0; i < NF; i++) w.push(0);
         return { v: 1, w: w, b: +d.b || 0, n: +d.n || 0, wins: +d.wins || 0, twSum: +d.twSum || 0, on: !!d.on,
             hist: Array.isArray(d.hist) ? d.hist : [], pend: Array.isArray(d.pend) ? d.pend : [], cool: (d.cool && typeof d.cool === "object") ? d.cool : {} };
     })();
     try { if (navigator.storage && navigator.storage.persist) navigator.storage.persist(); } catch (e) {}
+    /* 💾 MEMORIA REFORZADA v1 (Juan Pablo Ortiz Ortuño): lo que aprende el motor se guarda en 4 copias del navegador —
+       localStorage (2 claves), IndexedDB y Cache Storage— y al abrir la página se recupera la copia con MÁS aprendizaje. Si una se borra, las otras la reponen. */
+    var MDB = "cdcMotorMem_v1", MCK = "/cdc-motor-memoria.json";
+    function idbAbrir(cb) { try { var r = indexedDB.open(MDB, 1); r.onupgradeneeded = function () { try { r.result.createObjectStore("k"); } catch (e) {} }; r.onsuccess = function () { cb(r.result); }; r.onerror = function () { cb(null); }; } catch (e) { cb(null); } }
+    function idbPon(txt) { idbAbrir(function (db) { if (!db) return; try { var tx = db.transaction("k", "readwrite"); tx.objectStore("k").put(txt, "motor"); tx.oncomplete = function () { try { db.close(); } catch (e) {} }; } catch (e) {} }); }
+    function idbLee(cb) { idbAbrir(function (db) { if (!db) return cb(null); try { var rq = db.transaction("k", "readonly").objectStore("k").get("motor"); rq.onsuccess = function () { try { db.close(); } catch (e) {} cb(rq.result || null); }; rq.onerror = function () { cb(null); }; } catch (e) { cb(null); } }); }
+    function cachePon(txt) { try { if (window.caches) caches.open(MDB).then(function (c) { return c.put(MCK, new Response(txt, { headers: { "Content-Type": "application/json" } })); }).catch(function () {}); } catch (e) {} }
+    function cacheLee(cb) { try { if (!window.caches) return cb(null); caches.open(MDB).then(function (c) { return c.match(MCK); }).then(function (r) { return r ? r.text() : null; }).then(cb).catch(function () { cb(null); }); } catch (e) { cb(null); } }
     function motorGuardar() {
-        try { var t = Date.now(); Object.keys(MS.cool).forEach(function (k) { if (t - MS.cool[k] > 86400000) delete MS.cool[k]; }); localStorage.setItem(MK, JSON.stringify(MS)); } catch (e) {}
+        try { var t = Date.now(); Object.keys(MS.cool).forEach(function (k) { if (t - MS.cool[k] > 86400000) delete MS.cool[k]; });
+            var txt = JSON.stringify(MS);
+            try { localStorage.setItem(MK, txt); localStorage.setItem(MK + "_bak", txt); } catch (e) {}
+            idbPon(txt); cachePon(txt); } catch (e) {}
     }
+    function motorPuntaje(d) { return (+d.n || 0) * 1000 + (Array.isArray(d.hist) ? d.hist.length : 0); }
+    function motorParse(txt) { try { var d = JSON.parse(txt); return (d && Array.isArray(d.w) && d.w.length === NF && Array.isArray(d.hist)) ? d : null; } catch (e) { return null; } }
+    function motorRecuperar() {
+        idbLee(function (a) { cacheLee(function (b) {
+            var mejor = null, orig = "", L = [["IndexedDB", motorParse(a)], ["Cache Storage", motorParse(b)], ["copia de respaldo", motorParse((function () { try { return localStorage.getItem(MK + "_bak"); } catch (e) { return null; } })())]];
+            L.forEach(function (x) { if (x[1] && (!mejor || motorPuntaje(x[1]) > motorPuntaje(mejor))) { mejor = x[1]; orig = x[0]; } });
+            if (mejor && motorPuntaje(mejor) > motorPuntaje(MS)) {
+                MS.w = mejor.w.map(Number); MS.b = +mejor.b || 0; MS.n = +mejor.n || 0; MS.wins = +mejor.wins || 0; MS.twSum = +mejor.twSum || 0; MS.on = !!mejor.on;
+                MS.hist = mejor.hist.slice(-HMAX); MS.pend = Array.isArray(mejor.pend) ? mejor.pend : []; MS.cool = (mejor.cool && typeof mejor.cool === "object") ? mejor.cool : {};
+                log("🧠 Memoria del motor RECUPERADA desde " + orig + ": " + MS.n + " muestras (la copia principal estaba vacía o más corta)"); motorGuardar();
+            } else if (MS.n > 0 || MS.hist.length) motorGuardar();       /* reparte copias a los 4 lugares */
+        }); });
+    }
+    setTimeout(motorRecuperar, 800);
+    document.addEventListener("visibilitychange", function () { if (document.visibilityState === "hidden") motorGuardar(); });
+    window.addEventListener("pagehide", function () { motorGuardar(); });
     function mSig(z) { return 1 / (1 + Math.exp(-Math.max(-30, Math.min(30, z)))); }
     function mPred(v) { var z = MS.b; for (var i = 0; i < NF; i++) z += MS.w[i] * (+v[i] || 0); return mSig(z); }
     function mVec(r) {
