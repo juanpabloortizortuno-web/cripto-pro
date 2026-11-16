@@ -19127,7 +19127,7 @@ window.CDC_FLASH=(function(){
     // archivo completo sin caer en la paradoja de "el hash contiene su
     // propio hash". No cambiar este texto.
     var _PLACEHOLDER = "%%CDC_INTEGRITY_HASH%%";
-    var _HASH_ESPERADO = "d2fc2c60c8e890723f29830d1be60ac84252ba8114f8400d28adc92437c847e3"; // ← se reemplaza por el hash real en el paso final
+    var _HASH_ESPERADO = "a60970849afa74b1b34ded72d1855242e80bf91a465d934ec86e931cf011595b"; // ← se reemplaza por el hash real en el paso final
 
     function _bloquear(motivo) {
         try {
@@ -22248,7 +22248,7 @@ window.CDC_TRACK=(function(){
         var det = "caída " + caida.toFixed(1) + " % · " + base;
         if (caida >= F.minCaida) {
             if (qb) return { ok: true, motivo: "QUIEBRE GRANDE tras caída de " + caida.toFixed(1) + " % (vela +" + qb.pct.toFixed(2) + " %, cuerpo ×" + qb.cuerpoX.toFixed(1) + ", volumen ×" + qb.volX.toFixed(1) + ") · " + base, caida: caida, quiebre: true };
-            return { ok: false, motivo: "cascada " + caida.toFixed(1) + " % ≥ " + F.minCaida + " %: puede seguir cayendo, espera un quiebre grande que la frene · " + base, caida: caida };
+            return { ok: false, motivo: "cascada " + caida.toFixed(1) + " % ≥ " + F.minCaida + " %: puede seguir cayendo, espera un quiebre grande que la frene · " + base, caida: caida, cascada: true, minL: minL };
         }
         if (px < a7) return { ok: true, motivo: "caída " + caida.toFixed(1) + " % (< " + F.minCaida + " %) · amarilla rápida debajo de la lenta · " + base, caida: caida, quiebre: false };
         if (qb) return { ok: true, motivo: "quiebre tras caída de " + caida.toFixed(1) + " % · " + base, caida: caida, quiebre: true };
@@ -22266,7 +22266,12 @@ window.CDC_TRACK=(function(){
         var r;
         if (!k || k.length < 3) r = { ok: false, espera: true, motivo: "sin velas de 1 min (red o límite de Binance)" };
         else r = evaluarVelas(k.slice(0, -1), parseFloat(k[k.length - 1][4]), F);     /* la última vela aún se está formando */
-        if (r && r.ok && !r.quiebre && F.freno !== false) {      /* Juan Pablo: solo se compra si la caída YA frenó; si sigue cayendo no se compra */
+        if (r && !r.ok && r.cascada && F.freno !== false && k && k.length > 20) {   /* CASCADA grande: antes solo entraba con un quiebre enorme; ahora también si la caída YA FRENÓ y hay rebote */
+            var fc = frenoVelas(k.slice(0, -1)), pxn = parseFloat(k[k.length - 1][4]);
+            if (fc.ok && pxn >= r.minL * 1.003) r = { ok: true, motivo: "CASCADA " + r.caida.toFixed(1) + " % pero la caída FRENÓ (" + fc.motivo + ", " + ((pxn / r.minL - 1) * 100).toFixed(2) + " % sobre el mínimo) · " + r.motivo.split(" · ").slice(1).join(" · "), caida: r.caida, quiebre: false, frenoOk: true };
+            else r.motivo = "cascada " + r.caida.toFixed(1) + " %: " + (fc.ok ? "aún sin rebote (" + ((pxn / r.minL - 1) * 100).toFixed(2) + " % sobre el mínimo, pide 0.3 %)" : "sigue cayendo (" + fc.motivo + ")") + " · " + r.motivo.split(" · ").slice(1).join(" · ");
+        }
+        if (r && r.ok && !r.quiebre && !r.frenoOk && F.freno !== false) {      /* Juan Pablo: solo se compra si la caída YA frenó; si sigue cayendo no se compra */
             var fz = frenoVelas(k.slice(0, -1));
             if (!fz.ok) r = { ok: false, motivo: "SIGUE CAYENDO (" + fz.motivo + ") · no se compra hasta que frene · " + r.motivo, caida: r.caida };
             else r.motivo = "FRENÓ la caída (" + fz.motivo + ") · " + r.motivo;
