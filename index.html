@@ -19127,7 +19127,7 @@ window.CDC_FLASH=(function(){
     // archivo completo sin caer en la paradoja de "el hash contiene su
     // propio hash". No cambiar este texto.
     var _PLACEHOLDER = "%%CDC_INTEGRITY_HASH%%";
-    var _HASH_ESPERADO = "7ff17f1566081890ba8f56946912fb476ddc3f12868ffbcff616be18b491868a"; // ← se reemplaza por el hash real en el paso final
+    var _HASH_ESPERADO = "d2fc2c60c8e890723f29830d1be60ac84252ba8114f8400d28adc92437c847e3"; // ← se reemplaza por el hash real en el paso final
 
     function _bloquear(motivo) {
         try {
@@ -22142,17 +22142,17 @@ window.CDC_TRACK=(function(){
     async function caidaFrenada(sym) {
         if (window.__cdcApiLim && Date.now() < window.__cdcApiLim.until) return { ok: false, motivo: "Binance limita las llamadas" };
         var k = null; try { k = await obtenerKlines(sym, "1m", 30); } catch (e) {}
-        if (!k || k.length < 15) return { ok: false, motivo: "sin velas de 1 min" };
+        if (!k || k.length < 13) return { ok: false, motivo: "sin velas de 1 min" };
         return frenoVelas(k.slice(0, -1));
     }
     /* Freno de caída (velas de 1 min CERRADAS): los últimos 3 min no hacen mínimo nuevo vs. los 10 anteriores y la última vela no es roja fuerte */
     function frenoVelas(c) {
-        var n = c.length; if (n < 14) return { ok: false, motivo: "pocas velas" };
-        var lowRec = Math.min.apply(null, c.slice(n - 3).map(function (x) { return +x[3]; }));
-        var lowPrev = Math.min.apply(null, c.slice(n - 13, n - 3).map(function (x) { return +x[3]; }));
+        var n = c.length; if (n < 12) return { ok: false, motivo: "pocas velas" };
+        var lowRec = Math.min.apply(null, c.slice(n - 2).map(function (x) { return +x[3]; }));          /* últimos 2 min */
+        var lowPrev = Math.min.apply(null, c.slice(n - 9, n - 2).map(function (x) { return +x[3]; }));  /* 7 min anteriores */
         var u = c[n - 1], uo = +u[1], uc = +u[4];
-        var sinMin = lowRec >= lowPrev * 0.9995, noRoja = uc >= uo * 0.998;
-        if (sinMin && noRoja) return { ok: true, motivo: "sin mínimo nuevo en 3 min" };
+        var sinMin = lowRec >= lowPrev * 0.998, noRoja = uc >= uo * 0.996;   /* tolerancia 0.2 % en el mínimo y 0.4 % en la última vela */
+        if (sinMin && noRoja) return { ok: true, motivo: "sin mínimo nuevo en 2 min" };
         return { ok: false, motivo: !sinMin ? "sigue haciendo mínimos nuevos" : "última vela roja fuerte" };
     }
     async function gestionar() {
