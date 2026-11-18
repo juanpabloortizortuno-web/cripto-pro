@@ -1,0 +1,4 @@
+User-agent: *
+Allow: /
+
+Sitemap: https://juanpabloortizortuno-web.github.io/cripto-pro/sitemap.xml
